@@ -1,0 +1,494 @@
+<!-- Full-screen Leaflet map container -->
+<div id="map" class="absolute inset-0 z-0"></div>
+
+<!-- Pending Approval Banner -->
+@if (isPendingProvider()) {
+  <div class="absolute top-4 left-1/2 -translate-x-1/2 z-[1000] w-[calc(100%-2rem)] max-w-md
+              bg-amber-50/95 backdrop-blur-sm border border-amber-200 rounded-2xl px-4 py-3 shadow-lg
+              flex items-center gap-3 text-sm text-amber-800 font-medium animate-[slideDown_0.4s_ease-out]">
+    <span class="text-lg leading-none">&#9203;</span>
+    <span>Your sitter profile is pending admin approval.</span>
+  </div>
+}
+
+<!-- Loading indicator -->
+@if (isLoadingPins()) {
+  <div class="absolute top-20 left-1/2 -translate-x-1/2 z-[1000]
+              bg-white/90 backdrop-blur-sm rounded-full px-4 py-2 shadow-lg
+              flex items-center gap-2 text-sm text-gray-700">
+    <div class="w-4 h-4 border-2 border-violet-500 border-t-transparent rounded-full animate-spin"></div>
+    Searching nearby...
+  </div>
+}
+
+<!-- Filter Bar (always visible) -->
+<div class="filter-bar">
+  <div class="flex items-center justify-between">
+    <div class="filter-label">
+      <svg class="w-4 h-4 text-violet-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
+      </svg>
+      <span class="text-xs font-semibold text-gray-600 uppercase tracking-wide">Find a sitter</span>
+    </div>
+    <div class="flex items-center gap-2">
+      @if (isFilterActive()) {
+        <button (click)="clearFilter()" class="text-xs text-gray-500 hover:text-gray-700 font-medium">
+          Clear all
+        </button>
+      }
+      <button
+        (click)="toggleFilterPanel()"
+        class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors"
+        [class]="showFilterPanel() ? 'bg-violet-100 text-violet-700' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'">
+        <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+        </svg>
+        Filters
+        @if (activeFilterCount() > 0) {
+          <span class="bg-violet-600 text-white w-4 h-4 rounded-full flex items-center justify-center text-[10px] leading-none">
+            {{ activeFilterCount() }}
+          </span>
+        }
+      </button>
+    </div>
+  </div>
+
+  <!-- Availability toggle inline for approved providers -->
+  @if (isApprovedProvider()) {
+    <div class="mt-2 pt-2 border-t border-gray-100 flex justify-center">
+      <button
+        (click)="toggleAvailability()"
+        [disabled]="togglingAvailability()"
+        class="flex items-center gap-2 px-4 py-1.5 rounded-full
+               font-semibold text-xs transition-all duration-300 border-2"
+        [class]="isAvailable()
+          ? 'bg-green-500/95 text-white border-green-400 hover:bg-green-600'
+          : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'"
+      >
+        <span
+          class="w-2.5 h-2.5 rounded-full transition-colors duration-300"
+          [class]="isAvailable() ? 'bg-white' : 'bg-gray-400'"
+        ></span>
+        {{ togglingAvailability() ? 'Updating...' : (isAvailable() ? 'I am Available' : 'Go Online') }}
+      </button>
+    </div>
+  }
+
+  @if (showFilterPanel()) {
+    <div class="mt-3 space-y-3 border-t border-gray-200 pt-3">
+      <!-- Date/Time row -->
+      <div>
+        <label class="text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-1 block">Available on</label>
+        <div class="flex gap-2">
+          <input type="date" [value]="filterDate()" (input)="filterDate.set($any($event.target).value)" class="filter-input flex-1" />
+          <input type="time" [value]="filterTime()" (input)="filterTime.set($any($event.target).value)" class="filter-input flex-1" />
+        </div>
+      </div>
+
+      <!-- Service Type -->
+      <div>
+        <label class="text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-1 block">Service Type</label>
+        <div class="flex flex-wrap gap-1.5">
+          <button
+            (click)="filterServiceType.set('')"
+            class="px-2.5 py-1 rounded-full text-xs font-medium transition-colors"
+            [class]="!filterServiceType() ? 'bg-violet-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'">
+            All
+          </button>
+          @for (svc of serviceTypes(); track svc) {
+            <button
+              (click)="filterServiceType.set(svc)"
+              class="px-2.5 py-1 rounded-full text-xs font-medium transition-colors"
+              [class]="filterServiceType() === svc ? 'bg-violet-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'">
+              {{ svc }}
+            </button>
+          }
+        </div>
+      </div>
+
+      <!-- Rating + Rate + Radius -->
+      <div class="grid grid-cols-3 gap-2">
+        <div>
+          <label class="text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-1 block">Min Rating</label>
+          <select
+            [value]="filterMinRating() ?? ''"
+            (change)="setMinRating($any($event.target).value)"
+            class="filter-input w-full text-xs">
+            <option value="">Any</option>
+            <option value="3">3+</option>
+            <option value="3.5">3.5+</option>
+            <option value="4">4+</option>
+            <option value="4.5">4.5+</option>
+          </select>
+        </div>
+        <div>
+          <label class="text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-1 block">Max Rate</label>
+          <input type="number" placeholder="₪/hr" min="0" step="10"
+            [value]="filterMaxRate() ?? ''"
+            (input)="setMaxRate($any($event.target).value)"
+            class="filter-input w-full text-xs" />
+        </div>
+        <div>
+          <label class="text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-1 block">Distance</label>
+          <select
+            [value]="filterRadiusKm() ?? ''"
+            (change)="setRadiusKm($any($event.target).value)"
+            class="filter-input w-full text-xs">
+            <option value="">Any</option>
+            <option value="1">1 km</option>
+            <option value="3">3 km</option>
+            <option value="5">5 km</option>
+            <option value="10">10 km</option>
+            <option value="25">25 km</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Apply button -->
+      <button
+        (click)="applyFilter()"
+        [disabled]="isLoadingPins()"
+        class="w-full filter-btn filter-btn-search py-2">
+        Apply Filters
+      </button>
+    </div>
+  }
+</div>
+
+<!-- Bottom Sheet Overlay -->
+<div
+  class="fixed inset-0 z-[1000] transition-opacity duration-300"
+  [class.pointer-events-none]="!isSheetOpen()"
+  [class.opacity-0]="!isSheetOpen()">
+
+  <!-- Backdrop -->
+  <div
+    class="absolute inset-0 bg-black/30 backdrop-blur-[2px]"
+    (click)="closeSheet()">
+  </div>
+
+  <!-- Sheet Panel -->
+  <div
+    class="absolute bottom-0 left-0 right-0
+           bg-white rounded-t-3xl shadow-2xl
+           transition-transform duration-300 ease-out
+           max-h-[70vh] overflow-y-auto"
+    [class.translate-y-full]="!isSheetOpen()"
+    [class.translate-y-0]="isSheetOpen()">
+
+    <!-- Drag Handle -->
+    <div class="flex justify-center pt-3 pb-2">
+      <div class="w-10 h-1.5 bg-gray-300 rounded-full"></div>
+    </div>
+
+    @if (selectedPin(); as pin) {
+      <div class="px-5 pb-6">
+        <!-- Provider Header -->
+        <div class="flex items-center gap-4 mb-4">
+          <div class="w-14 h-14 rounded-full bg-violet-100 flex items-center justify-center
+                      text-2xl shrink-0 overflow-hidden ring-2 ring-violet-200">
+            @if (pin.profileImageUrl) {
+              <img [src]="pin.profileImageUrl" alt="{{ pin.name }}"
+                   class="w-full h-full object-cover" />
+            } @else {
+              🐾
+            }
+          </div>
+          <div class="min-w-0">
+            <h2 class="text-lg font-bold text-gray-900 truncate">
+              {{ pin.name }}
+            </h2>
+            <p class="text-sm text-violet-600 font-medium">
+              {{ pin.services }}
+            </p>
+            @if (pin.reviewCount > 0) {
+              <div class="flex items-center gap-1.5 mt-1">
+                <span class="text-amber-500 text-sm">
+                  @for (s of [1,2,3,4,5]; track s) {
+                    <span [class]="s <= (pin.averageRating ?? 0) ? 'opacity-100' : 'opacity-25'">&#9733;</span>
+                  }
+                </span>
+                <span class="text-xs font-semibold text-gray-700">{{ pin.averageRating }}</span>
+                <span class="text-xs text-gray-400">({{ pin.reviewCount }})</span>
+              </div>
+            }
+          </div>
+        </div>
+
+        <!-- Info Card -->
+        <div class="bg-gray-50 rounded-2xl p-4 mb-4">
+          <div class="flex items-center justify-between">
+            <div>
+              <p class="text-xs text-gray-500 uppercase tracking-wide font-medium">Hourly Rate</p>
+              <p class="text-2xl font-bold text-gray-900 mt-0.5">
+                ₪{{ pin.hourlyRate }}
+              </p>
+            </div>
+            <div class="text-right">
+              <p class="text-xs text-gray-500 uppercase tracking-wide font-medium">Services</p>
+              <p class="text-sm text-gray-700 mt-0.5">
+                {{ pin.services }}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Reviews Section -->
+        <div class="mb-4">
+          <h3 class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Reviews</h3>
+
+          @if (loadingReviews()) {
+            <div class="flex items-center gap-2 py-4 justify-center text-sm text-gray-400">
+              <div class="w-4 h-4 border-2 border-violet-400 border-t-transparent rounded-full animate-spin"></div>
+              Loading reviews...
+            </div>
+          } @else if (providerReviews().length === 0) {
+            <p class="text-sm text-gray-400 text-center py-3">No reviews yet</p>
+          } @else {
+            <div class="space-y-2.5 max-h-52 overflow-y-auto pr-1">
+              @for (review of providerReviews(); track review.id) {
+                <div class="bg-gray-50 rounded-xl p-3">
+                  <div class="flex items-center justify-between mb-1.5">
+                    <div class="flex items-center gap-2 min-w-0">
+                      <span class="font-medium text-sm text-gray-800 truncate">{{ review.reviewerName }}</span>
+                      @if (review.isVerified) {
+                        <span class="shrink-0 inline-flex items-center gap-0.5 bg-emerald-50 text-emerald-700
+                                     text-[10px] font-semibold px-1.5 py-0.5 rounded-full border border-emerald-200">
+                          <svg class="w-2.5 h-2.5" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
+                          </svg>
+                          Verified
+                        </span>
+                      }
+                    </div>
+                    <span class="text-[10px] text-gray-400 shrink-0">{{ review.createdAt | date:'mediumDate' }}</span>
+                  </div>
+
+                  <!-- Stars row -->
+                  <div class="flex items-center gap-2 mb-1">
+                    <span class="text-amber-500 text-xs">
+                      @for (s of [1,2,3,4,5]; track s) {
+                        <span [class]="s <= review.rating ? 'opacity-100' : 'opacity-25'">&#9733;</span>
+                      }
+                    </span>
+                    @if (review.communicationRating || review.reliabilityRating) {
+                      <span class="text-[10px] text-gray-400">
+                        @if (review.communicationRating) {
+                          Comm {{ review.communicationRating }}/5
+                        }
+                        @if (review.communicationRating && review.reliabilityRating) {
+                          ·
+                        }
+                        @if (review.reliabilityRating) {
+                          Reliability {{ review.reliabilityRating }}/5
+                        }
+                      </span>
+                    }
+                  </div>
+
+                  @if (review.comment) {
+                    <p class="text-xs text-gray-600 leading-relaxed">{{ review.comment }}</p>
+                  }
+                </div>
+              }
+            </div>
+          }
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="flex gap-2">
+          <button
+            (click)="openRequestModal()"
+            class="flex-1 flex items-center justify-center gap-2
+                   bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800
+                   text-white font-semibold rounded-xl py-3.5 px-4
+                   transition-colors duration-150 text-sm">
+            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+            </svg>
+            Book
+          </button>
+          <button
+            (click)="viewProviderProfile(pin.providerId)"
+            class="flex items-center justify-center gap-1.5
+                   bg-violet-50 hover:bg-violet-100 active:bg-violet-200
+                   text-violet-700 font-semibold rounded-xl py-3.5 px-4
+                   transition-colors duration-150 text-sm">
+            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+            </svg>
+            Profile
+          </button>
+          <button
+            (click)="closeSheet()"
+            class="flex items-center justify-center
+                   bg-gray-100 hover:bg-gray-200 active:bg-gray-300
+                   text-gray-700 font-semibold rounded-xl py-3.5 px-4
+                   transition-colors duration-150 text-sm">
+            Close
+          </button>
+        </div>
+      </div>
+    }
+  </div>
+</div>
+
+<!-- Booking Modal -->
+<div
+  class="fixed inset-0 z-[2000] flex items-end sm:items-center justify-center transition-opacity duration-200"
+  [class.pointer-events-none]="!isRequestModalOpen()"
+  [class.opacity-0]="!isRequestModalOpen()">
+
+  <div class="absolute inset-0 bg-black/40 backdrop-blur-[2px]" (click)="closeRequestModal()"></div>
+
+  <div class="relative bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full sm:w-[calc(100%-2rem)] sm:max-w-md p-6 z-10
+              max-h-[90vh] overflow-y-auto transition-all duration-200"
+       [class.translate-y-full]="!isRequestModalOpen()"
+       [class.translate-y-0]="isRequestModalOpen()">
+
+    <h3 class="text-lg font-bold text-gray-900 mb-1">Book a Service</h3>
+    @if (selectedPin(); as pin) {
+      <p class="text-sm text-gray-500 mb-4">With <span class="font-medium text-violet-600">{{ pin.name }}</span> · ₪{{ pin.hourlyRate }}/hr</p>
+    }
+
+    @if (loadingPets()) {
+      <div class="flex items-center justify-center py-8 gap-2 text-sm text-gray-500">
+        <div class="w-4 h-4 border-2 border-violet-500 border-t-transparent rounded-full animate-spin"></div>
+        Loading your pets...
+      </div>
+    } @else if (pets().length === 0) {
+      <div class="text-center py-6">
+        <p class="text-gray-500 text-sm mb-3">You don't have any pets yet.</p>
+        <a href="/my-pets" class="text-indigo-600 font-medium text-sm hover:underline">Add a pet first</a>
+      </div>
+    } @else {
+      <!-- Pet Selector -->
+      <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Your Pet</label>
+      <div class="space-y-2 mb-4 max-h-36 overflow-y-auto">
+        @for (pet of pets(); track pet.id) {
+          <label
+            class="flex items-center gap-3 p-2.5 rounded-xl border-2 cursor-pointer transition-all duration-150"
+            [class]="selectedPetId() === pet.id
+              ? 'border-indigo-500 bg-indigo-50'
+              : 'border-gray-200 hover:border-gray-300 bg-white'">
+            <input
+              type="radio"
+              name="pet"
+              [value]="pet.id"
+              [checked]="selectedPetId() === pet.id"
+              (change)="selectedPetId.set(pet.id)"
+              class="sr-only" />
+            <span class="text-lg">{{ pet.species === 'Dog' ? '🐕' : pet.species === 'Cat' ? '🐈' : '🐾' }}</span>
+            <div class="min-w-0 flex-1">
+              <p class="font-medium text-gray-900 text-sm truncate">{{ pet.name }}</p>
+              <p class="text-xs text-gray-500">{{ pet.species }} · {{ pet.age }}y</p>
+            </div>
+            @if (selectedPetId() === pet.id) {
+              <svg class="w-5 h-5 text-indigo-600 shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
+              </svg>
+            }
+          </label>
+        }
+      </div>
+
+      <!-- Date & Time -->
+      <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">When</label>
+      <div class="space-y-3 mb-4">
+        <input
+          type="date"
+          [value]="bookingDate()"
+          (input)="bookingDate.set($any($event.target).value)"
+          class="w-full rounded-xl border-2 border-gray-200 px-4 py-2.5 text-sm text-gray-900
+                 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 outline-none transition" />
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs text-gray-500 mb-1">Start</label>
+            <input
+              type="time"
+              [value]="bookingStartTime()"
+              (input)="bookingStartTime.set($any($event.target).value)"
+              class="w-full rounded-xl border-2 border-gray-200 px-4 py-2.5 text-sm text-gray-900
+                     focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 outline-none transition" />
+          </div>
+          <div>
+            <label class="block text-xs text-gray-500 mb-1">End</label>
+            <input
+              type="time"
+              [value]="bookingEndTime()"
+              (input)="bookingEndTime.set($any($event.target).value)"
+              class="w-full rounded-xl border-2 border-gray-200 px-4 py-2.5 text-sm text-gray-900
+                     focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 outline-none transition" />
+          </div>
+        </div>
+      </div>
+
+      <!-- Notes -->
+      <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Notes (optional)</label>
+      <textarea
+        rows="2"
+        [value]="bookingNotes()"
+        (input)="bookingNotes.set($any($event.target).value)"
+        placeholder="Any special instructions for the sitter..."
+        class="w-full rounded-xl border-2 border-gray-200 px-4 py-2.5 text-sm text-gray-900 placeholder-gray-400
+               focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 outline-none transition resize-none mb-4">
+      </textarea>
+
+      <!-- Share Medical Records -->
+      <label class="flex items-center gap-3 bg-blue-50 rounded-xl px-4 py-3 mb-4 cursor-pointer select-none">
+        <input
+          type="checkbox"
+          [checked]="shareMedicalRecords()"
+          (change)="shareMedicalRecords.set($any($event.target).checked)"
+          class="w-4 h-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" />
+        <div class="min-w-0 flex-1">
+          <span class="text-sm font-medium text-gray-800">Share health records</span>
+          <p class="text-xs text-gray-500 mt-0.5">Allow the provider to view your pet's medical records for this booking</p>
+        </div>
+        <svg class="w-5 h-5 text-blue-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+        </svg>
+      </label>
+
+      <!-- Price Preview -->
+      @if (estimatedPrice(); as price) {
+        <div class="bg-indigo-50 rounded-xl p-3.5 mb-4 flex items-center justify-between">
+          <div class="text-sm text-gray-600">
+            {{ price.hours }}h × ₪{{ price.rate }}/hr
+          </div>
+          <div class="text-lg font-bold text-indigo-700">
+            ₪{{ price.total }}
+          </div>
+        </div>
+      }
+
+      <!-- Actions -->
+      <div class="flex gap-3">
+        <button
+          (click)="sendRequest()"
+          [disabled]="!canBook()"
+          class="flex-1 flex items-center justify-center gap-2
+                 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800
+                 disabled:opacity-50 disabled:cursor-not-allowed
+                 text-white font-semibold rounded-xl py-3 px-4
+                 transition-colors duration-150 text-sm">
+          @if (sendingRequest()) {
+            <div class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+            Booking...
+          } @else {
+            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+            </svg>
+            Book Now
+          }
+        </button>
+        <button
+          (click)="closeRequestModal()"
+          class="bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold rounded-xl py-3 px-5
+                 transition-colors duration-150 text-sm">
+          Cancel
+        </button>
+      </div>
+    }
+  </div>
+</div>

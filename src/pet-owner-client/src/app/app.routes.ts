@@ -1,0 +1,123 @@
+import { Routes } from '@angular/router';
+import { authGuard } from './guards/auth.guard';
+import { roleGuard } from './guards/role.guard';
+
+export const routes: Routes = [
+  {
+    path: 'login',
+    loadComponent: () =>
+      import('./features/login/login.component').then(
+        (m) => m.LoginComponent
+      ),
+  },
+  {
+    path: '',
+    loadComponent: () =>
+      import('./features/map-dashboard/map-dashboard.component').then(
+        (m) => m.MapDashboardComponent
+      ),
+  },
+  {
+    path: 'become-a-sitter',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./features/wizard/wizard.component').then(
+        (m) => m.WizardComponent
+      ),
+  },
+  {
+    path: 'edit-profile',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./features/edit-profile/edit-profile.component').then(
+        (m) => m.EditProfileComponent
+      ),
+  },
+  {
+    path: 'my-pets',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./features/my-pets/my-pets.component').then(
+        (m) => m.MyPetsComponent
+      ),
+  },
+  {
+    path: 'requests',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./features/requests/requests.component').then(
+        (m) => m.RequestsComponent
+      ),
+  },
+  {
+    path: 'earnings',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./features/earnings/earnings.component').then(
+        (m) => m.EarningsComponent
+      ),
+  },
+  {
+    path: 'activity',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./features/pet-activity/pet-activity.component').then(
+        (m) => m.PetActivityComponent
+      ),
+  },
+  {
+    path: 'fitness',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./features/fitness-dashboard/fitness-dashboard.component').then(
+        (m) => m.FitnessDashboardComponent
+      ),
+  },
+  {
+    path: 'teletriage',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./features/teletriage/teletriage.component').then(
+        (m) => m.TeletriageComponent
+      ),
+  },
+  {
+    path: 'community',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./features/social-feed/social-feed.component').then(
+        (m) => m.SocialFeedComponent
+      ),
+  },
+  {
+    path: 'messages',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./features/messaging/messaging.component').then(
+        (m) => m.MessagingComponent
+      ),
+  },
+  {
+    path: 'provider-dashboard',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./features/provider-dashboard/provider-dashboard.component').then(
+        (m) => m.ProviderDashboardComponent
+      ),
+  },
+  {
+    path: 'provider/:id',
+    loadComponent: () =>
+      import('./features/provider-profile/provider-profile.component').then(
+        (m) => m.ProviderProfileComponent
+      ),
+  },
+  {
+    path: 'admin',
+    canActivate: [roleGuard('Admin')],
+    loadComponent: () =>
+      import('./features/admin-dashboard/admin-dashboard.component').then(
+        (m) => m.AdminDashboardComponent
+      ),
+  },
+];

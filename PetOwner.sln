@@ -1,0 +1,34 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{DD7C37C3-566B-47DD-9230-9A2770228918}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PetOwner.Data", "src\PetOwner.Data\PetOwner.Data.csproj", "{FE341FCC-3225-4BE3-8244-56AE3CD452A0}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PetOwner.Api", "src\PetOwner.Api\PetOwner.Api.csproj", "{DB1AA111-B185-4BC4-93D1-57460E01E90E}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{FE341FCC-3225-4BE3-8244-56AE3CD452A0}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{FE341FCC-3225-4BE3-8244-56AE3CD452A0}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{FE341FCC-3225-4BE3-8244-56AE3CD452A0}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{FE341FCC-3225-4BE3-8244-56AE3CD452A0}.Release|Any CPU.Build.0 = Release|Any CPU
+		{DB1AA111-B185-4BC4-93D1-57460E01E90E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{DB1AA111-B185-4BC4-93D1-57460E01E90E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{DB1AA111-B185-4BC4-93D1-57460E01E90E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{DB1AA111-B185-4BC4-93D1-57460E01E90E}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{FE341FCC-3225-4BE3-8244-56AE3CD452A0} = {DD7C37C3-566B-47DD-9230-9A2770228918}
+		{DB1AA111-B185-4BC4-93D1-57460E01E90E} = {DD7C37C3-566B-47DD-9230-9A2770228918}
+	EndGlobalSection
+EndGlobal

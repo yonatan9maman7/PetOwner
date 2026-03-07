@@ -1,0 +1,114 @@
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using PetOwner.Api.DTOs;
+using PetOwner.Api.Services;
+using PetOwner.Data;
+
+namespace PetOwner.Api.Controllers;
+
+[ApiController]
+[Route("api/map")]
+public class MapController : ControllerBase
+{
+    private readonly IMapService _mapService;
+    private readonly ApplicationDbContext _db;
+
+    public MapController(IMapService mapService, ApplicationDbContext db)
+    {
+        _mapService = mapService;
+        _db = db;
+    }
+
+    [HttpGet("pins")]
+    public async Task<IActionResult> GetPins(
+        [FromQuery] DateTime? requestedTime,
+        [FromQuery] string? serviceType,
+        [FromQuery] double? minRating,
+        [FromQuery] decimal? maxRate,
+        [FromQuery] double? radiusKm,
+        [FromQuery] double? latitude,
+        [FromQuery] double? longitude)
+    {
+        var filter = new MapSearchFilter(
+            requestedTime, serviceType, minRating, maxRate, radiusKm, latitude, longitude);
+        var pins = await _mapService.SearchProvidersAsync(filter);
+        return Ok(pins);
+    }
+
+    [HttpGet("service-types")]
+    public async Task<IActionResult> GetServiceTypes()
+    {
+        var types = await _db.Services
+            .AsNoTracking()
+            .OrderBy(s => s.Name)
+            .Select(s => s.Name)
+            .ToListAsync();
+        return Ok(types);
+    }
+
+    [HttpGet("~/api/providers/{providerId:guid}/profile")]
+    public async Task<IActionResult> GetProviderProfile(Guid providerId)
+    {
+        var provider = await _db.Users
+            .AsNoTracking()
+            .Where(u => u.Id == providerId && u.ProviderProfile != null && u.ProviderProfile.Status == "Approved")
+            .Select(u => new ProviderPublicProfileDto(
+                u.Id,
+                u.Name,
+                u.ProviderProfile!.Bio,
+                u.ProviderProfile.ProfileImageUrl,
+                u.ProviderProfile.HourlyRate,
+                u.ProviderProfile.AverageRating,
+                u.ProviderProfile.ReviewCount,
+                u.ProviderProfile.IsAvailableNow,
+                u.ProviderProfile.AcceptsOffHoursRequests,
+                u.ProviderProfile.ProviderServices.Select(ps => ps.Service.Name).ToList(),
+                u.ProviderProfile.AvailabilitySlots
+                    .OrderBy(a => a.DayOfWeek).ThenBy(a => a.StartTime)
+                    .Select(a => new PublicAvailabilitySlotDto(
+                        a.DayOfWeek,
+                        a.StartTime.ToString(@"hh\:mm"),
+                        a.EndTime.ToString(@"hh\:mm")))
+                    .ToList(),
+                u.ReviewsReceived
+                    .OrderByDescending(r => r.CreatedAt)
+                    .Take(10)
+                    .Select(r => new ReviewDto(
+                        r.Id,
+                        r.ServiceRequestId,
+                        r.ReviewerId,
+                        r.Reviewer.Name,
+                        r.RevieweeId,
+                        r.Rating,
+                        r.Comment,
+                        r.IsVerified,
+                        r.CommunicationRating,
+                        r.ReliabilityRating,
+                        r.PhotoUrl,
+                        r.CreatedAt))
+                    .ToList()))
+            .FirstOrDefaultAsync();
+
+        if (provider is null)
+            return NotFound(new { message = "Provider not found." });
+
+        return Ok(provider);
+    }
+
+    [Authorize]
+    [HttpGet("~/api/providers/{providerId:guid}/contact")]
+    public async Task<IActionResult> GetProviderContact(Guid providerId)
+    {
+        var phone = await _db.Users
+            .AsNoTracking()
+            .Where(u => u.Id == providerId && u.ProviderProfile != null && u.ProviderProfile.Status == "Approved")
+            .Select(u => u.Phone)
+            .FirstOrDefaultAsync();
+
+        if (phone is null)
+            return NotFound(new { message = "Provider contact not found." });
+
+        return Ok(new ContactDto(phone));
+    }
+}
