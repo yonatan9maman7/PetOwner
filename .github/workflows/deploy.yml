@@ -1,0 +1,48 @@
+name: Build & Deploy to Azure
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: src/pet-owner-client/package-lock.json
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.x
+
+      - name: Install Angular dependencies
+        working-directory: src/pet-owner-client
+        run: npm ci
+
+      - name: Build Angular (production)
+        working-directory: src/pet-owner-client
+        run: npx ng build --configuration production
+
+      - name: Publish .NET API
+        run: dotnet publish src/PetOwner.Api/PetOwner.Api.csproj -c Release -o ./publish
+
+      - name: Copy Angular output into .NET wwwroot
+        run: |
+          mkdir -p ./publish/wwwroot
+          cp -r src/pet-owner-client/dist/pet-owner-client/browser/* ./publish/wwwroot/
+
+      - name: Deploy to Azure App Service
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: petowner-app
+          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
+          package: ./publish
