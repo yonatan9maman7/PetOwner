@@ -14,7 +14,7 @@ export interface JwtPayload {
   sub: string;
   name: string;
   exp: number;
-  role?: string;
+  role?: string | string[];
   [key: string]: unknown;
 }
 
@@ -45,6 +45,19 @@ export class AuthService {
   readonly userId = computed(() => this.currentUser$()?.userId ?? null);
   readonly userRole = computed(() => this.currentUser$()?.role ?? null);
   readonly userName = computed(() => this.decoded()?.name ?? null);
+
+  readonly roles = computed<string[]>(() => {
+    const payload = this.decoded();
+    if (!payload || this.isExpired()) return [];
+    const raw = payload.role ?? payload[ROLE_CLAIM_URI];
+    if (Array.isArray(raw)) return raw as string[];
+    if (typeof raw === 'string' && raw.length > 0) return [raw];
+    return [];
+  });
+
+  hasRole(role: string): boolean {
+    return this.roles().includes(role);
+  }
 
   private readonly decoded = computed<JwtPayload | null>(() => {
     const token = this.tokenSignal();

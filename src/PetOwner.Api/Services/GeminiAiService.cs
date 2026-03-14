@@ -11,6 +11,13 @@ public class GeminiAiService : IGeminiAiService
     private const string GeminiEndpoint =
         "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent";
 
+    private const string LanguageMirrorDirective =
+        "CRITICAL INSTRUCTION: You must analyze the language of the user's input information. " +
+        "Your entire response MUST be generated in the EXACT SAME LANGUAGE as the user's input. " +
+        "For example, if the input is in Hebrew, you must reply entirely in Hebrew. " +
+        "If the input is in English, you must reply entirely in English. " +
+        "Do not mix languages unless absolutely necessary for specific terms.";
+
     public GeminiAiService(HttpClient httpClient, IConfiguration configuration, ILogger<GeminiAiService> logger)
     {
         _httpClient = httpClient;
@@ -73,8 +80,9 @@ public class GeminiAiService : IGeminiAiService
             var prompt =
                 "You are an expert copywriter for a premium pet-care platform. " +
                 "The user will give you rough notes about their experience with pets. " +
-                "Write a warm, trustworthy, and professional 3-sentence bio in Hebrew. " +
+                "Write a warm, trustworthy, and professional 3-sentence bio. " +
                 "Keep it engaging but under 100 words.\n\n" +
+                $"{LanguageMirrorDirective}\n\n" +
                 baseInfo;
 
             var parts = new List<object> { new { text = prompt } };
@@ -95,7 +103,8 @@ public class GeminiAiService : IGeminiAiService
             return string.Empty;
         }
 
-        var parts = new List<object> { new { text = prompt } };
+        var fullPrompt = $"{LanguageMirrorDirective}\n\n{prompt}";
+        var parts = new List<object> { new { text = fullPrompt } };
         return await CallGeminiApi(parts);
     }
 
@@ -138,6 +147,7 @@ public class GeminiAiService : IGeminiAiService
     }
 
     private static string BuildTeletriageSystemPrompt(bool hasImage) =>
+        LanguageMirrorDirective + "\n\n" +
         """
         You are a veterinary teletriage assistant. Your role is to provide a preliminary health assessment for pets based on symptoms described by their owner. You are NOT a replacement for a veterinarian.
 

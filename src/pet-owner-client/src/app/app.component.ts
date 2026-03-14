@@ -61,8 +61,13 @@ export class AppComponent {
       this.notificationService.loadNotifications().subscribe({
         next: (list) => this.notificationService.notifications.set(list),
       });
+
+      if (this.auth.hasRole('Provider')) {
+        this.providerService.getMe().subscribe();
+      }
     } else {
       this.notificationService.stopConnection();
+      this.providerService.providerStatus.set(null);
     }
   });
 

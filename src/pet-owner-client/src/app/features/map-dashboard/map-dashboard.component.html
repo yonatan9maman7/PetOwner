@@ -502,6 +502,13 @@
         </svg>
       </label>
 
+      <!-- Outside Working Hours Warning -->
+      @if (isOutsideWorkingHours()) {
+        <div class="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-4 rounded-r-xl">
+          <p class="text-sm text-yellow-700">⚠️ <b>Note:</b> The requested time is outside the sitter's regular working hours. You can still send the request, but it may take longer for them to approve.</p>
+        </div>
+      }
+
       <!-- Price Preview -->
       @if (estimatedPrice(); as price) {
         <div class="bg-indigo-50 rounded-xl p-3.5 mb-4 flex items-center justify-between">
@@ -526,12 +533,12 @@
                  transition-colors duration-150 text-sm">
           @if (sendingRequest()) {
             <div class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-            Booking...
+            Sending...
           } @else {
             <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
               <path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
             </svg>
-            Book Now
+            Send Request
           }
         </button>
         <button

@@ -79,6 +79,8 @@ export class MapDashboardComponent implements OnInit, OnDestroy {
   bookingNotes = signal('');
   shareMedicalRecords = signal(false);
 
+  providerSlots = signal<{ dayOfWeek: number; startTime: string; endTime: string }[]>([]);
+
   providerReviews = signal<ProviderReview[]>([]);
   loadingReviews = signal(false);
   revokingProvider = signal(false);
@@ -145,6 +147,30 @@ export class MapDashboardComponent implements OnInit, OnDestroy {
       && !this.sendingRequest();
   });
 
+  isOutsideWorkingHours = computed(() => {
+    const date = this.bookingDate();
+    const startTime = this.bookingStartTime();
+    const endTime = this.bookingEndTime();
+    const slots = this.providerSlots();
+    if (!date || !startTime || !endTime || slots.length === 0) return false;
+
+    const [y, m, d] = date.split('-').map(Number);
+    const dayOfWeek = new Date(y, m - 1, d).getDay();
+    const startMin = this.timeToMinutes(startTime);
+    const endMin = this.timeToMinutes(endTime);
+
+    return !slots.some(s =>
+      s.dayOfWeek === dayOfWeek
+      && this.timeToMinutes(s.startTime) <= startMin
+      && this.timeToMinutes(s.endTime) >= endMin
+    );
+  });
+
+  private timeToMinutes(t: string): number {
+    const [h, m] = t.split(':').map(Number);
+    return h * 60 + m;
+  }
+
   ngOnInit(): void {
     this.initMap();
     this.locateUser();
@@ -197,6 +223,7 @@ export class MapDashboardComponent implements OnInit, OnDestroy {
     this.bookingNotes.set('');
 
     this.loadingPets.set(true);
+    this.providerSlots.set([]);
     this.isRequestModalOpen.set(true);
 
     this.petService.getAll().subscribe({
@@ -211,6 +238,10 @@ export class MapDashboardComponent implements OnInit, OnDestroy {
         this.loadingPets.set(false);
         this.toast.error('Failed to load your pets.');
       },
+    });
+
+    this.mapService.getProviderProfile(pin.providerId).subscribe({
+      next: (profile) => this.providerSlots.set(profile.availabilitySlots),
     });
   }
 
@@ -245,7 +276,7 @@ export class MapDashboardComponent implements OnInit, OnDestroy {
         this.sendingRequest.set(false);
         this.closeRequestModal();
         this.closeSheet();
-        this.toast.success(`Booking request sent to ${pin.name}!`);
+        this.toast.success('Request sent successfully! Waiting for the sitter\'s approval.');
       },
       error: () => {
         this.sendingRequest.set(false);

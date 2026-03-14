@@ -77,19 +77,6 @@ public class RequestsController : ControllerBase
             if (start < DateTime.UtcNow.AddMinutes(-5))
                 return BadRequest(new { message = "Cannot book a time slot in the past." });
 
-            var dayOfWeek = (int)start.DayOfWeek;
-            var startTimeOfDay = start.TimeOfDay;
-            var endTimeOfDay = end.TimeOfDay;
-
-            var hasCoveringSlot = await _db.AvailabilitySlots.AnyAsync(s =>
-                s.ProviderId == request.ProviderId
-                && s.DayOfWeek == dayOfWeek
-                && s.StartTime <= startTimeOfDay
-                && s.EndTime >= endTimeOfDay);
-
-            if (!hasCoveringSlot)
-                return BadRequest(new { message = "The provider is not available during the requested time." });
-
             var hasConflict = await _db.ServiceRequests.AnyAsync(sr =>
                 sr.ProviderId == request.ProviderId
                 && sr.Status != "Rejected" && sr.Status != "Cancelled" && sr.Status != "Completed"
