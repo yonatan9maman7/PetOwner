@@ -28,10 +28,11 @@ public class MapController : ControllerBase
         [FromQuery] decimal? maxRate,
         [FromQuery] double? radiusKm,
         [FromQuery] double? latitude,
-        [FromQuery] double? longitude)
+        [FromQuery] double? longitude,
+        [FromQuery] string? searchTerm)
     {
         var filter = new MapSearchFilter(
-            requestedTime, serviceType, minRating, maxRate, radiusKm, latitude, longitude);
+            requestedTime, serviceType, minRating, maxRate, radiusKm, latitude, longitude, searchTerm);
         var pins = await _mapService.SearchProvidersAsync(filter);
         return Ok(pins);
     }
@@ -94,6 +95,34 @@ public class MapController : ControllerBase
             return NotFound(new { message = "Provider not found." });
 
         return Ok(provider);
+    }
+
+    [HttpGet("~/api/users/{userId:guid}/mini-profile")]
+    public async Task<IActionResult> GetUserMiniProfile(Guid userId)
+    {
+        var user = await _db.Users
+            .AsNoTracking()
+            .Where(u => u.Id == userId)
+            .Select(u => new UserMiniProfileDto(
+                u.Id,
+                u.Name,
+                u.ProviderProfile != null ? u.ProviderProfile.ProfileImageUrl : null,
+                u.ProviderProfile != null ? u.ProviderProfile.Bio : null,
+                u.Role,
+                u.CreatedAt,
+                u.ProviderProfile != null && u.ProviderProfile.Status == "Approved",
+                u.ProviderProfile != null && u.ProviderProfile.Status == "Approved"
+                    ? u.ProviderProfile.ProviderServices.Select(ps => ps.Service.Name).ToList()
+                    : null,
+                u.ProviderProfile != null ? u.ProviderProfile.AverageRating : null,
+                u.ProviderProfile != null ? u.ProviderProfile.ReviewCount : (int?)null
+            ))
+            .FirstOrDefaultAsync();
+
+        if (user is null)
+            return NotFound(new { message = "User not found." });
+
+        return Ok(user);
     }
 
     [Authorize]

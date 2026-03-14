@@ -45,8 +45,10 @@ export class TeletriageService {
   private readonly http = inject(HttpClient);
   private readonly baseUrl = '/api/teletriage';
 
-  assess(petId: string, symptoms: string): Observable<TeletriageResponse> {
-    return this.http.post<TeletriageResponse>(`${this.baseUrl}/assess`, { petId, symptoms });
+  assess(petId: string, symptoms: string, imageBase64?: string): Observable<TeletriageResponse> {
+    const payload: Record<string, string> = { petId, symptoms };
+    if (imageBase64) payload['imageBase64'] = imageBase64;
+    return this.http.post<TeletriageResponse>(`${this.baseUrl}/assess`, payload);
   }
 
   getHistory(petId: string): Observable<TeletriageHistory[]> {

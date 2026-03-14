@@ -18,7 +18,7 @@ public class OpenAiTeletriageService : ITeletriageService
     }
 
     public async Task<TeletriageResult> AssessAsync(
-        string petName, string species, int age, string symptoms, string? medicalHistory)
+        string petName, string species, int age, string symptoms, string? medicalHistory, string? imageBase64 = null)
     {
         if (string.IsNullOrWhiteSpace(_settings.ApiKey))
         {
@@ -31,15 +31,16 @@ public class OpenAiTeletriageService : ITeletriageService
             var client = new OpenAIClient(new ApiKeyCredential(_settings.ApiKey));
             var chatClient = client.GetChatClient(_settings.Model);
 
-            var systemPrompt = BuildSystemPrompt();
-            var userPrompt = BuildUserPrompt(petName, species, age, symptoms, medicalHistory);
+            bool hasImage = !string.IsNullOrWhiteSpace(imageBase64);
+            var systemPrompt = BuildSystemPrompt(hasImage);
+            var userMessage = BuildUserMessage(petName, species, age, symptoms, medicalHistory, imageBase64);
 
             var options = new ChatCompletionOptions { MaxOutputTokenCount = _settings.MaxTokens };
 
             var completion = await chatClient.CompleteChatAsync(
                 [
                     new SystemChatMessage(systemPrompt),
-                    new UserChatMessage(userPrompt),
+                    userMessage,
                 ],
                 options);
 
@@ -53,7 +54,8 @@ public class OpenAiTeletriageService : ITeletriageService
         }
     }
 
-    private static string BuildSystemPrompt() => """
+    private static string BuildSystemPrompt(bool hasImage) =>
+        """
         You are a veterinary teletriage assistant. Your role is to provide a preliminary health assessment for pets based on symptoms described by their owner. You are NOT a replacement for a veterinarian.
 
         Always respond in valid JSON with exactly these fields:
@@ -69,14 +71,29 @@ public class OpenAiTeletriageService : ITeletriageService
         - Be compassionate but factual.
         - Always recommend consulting a veterinarian for Medium, High, and Critical cases.
         - Never diagnose definitively — use phrases like "may indicate", "could suggest", "possible".
-        """;
+        """
+        + (hasImage
+            ? """
 
-    private static string BuildUserPrompt(string petName, string species, int age, string symptoms, string? medicalHistory)
+        An image of the pet's condition is attached. Carefully analyze any visible symptoms — wounds, swelling, discoloration, rashes, lumps, discharge, or abnormalities — and incorporate your visual findings into the assessment alongside the owner's description.
+        """
+            : "");
+
+    private static UserChatMessage BuildUserMessage(
+        string petName, string species, int age, string symptoms, string? medicalHistory, string? imageBase64)
     {
-        var prompt = $"Pet: {petName}, a {age}-year-old {species}.\nSymptoms: {symptoms}";
+        var text = $"Pet: {petName}, a {age}-year-old {species}.\nSymptoms: {symptoms}";
         if (!string.IsNullOrWhiteSpace(medicalHistory))
-            prompt += $"\nMedical history: {medicalHistory}";
-        return prompt;
+            text += $"\nMedical history: {medicalHistory}";
+
+        if (string.IsNullOrWhiteSpace(imageBase64))
+            return new UserChatMessage(text);
+
+        var imageBytes = BinaryData.FromBytes(Convert.FromBase64String(imageBase64));
+
+        return new UserChatMessage(
+            ChatMessageContentPart.CreateTextPart(text),
+            ChatMessageContentPart.CreateImagePart(imageBytes, "image/jpeg", ChatImageDetailLevel.High));
     }
 
     private TeletriageResult ParseAssessment(string content)

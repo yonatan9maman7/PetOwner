@@ -1,15 +1,17 @@
-import { Component, inject, OnInit, signal } from '@angular/core';
+import { Component, inject, OnInit, signal, HostListener } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { DatePipe } from '@angular/common';
+import { DatePipe, DecimalPipe } from '@angular/common';
+import { Router } from '@angular/router';
 import { Post, PostComment, PostService } from '../../services/post.service';
 import { AuthService } from '../../services/auth.service';
 import { FileUploadService } from '../../services/file-upload.service';
 import { ToastService } from '../../services/toast.service';
+import { MapService, UserMiniProfile } from '../../services/map.service';
 
 @Component({
   selector: 'app-social-feed',
   standalone: true,
-  imports: [FormsModule, DatePipe],
+  imports: [FormsModule, DatePipe, DecimalPipe],
   template: `
     <div class="min-h-screen bg-gradient-to-b from-sky-50 to-white px-4 py-8">
       <div class="max-w-xl mx-auto">
@@ -80,11 +82,19 @@ import { ToastService } from '../../services/toast.service';
               <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
                 <!-- Post Header -->
                 <div class="flex items-center gap-3 px-5 pt-4 pb-2">
-                  <div class="w-9 h-9 rounded-full bg-sky-100 flex items-center justify-center text-sky-600 font-bold text-sm">
+                  <button
+                    (click)="openMiniProfile(post.userId, $event)"
+                    class="w-9 h-9 rounded-full bg-sky-100 flex items-center justify-center text-sky-600 font-bold text-sm hover:ring-2 hover:ring-sky-300 transition-all cursor-pointer shrink-0"
+                  >
                     {{ post.userName.charAt(0).toUpperCase() }}
-                  </div>
+                  </button>
                   <div class="flex-1 min-w-0">
-                    <p class="text-sm font-semibold text-slate-800">{{ post.userName }}</p>
+                    <button
+                      (click)="openMiniProfile(post.userId, $event)"
+                      class="text-sm font-semibold text-slate-800 hover:text-sky-600 transition-colors cursor-pointer"
+                    >
+                      {{ post.userName }}
+                    </button>
                     <p class="text-[11px] text-slate-400">{{ post.createdAt | date:'medium' }}</p>
                   </div>
                   @if (post.userId === currentUserId()) {
@@ -141,12 +151,20 @@ import { ToastService } from '../../services/toast.service';
                     } @else {
                       @for (c of comments(); track c.id) {
                         <div class="flex gap-2.5">
-                          <div class="w-7 h-7 rounded-full bg-slate-200 flex items-center justify-center text-[11px] font-bold text-slate-500 flex-shrink-0">
+                          <button
+                            (click)="openMiniProfile(c.userId, $event)"
+                            class="w-7 h-7 rounded-full bg-slate-200 flex items-center justify-center text-[11px] font-bold text-slate-500 flex-shrink-0 hover:ring-2 hover:ring-sky-300 transition-all cursor-pointer"
+                          >
                             {{ c.userName.charAt(0).toUpperCase() }}
-                          </div>
+                          </button>
                           <div class="flex-1 min-w-0">
                             <div class="bg-white rounded-xl px-3 py-2">
-                              <p class="text-xs font-semibold text-slate-700">{{ c.userName }}</p>
+                              <button
+                                (click)="openMiniProfile(c.userId, $event)"
+                                class="text-xs font-semibold text-slate-700 hover:text-sky-600 transition-colors cursor-pointer"
+                              >
+                                {{ c.userName }}
+                              </button>
                               <p class="text-sm text-slate-600">{{ c.content }}</p>
                             </div>
                             <p class="text-[10px] text-slate-400 mt-0.5 px-1">{{ c.createdAt | date:'short' }}</p>
@@ -187,6 +205,90 @@ import { ToastService } from '../../services/toast.service';
         }
       </div>
     </div>
+
+    <!-- Mini Profile Popup (overlay) -->
+    @if (miniProfile()) {
+      <div class="fixed inset-0 z-[2000] flex items-center justify-center p-4" (click)="closeMiniProfile()">
+        <div class="absolute inset-0 bg-black/30 backdrop-blur-sm"></div>
+        <div
+          class="relative bg-white rounded-2xl shadow-2xl border border-gray-200 w-full max-w-sm overflow-hidden animate-scaleIn"
+          (click)="$event.stopPropagation()"
+        >
+          <!-- Header band -->
+          <div class="h-20 bg-gradient-to-br from-sky-400 to-indigo-500"></div>
+
+          <!-- Avatar -->
+          <div class="flex justify-center -mt-10">
+            <div class="w-20 h-20 rounded-full border-4 border-white bg-gray-100 overflow-hidden shadow-md flex items-center justify-center">
+              @if (miniProfile()!.profileImageUrl) {
+                <img [src]="miniProfile()!.profileImageUrl" [alt]="miniProfile()!.name" class="w-full h-full object-cover" />
+              } @else {
+                <span class="text-2xl font-bold text-gray-400">{{ miniProfile()!.name.charAt(0).toUpperCase() }}</span>
+              }
+            </div>
+          </div>
+
+          <!-- Info -->
+          <div class="px-6 pt-3 pb-5 text-center">
+            <h3 class="text-lg font-bold text-slate-900">{{ miniProfile()!.name }}</h3>
+
+            <div class="flex items-center justify-center gap-2 mt-1">
+              <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium"
+                    [class]="miniProfile()!.isProvider ? 'bg-emerald-50 text-emerald-700' : 'bg-sky-50 text-sky-700'">
+                {{ miniProfile()!.isProvider ? 'Pet Care Provider' : 'Pet Owner' }}
+              </span>
+              <span class="text-xs text-slate-400">
+                Member since {{ miniProfile()!.memberSince | date:'MMM yyyy' }}
+              </span>
+            </div>
+
+            @if (miniProfile()!.bio) {
+              <p class="mt-3 text-sm text-slate-600 leading-relaxed">{{ miniProfile()!.bio }}</p>
+            }
+
+            @if (miniProfile()!.isProvider) {
+              <div class="mt-4 flex items-center justify-center gap-4 text-sm">
+                @if (miniProfile()!.averageRating) {
+                  <div class="flex items-center gap-1">
+                    <svg class="w-4 h-4 text-amber-400" fill="currentColor" viewBox="0 0 20 20">
+                      <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                    </svg>
+                    <span class="font-semibold text-slate-700">{{ miniProfile()!.averageRating | number:'1.1-1' }}</span>
+                    <span class="text-slate-400">({{ miniProfile()!.reviewCount }})</span>
+                  </div>
+                }
+              </div>
+
+              @if (miniProfile()!.services?.length) {
+                <div class="flex flex-wrap justify-center gap-1.5 mt-3">
+                  @for (svc of miniProfile()!.services!; track svc) {
+                    <span class="inline-block rounded-full bg-indigo-50 px-2.5 py-0.5 text-xs font-medium text-indigo-700">
+                      {{ svc }}
+                    </span>
+                  }
+                </div>
+              }
+
+              <button
+                (click)="viewFullProfile(miniProfile()!.id)"
+                class="mt-4 inline-flex items-center gap-1.5 px-4 py-2 bg-indigo-600 text-white text-sm font-semibold rounded-xl hover:bg-indigo-500 transition-colors"
+              >
+                View Full Profile
+              </button>
+            }
+          </div>
+        </div>
+      </div>
+    }
+  `,
+  styles: `
+    @keyframes scaleIn {
+      from { opacity: 0; transform: scale(0.9); }
+      to { opacity: 1; transform: scale(1); }
+    }
+    .animate-scaleIn {
+      animation: scaleIn 0.2s ease-out;
+    }
   `,
 })
 export class SocialFeedComponent implements OnInit {
@@ -194,6 +296,8 @@ export class SocialFeedComponent implements OnInit {
   private readonly auth = inject(AuthService);
   private readonly fileUpload = inject(FileUploadService);
   private readonly toast = inject(ToastService);
+  private readonly mapService = inject(MapService);
+  private readonly router = inject(Router);
 
   posts = signal<Post[]>([]);
   feedLoading = signal(true);
@@ -213,9 +317,43 @@ export class SocialFeedComponent implements OnInit {
 
   currentUserId = signal<string | null>(null);
 
+  miniProfile = signal<UserMiniProfile | null>(null);
+  miniProfileLoading = signal(false);
+
   ngOnInit(): void {
     this.currentUserId.set(this.auth.userId());
     this.loadFeed();
+  }
+
+  openMiniProfile(userId: string, event: Event): void {
+    event.stopPropagation();
+    if (this.miniProfileLoading()) return;
+
+    this.miniProfileLoading.set(true);
+    this.mapService.getUserMiniProfile(userId).subscribe({
+      next: (profile) => {
+        this.miniProfile.set(profile);
+        this.miniProfileLoading.set(false);
+      },
+      error: () => {
+        this.toast.error('Could not load profile.');
+        this.miniProfileLoading.set(false);
+      },
+    });
+  }
+
+  closeMiniProfile(): void {
+    this.miniProfile.set(null);
+  }
+
+  viewFullProfile(userId: string): void {
+    this.closeMiniProfile();
+    this.router.navigate(['/provider', userId]);
+  }
+
+  @HostListener('document:keydown.escape')
+  onEscape(): void {
+    this.closeMiniProfile();
   }
 
   private loadFeed(): void {

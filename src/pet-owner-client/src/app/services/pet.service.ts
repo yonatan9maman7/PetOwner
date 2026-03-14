@@ -8,6 +8,10 @@ export interface Pet {
   species: string;
   age: number;
   notes: string | null;
+  breed?: string;
+  weight?: number;
+  allergies?: string;
+  medicalConditions?: string;
 }
 
 export interface CreatePetPayload {
@@ -15,6 +19,21 @@ export interface CreatePetPayload {
   species: string;
   age: number;
   notes: string | null;
+  breed?: string;
+  weight?: number;
+  allergies?: string;
+  medicalConditions?: string;
+}
+
+export interface UpdatePetPayload {
+  name: string;
+  species: string;
+  age: number;
+  notes: string | null;
+  breed?: string;
+  weight?: number;
+  allergies?: string;
+  medicalConditions?: string;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -28,6 +47,10 @@ export class PetService {
 
   create(payload: CreatePetPayload): Observable<Pet> {
     return this.http.post<Pet>(this.baseUrl, payload);
+  }
+
+  update(id: string, payload: UpdatePetPayload): Observable<Pet> {
+    return this.http.put<Pet>(`${this.baseUrl}/${id}`, payload);
   }
 
   delete(id: string): Observable<void> {

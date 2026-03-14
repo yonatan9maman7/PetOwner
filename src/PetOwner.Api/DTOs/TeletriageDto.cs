@@ -2,7 +2,8 @@ namespace PetOwner.Api.DTOs;
 
 public record TeletriageRequestDto(
     Guid PetId,
-    string Symptoms
+    string Symptoms,
+    string? ImageBase64 = null
 );
 
 public record TeletriageResponseDto(

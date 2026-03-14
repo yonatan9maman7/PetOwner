@@ -28,3 +28,16 @@ public record ProviderPublicProfileDto(
 );
 
 public record PublicAvailabilitySlotDto(int DayOfWeek, string StartTime, string EndTime);
+
+public record UserMiniProfileDto(
+    Guid Id,
+    string Name,
+    string? ProfileImageUrl,
+    string? Bio,
+    string Role,
+    DateTime MemberSince,
+    bool IsProvider,
+    List<string>? Services,
+    decimal? AverageRating,
+    int? ReviewCount
+);

@@ -31,6 +31,19 @@ export interface ProviderPublicProfile {
   }[];
 }
 
+export interface UserMiniProfile {
+  id: string;
+  name: string;
+  profileImageUrl: string | null;
+  bio: string | null;
+  role: string;
+  memberSince: string;
+  isProvider: boolean;
+  services: string[] | null;
+  averageRating: number | null;
+  reviewCount: number | null;
+}
+
 export interface MapSearchFilters {
   requestedTime?: string;
   serviceType?: string;
@@ -39,6 +52,7 @@ export interface MapSearchFilters {
   radiusKm?: number;
   latitude?: number;
   longitude?: number;
+  searchTerm?: string;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -55,6 +69,7 @@ export class MapService {
     if (filters.radiusKm != null) params = params.set('radiusKm', filters.radiusKm.toString());
     if (filters.latitude != null) params = params.set('latitude', filters.latitude.toString());
     if (filters.longitude != null) params = params.set('longitude', filters.longitude.toString());
+    if (filters.searchTerm) params = params.set('searchTerm', filters.searchTerm);
     return this.http.get<MapPin[]>(`${this.baseUrl}/pins`, { params });
   }
 
@@ -64,5 +79,9 @@ export class MapService {
 
   getProviderProfile(providerId: string): Observable<ProviderPublicProfile> {
     return this.http.get<ProviderPublicProfile>(`/api/providers/${providerId}/profile`);
+  }
+
+  getUserMiniProfile(userId: string): Observable<UserMiniProfile> {
+    return this.http.get<UserMiniProfile>(`/api/users/${userId}/mini-profile`);
   }
 }

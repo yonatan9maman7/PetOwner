@@ -9,7 +9,8 @@ public record MapSearchFilter(
     decimal? MaxRate = null,
     double? RadiusKm = null,
     double? Latitude = null,
-    double? Longitude = null
+    double? Longitude = null,
+    string? SearchTerm = null
 );
 
 public interface IMapService

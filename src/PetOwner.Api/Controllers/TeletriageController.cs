@@ -47,7 +47,7 @@ public class TeletriageController : ControllerBase
         var medicalHistory = recentRecords.Count > 0 ? string.Join("; ", recentRecords) : null;
 
         var result = await _teletriageService.AssessAsync(
-            pet.Name, pet.Species, pet.Age, request.Symptoms.Trim(), medicalHistory);
+            pet.Name, pet.Species, pet.Age, request.Symptoms.Trim(), medicalHistory, request.ImageBase64);
 
         var session = new TeletriageSession
         {

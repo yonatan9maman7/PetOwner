@@ -69,6 +69,14 @@ public class MapService : IMapService
             query = query.Where(l => l.GeoLocation!.Distance(center) <= radiusDegrees);
         }
 
+        if (!string.IsNullOrWhiteSpace(filter.SearchTerm))
+        {
+            var term = filter.SearchTerm.Trim();
+            query = query.Where(l =>
+                l.User!.Name.Contains(term) ||
+                l.User.ProviderProfile!.ProviderServices.Any(ps => ps.Service.Name.Contains(term)));
+        }
+
         return await query
             .Select(l => new MapPinDto(
                 l.UserId,

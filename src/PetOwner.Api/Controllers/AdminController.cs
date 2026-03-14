@@ -35,6 +35,12 @@ public class AdminController : ControllerBase
                 p.User.Phone,
                 p.Bio,
                 p.HourlyRate,
+                p.ProfileImageUrl,
+                p.User.CreatedAt,
+                Address = _db.Locations
+                    .Where(l => l.UserId == p.UserId)
+                    .Select(l => l.Address)
+                    .FirstOrDefault(),
                 Services = p.ProviderServices.Select(ps => ps.Service.Name).ToList()
             })
             .ToListAsync();
@@ -57,6 +63,31 @@ public class AdminController : ControllerBase
         await _db.SaveChangesAsync();
 
         return Ok(new { message = "Provider approved successfully." });
+    }
+
+    [HttpPost("users/{providerId:guid}/revoke-sitter")]
+    public async Task<IActionResult> RevokeSitter(Guid providerId)
+    {
+        var user = await _db.Users
+            .Include(u => u.ProviderProfile)
+            .FirstOrDefaultAsync(u => u.Id == providerId);
+
+        if (user is null)
+            return NotFound(new { message = "User not found." });
+
+        if (user.ProviderProfile is null)
+            return BadRequest(new { message = "User is not a provider." });
+
+        if (user.ProviderProfile.Status == "Revoked")
+            return BadRequest(new { message = "Provider status is already revoked." });
+
+        user.ProviderProfile.Status = "Revoked";
+        user.ProviderProfile.IsAvailableNow = false;
+        user.Role = "Owner";
+
+        await _db.SaveChangesAsync();
+
+        return Ok(new { message = "Sitter status revoked successfully." });
     }
 
     [HttpPost("seed-dummy-data")]

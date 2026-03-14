@@ -12,6 +12,7 @@ interface ChatMessage {
   content: string;
   timestamp: Date;
   assessment?: TeletriageResponse;
+  imagePreview?: string;
 }
 
 @Component({
@@ -183,6 +184,9 @@ interface ChatMessage {
               @if (msg.role === 'user') {
                 <div class="flex justify-end">
                   <div class="bg-indigo-600 text-white rounded-2xl rounded-tr-md px-4 py-3 max-w-[85%] shadow-sm">
+                    @if (msg.imagePreview) {
+                      <img [src]="msg.imagePreview" alt="Attached photo" class="w-32 h-32 object-cover rounded-lg mb-2 border border-indigo-400/30" />
+                    }
                     <p class="text-sm whitespace-pre-wrap">{{ msg.content }}</p>
                     <p class="text-xs text-indigo-200 mt-1 text-right">{{ msg.timestamp | date:'shortTime' }}</p>
                   </div>
@@ -301,7 +305,7 @@ interface ChatMessage {
                       <div class="w-2 h-2 bg-indigo-400 rounded-full animate-bounce" style="animation-delay: 150ms"></div>
                       <div class="w-2 h-2 bg-indigo-400 rounded-full animate-bounce" style="animation-delay: 300ms"></div>
                     </div>
-                    <span class="text-xs text-slate-400">Analyzing symptoms...</span>
+                    <span class="text-xs text-slate-400">Analyzing symptoms{{ messages().at(-1)?.imagePreview ? ' & photo' : '' }}...</span>
                   </div>
                 </div>
               </div>
@@ -422,7 +426,40 @@ interface ChatMessage {
                 </div>
               }
 
+              @if (attachedImagePreview()) {
+                <div class="flex items-center gap-2 mb-2 px-1">
+                  <div class="relative group">
+                    <img [src]="attachedImagePreview()!" alt="Attached" class="w-14 h-14 object-cover rounded-lg border border-gray-200 shadow-sm" />
+                    <button
+                      type="button"
+                      (click)="removeAttachedImage()"
+                      class="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-slate-700 text-white flex items-center justify-center text-xs hover:bg-red-600 transition-colors shadow-sm opacity-0 group-hover:opacity-100 focus:opacity-100"
+                      aria-label="Remove photo"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
+                  <span class="text-xs text-slate-400">Photo attached</span>
+                </div>
+              }
+
+              <input type="file" accept="image/*" (change)="onFileSelected($event)" class="hidden" #fileInput />
+
               <form (ngSubmit)="submitSymptoms()" class="flex items-end gap-2">
+                <button
+                  type="button"
+                  (click)="fileInput.click()"
+                  [disabled]="assessing()"
+                  class="flex-shrink-0 w-10 h-10 rounded-xl border border-gray-300 text-slate-500 flex items-center justify-center hover:border-indigo-400 hover:text-indigo-600 hover:bg-indigo-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                  title="Attach a photo"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                  </svg>
+                </button>
                 <div class="flex-1 relative">
                   <textarea
                     [(ngModel)]="symptomInput"
@@ -469,6 +506,9 @@ export class TeletriageComponent implements OnInit {
   historyItems = signal<TeletriageHistory[]>([]);
   historyLoading = signal(false);
 
+  attachedImageBase64 = signal<string | null>(null);
+  attachedImagePreview = signal<string | null>(null);
+
   nearbyVets = signal<NearbyVet[]>([]);
   nearbyVetsLoading = signal(false);
   userLocation = signal<{ lat: number; lng: number } | null>(null);
@@ -513,17 +553,23 @@ export class TeletriageComponent implements OnInit {
     const pet = this.selectedPet();
     if (!symptoms || !pet || this.assessing()) return;
 
+    const imageBase64 = this.attachedImageBase64() ?? undefined;
+    const imagePreview = this.attachedImagePreview() ?? undefined;
+
     const userMsg: ChatMessage = {
       role: 'user',
       content: symptoms,
       timestamp: new Date(),
+      imagePreview,
     };
     this.messages.update((msgs) => [...msgs, userMsg]);
     this.symptomInput.set('');
+    this.attachedImageBase64.set(null);
+    this.attachedImagePreview.set(null);
     this.assessing.set(true);
     this.scrollToBottom();
 
-    this.triageService.assess(pet.id, symptoms).subscribe({
+    this.triageService.assess(pet.id, symptoms, imageBase64).subscribe({
       next: (result) => {
         const assessmentMsg: ChatMessage = {
           role: 'assistant',
@@ -567,9 +613,44 @@ export class TeletriageComponent implements OnInit {
     textarea.style.height = Math.min(textarea.scrollHeight, 120) + 'px';
   }
 
+  onFileSelected(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      this.toast.show('Please select an image file', 'error');
+      input.value = '';
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      this.toast.show('Image must be under 5 MB', 'error');
+      input.value = '';
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = reader.result as string;
+      this.attachedImagePreview.set(dataUrl);
+      const base64 = dataUrl.split(',')[1];
+      this.attachedImageBase64.set(base64);
+    };
+    reader.readAsDataURL(file);
+    input.value = '';
+  }
+
+  removeAttachedImage(): void {
+    this.attachedImageBase64.set(null);
+    this.attachedImagePreview.set(null);
+  }
+
   startNewAssessment(): void {
     this.messages.set([]);
     this.symptomInput.set('');
+    this.attachedImageBase64.set(null);
+    this.attachedImagePreview.set(null);
     this.nearbyVets.set([]);
   }
 
@@ -577,6 +658,8 @@ export class TeletriageComponent implements OnInit {
     this.selectedPet.set(null);
     this.messages.set([]);
     this.symptomInput.set('');
+    this.attachedImageBase64.set(null);
+    this.attachedImagePreview.set(null);
     this.nearbyVets.set([]);
   }
 

@@ -9,5 +9,5 @@ public record TeletriageResult(
 
 public interface ITeletriageService
 {
-    Task<TeletriageResult> AssessAsync(string petName, string species, int age, string symptoms, string? medicalHistory);
+    Task<TeletriageResult> AssessAsync(string petName, string species, int age, string symptoms, string? medicalHistory, string? imageBase64 = null);
 }

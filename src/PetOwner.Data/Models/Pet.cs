@@ -6,7 +6,11 @@ public class Pet
     public Guid UserId { get; set; }
     public string Name { get; set; } = null!;
     public string Species { get; set; } = null!;
+    public string? Breed { get; set; }
     public int Age { get; set; }
+    public double? Weight { get; set; }
+    public string? Allergies { get; set; }
+    public string? MedicalConditions { get; set; }
     public string? Notes { get; set; }
 
     public User User { get; set; } = null!;

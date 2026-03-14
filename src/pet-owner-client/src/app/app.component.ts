@@ -1,4 +1,4 @@
-import { Component, computed, inject, signal, effect, OnInit } from '@angular/core';
+import { Component, computed, inject, signal, effect } from '@angular/core';
 import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { CommonModule, DatePipe } from '@angular/common';
 import { toSignal } from '@angular/core/rxjs-interop';
@@ -15,13 +15,19 @@ import { ToastContainerComponent } from './shared/toast-container.component';
   templateUrl: './app.component.html',
   styleUrl: './app.component.scss',
 })
-export class AppComponent implements OnInit {
+export class AppComponent {
   private router = inject(Router);
   readonly auth = inject(AuthService);
-  private readonly providerService = inject(ProviderService);
+  readonly providerService = inject(ProviderService);
   readonly notificationService = inject(NotificationService);
 
   showNotificationPanel = signal(false);
+  isProfileMenuOpen = signal(false);
+
+  readonly userInitial = computed(() => {
+    const name = this.auth.userName();
+    return name ? name.charAt(0).toUpperCase() : '?';
+  });
 
   private url = toSignal(
     this.router.events.pipe(map(() => this.router.url)),
@@ -33,38 +39,19 @@ export class AppComponent implements OnInit {
     return !u.startsWith('/login');
   });
 
+  readonly isLoggedIn = computed(() => this.auth.isLoggedIn());
   readonly isAdmin = computed(() => this.auth.userRole() === 'Admin');
 
-  private readonly hasProviderProfile = computed(() => {
-    const status = this.providerService.providerStatus();
-    return status === 'Pending' || status === 'Approved';
-  });
+  readonly canSwitchToProvider = computed(
+    () => this.isLoggedIn() && this.providerService.providerStatus() === 'Approved',
+  );
 
-  navItems = computed(() => {
-    const items: { label: string; route: string; icon: string }[] = [
-      { label: 'Map', route: '/', icon: 'map' },
-    ];
+  readonly currentMode = signal<'Owner' | 'Provider'>('Owner');
 
-    if (this.auth.isLoggedIn()) {
-      items.push(
-        { label: '🐾 My Pets', route: '/my-pets', icon: 'pets' },
-        { label: 'Requests', route: '/requests', icon: 'requests' },
-        { label: 'Feed', route: '/community', icon: 'feed' },
-        { label: 'Chat', route: '/messages', icon: 'chat' },
-      );
-
-      if (this.hasProviderProfile()) {
-        items.push(
-          { label: 'Dashboard', route: '/provider-dashboard', icon: 'dashboard' },
-        );
-      } else {
-        items.push(
-          { label: 'Become a Sitter', route: '/become-a-sitter', icon: 'sitter' },
-        );
-      }
+  private readonly resetModeOnLogout = effect(() => {
+    if (!this.isLoggedIn()) {
+      this.currentMode.set('Owner');
     }
-
-    return items;
   });
 
   private loggedInEffect = effect(() => {
@@ -79,9 +66,24 @@ export class AppComponent implements OnInit {
     }
   });
 
-  ngOnInit(): void {}
+  toggleMode(): void {
+    if (!this.canSwitchToProvider()) return;
+    const newMode = this.currentMode() === 'Owner' ? 'Provider' : 'Owner';
+    this.currentMode.set(newMode);
+    this.router.navigate([newMode === 'Provider' ? '/provider-dashboard' : '/']);
+  }
+
+  toggleProfileMenu(): void {
+    this.showNotificationPanel.set(false);
+    this.isProfileMenuOpen.update(v => !v);
+  }
+
+  closeProfileMenu(): void {
+    this.isProfileMenuOpen.set(false);
+  }
 
   toggleNotifications(): void {
+    this.isProfileMenuOpen.set(false);
     this.showNotificationPanel.update(v => !v);
     if (this.showNotificationPanel()) {
       this.notificationService.loadNotifications().subscribe({

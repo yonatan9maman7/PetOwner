@@ -167,6 +167,19 @@ Phase 3 ── E10 (AI Teletriage) → E11 (Fitness) → E12 (Social)
 
 ---
 
+## Phase 4 — Calendar & Enhanced Pet Profiles
+
+### E13: Google Calendar Integration ⬜
+
+| Story | Title | Description | Status |
+|-------|-------|-------------|--------|
+| S13.1 | Google OAuth & Calendar API Setup | Backend: Add Google Calendar API client (`Google.Apis.Calendar.v3`). Configure OAuth 2.0 credentials. `GoogleCalendarService` with token storage per user. `GET /api/calendar/connect` (OAuth redirect) and `GET /api/calendar/callback` (token exchange). | ⬜ Pending |
+| S13.2 | Add Booking to Google Calendar API | `POST /api/calendar/add-event/{bookingId}` — creates a Google Calendar event from a confirmed booking (title: service type + provider/pet name, start/end from `ScheduledStart`/`ScheduledEnd`, description with provider details, location if available). Returns event link. | ⬜ Pending |
+| S13.3 | Calendar Integration UI | "Add to Google Calendar" button on confirmed bookings in the Requests page. Google account connect/disconnect toggle in user settings. Success toast with link to event. Visual indicator on bookings already added to calendar. | ⬜ Pending |
+| S13.4 | Auto-Add & Sync | Option to auto-add confirmed bookings to Google Calendar. Update/delete calendar events when bookings are rescheduled or cancelled. User preference stored in profile. | ⬜ Pending |
+
+---
+
 ## Progress Summary
 
 | Phase | Epics | Stories Total | Stories Done |
@@ -174,4 +187,5 @@ Phase 3 ── E10 (AI Teletriage) → E11 (Fitness) → E12 (Social)
 | Phase 1 | E1–E6 | 18 | 18 (E1✅ E2✅ E3✅ E4✅ E5✅ E6✅) |
 | Phase 2 | E7–E9 | 13 | 13 (E7✅ E8✅ E9✅) |
 | Phase 3 | E10–E12 | 10 | 10 (E10✅ E11✅ E12✅) |
-| **Total** | **12** | **41** | **41 ✅** |
+| Phase 4 | E13 | 4 | 0 (E13⬜) |
+| **Total** | **13** | **45** | **41 ✅** |

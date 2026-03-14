@@ -14,6 +14,7 @@ import * as L from 'leaflet';
 import { MapService, MapSearchFilters } from '../../services/map.service';
 import { ProviderService } from '../../services/provider.service';
 import { AuthService } from '../../services/auth.service';
+import { AdminService } from '../../services/admin.service';
 import { ToastService } from '../../services/toast.service';
 import { PetService, Pet } from '../../services/pet.service';
 import { RequestService } from '../../services/request.service';
@@ -40,7 +41,11 @@ export class MapDashboardComponent implements OnInit, OnDestroy {
   private readonly petService = inject(PetService);
   private readonly requestService = inject(RequestService);
   private readonly reviewService = inject(ReviewService);
+  private readonly adminService = inject(AdminService);
   private readonly router = inject(Router);
+
+  readonly isLoggedIn = computed(() => this.auth.isLoggedIn());
+  readonly isAdmin = computed(() => this.auth.userRole() === 'Admin');
 
   private map!: L.Map;
   private markersLayer = L.layerGroup();
@@ -72,6 +77,7 @@ export class MapDashboardComponent implements OnInit, OnDestroy {
 
   providerReviews = signal<ProviderReview[]>([]);
   loadingReviews = signal(false);
+  revokingProvider = signal(false);
 
   // Filters
   filterDate = signal('');
@@ -81,6 +87,17 @@ export class MapDashboardComponent implements OnInit, OnDestroy {
   filterMaxRate = signal<number | null>(null);
   filterRadiusKm = signal<number | null>(null);
   showFilterPanel = signal(false);
+  searchQuery = signal('');
+  selectedCategory = signal('');
+  readonly categories = [
+    { label: 'Walkers', icon: '🚶', value: 'Dog Walker' },
+    { label: 'Sitters', icon: '🏠', value: 'Pet Sitter' },
+    { label: 'Boarding', icon: '🛏️', value: 'Boarding' },
+    { label: 'Vets', icon: '🩺', value: 'Vet' },
+    { label: 'Groomers', icon: '✂️', value: 'Groomer' },
+    { label: 'Shops', icon: '🛒', value: 'Shop' },
+    { label: 'Parks', icon: '🌳', value: 'Park' },
+  ];
   serviceTypes = signal<string[]>([]);
   isFilterActive = computed(() =>
     !!this.filterDate() || !!this.filterTime() ||
@@ -262,7 +279,7 @@ export class MapDashboardComponent implements OnInit, OnDestroy {
       maxZoom: 19,
     }).addTo(this.map);
 
-    L.control.zoom({ position: 'topright' }).addTo(this.map);
+    L.control.zoom({ position: 'bottomright' }).addTo(this.map);
     this.markersLayer.addTo(this.map);
   }
 
@@ -298,11 +315,29 @@ export class MapDashboardComponent implements OnInit, OnDestroy {
     this.filterMinRating.set(null);
     this.filterMaxRate.set(null);
     this.filterRadiusKm.set(null);
+    this.selectedCategory.set('');
+    this.searchQuery.set('');
     this.loadPins();
   }
 
   toggleFilterPanel(): void {
     this.showFilterPanel.update(v => !v);
+  }
+
+  selectCategory(value: string): void {
+    const next = this.selectedCategory() === value ? '' : value;
+    this.selectedCategory.set(next);
+    this.filterServiceType.set(next);
+    this.loadPins();
+  }
+
+  onSearch(term: string): void {
+    this.searchQuery.set(term);
+    this.loadPins();
+  }
+
+  redirectToLogin(): void {
+    this.router.navigate(['/login']);
   }
 
   setMinRating(val: string): void {
@@ -321,6 +356,27 @@ export class MapDashboardComponent implements OnInit, OnDestroy {
     this.router.navigate(['/provider', providerId]);
   }
 
+  revokeSitter(providerId: string): void {
+    if (!confirm('Are you sure you want to revoke this provider\'s sitter status? This action cannot be easily undone.')) {
+      return;
+    }
+
+    this.revokingProvider.set(true);
+
+    this.adminService.revokeSitterStatus(providerId).subscribe({
+      next: (res) => {
+        this.revokingProvider.set(false);
+        this.toast.success(res.message);
+        this.closeSheet();
+        this.loadPins();
+      },
+      error: () => {
+        this.revokingProvider.set(false);
+        this.toast.error('Failed to revoke sitter status.');
+      },
+    });
+  }
+
   private loadPins(): void {
     this.isLoadingPins.set(true);
 
@@ -336,6 +392,7 @@ export class MapDashboardComponent implements OnInit, OnDestroy {
       filters.latitude = this.userLat;
       filters.longitude = this.userLng;
     }
+    if (this.searchQuery()) filters.searchTerm = this.searchQuery();
 
     this.mapService.fetchPins(filters).subscribe({
       next: (pins) => {

@@ -16,6 +16,10 @@ export class AdminService {
     return this.http.put<{ message: string }>(`${this.baseUrl}/approve/${providerId}`, {});
   }
 
+  revokeSitterStatus(providerId: string): Observable<{ message: string }> {
+    return this.http.post<{ message: string }>(`${this.baseUrl}/users/${providerId}/revoke-sitter`, {});
+  }
+
   seedDummyData(): Observable<{ message: string }> {
     return this.http.post<{ message: string }>(`${this.baseUrl}/seed-dummy-data`, {});
   }

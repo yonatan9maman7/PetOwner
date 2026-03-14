@@ -1,82 +1,84 @@
-<!-- Full-screen Leaflet map container -->
+<!-- Full-screen Leaflet map -->
 <div id="map" class="absolute inset-0 z-0"></div>
 
-<!-- Pending Approval Banner -->
-@if (isPendingProvider()) {
-  <div class="absolute top-4 left-1/2 -translate-x-1/2 z-[1000] w-[calc(100%-2rem)] max-w-md
-              bg-amber-50/95 backdrop-blur-sm border border-amber-200 rounded-2xl px-4 py-3 shadow-lg
-              flex items-center gap-3 text-sm text-amber-800 font-medium animate-[slideDown_0.4s_ease-out]">
-    <span class="text-lg leading-none">&#9203;</span>
-    <span>Your sitter profile is pending admin approval.</span>
-  </div>
-}
+<!-- ─── Top Overlay Zone ─── -->
+<div class="absolute top-4 left-0 right-0 z-[400] flex flex-col items-center pointer-events-none">
 
-<!-- Loading indicator -->
-@if (isLoadingPins()) {
-  <div class="absolute top-20 left-1/2 -translate-x-1/2 z-[1000]
-              bg-white/90 backdrop-blur-sm rounded-full px-4 py-2 shadow-lg
-              flex items-center gap-2 text-sm text-gray-700">
-    <div class="w-4 h-4 border-2 border-violet-500 border-t-transparent rounded-full animate-spin"></div>
-    Searching nearby...
-  </div>
-}
-
-<!-- Filter Bar (always visible) -->
-<div class="filter-bar">
-  <div class="flex items-center justify-between">
-    <div class="filter-label">
-      <svg class="w-4 h-4 text-violet-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-        <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
-      </svg>
-      <span class="text-xs font-semibold text-gray-600 uppercase tracking-wide">Find a sitter</span>
-    </div>
-    <div class="flex items-center gap-2">
-      @if (isFilterActive()) {
-        <button (click)="clearFilter()" class="text-xs text-gray-500 hover:text-gray-700 font-medium">
-          Clear all
-        </button>
-      }
-      <button
-        (click)="toggleFilterPanel()"
-        class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors"
-        [class]="showFilterPanel() ? 'bg-violet-100 text-violet-700' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'">
-        <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
-        </svg>
-        Filters
-        @if (activeFilterCount() > 0) {
-          <span class="bg-violet-600 text-white w-4 h-4 rounded-full flex items-center justify-center text-[10px] leading-none">
-            {{ activeFilterCount() }}
-          </span>
-        }
-      </button>
-    </div>
-  </div>
-
-  <!-- Availability toggle inline for approved providers -->
-  @if (isApprovedProvider()) {
-    <div class="mt-2 pt-2 border-t border-gray-100 flex justify-center">
-      <button
-        (click)="toggleAvailability()"
-        [disabled]="togglingAvailability()"
-        class="flex items-center gap-2 px-4 py-1.5 rounded-full
-               font-semibold text-xs transition-all duration-300 border-2"
-        [class]="isAvailable()
-          ? 'bg-green-500/95 text-white border-green-400 hover:bg-green-600'
-          : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'"
-      >
-        <span
-          class="w-2.5 h-2.5 rounded-full transition-colors duration-300"
-          [class]="isAvailable() ? 'bg-white' : 'bg-gray-400'"
-        ></span>
-        {{ togglingAvailability() ? 'Updating...' : (isAvailable() ? 'I am Available' : 'Go Online') }}
-      </button>
+  <!-- Pending Approval Banner -->
+  @if (isPendingProvider()) {
+    <div class="pointer-events-auto mt-3 w-[90%] md:w-[600px]
+                bg-amber-50/95 backdrop-blur-sm border border-amber-200 rounded-2xl px-4 py-3 shadow-lg
+                flex items-center gap-3 text-sm text-amber-800 font-medium animate-[slideDown_0.4s_ease-out]">
+      <span class="text-lg leading-none">&#9203;</span>
+      <span>Your sitter profile is pending admin approval.</span>
     </div>
   }
 
+  <!-- Floating Pill Search Bar -->
+  <div class="pointer-events-auto mt-4 w-[90%] md:w-[600px]
+              bg-white/95 backdrop-blur-md rounded-full shadow-lg border border-gray-100
+              flex items-center px-4 py-3 gap-3">
+    <svg (click)="onSearch(searchInput.value)"
+      class="w-5 h-5 text-gray-400 hover:text-violet-500 shrink-0 cursor-pointer transition-colors"
+      fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+      <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
+    </svg>
+    <input
+      #searchInput
+      type="text"
+      placeholder="Search services, vets..."
+      [value]="searchQuery()"
+      (input)="searchQuery.set($any($event.target).value)"
+      (keyup.enter)="onSearch(searchInput.value)"
+      class="flex-1 bg-transparent text-sm text-gray-800 placeholder-gray-400 outline-none" />
+    <button
+      (click)="toggleFilterPanel()"
+      class="relative shrink-0 w-9 h-9 flex items-center justify-center rounded-full transition-colors"
+      [class]="showFilterPanel() ? 'bg-violet-100 text-violet-600' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'">
+      <svg class="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+      </svg>
+      @if (activeFilterCount() > 0) {
+        <span class="absolute -top-1 -right-1 bg-violet-600 text-white w-4 h-4 rounded-full
+                     flex items-center justify-center text-[10px] leading-none font-bold">
+          {{ activeFilterCount() }}
+        </span>
+      }
+    </button>
+  </div>
+
+  <!-- Category Chips (Horizontal Scroll) -->
+  <div class="pointer-events-auto mt-2.5 w-[90%] md:w-[600px] relative">
+    <div class="overflow-x-auto whitespace-nowrap scrollbar-hide flex gap-2 pb-1 pr-8">
+      @for (cat of categories; track cat.value) {
+        <button
+          (click)="selectCategory(cat.value)"
+          class="inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-medium shadow-sm
+                 cursor-pointer transition-all duration-150 shrink-0 border"
+          [class]="selectedCategory() === cat.value
+            ? 'bg-violet-600 text-white border-violet-600 shadow-md'
+            : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'">
+          <span class="text-base leading-none">{{ cat.icon }}</span>
+          {{ cat.label }}
+        </button>
+      }
+    </div>
+    <div class="absolute top-0 right-0 bottom-0 w-10 bg-gradient-to-l from-white/90 to-transparent pointer-events-none rounded-r-full"></div>
+  </div>
+
+  <!-- Loading Indicator -->
+  @if (isLoadingPins()) {
+    <div class="mt-3 bg-white/90 backdrop-blur-sm rounded-full px-4 py-2 shadow-lg
+                flex items-center gap-2 text-sm text-gray-700">
+      <div class="w-4 h-4 border-2 border-violet-500 border-t-transparent rounded-full animate-spin"></div>
+      Searching nearby...
+    </div>
+  }
+
+  <!-- Expanded Filter Panel -->
   @if (showFilterPanel()) {
-    <div class="mt-3 space-y-3 border-t border-gray-200 pt-3">
-      <!-- Date/Time row -->
+    <div class="pointer-events-auto mt-2 w-[90%] md:w-[600px]
+                bg-white/95 backdrop-blur-md rounded-2xl shadow-xl border border-gray-100 p-4 space-y-3">
       <div>
         <label class="text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-1 block">Available on</label>
         <div class="flex gap-2">
@@ -85,12 +87,11 @@
         </div>
       </div>
 
-      <!-- Service Type -->
       <div>
         <label class="text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-1 block">Service Type</label>
         <div class="flex flex-wrap gap-1.5">
           <button
-            (click)="filterServiceType.set('')"
+            (click)="filterServiceType.set(''); selectedCategory.set('')"
             class="px-2.5 py-1 rounded-full text-xs font-medium transition-colors"
             [class]="!filterServiceType() ? 'bg-violet-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'">
             All
@@ -106,7 +107,6 @@
         </div>
       </div>
 
-      <!-- Rating + Rate + Radius -->
       <div class="grid grid-cols-3 gap-2">
         <div>
           <label class="text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-1 block">Min Rating</label>
@@ -144,30 +144,31 @@
         </div>
       </div>
 
-      <!-- Apply button -->
-      <button
-        (click)="applyFilter()"
-        [disabled]="isLoadingPins()"
-        class="w-full filter-btn filter-btn-search py-2">
-        Apply Filters
-      </button>
+      <div class="flex gap-2">
+        <button
+          (click)="applyFilter()"
+          [disabled]="isLoadingPins()"
+          class="flex-1 filter-btn filter-btn-search py-2.5">
+          Apply Filters
+        </button>
+        @if (isFilterActive()) {
+          <button (click)="clearFilter()" class="filter-btn filter-btn-clear py-2.5 px-4">
+            Clear
+          </button>
+        }
+      </div>
     </div>
   }
 </div>
 
-<!-- Bottom Sheet Overlay -->
+<!-- ─── Bottom Sheet (Selected Pin Details) ─── -->
 <div
   class="fixed inset-0 z-[1000] transition-opacity duration-300"
   [class.pointer-events-none]="!isSheetOpen()"
   [class.opacity-0]="!isSheetOpen()">
 
-  <!-- Backdrop -->
-  <div
-    class="absolute inset-0 bg-black/30 backdrop-blur-[2px]"
-    (click)="closeSheet()">
-  </div>
+  <div class="absolute inset-0 bg-black/30 backdrop-blur-[2px]" (click)="closeSheet()"></div>
 
-  <!-- Sheet Panel -->
   <div
     class="absolute bottom-0 left-0 right-0
            bg-white rounded-t-3xl shadow-2xl
@@ -176,7 +177,6 @@
     [class.translate-y-full]="!isSheetOpen()"
     [class.translate-y-0]="isSheetOpen()">
 
-    <!-- Drag Handle -->
     <div class="flex justify-center pt-3 pb-2">
       <div class="w-10 h-1.5 bg-gray-300 rounded-full"></div>
     </div>
@@ -188,19 +188,15 @@
           <div class="w-14 h-14 rounded-full bg-violet-100 flex items-center justify-center
                       text-2xl shrink-0 overflow-hidden ring-2 ring-violet-200">
             @if (pin.profileImageUrl) {
-              <img [src]="pin.profileImageUrl" alt="{{ pin.name }}"
+              <img [src]="pin.profileImageUrl" [alt]="pin.name"
                    class="w-full h-full object-cover" />
             } @else {
               🐾
             }
           </div>
           <div class="min-w-0">
-            <h2 class="text-lg font-bold text-gray-900 truncate">
-              {{ pin.name }}
-            </h2>
-            <p class="text-sm text-violet-600 font-medium">
-              {{ pin.services }}
-            </p>
+            <h2 class="text-lg font-bold text-gray-900 truncate">{{ pin.name }}</h2>
+            <p class="text-sm text-violet-600 font-medium">{{ pin.services }}</p>
             @if (pin.reviewCount > 0) {
               <div class="flex items-center gap-1.5 mt-1">
                 <span class="text-amber-500 text-sm">
@@ -220,15 +216,11 @@
           <div class="flex items-center justify-between">
             <div>
               <p class="text-xs text-gray-500 uppercase tracking-wide font-medium">Hourly Rate</p>
-              <p class="text-2xl font-bold text-gray-900 mt-0.5">
-                ₪{{ pin.hourlyRate }}
-              </p>
+              <p class="text-2xl font-bold text-gray-900 mt-0.5">₪{{ pin.hourlyRate }}</p>
             </div>
             <div class="text-right">
               <p class="text-xs text-gray-500 uppercase tracking-wide font-medium">Services</p>
-              <p class="text-sm text-gray-700 mt-0.5">
-                {{ pin.services }}
-              </p>
+              <p class="text-sm text-gray-700 mt-0.5">{{ pin.services }}</p>
             </div>
           </div>
         </div>
@@ -264,7 +256,6 @@
                     <span class="text-[10px] text-gray-400 shrink-0">{{ review.createdAt | date:'mediumDate' }}</span>
                   </div>
 
-                  <!-- Stars row -->
                   <div class="flex items-center gap-2 mb-1">
                     <span class="text-amber-500 text-xs">
                       @for (s of [1,2,3,4,5]; track s) {
@@ -295,19 +286,53 @@
           }
         </div>
 
-        <!-- Action Buttons -->
-        <div class="flex gap-2">
+        <!-- Admin: Revoke Sitter -->
+        @if (isAdmin()) {
           <button
-            (click)="openRequestModal()"
-            class="flex-1 flex items-center justify-center gap-2
-                   bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800
-                   text-white font-semibold rounded-xl py-3.5 px-4
-                   transition-colors duration-150 text-sm">
-            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-            </svg>
-            Book
+            (click)="revokeSitter(pin.providerId)"
+            [disabled]="revokingProvider()"
+            class="w-full flex items-center justify-center gap-2 mb-4
+                   bg-red-50 hover:bg-red-100 active:bg-red-200
+                   border-2 border-red-300 text-red-700 font-semibold rounded-xl py-3 px-4
+                   transition-colors duration-150 text-sm
+                   disabled:opacity-50 disabled:cursor-not-allowed">
+            @if (revokingProvider()) {
+              <div class="w-4 h-4 border-2 border-red-500 border-t-transparent rounded-full animate-spin"></div>
+              Revoking...
+            } @else {
+              <span class="text-base leading-none">&#128683;</span>
+              Revoke Sitter Status
+            }
           </button>
+        }
+
+        <!-- Soft-Gated Action Buttons -->
+        <div class="flex gap-2">
+          @if (isLoggedIn()) {
+            <button
+              (click)="openRequestModal()"
+              class="flex-1 flex items-center justify-center gap-2
+                     bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800
+                     text-white font-semibold rounded-xl py-3.5 px-4
+                     transition-colors duration-150 text-sm">
+              <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+              Book Now
+            </button>
+          } @else {
+            <button
+              (click)="redirectToLogin()"
+              class="flex-1 flex items-center justify-center gap-2
+                     bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800
+                     text-white font-semibold rounded-xl py-3.5 px-4
+                     transition-colors duration-150 text-sm">
+              <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-3a2.25 2.25 0 00-2.25 2.25V9m-3 0h13.5a.75.75 0 01.75.75v7.5a.75.75 0 01-.75.75H5.25a.75.75 0 01-.75-.75v-7.5A.75.75 0 015.25 9z" />
+              </svg>
+              Login to Book
+            </button>
+          }
           <button
             (click)="viewProviderProfile(pin.providerId)"
             class="flex items-center justify-center gap-1.5
@@ -333,7 +358,7 @@
   </div>
 </div>
 
-<!-- Booking Modal -->
+<!-- ─── Booking Modal ─── -->
 <div
   class="fixed inset-0 z-[2000] flex items-end sm:items-center justify-center transition-opacity duration-200"
   [class.pointer-events-none]="!isRequestModalOpen()"

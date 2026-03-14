@@ -44,6 +44,7 @@ export class AuthService {
 
   readonly userId = computed(() => this.currentUser$()?.userId ?? null);
   readonly userRole = computed(() => this.currentUser$()?.role ?? null);
+  readonly userName = computed(() => this.decoded()?.name ?? null);
 
   private readonly decoded = computed<JwtPayload | null>(() => {
     const token = this.tokenSignal();
