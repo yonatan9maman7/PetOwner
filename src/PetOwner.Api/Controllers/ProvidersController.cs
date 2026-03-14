@@ -16,9 +16,9 @@ public class ProvidersController : ControllerBase
 {
     private readonly ApplicationDbContext _db;
     private readonly IBlobService _blobService;
-    private readonly IAiService _aiService;
+    private readonly IGeminiAiService _aiService;
 
-    public ProvidersController(ApplicationDbContext db, IBlobService blobService, IAiService aiService)
+    public ProvidersController(ApplicationDbContext db, IBlobService blobService, IGeminiAiService aiService)
     {
         _db = db;
         _blobService = blobService;
@@ -99,7 +99,7 @@ public class ProvidersController : ControllerBase
         if (string.IsNullOrWhiteSpace(request.UserNotes))
             return BadRequest(new { message = "UserNotes is required." });
 
-        var bio = await _aiService.GenerateBioAsync(request.UserNotes);
+        var bio = await _aiService.GenerateProfileBioAsync(request.UserNotes);
         return Ok(new GenerateBioResponse(bio));
     }
 

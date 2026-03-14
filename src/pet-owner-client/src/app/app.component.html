@@ -9,33 +9,6 @@
   </main>
 
   <!-- ============================================================ -->
-  <!-- Mobile: Mode Switcher (centered above bottom nav)            -->
-  <!-- ============================================================ -->
-  @if (isLoggedIn() && canSwitchToProvider()) {
-    <div class="fixed bottom-24 left-1/2 -translate-x-1/2 z-[500] md:hidden">
-      <div class="flex items-center rounded-full p-1 shadow-lg backdrop-blur-sm border transition-colors duration-300"
-           [class]="currentMode() === 'Provider'
-             ? 'bg-emerald-50/95 border-emerald-300'
-             : 'bg-white/95 border-gray-200'">
-        <button (click)="currentMode() !== 'Owner' && toggleMode()"
-                class="px-5 py-2 rounded-full text-sm font-bold transition-all duration-300"
-                [class]="currentMode() === 'Owner'
-                  ? 'bg-indigo-600 text-white shadow-md'
-                  : 'text-gray-400 hover:text-gray-600'">
-          Owner
-        </button>
-        <button (click)="currentMode() !== 'Provider' && toggleMode()"
-                class="px-5 py-2 rounded-full text-sm font-bold transition-all duration-300"
-                [class]="currentMode() === 'Provider'
-                  ? 'bg-emerald-600 text-white shadow-md'
-                  : 'text-gray-400 hover:text-gray-600'">
-          Sitter
-        </button>
-      </div>
-    </div>
-  }
-
-  <!-- ============================================================ -->
   <!-- Mobile: Notification Bell (top-right)                        -->
   <!-- ============================================================ -->
   @if (showNav()) {
@@ -123,6 +96,25 @@
                 </a>
                 <hr class="border-gray-100 my-1">
               }
+              @if (canSwitchToProvider()) {
+                <button
+                  (click)="toggleMode(); closeProfileMenu()"
+                  class="w-full text-left flex items-center gap-2 px-4 py-2 text-sm font-semibold transition-colors cursor-pointer"
+                  [class]="currentMode() === 'Owner'
+                    ? 'text-emerald-600 hover:bg-emerald-50'
+                    : 'text-indigo-600 hover:bg-indigo-50'">
+                  🔄 {{ currentMode() === 'Owner' ? 'Switch to Sitter Mode' : 'Switch to Owner Mode' }}
+                </button>
+                <hr class="border-gray-100 my-1">
+              }
+              <a routerLink="/edit-profile"
+                 class="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 cursor-pointer"
+                 (click)="toggleProfileMenu()">
+                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
+                </svg>
+                Edit Profile
+              </a>
               @if (isAdmin()) {
                 <a routerLink="/admin"
                    class="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 cursor-pointer"
@@ -146,37 +138,9 @@
     </div>
 
     <!-- ============================================================ -->
-    <!-- Desktop: Grouped Mode Toggle + Notification Bell (top-right) -->
+    <!-- Desktop: Notification Bell + Avatar (top-right)              -->
     <!-- ============================================================ -->
     <div class="hidden md:flex fixed top-4 right-6 z-[1001] items-center gap-4">
-      @if (isLoggedIn() && !canSwitchToProvider()) {
-        <a routerLink="/become-a-sitter"
-           class="text-sm font-semibold text-gray-700 hover:bg-gray-100 rounded-full px-4 py-2 transition-colors cursor-pointer">
-          Become a Sitter
-        </a>
-      }
-      @if (isLoggedIn() && canSwitchToProvider()) {
-        <div class="flex items-center rounded-full p-1 shadow-lg backdrop-blur-sm border transition-colors duration-300"
-             [class]="currentMode() === 'Provider'
-               ? 'bg-emerald-50/95 border-emerald-300'
-               : 'bg-white/95 border-gray-200'">
-          <button (click)="currentMode() !== 'Owner' && toggleMode()"
-                  class="px-5 py-2 rounded-full text-sm font-bold transition-all duration-300"
-                  [class]="currentMode() === 'Owner'
-                    ? 'bg-indigo-600 text-white shadow-md'
-                    : 'text-gray-400 hover:text-gray-600'">
-            Owner
-          </button>
-          <button (click)="currentMode() !== 'Provider' && toggleMode()"
-                  class="px-5 py-2 rounded-full text-sm font-bold transition-all duration-300"
-                  [class]="currentMode() === 'Provider'
-                    ? 'bg-emerald-600 text-white shadow-md'
-                    : 'text-gray-400 hover:text-gray-600'">
-            Sitter
-          </button>
-        </div>
-      }
-
       @if (isLoggedIn()) {
         <!-- Notification Bell -->
         <div class="relative">
@@ -260,6 +224,25 @@
                 </a>
                 <hr class="border-gray-100 my-1">
               }
+              @if (canSwitchToProvider()) {
+                <button
+                  (click)="toggleMode(); closeProfileMenu()"
+                  class="w-full text-left flex items-center gap-2 px-4 py-2 text-sm font-semibold transition-colors cursor-pointer"
+                  [class]="currentMode() === 'Owner'
+                    ? 'text-emerald-600 hover:bg-emerald-50'
+                    : 'text-indigo-600 hover:bg-indigo-50'">
+                  🔄 {{ currentMode() === 'Owner' ? 'Switch to Sitter Mode' : 'Switch to Owner Mode' }}
+                </button>
+                <hr class="border-gray-100 my-1">
+              }
+              <a routerLink="/edit-profile"
+                 class="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 cursor-pointer"
+                 (click)="toggleProfileMenu()">
+                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
+                </svg>
+                Edit Profile
+              </a>
               @if (isAdmin()) {
                 <a routerLink="/admin"
                    class="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 cursor-pointer"

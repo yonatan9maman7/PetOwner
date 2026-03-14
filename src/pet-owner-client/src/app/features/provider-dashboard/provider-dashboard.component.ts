@@ -2,6 +2,7 @@ import { Component, OnInit, inject, signal } from '@angular/core';
 import { CommonModule, DatePipe } from '@angular/common';
 import { Router, RouterLink } from '@angular/router';
 import { ProviderService, ProviderDashboardStats } from '../../services/provider.service';
+import { ToastService } from '../../services/toast.service';
 
 @Component({
   selector: 'app-provider-dashboard',
@@ -21,6 +22,36 @@ import { ProviderService, ProviderDashboardStats } from '../../services/provider
         </div>
       } @else if (stats()) {
         <div class="px-5 -mt-8 max-w-lg mx-auto space-y-4">
+          <!-- Availability Toggle -->
+          <div class="bg-white rounded-2xl shadow-md p-5 flex items-center justify-between gap-4">
+            <div class="flex items-center gap-3">
+              <span class="relative flex h-3 w-3">
+                @if (isAvailable()) {
+                  <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                  <span class="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
+                } @else {
+                  <span class="relative inline-flex rounded-full h-3 w-3 bg-gray-300"></span>
+                }
+              </span>
+              <div>
+                <p class="text-sm font-semibold text-gray-900">
+                  Status: <span [class]="isAvailable() ? 'text-emerald-600' : 'text-gray-400'">{{ isAvailable() ? 'Online' : 'Offline' }}</span>
+                </p>
+                <p class="text-xs text-gray-400 mt-0.5">Turn this on to appear on the map and receive booking requests.</p>
+              </div>
+            </div>
+            <button
+              (click)="toggleAvailability()"
+              [disabled]="togglingAvailability()"
+              [class]="'relative inline-flex h-7 w-12 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-violet-500 focus:ring-offset-2 disabled:opacity-50 ' + (isAvailable() ? 'bg-emerald-500' : 'bg-gray-200')"
+              role="switch"
+              [attr.aria-checked]="isAvailable()">
+              <span
+                [class]="'pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out ' + (isAvailable() ? 'translate-x-5' : 'translate-x-0')">
+              </span>
+            </button>
+          </div>
+
           <!-- Stat Cards Grid -->
           <div class="grid grid-cols-2 gap-3">
             <div class="bg-white rounded-2xl shadow-md p-4">
@@ -150,12 +181,35 @@ import { ProviderService, ProviderDashboardStats } from '../../services/provider
 })
 export class ProviderDashboardComponent implements OnInit {
   private readonly providerService = inject(ProviderService);
+  private readonly toast = inject(ToastService);
 
   stats = signal<ProviderDashboardStats | null>(null);
   loading = signal(true);
+  isAvailable = signal(false);
+  togglingAvailability = signal(false);
 
   ngOnInit(): void {
     this.loadStats();
+    this.loadAvailability();
+  }
+
+  toggleAvailability(): void {
+    const newValue = !this.isAvailable();
+    this.togglingAvailability.set(true);
+
+    this.providerService.updateAvailability(newValue).subscribe({
+      next: (res) => {
+        this.isAvailable.set(res.isAvailableNow);
+        this.togglingAvailability.set(false);
+        this.toast.success(res.isAvailableNow
+          ? 'You are now visible on the map!'
+          : 'You are now offline.');
+      },
+      error: () => {
+        this.togglingAvailability.set(false);
+        this.toast.error('Failed to update availability.');
+      },
+    });
   }
 
   loadStats(): void {
@@ -163,6 +217,16 @@ export class ProviderDashboardComponent implements OnInit {
     this.providerService.getStats().subscribe({
       next: (s) => { this.stats.set(s); this.loading.set(false); },
       error: () => { this.loading.set(false); },
+    });
+  }
+
+  private loadAvailability(): void {
+    this.providerService.getMe().subscribe({
+      next: (profile) => {
+        if (profile) {
+          this.isAvailable.set(profile.isAvailableNow);
+        }
+      },
     });
   }
 }

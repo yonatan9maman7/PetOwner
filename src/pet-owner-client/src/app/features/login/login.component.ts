@@ -38,6 +38,9 @@ import { AuthService } from '../../services/auth.service';
                        placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500
                        focus:border-transparent transition"
               />
+              @if (form.get('name')?.invalid && form.get('name')?.touched) {
+                <span class="text-xs text-red-500">Full name is required</span>
+              }
             </div>
           }
 
@@ -52,6 +55,9 @@ import { AuthService } from '../../services/auth.service';
                      placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500
                      focus:border-transparent transition"
             />
+            @if (form.get('phone')?.invalid && form.get('phone')?.touched) {
+              <span class="text-xs text-red-500">Valid phone number is required (e.g. 05XXXXXXXX)</span>
+            }
           </div>
 
           <div>
@@ -65,6 +71,9 @@ import { AuthService } from '../../services/auth.service';
                      placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500
                      focus:border-transparent transition"
             />
+            @if (form.get('password')?.invalid && form.get('password')?.touched) {
+              <span class="text-xs text-red-500">Password must be at least 6 characters</span>
+            }
           </div>
 
           @if (errorMsg()) {
@@ -73,7 +82,7 @@ import { AuthService } from '../../services/auth.service';
 
           <button
             type="submit"
-            [disabled]="loading()"
+            [disabled]="loading() || form.invalid"
             class="w-full py-3 rounded-xl bg-indigo-600 text-white font-semibold
                    hover:bg-indigo-700 active:bg-indigo-800 disabled:opacity-50
                    disabled:cursor-not-allowed transition"
@@ -114,6 +123,13 @@ export class LoginComponent {
     this.isRegister.update((v) => !v);
     this.errorMsg.set('');
     this.form.reset({ name: '', phone: '', password: '' });
+
+    if (this.isRegister()) {
+      this.form.controls.name.setValidators([Validators.required]);
+    } else {
+      this.form.controls.name.clearValidators();
+    }
+    this.form.controls.name.updateValueAndValidity();
   }
 
   onSubmit(): void {

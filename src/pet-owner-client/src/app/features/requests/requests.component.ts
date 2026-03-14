@@ -507,7 +507,9 @@ export class RequestsComponent implements OnInit {
 
   ngOnInit(): void {
     this.loadRequests();
-    this.providerService.refreshStatus();
+    if (this.auth.userRole() === 'Provider') {
+      this.providerService.refreshStatus();
+    }
   }
 
   statusClass(status: string): string {

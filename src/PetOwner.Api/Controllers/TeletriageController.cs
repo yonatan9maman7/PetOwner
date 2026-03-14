@@ -16,12 +16,12 @@ namespace PetOwner.Api.Controllers;
 public class TeletriageController : ControllerBase
 {
     private readonly ApplicationDbContext _db;
-    private readonly ITeletriageService _teletriageService;
+    private readonly IGeminiAiService _aiService;
 
-    public TeletriageController(ApplicationDbContext db, ITeletriageService teletriageService)
+    public TeletriageController(ApplicationDbContext db, IGeminiAiService aiService)
     {
         _db = db;
-        _teletriageService = teletriageService;
+        _aiService = aiService;
     }
 
     [HttpPost("assess")]
@@ -46,8 +46,11 @@ public class TeletriageController : ControllerBase
 
         var medicalHistory = recentRecords.Count > 0 ? string.Join("; ", recentRecords) : null;
 
-        var result = await _teletriageService.AssessAsync(
-            pet.Name, pet.Species, pet.Age, request.Symptoms.Trim(), medicalHistory, request.ImageBase64);
+        var petDetails = $"Pet: {pet.Name}, a {pet.Age}-year-old {pet.Species}."
+            + (medicalHistory != null ? $"\nMedical history: {medicalHistory}" : "");
+
+        var result = await _aiService.AssessTeletriageAsync(
+            petDetails, request.Symptoms.Trim(), request.ImageBase64);
 
         var session = new TeletriageSession
         {

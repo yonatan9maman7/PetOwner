@@ -122,9 +122,7 @@ builder.Services.AddScoped<IPaymentService, StripePaymentService>();
 builder.Services.Configure<BlobStorageSettings>(builder.Configuration.GetSection(BlobStorageSettings.SectionName));
 builder.Services.AddScoped<IBlobService, BlobService>();
 
-builder.Services.Configure<OpenAiSettings>(builder.Configuration.GetSection(OpenAiSettings.SectionName));
-builder.Services.AddScoped<ITeletriageService, OpenAiTeletriageService>();
-builder.Services.AddScoped<IAiService, OpenAiService>();
+builder.Services.AddHttpClient<IGeminiAiService, GeminiAiService>();
 
 builder.Services.AddSignalR();
 builder.Services.AddScoped<INotificationService, NotificationService>();

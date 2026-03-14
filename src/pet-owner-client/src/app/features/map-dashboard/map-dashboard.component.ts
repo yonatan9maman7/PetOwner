@@ -6,6 +6,8 @@ import {
   computed,
   inject,
   ChangeDetectionStrategy,
+  ViewChild,
+  ElementRef,
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -34,6 +36,8 @@ const DEFAULT_ZOOM = 15;
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class MapDashboardComponent implements OnInit, OnDestroy {
+  @ViewChild('chipsContainer') chipsContainer!: ElementRef<HTMLDivElement>;
+
   private readonly mapService = inject(MapService);
   readonly providerService = inject(ProviderService);
   private readonly auth = inject(AuthService);
@@ -251,9 +255,11 @@ export class MapDashboardComponent implements OnInit, OnDestroy {
 
   private checkProviderStatus(): void {
     if (!this.auth.isLoggedIn()) return;
+    if (this.auth.userRole() !== 'Provider') return;
 
     this.providerService.getMe().subscribe({
       next: (profile) => {
+        if (!profile) return;
         if (profile.status === 'Approved') {
           this.isApprovedProvider.set(true);
           this.isAvailable.set(profile.isAvailableNow);
@@ -322,6 +328,17 @@ export class MapDashboardComponent implements OnInit, OnDestroy {
 
   toggleFilterPanel(): void {
     this.showFilterPanel.update(v => !v);
+  }
+
+  scrollChips(direction: 'left' | 'right'): void {
+    const container = this.chipsContainer?.nativeElement;
+    if (container) {
+      const scrollAmount = 200;
+      container.scrollBy({
+        left: direction === 'left' ? -scrollAmount : scrollAmount,
+        behavior: 'smooth',
+      });
+    }
   }
 
   selectCategory(value: string): void {

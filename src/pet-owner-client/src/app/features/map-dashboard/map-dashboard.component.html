@@ -49,7 +49,35 @@
 
   <!-- Category Chips (Horizontal Scroll) -->
   <div class="pointer-events-auto mt-2.5 w-[90%] md:w-[600px] relative">
-    <div class="overflow-x-auto whitespace-nowrap scrollbar-hide flex gap-2 pb-1 pr-8">
+    <!-- Left scroll button (desktop only) -->
+    <button
+      (click)="scrollChips('left')"
+      class="hidden md:flex absolute left-0 top-1/2 -translate-y-1/2 z-10
+             bg-white/95 shadow-md rounded-full w-8 h-8 items-center justify-center
+             text-gray-500 hover:text-gray-800 hover:bg-gray-50
+             border border-gray-100 backdrop-blur-sm transition-colors duration-150">
+      <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
+      </svg>
+    </button>
+
+    <!-- Right scroll button (desktop only) -->
+    <button
+      (click)="scrollChips('right')"
+      class="hidden md:flex absolute right-0 top-1/2 -translate-y-1/2 z-10
+             bg-white/95 shadow-md rounded-full w-8 h-8 items-center justify-center
+             text-gray-500 hover:text-gray-800 hover:bg-gray-50
+             border border-gray-100 backdrop-blur-sm transition-colors duration-150">
+      <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
+      </svg>
+    </button>
+
+    <!-- Fade gradients (sit behind the buttons) -->
+    <div class="absolute top-0 left-0 bottom-0 w-10 bg-gradient-to-r from-white/80 to-transparent pointer-events-none rounded-l-full z-[5]"></div>
+    <div class="absolute top-0 right-0 bottom-0 w-10 bg-gradient-to-l from-white/80 to-transparent pointer-events-none rounded-r-full z-[5]"></div>
+
+    <div #chipsContainer class="overflow-x-auto whitespace-nowrap scrollbar-hide flex gap-2 pb-1 px-5 md:px-10">
       @for (cat of categories; track cat.value) {
         <button
           (click)="selectCategory(cat.value)"
@@ -63,7 +91,6 @@
         </button>
       }
     </div>
-    <div class="absolute top-0 right-0 bottom-0 w-10 bg-gradient-to-l from-white/90 to-transparent pointer-events-none rounded-r-full"></div>
   </div>
 
   <!-- Loading Indicator -->

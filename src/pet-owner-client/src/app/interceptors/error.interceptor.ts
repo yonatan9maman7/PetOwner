@@ -15,6 +15,8 @@ export const errorInterceptor: HttpInterceptorFn = (req, next) => {
         auth.logout();
       } else if (err.status === 403) {
         toast.error('You don\'t have permission to perform this action.');
+      } else if (err.status === 404 && req.url.includes('/api/providers/me')) {
+        // Provider-profile lookup for non-providers — handled silently by the service
       } else if (err.status >= 400 && err.status < 500) {
         const message = extractMessage(err) ?? 'Something went wrong with your request.';
         toast.error(message);

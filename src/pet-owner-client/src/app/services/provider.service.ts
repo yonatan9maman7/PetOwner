@@ -1,6 +1,6 @@
 import { Injectable, inject, signal } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
-import { Observable, tap } from 'rxjs';
+import { HttpClient, HttpErrorResponse } from '@angular/common/http';
+import { Observable, tap, catchError, of } from 'rxjs';
 
 export interface ProviderProfile {
   status: string;
@@ -123,11 +123,15 @@ export class ProviderService {
 
   readonly providerStatus = signal<ProviderStatus>(null);
 
-  getMe(): Observable<ProviderProfile> {
+  getMe(): Observable<ProviderProfile | null> {
     return this.http.get<ProviderProfile>(`${this.baseUrl}/me`).pipe(
-      tap({
-        next: (profile) => this.providerStatus.set(profile.status as ProviderStatus),
-        error: () => this.providerStatus.set('None'),
+      tap((profile) => this.providerStatus.set(profile.status as ProviderStatus)),
+      catchError((err: HttpErrorResponse) => {
+        this.providerStatus.set('None');
+        if (err.status === 404) {
+          return of(null);
+        }
+        throw err;
       })
     );
   }

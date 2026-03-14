@@ -231,7 +231,8 @@ export class EditProfileComponent implements OnInit {
     this.error.set('');
 
     this.providerService.getMe().subscribe({
-      next: (profile: ProviderProfile) => {
+      next: (profile) => {
+        if (!profile) { this.error.set('Provider profile not found.'); this.loading.set(false); return; }
         this.userName.set(profile.userName ?? '');
         this.status.set(profile.status ?? '');
         this.bio = profile.bio ?? '';
