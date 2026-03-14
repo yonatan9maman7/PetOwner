@@ -9,7 +9,7 @@ public class GeminiAiService : IGeminiAiService
     private readonly ILogger<GeminiAiService> _logger;
 
     private const string GeminiEndpoint =
-        "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent";
+        "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent";
 
     public GeminiAiService(HttpClient httpClient, IConfiguration configuration, ILogger<GeminiAiService> logger)
     {
