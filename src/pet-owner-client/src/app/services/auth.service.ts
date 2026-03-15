@@ -69,16 +69,24 @@ export class AuthService {
     }
   });
 
-  login(phone: string, password: string) {
-    return this.http.post<AuthResponse>('/api/auth/login', { phone, password }).pipe(
+  login(email: string, password: string) {
+    return this.http.post<AuthResponse>('/api/auth/login', { email, password }).pipe(
       tap((res) => this.setToken(res.token)),
     );
   }
 
-  register(phone: string, password: string, name: string) {
-    return this.http.post<AuthResponse>('/api/auth/register', { phone, password, name }).pipe(
+  register(payload: { email: string; phone: string; name: string; password: string; role?: string }) {
+    return this.http.post<AuthResponse>('/api/auth/register', payload).pipe(
       tap((res) => this.setToken(res.token)),
     );
+  }
+
+  forgotPassword(email: string) {
+    return this.http.post<{ message: string }>('/api/auth/forgot-password', { email });
+  }
+
+  resetPassword(payload: { email: string; token: string; newPassword: string }) {
+    return this.http.post<{ message: string }>('/api/auth/reset-password', payload);
   }
 
   logout(): void {

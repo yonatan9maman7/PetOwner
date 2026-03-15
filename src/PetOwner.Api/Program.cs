@@ -14,8 +14,8 @@ const string developmentJwtFallback = "DevOnly_JwtKey_ChangeBeforeSharing_123456
 const string developmentAdminPasswordFallback = "DevOnly_AdminPassword_ChangeMe_123!";
 var developmentAdminDefaults = new List<AdminSeedUser>
 {
-    new() { Phone = "0500000001", Name = "JonathanAdmin" },
-    new() { Phone = "0500000002", Name = "TomerAdmin" }
+    new() { Phone = "0500000001", Email = "jonathan@petowner.dev", Name = "JonathanAdmin" },
+    new() { Phone = "0500000002", Email = "tomer@petowner.dev", Name = "TomerAdmin" }
 };
 
 if (builder.Environment.IsDevelopment() && string.IsNullOrWhiteSpace(builder.Configuration["Jwt:Key"]))
@@ -124,6 +124,9 @@ builder.Services.AddScoped<IBlobService, BlobService>();
 
 builder.Services.AddHttpClient<IGeminiAiService, GeminiAiService>();
 
+builder.Services.Configure<EmailSettings>(builder.Configuration.GetSection(EmailSettings.SectionName));
+builder.Services.AddScoped<IEmailService, SmtpEmailService>();
+
 builder.Services.AddSignalR();
 builder.Services.AddScoped<INotificationService, NotificationService>();
 
@@ -206,14 +209,18 @@ static async Task SeedAdminUsers(
         return;
     }
 
-    foreach (var admin in admins.Where(a => !string.IsNullOrWhiteSpace(a.Phone) && !string.IsNullOrWhiteSpace(a.Name)))
+    foreach (var admin in admins.Where(a =>
+        !string.IsNullOrWhiteSpace(a.Phone)
+        && !string.IsNullOrWhiteSpace(a.Email)
+        && !string.IsNullOrWhiteSpace(a.Name)))
     {
-        if (!await db.Users.AnyAsync(u => u.Phone == admin.Phone))
+        if (!await db.Users.AnyAsync(u => u.Email == admin.Email))
         {
             db.Users.Add(new User
             {
                 Id = Guid.NewGuid(),
                 Phone = admin.Phone,
+                Email = admin.Email,
                 Name = admin.Name,
                 Role = "Admin",
                 PasswordHash = BCrypt.Net.BCrypt.HashPassword(adminPassword),
@@ -228,5 +235,6 @@ static async Task SeedAdminUsers(
 internal class AdminSeedUser
 {
     public string Phone { get; init; } = string.Empty;
+    public string Email { get; init; } = string.Empty;
     public string Name { get; init; } = string.Empty;
 }

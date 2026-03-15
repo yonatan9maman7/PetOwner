@@ -1,9 +1,12 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
+using System.Security.Cryptography;
 using System.Text;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using PetOwner.Api.DTOs;
+using PetOwner.Api.Services;
 using PetOwner.Data;
 using PetOwner.Data.Models;
 
@@ -15,27 +18,34 @@ public class AuthController : ControllerBase
 {
     private readonly ApplicationDbContext _db;
     private readonly IConfiguration _config;
+    private readonly IEmailService _emailService;
 
-    public AuthController(ApplicationDbContext db, IConfiguration config)
+    public AuthController(ApplicationDbContext db, IConfiguration config, IEmailService emailService)
     {
         _db = db;
         _config = config;
+        _emailService = emailService;
     }
 
     [HttpPost("register")]
-    public async Task<IActionResult> Register([FromBody] RegisterRequest request)
+    public async Task<IActionResult> Register([FromBody] RegisterDto dto)
     {
-        var exists = await _db.Users.AnyAsync(u => u.Phone == request.Phone);
-        if (exists)
-            return Conflict(new { message = "A user with this phone already exists." });
+        var emailExists = await _db.Users.AnyAsync(u => u.Email == dto.Email);
+        if (emailExists)
+            return BadRequest(new { message = "A user with this email already exists." });
+
+        var phoneExists = await _db.Users.AnyAsync(u => u.Phone == dto.Phone);
+        if (phoneExists)
+            return BadRequest(new { message = "This phone number is already registered." });
 
         var user = new User
         {
             Id = Guid.NewGuid(),
-            Phone = request.Phone,
-            Name = request.Name,
-            Role = "Owner",
-            PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.Password),
+            Email = dto.Email,
+            Phone = dto.Phone,
+            Name = dto.Name,
+            Role = dto.Role,
+            PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.Password),
             CreatedAt = DateTime.UtcNow
         };
 
@@ -43,21 +53,79 @@ public class AuthController : ControllerBase
         await _db.SaveChangesAsync();
 
         var token = GenerateJwt(user);
-
         return Ok(new { token, userId = user.Id });
     }
 
     [HttpPost("login")]
-    public async Task<IActionResult> Login([FromBody] LoginRequest request)
+    public async Task<IActionResult> Login([FromBody] LoginDto dto)
     {
-        var user = await _db.Users.FirstOrDefaultAsync(u => u.Phone == request.Phone);
+        var user = await _db.Users.FirstOrDefaultAsync(u => u.Email == dto.Email);
 
-        if (user is null || !BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash))
-            return Unauthorized(new { message = "Invalid phone or password." });
+        if (user is null || !BCrypt.Net.BCrypt.Verify(dto.Password, user.PasswordHash))
+            return Unauthorized(new { message = "Invalid email or password." });
 
         var token = GenerateJwt(user);
-
         return Ok(new { token, userId = user.Id });
+    }
+
+    [HttpPost("forgot-password")]
+    public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordDto dto)
+    {
+        var user = await _db.Users.FirstOrDefaultAsync(u => u.Email == dto.Email);
+
+        if (user is not null)
+        {
+            var tokenBytes = RandomNumberGenerator.GetBytes(32);
+            var resetToken = Convert.ToBase64String(tokenBytes);
+
+            user.ResetPasswordToken = resetToken;
+            user.ResetPasswordTokenExpiry = DateTime.UtcNow.AddHours(1);
+            await _db.SaveChangesAsync();
+
+            var encodedToken = Uri.EscapeDataString(resetToken);
+            var encodedEmail = Uri.EscapeDataString(dto.Email);
+            var resetLink = $"http://localhost:4200/reset-password?token={encodedToken}&email={encodedEmail}";
+
+            var body = $"""
+                <div dir="rtl" style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                    <h2>איפוס סיסמה - PetOwner</h2>
+                    <p>קיבלנו בקשה לאיפוס הסיסמה שלך.</p>
+                    <p>לחץ על הכפתור למטה לאיפוס הסיסמה:</p>
+                    <a href="{resetLink}"
+                       style="display: inline-block; padding: 12px 24px; background-color: #4F46E5;
+                              color: white; text-decoration: none; border-radius: 8px; margin: 16px 0;">
+                        איפוס סיסמה
+                    </a>
+                    <p style="color: #6B7280; font-size: 14px;">הקישור תקף לשעה אחת בלבד.</p>
+                    <p style="color: #6B7280; font-size: 14px;">אם לא ביקשת לאפס את הסיסמה, ניתן להתעלם מהודעה זו.</p>
+                </div>
+                """;
+
+            await _emailService.SendEmailAsync(dto.Email, "איפוס סיסמה - PetOwner", body);
+        }
+
+        return Ok(new { message = "If the email exists in our system, a reset link has been sent." });
+    }
+
+    [HttpPost("reset-password")]
+    public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordDto dto)
+    {
+        var user = await _db.Users.FirstOrDefaultAsync(u => u.Email == dto.Email);
+
+        if (user is null
+            || user.ResetPasswordToken != dto.Token
+            || user.ResetPasswordTokenExpiry is null
+            || user.ResetPasswordTokenExpiry < DateTime.UtcNow)
+        {
+            return BadRequest(new { message = "Invalid or expired reset token." });
+        }
+
+        user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.NewPassword);
+        user.ResetPasswordToken = null;
+        user.ResetPasswordTokenExpiry = null;
+        await _db.SaveChangesAsync();
+
+        return Ok(new { message = "Password has been reset successfully." });
     }
 
     private string GenerateJwt(User user)
@@ -87,6 +155,3 @@ public class AuthController : ControllerBase
         return new JwtSecurityTokenHandler().WriteToken(token);
     }
 }
-
-public record RegisterRequest(string Phone, string Password, string Name);
-public record LoginRequest(string Phone, string Password);

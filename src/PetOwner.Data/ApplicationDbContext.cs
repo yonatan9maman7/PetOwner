@@ -66,6 +66,13 @@ public class ApplicationDbContext : DbContext
             entity.HasIndex(u => u.Phone)
                 .IsUnique();
 
+            entity.Property(u => u.Email)
+                .IsRequired()
+                .HasMaxLength(200);
+
+            entity.HasIndex(u => u.Email)
+                .IsUnique();
+
             entity.Property(u => u.Name)
                 .IsRequired()
                 .HasMaxLength(100);
@@ -80,6 +87,11 @@ public class ApplicationDbContext : DbContext
 
             entity.Property(u => u.CreatedAt)
                 .HasDefaultValueSql("GETUTCDATE()");
+
+            entity.Property(u => u.ResetPasswordToken)
+                .HasMaxLength(200);
+
+            entity.Property(u => u.ResetPasswordTokenExpiry);
         });
     }
 
