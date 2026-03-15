@@ -14,7 +14,7 @@ const string developmentJwtFallback = "DevOnly_JwtKey_ChangeBeforeSharing_123456
 const string developmentAdminPasswordFallback = "DevOnly_AdminPassword_ChangeMe_123!";
 var developmentAdminDefaults = new List<AdminSeedUser>
 {
-    new() { Phone = "0500000001", Email = "jonathan@petowner.dev", Name = "JonathanAdmin" },
+    new() { Phone = "0500000001", Email = "yonatan9maman7@gmail.com", Name = "JonathanAdmin" },
     new() { Phone = "0500000002", Email = "tomer@petowner.dev", Name = "TomerAdmin" }
 };
 

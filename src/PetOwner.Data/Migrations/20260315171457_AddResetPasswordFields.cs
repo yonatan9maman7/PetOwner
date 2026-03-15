@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
@@ -31,6 +31,8 @@ namespace PetOwner.Data.Migrations
                 table: "Users",
                 type: "datetime2",
                 nullable: true);
+
+            migrationBuilder.Sql("UPDATE Users SET Email = CAST(Id AS NVARCHAR(36)) + '@temp-petowner.com' WHERE Email = '' OR Email IS NULL");
 
             migrationBuilder.CreateIndex(
                 name: "IX_Users_Email",
