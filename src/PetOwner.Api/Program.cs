@@ -208,24 +208,44 @@ static async Task SeedAdminUsers(
         return;
     }
 
+    var passwordHash = BCrypt.Net.BCrypt.HashPassword(adminPassword);
+
     foreach (var admin in admins.Where(a =>
         !string.IsNullOrWhiteSpace(a.Phone)
         && !string.IsNullOrWhiteSpace(a.Email)
         && !string.IsNullOrWhiteSpace(a.Name)))
     {
-        if (!await db.Users.AnyAsync(u => u.Email == admin.Email))
+        var existingByPhone = await db.Users.FirstOrDefaultAsync(u => u.Phone == admin.Phone);
+        if (existingByPhone is not null)
         {
-            db.Users.Add(new User
-            {
-                Id = Guid.NewGuid(),
-                Phone = admin.Phone,
-                Email = admin.Email,
-                Name = admin.Name,
-                Role = "Admin",
-                PasswordHash = BCrypt.Net.BCrypt.HashPassword(adminPassword),
-                CreatedAt = DateTime.UtcNow
-            });
+            existingByPhone.Email = admin.Email;
+            existingByPhone.Name = admin.Name;
+            existingByPhone.Role = "Admin";
+            logger.LogInformation("Admin user updated (matched by phone {Phone})", admin.Phone);
+            continue;
         }
+
+        var existingByEmail = await db.Users.FirstOrDefaultAsync(u => u.Email == admin.Email);
+        if (existingByEmail is not null)
+        {
+            existingByEmail.Phone = admin.Phone;
+            existingByEmail.Name = admin.Name;
+            existingByEmail.Role = "Admin";
+            logger.LogInformation("Admin user updated (matched by email {Email})", admin.Email);
+            continue;
+        }
+
+        db.Users.Add(new User
+        {
+            Id = Guid.NewGuid(),
+            Phone = admin.Phone,
+            Email = admin.Email,
+            Name = admin.Name,
+            Role = "Admin",
+            PasswordHash = passwordHash,
+            CreatedAt = DateTime.UtcNow
+        });
+        logger.LogInformation("Admin user created ({Email})", admin.Email);
     }
 
     await db.SaveChangesAsync();
