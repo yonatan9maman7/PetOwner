@@ -18,16 +18,13 @@ public class SmtpEmailService : IEmailService
     public async Task SendEmailAsync(string to, string subject, string body)
     {
         using var client = new SmtpClient(_settings.Host, _settings.Port);
+        client.EnableSsl = true;
+        client.UseDefaultCredentials = false;
+        client.Credentials = new NetworkCredential(_settings.Username, _settings.Password);
 
-        if (!string.IsNullOrWhiteSpace(_settings.Username))
+        using var message = new MailMessage
         {
-            client.Credentials = new NetworkCredential(_settings.Username, _settings.Password);
-            client.EnableSsl = true;
-        }
-
-        var message = new MailMessage
-        {
-            From = new MailAddress(_settings.FromAddress, _settings.FromName),
+            From = new MailAddress(_settings.FromEmail, _settings.FromName),
             Subject = subject,
             Body = body,
             IsBodyHtml = true
