@@ -84,24 +84,23 @@ public class AuthController : ControllerBase
 
             var encodedToken = Uri.EscapeDataString(resetToken);
             var encodedEmail = Uri.EscapeDataString(dto.Email);
-            var resetLink = $"http://localhost:4200/reset-password?token={encodedToken}&email={encodedEmail}";
+            var baseUrl = _config["FrontendBaseUrl"]?.TrimEnd('/');
+            var resetLink = $"{baseUrl}/reset-password?token={encodedToken}&email={encodedEmail}";
 
-            var body = $"""
-                <div dir="rtl" style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-                    <h2>איפוס סיסמה - PetOwner</h2>
-                    <p>קיבלנו בקשה לאיפוס הסיסמה שלך.</p>
-                    <p>לחץ על הכפתור למטה לאיפוס הסיסמה:</p>
-                    <a href="{resetLink}"
-                       style="display: inline-block; padding: 12px 24px; background-color: #4F46E5;
-                              color: white; text-decoration: none; border-radius: 8px; margin: 16px 0;">
-                        איפוס סיסמה
-                    </a>
-                    <p style="color: #6B7280; font-size: 14px;">הקישור תקף לשעה אחת בלבד.</p>
-                    <p style="color: #6B7280; font-size: 14px;">אם לא ביקשת לאפס את הסיסמה, ניתן להתעלם מהודעה זו.</p>
-                </div>
-                """;
+            var body = $@"
+<div dir='ltr' style='font-family: Arial, sans-serif; color: #333; text-align: left; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eaeaea; border-radius: 10px;'>
+    <h2 style='color: #4F46E5;'>Reset Your Password - PetOwner</h2>
+    <p>Hello,</p>
+    <p>We received a request to reset the password for your account.</p>
+    <p>Click the button below to choose a new password:</p>
+    <div style='margin: 30px 0;'>
+        <a href='{resetLink}' style='background-color: #4F46E5; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; font-weight: bold; display: inline-block;'>Reset Password</a>
+    </div>
+    <p style='font-size: 12px; color: #888;'>If you didn't request a password reset, you can safely ignore this email.</p>
+    <p>Best regards,<br/>The PetOwner Team</p>
+</div>";
 
-            await _emailService.SendEmailAsync(dto.Email, "איפוס סיסמה - PetOwner", body);
+            await _emailService.SendEmailAsync(dto.Email, "Reset Your Password - PetOwner", body);
         }
 
         return Ok(new { message = "If the email exists in our system, a reset link has been sent." });

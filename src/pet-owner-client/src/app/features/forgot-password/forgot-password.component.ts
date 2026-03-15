@@ -9,7 +9,7 @@ import { ToastService } from '../../services/toast.service';
   standalone: true,
   imports: [ReactiveFormsModule, RouterLink],
   template: `
-    <div class="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-50 to-white px-4" dir="rtl">
+    <div class="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-50 to-white px-4" dir="ltr">
       <div class="w-full max-w-sm">
         <div class="text-center mb-8">
           <div class="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-indigo-600 text-white mb-4">
@@ -18,25 +18,24 @@ import { ToastService } from '../../services/toast.service';
                 d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
             </svg>
           </div>
-          <h1 class="text-2xl font-bold text-gray-900">שכחתי סיסמה</h1>
-          <p class="text-sm text-gray-500 mt-1">הזינו את כתובת האימייל שלכם ונשלח לכם קישור לאיפוס</p>
+          <h1 class="text-2xl font-bold text-gray-900">Forgot Password</h1>
+          <p class="text-sm text-gray-500 mt-1">Enter your email address to receive a reset link.</p>
         </div>
 
         <form [formGroup]="form" (ngSubmit)="onSubmit()" class="space-y-4">
           <div>
-            <label for="email" class="block text-sm font-medium text-gray-700 mb-1">אימייל</label>
+            <label for="email" class="block text-sm font-medium text-gray-700 mb-1">Email Address</label>
             <input
               id="email"
               formControlName="email"
               type="email"
               placeholder="you&#64;example.com"
-              dir="ltr"
               class="w-full px-4 py-3 rounded-xl border border-gray-300 bg-white text-gray-900
                      placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500
-                     focus:border-transparent transition text-left"
+                     focus:border-transparent transition"
             />
             @if (form.get('email')?.invalid && form.get('email')?.touched) {
-              <span class="text-xs text-red-500">יש להזין כתובת אימייל תקינה</span>
+              <span class="text-xs text-red-500">Please enter a valid email address</span>
             }
           </div>
 
@@ -47,12 +46,12 @@ import { ToastService } from '../../services/toast.service';
                    hover:bg-indigo-700 active:bg-indigo-800 disabled:opacity-50
                    disabled:cursor-not-allowed transition"
           >
-            {{ loading() ? 'שולח...' : 'שליחת קישור איפוס' }}
+            {{ loading() ? 'Sending...' : 'Send Reset Link' }}
           </button>
         </form>
 
         <p class="text-center text-sm text-gray-500 mt-6">
-          <a routerLink="/login" class="text-indigo-600 font-medium hover:underline">חזרה להתחברות</a>
+          <a routerLink="/login" class="text-indigo-600 font-medium hover:underline">Back to Login</a>
         </p>
       </div>
     </div>
@@ -81,12 +80,12 @@ export class ForgotPasswordComponent {
     this.auth.forgotPassword(email).subscribe({
       next: () => {
         this.loading.set(false);
-        this.toast.success('אם המייל קיים במערכת, נשלח אליך קישור לאיפוס סיסמה');
+        this.toast.success('If the email exists, a reset link has been sent.');
         this.form.reset({ email: '' });
       },
       error: () => {
         this.loading.set(false);
-        this.toast.success('אם המייל קיים במערכת, נשלח אליך קישור לאיפוס סיסמה');
+        this.toast.success('If the email exists, a reset link has been sent.');
         this.form.reset({ email: '' });
       },
     });

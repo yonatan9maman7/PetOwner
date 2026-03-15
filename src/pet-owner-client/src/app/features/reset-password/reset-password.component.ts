@@ -9,7 +9,7 @@ import { ToastService } from '../../services/toast.service';
   standalone: true,
   imports: [ReactiveFormsModule, RouterLink],
   template: `
-    <div class="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-50 to-white px-4" dir="rtl">
+    <div class="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-50 to-white px-4" dir="ltr">
       <div class="w-full max-w-sm">
         <div class="text-center mb-8">
           <div class="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-indigo-600 text-white mb-4">
@@ -18,13 +18,13 @@ import { ToastService } from '../../services/toast.service';
                 d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
             </svg>
           </div>
-          <h1 class="text-2xl font-bold text-gray-900">איפוס סיסמה</h1>
-          <p class="text-sm text-gray-500 mt-1">הזינו סיסמה חדשה לחשבון שלכם</p>
+          <h1 class="text-2xl font-bold text-gray-900">Reset Password</h1>
+          <p class="text-sm text-gray-500 mt-1">Enter your new password below.</p>
         </div>
 
         <form [formGroup]="form" (ngSubmit)="onSubmit()" class="space-y-4">
           <div>
-            <label for="newPassword" class="block text-sm font-medium text-gray-700 mb-1">סיסמה חדשה</label>
+            <label for="newPassword" class="block text-sm font-medium text-gray-700 mb-1">New Password</label>
             <input
               id="newPassword"
               formControlName="newPassword"
@@ -35,12 +35,12 @@ import { ToastService } from '../../services/toast.service';
                      focus:border-transparent transition"
             />
             @if (form.get('newPassword')?.invalid && form.get('newPassword')?.touched) {
-              <span class="text-xs text-red-500">הסיסמה חייבת להכיל לפחות 6 תווים</span>
+              <span class="text-xs text-red-500">Password must be at least 6 characters</span>
             }
           </div>
 
           <div>
-            <label for="confirmPassword" class="block text-sm font-medium text-gray-700 mb-1">אימות סיסמה</label>
+            <label for="confirmPassword" class="block text-sm font-medium text-gray-700 mb-1">Confirm Password</label>
             <input
               id="confirmPassword"
               formControlName="confirmPassword"
@@ -51,7 +51,7 @@ import { ToastService } from '../../services/toast.service';
                      focus:border-transparent transition"
             />
             @if (form.get('confirmPassword')?.touched && form.hasError('passwordsMismatch')) {
-              <span class="text-xs text-red-500">הסיסמאות אינן תואמות</span>
+              <span class="text-xs text-red-500">Passwords do not match</span>
             }
           </div>
 
@@ -66,12 +66,12 @@ import { ToastService } from '../../services/toast.service';
                    hover:bg-indigo-700 active:bg-indigo-800 disabled:opacity-50
                    disabled:cursor-not-allowed transition"
           >
-            {{ loading() ? 'מעדכן...' : 'עדכון סיסמה' }}
+            {{ loading() ? 'Resetting...' : 'Reset My Password' }}
           </button>
         </form>
 
         <p class="text-center text-sm text-gray-500 mt-6">
-          <a routerLink="/login" class="text-indigo-600 font-medium hover:underline">חזרה להתחברות</a>
+          <a routerLink="/login" class="text-indigo-600 font-medium hover:underline">Back to Login</a>
         </p>
       </div>
     </div>
@@ -121,12 +121,12 @@ export class ResetPasswordComponent implements OnInit {
     this.auth.resetPassword({ email: this.email, token: this.token, newPassword }).subscribe({
       next: () => {
         this.loading.set(false);
-        this.toast.success('הסיסמה שונתה בהצלחה');
+        this.toast.success('Password successfully reset.');
         this.router.navigateByUrl('/login');
       },
       error: (err) => {
         this.loading.set(false);
-        this.errorMsg.set(err.error?.message ?? 'הקישור אינו תקין או שפג תוקפו. נסו לבקש קישור חדש.');
+        this.errorMsg.set(err.error?.message ?? 'The link is invalid or has expired. Please request a new one.');
       },
     });
   }
