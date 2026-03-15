@@ -1,12 +1,20 @@
+using System.ComponentModel.DataAnnotations;
+
 namespace PetOwner.Api.DTOs;
 
 public record ProviderOnboardingRequest(
     List<string> Services,
     decimal HourlyRate,
     string Bio,
-    double? Latitude,
-    double? Longitude,
-    string? Address
+    [Required] double Latitude,
+    [Required] double Longitude,
+    [Required] string Address,
+    [Required] string ReferenceName,
+    [Required] string ReferenceContact,
+    [Required]
+    [StringLength(9, MinimumLength = 9)]
+    [RegularExpression("^[0-9]{9}$", ErrorMessage = "ID Number must be exactly 9 digits.")]
+    string IdNumber
 );
 
 public record ProviderMeResponse(

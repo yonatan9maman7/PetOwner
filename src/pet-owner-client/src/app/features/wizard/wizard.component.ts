@@ -90,6 +90,9 @@ import { AddressSuggestion } from '../../services/geocoding.service';
             <app-step-magic-bio />
 
             <div class="location-section">
+              <h3 class="step-title" style="font-size:1.1rem">Location <span class="text-red-500">*</span></h3>
+              <p class="step-subtitle" style="margin-bottom:0.75rem">A verified address with coordinates is required.</p>
+
               <div class="location-toggle">
                 <button
                   type="button"
@@ -97,7 +100,7 @@ import { AddressSuggestion } from '../../services/geocoding.service';
                   [class.location-toggle__btn--active]="locationMode() === 'auto'"
                   (click)="switchLocationMode('auto')"
                 >
-                  📍 Use My Location
+                  Use My Location
                 </button>
                 <button
                   type="button"
@@ -105,7 +108,7 @@ import { AddressSuggestion } from '../../services/geocoding.service';
                   [class.location-toggle__btn--active]="locationMode() === 'manual'"
                   (click)="switchLocationMode('manual')"
                 >
-                  ✏️ Enter Address
+                  Enter Address
                 </button>
               </div>
 
@@ -125,14 +128,17 @@ import { AddressSuggestion } from '../../services/geocoding.service';
 
               @if (locationMode() === 'manual') {
                 <div class="field">
-                  <label class="field-label">Address</label>
+                  <label class="field-label">Address <span class="text-red-500">*</span></label>
                   <app-address-autocomplete
                     [ngModel]="store.address()"
                     (ngModelChange)="onAddressChange($event)"
                     (suggestionSelected)="onSuggestionSelected($event)"
                   />
+                  @if (addressTouched() && !store.hasLocation()) {
+                    <span class="field-error">Please select an address from the suggestions to capture coordinates.</span>
+                  }
                 </div>
-                @if (store.address().trim()) {
+                @if (store.hasLocation()) {
                   <p class="location-confirmation">Address set ✓</p>
                 }
               }
@@ -140,6 +146,75 @@ import { AddressSuggestion } from '../../services/geocoding.service';
               @if (locationError()) {
                 <p class="location-error">{{ locationError() }}</p>
               }
+            </div>
+          }
+          @case (3) {
+            <div class="step-form">
+              <h2 class="step-title">Trust & Verification</h2>
+              <p class="step-subtitle">We need a few details to prepare for future KYC verification.</p>
+
+              <div class="field">
+                <label class="field-label" for="idNumber">ID Number <span class="text-red-500">*</span></label>
+                <input
+                  id="idNumber"
+                  type="text"
+                  inputmode="numeric"
+                  maxlength="9"
+                  placeholder="123456789"
+                  class="w-full px-4 py-3 text-base border-[1.5px] rounded-xl bg-white text-slate-900 outline-none transition-all
+                         border-slate-300 focus:border-indigo-500 focus:ring-[3px] focus:ring-indigo-500/15
+                         placeholder:text-slate-400"
+                  [class.border-red-400]="verificationTouched() && !isIdNumberValid()"
+                  [class.focus:border-red-400]="verificationTouched() && !isIdNumberValid()"
+                  [ngModel]="store.verification().idNumber"
+                  (ngModelChange)="onIdNumberChange($event)"
+                />
+                @if (verificationTouched() && !isIdNumberValid()) {
+                  <span class="field-error">Must be exactly 9 digits.</span>
+                }
+              </div>
+
+              <fieldset class="reference-group">
+                <legend>Reference Details <span class="text-red-500">*</span></legend>
+
+                <div class="field">
+                  <label class="field-label" for="referenceName">Reference Name</label>
+                  <input
+                    id="referenceName"
+                    type="text"
+                    placeholder="Someone who can vouch for your experience"
+                    class="w-full px-4 py-3 text-base border-[1.5px] rounded-xl bg-white text-slate-900 outline-none transition-all
+                           border-slate-300 focus:border-indigo-500 focus:ring-[3px] focus:ring-indigo-500/15
+                           placeholder:text-slate-400"
+                    [class.border-red-400]="verificationTouched() && !store.verification().referenceName.trim()"
+                    [class.focus:border-red-400]="verificationTouched() && !store.verification().referenceName.trim()"
+                    [ngModel]="store.verification().referenceName"
+                    (ngModelChange)="store.patchVerification({ referenceName: $event })"
+                  />
+                  @if (verificationTouched() && !store.verification().referenceName.trim()) {
+                    <span class="field-error">Reference name is required.</span>
+                  }
+                </div>
+
+                <div class="field">
+                  <label class="field-label" for="referenceContact">Reference Contact</label>
+                  <input
+                    id="referenceContact"
+                    type="text"
+                    placeholder="Phone number or email address"
+                    class="w-full px-4 py-3 text-base border-[1.5px] rounded-xl bg-white text-slate-900 outline-none transition-all
+                           border-slate-300 focus:border-indigo-500 focus:ring-[3px] focus:ring-indigo-500/15
+                           placeholder:text-slate-400"
+                    [class.border-red-400]="verificationTouched() && !store.verification().referenceContact.trim()"
+                    [class.focus:border-red-400]="verificationTouched() && !store.verification().referenceContact.trim()"
+                    [ngModel]="store.verification().referenceContact"
+                    (ngModelChange)="store.patchVerification({ referenceContact: $event })"
+                  />
+                  @if (verificationTouched() && !store.verification().referenceContact.trim()) {
+                    <span class="field-error">Reference contact is required.</span>
+                  }
+                </div>
+              </fieldset>
             </div>
           }
         }
@@ -155,13 +230,17 @@ import { AddressSuggestion } from '../../services/geocoding.service';
         }
 
         @if (store.step() < totalSteps) {
-          <button class="btn btn-primary" (click)="onNext()">
+          <button
+            class="btn btn-primary"
+            [disabled]="store.step() === 2 && !store.hasLocation()"
+            (click)="onNext()"
+          >
             Next →
           </button>
         } @else {
           <button
             class="btn btn-primary btn-submit"
-            [disabled]="uploading() || store.isSubmitting()"
+            [disabled]="uploading() || store.isSubmitting() || !store.canSubmit()"
             (click)="onSubmit()"
           >
             {{ uploading() ? 'Uploading image...' : store.isSubmitting() ? 'Submitting...' : 'Submit Application' }}
@@ -192,6 +271,8 @@ export class WizardComponent {
   readonly locationMode = signal<'auto' | 'manual'>('auto');
   readonly imagePreview = signal<string | null>(null);
   readonly uploading = signal(false);
+  readonly addressTouched = signal(false);
+  readonly verificationTouched = signal(false);
 
   selectedImageFile: File | null = null;
 
@@ -201,12 +282,18 @@ export class WizardComponent {
   readonly steps = [
     { num: 1, label: 'Services' },
     { num: 2, label: 'Bio' },
+    { num: 3, label: 'Verification' },
   ];
+
+  isIdNumberValid(): boolean {
+    return /^[0-9]{9}$/.test(this.store.verification().idNumber);
+  }
 
   isCurrentStepValid(): boolean {
     switch (this.store.step()) {
       case 1: return this.servicesStep()?.form.valid ?? false;
-      case 2: return true;
+      case 2: return this.store.hasLocation();
+      case 3: return this.store.isVerificationValid();
       default: return false;
     }
   }
@@ -217,8 +304,17 @@ export class WizardComponent {
     if (this.isCurrentStepValid()) {
       this.store.next();
     } else {
-      this.errorMessage.set('Please fill in all required fields correctly before continuing.');
+      if (this.store.step() === 2 && !this.store.hasLocation()) {
+        this.errorMessage.set('Please provide a valid address with coordinates before continuing.');
+      } else {
+        this.errorMessage.set('Please fill in all required fields correctly before continuing.');
+      }
     }
+  }
+
+  onIdNumberChange(value: string): void {
+    const digits = value.replace(/\D/g, '').slice(0, 9);
+    this.store.patchVerification({ idNumber: digits });
   }
 
   onImageSelected(event: Event): void {
@@ -235,8 +331,9 @@ export class WizardComponent {
 
   onSubmit(): void {
     this.errorMessage.set('');
-    this.markCurrentStepTouched();
-    if (!this.isCurrentStepValid()) {
+    this.verificationTouched.set(true);
+
+    if (!this.store.canSubmit()) {
       this.errorMessage.set('Please fill in all required fields correctly before submitting.');
       return;
     }
@@ -277,6 +374,7 @@ export class WizardComponent {
 
   onAddressChange(value: string): void {
     this.store.setAddress(value);
+    this.addressTouched.set(true);
   }
 
   onSuggestionSelected(suggestion: AddressSuggestion): void {
@@ -306,6 +404,12 @@ export class WizardComponent {
   }
 
   private markCurrentStepTouched(): void {
+    if (this.store.step() === 2) {
+      this.addressTouched.set(true);
+    }
+    if (this.store.step() === 3) {
+      this.verificationTouched.set(true);
+    }
     const formMap: Record<number, { markAllAsTouched(): void } | undefined> = {
       1: this.servicesStep()?.form,
     };

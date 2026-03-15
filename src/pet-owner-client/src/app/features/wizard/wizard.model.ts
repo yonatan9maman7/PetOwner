@@ -10,12 +10,19 @@ export interface MagicBio {
   generatedBio: string;
 }
 
+export interface TrustVerification {
+  idNumber: string;
+  referenceName: string;
+  referenceContact: string;
+}
+
 export interface OnboardingPayload {
   services: ServicesAndRates;
   bio: MagicBio;
   latitude: number | null;
   longitude: number | null;
   address: string;
+  verification: TrustVerification;
 }
 
 export interface OnboardingApiPayload {
@@ -25,4 +32,7 @@ export interface OnboardingApiPayload {
   latitude: number | null;
   longitude: number | null;
   address: string | null;
+  referenceName: string;
+  referenceContact: string;
+  idNumber: string;
 }

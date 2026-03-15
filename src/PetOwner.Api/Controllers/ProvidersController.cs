@@ -44,6 +44,9 @@ public class ProvidersController : ControllerBase
             HourlyRate = request.HourlyRate,
             Status = "Pending",
             IsAvailableNow = false,
+            ReferenceName = request.ReferenceName,
+            ReferenceContact = request.ReferenceContact,
+            IdNumber = request.IdNumber,
         };
 
         _db.ProviderProfiles.Add(profile);
@@ -51,9 +54,7 @@ public class ProvidersController : ControllerBase
         var location = new PetOwner.Data.Models.Location
         {
             UserId = userId,
-            GeoLocation = request.Latitude.HasValue && request.Longitude.HasValue
-                ? new Point(request.Longitude.Value, request.Latitude.Value) { SRID = 4326 }
-                : null,
+            GeoLocation = new Point(request.Longitude, request.Latitude) { SRID = 4326 },
             Address = request.Address,
         };
 

@@ -12,6 +12,9 @@ public class ProviderProfile
     public int ReviewCount { get; set; }
     public string? StripeConnectAccountId { get; set; }
     public bool AcceptsOffHoursRequests { get; set; } = true;
+    public string? ReferenceName { get; set; }
+    public string? ReferenceContact { get; set; }
+    public string? IdNumber { get; set; }
 
     public User User { get; set; } = null!;
     public ICollection<ProviderService> ProviderServices { get; set; } = [];

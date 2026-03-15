@@ -41,7 +41,10 @@ public class AdminController : ControllerBase
                     .Where(l => l.UserId == p.UserId)
                     .Select(l => l.Address)
                     .FirstOrDefault(),
-                Services = p.ProviderServices.Select(ps => ps.Service.Name).ToList()
+                Services = p.ProviderServices.Select(ps => ps.Service.Name).ToList(),
+                p.IdNumber,
+                p.ReferenceName,
+                p.ReferenceContact,
             })
             .ToListAsync();
 

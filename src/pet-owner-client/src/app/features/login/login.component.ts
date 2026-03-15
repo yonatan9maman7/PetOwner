@@ -8,7 +8,7 @@ import { AuthService } from '../../services/auth.service';
   standalone: true,
   imports: [ReactiveFormsModule, RouterLink],
   template: `
-    <div class="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-50 to-white px-4" dir="rtl">
+    <div class="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-50 to-white px-4">
       <div class="w-full max-w-sm">
         <div class="text-center mb-8">
           <div class="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-indigo-600 text-white mb-4">
@@ -18,70 +18,68 @@ import { AuthService } from '../../services/auth.service';
             </svg>
           </div>
           <h1 class="text-2xl font-bold text-gray-900">
-            {{ isRegister() ? 'יצירת חשבון' : 'ברוכים הבאים' }}
+            {{ isRegister() ? 'Create Account' : 'Welcome Back' }}
           </h1>
           <p class="text-sm text-gray-500 mt-1">
-            {{ isRegister() ? 'הירשמו כדי להתחיל' : 'התחברו לחשבון שלכם' }}
+            {{ isRegister() ? 'Sign up to get started' : 'Log in to your account' }}
           </p>
         </div>
 
         <form [formGroup]="form" (ngSubmit)="onSubmit()" class="space-y-4">
           @if (isRegister()) {
             <div>
-              <label for="name" class="block text-sm font-medium text-gray-700 mb-1">שם מלא</label>
+              <label for="name" class="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
               <input
                 id="name"
                 formControlName="name"
                 type="text"
-                placeholder="השם שלך"
+                placeholder="Your name"
                 class="w-full px-4 py-3 rounded-xl border border-gray-300 bg-white text-gray-900
                        placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500
-                       focus:border-transparent transition text-right"
+                       focus:border-transparent transition"
               />
               @if (form.get('name')?.invalid && form.get('name')?.touched) {
-                <span class="text-xs text-red-500">שם מלא הוא שדה חובה</span>
+                <span class="text-xs text-red-500">Full name is required</span>
               }
             </div>
           }
 
           <div>
-            <label for="email" class="block text-sm font-medium text-gray-700 mb-1">אימייל</label>
+            <label for="email" class="block text-sm font-medium text-gray-700 mb-1">Email Address</label>
             <input
               id="email"
               formControlName="email"
               type="email"
               placeholder="you&#64;example.com"
-              dir="ltr"
               class="w-full px-4 py-3 rounded-xl border border-gray-300 bg-white text-gray-900
                      placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500
-                     focus:border-transparent transition text-left"
+                     focus:border-transparent transition"
             />
             @if (form.get('email')?.invalid && form.get('email')?.touched) {
-              <span class="text-xs text-red-500">יש להזין כתובת אימייל תקינה</span>
+              <span class="text-xs text-red-500">Please enter a valid email address</span>
             }
           </div>
 
           @if (isRegister()) {
             <div>
-              <label for="phone" class="block text-sm font-medium text-gray-700 mb-1">טלפון</label>
+              <label for="phone" class="block text-sm font-medium text-gray-700 mb-1">Phone</label>
               <input
                 id="phone"
                 formControlName="phone"
                 type="tel"
                 placeholder="05X-XXXXXXX"
-                dir="ltr"
                 class="w-full px-4 py-3 rounded-xl border border-gray-300 bg-white text-gray-900
                        placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500
-                       focus:border-transparent transition text-left"
+                       focus:border-transparent transition"
               />
               @if (form.get('phone')?.invalid && form.get('phone')?.touched) {
-                <span class="text-xs text-red-500">יש להזין מספר טלפון תקין (לדוגמה 05XXXXXXXX)</span>
+                <span class="text-xs text-red-500">Please enter a valid phone number (e.g. 05XXXXXXXX)</span>
               }
             </div>
           }
 
           <div>
-            <label for="password" class="block text-sm font-medium text-gray-700 mb-1">סיסמה</label>
+            <label for="password" class="block text-sm font-medium text-gray-700 mb-1">Password</label>
             <input
               id="password"
               formControlName="password"
@@ -92,14 +90,14 @@ import { AuthService } from '../../services/auth.service';
                      focus:border-transparent transition"
             />
             @if (form.get('password')?.invalid && form.get('password')?.touched) {
-              <span class="text-xs text-red-500">הסיסמה חייבת להכיל לפחות 6 תווים</span>
+              <span class="text-xs text-red-500">Password must be at least 6 characters</span>
             }
           </div>
 
           @if (!isRegister()) {
-            <div class="text-start">
+            <div class="text-left">
               <a routerLink="/forgot-password" class="text-sm text-indigo-600 font-medium hover:underline">
-                שכחתי סיסמה
+                Forgot password?
               </a>
             </div>
           }
@@ -115,17 +113,17 @@ import { AuthService } from '../../services/auth.service';
                    hover:bg-indigo-700 active:bg-indigo-800 disabled:opacity-50
                    disabled:cursor-not-allowed transition"
           >
-            {{ loading() ? 'אנא המתינו...' : (isRegister() ? 'יצירת חשבון' : 'התחברות') }}
+            {{ loading() ? 'Please wait...' : (isRegister() ? 'Create Account' : 'Login') }}
           </button>
         </form>
 
         <p class="text-center text-sm text-gray-500 mt-6">
           @if (isRegister()) {
-            כבר יש לכם חשבון?
-            <button (click)="toggleMode()" class="text-indigo-600 font-medium hover:underline">התחברות</button>
+            Already have an account?
+            <button (click)="toggleMode()" class="text-indigo-600 font-medium hover:underline">Login</button>
           } @else {
-            אין לכם חשבון?
-            <button (click)="toggleMode()" class="text-indigo-600 font-medium hover:underline">הרשמה</button>
+            Don't have an account?
+            <button (click)="toggleMode()" class="text-indigo-600 font-medium hover:underline">Sign up</button>
           }
         </p>
       </div>
@@ -196,7 +194,7 @@ export class LoginComponent {
       },
       error: (err) => {
         this.loading.set(false);
-        this.errorMsg.set(err.error?.message ?? 'משהו השתבש. אנא נסו שוב.');
+        this.errorMsg.set(err.error?.message ?? 'Something went wrong. Please try again.');
       },
     });
   }

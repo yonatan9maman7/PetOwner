@@ -1,15 +1,17 @@
 import { computed, Injectable, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { tap } from 'rxjs';
-import { MagicBio, OnboardingApiPayload, OnboardingPayload, ServicesAndRates } from './wizard.model';
+import { MagicBio, OnboardingApiPayload, OnboardingPayload, ServicesAndRates, TrustVerification } from './wizard.model';
 
-export const TOTAL_STEPS = 2;
+export const TOTAL_STEPS = 3;
 
 const SERVICE_KEY_MAP: Record<string, string> = {
   dogWalker: 'DogWalker',
   petSitter: 'PetSitter',
   boarding: 'Boarding',
 };
+
+const ID_NUMBER_PATTERN = /^[0-9]{9}$/;
 
 @Injectable({ providedIn: 'root' })
 export class WizardStore {
@@ -21,15 +23,30 @@ export class WizardStore {
   private readonly address_ = signal('');
   private readonly submitting = signal(false);
   private readonly generatingBio = signal(false);
+  private readonly verification_ = signal<TrustVerification>({ idNumber: '', referenceName: '', referenceContact: '' });
 
   readonly step = this.currentStep.asReadonly();
   readonly isSubmitting = this.submitting.asReadonly();
   readonly isGeneratingBio = this.generatingBio.asReadonly();
   readonly progressPercent = computed(() => (this.currentStep() / TOTAL_STEPS) * 100);
   readonly hasLocation = computed(() =>
-    (this.latitude() !== null && this.longitude() !== null) || this.address_().trim().length > 0
+    this.latitude() !== null && this.longitude() !== null && this.address_().trim().length > 0
   );
   readonly address = this.address_.asReadonly();
+  readonly verification = this.verification_.asReadonly();
+
+  readonly isVerificationValid = computed(() => {
+    const v = this.verification_();
+    return (
+      ID_NUMBER_PATTERN.test(v.idNumber) &&
+      v.referenceName.trim().length > 0 &&
+      v.referenceContact.trim().length > 0
+    );
+  });
+
+  readonly canSubmit = computed(() =>
+    this.hasLocation() && this.isVerificationValid()
+  );
 
   readonly formSnapshot = computed<OnboardingPayload>(() => ({
     services: this.services(),
@@ -37,6 +54,7 @@ export class WizardStore {
     latitude: this.latitude(),
     longitude: this.longitude(),
     address: this.address_(),
+    verification: this.verification_(),
   }));
 
   constructor(private readonly http: HttpClient) {}
@@ -77,6 +95,10 @@ export class WizardStore {
     this.longitude.set(null);
   }
 
+  patchVerification(value: Partial<TrustVerification>): void {
+    this.verification_.update((prev) => ({ ...prev, ...value }));
+  }
+
   generateBio(userNotes: string) {
     this.generatingBio.set(true);
     this.http
@@ -103,6 +125,9 @@ export class WizardStore {
       latitude: snap.latitude,
       longitude: snap.longitude,
       address: snap.address.trim() || null,
+      referenceName: snap.verification.referenceName.trim(),
+      referenceContact: snap.verification.referenceContact.trim(),
+      idNumber: snap.verification.idNumber.trim(),
     };
 
     return this.http

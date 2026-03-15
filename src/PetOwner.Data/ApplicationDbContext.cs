@@ -124,6 +124,15 @@ public class ApplicationDbContext : DbContext
             entity.Property(p => p.AcceptsOffHoursRequests)
                 .HasDefaultValue(true);
 
+            entity.Property(p => p.ReferenceName)
+                .HasMaxLength(200);
+
+            entity.Property(p => p.ReferenceContact)
+                .HasMaxLength(200);
+
+            entity.Property(p => p.IdNumber)
+                .HasMaxLength(9);
+
             entity.HasOne(p => p.User)
                 .WithOne(u => u.ProviderProfile)
                 .HasForeignKey<ProviderProfile>(p => p.UserId)

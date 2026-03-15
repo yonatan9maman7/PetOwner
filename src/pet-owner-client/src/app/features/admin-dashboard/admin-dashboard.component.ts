@@ -139,8 +139,27 @@ import { PendingProvider } from '../../models/pending-provider.model';
                       </div>
 
                       <div class="sm:col-span-2">
-                        <label class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Location</label>
+                        <label class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Location / Address</label>
                         <p class="mt-1 text-sm text-gray-800">{{ provider.address ?? 'No address provided' }}</p>
+                      </div>
+
+                      <div class="sm:col-span-2 mt-2 pt-3 border-t border-gray-200">
+                        <label class="text-xs font-semibold text-indigo-600 uppercase tracking-wider">Trust & Verification</label>
+                      </div>
+
+                      <div>
+                        <label class="text-xs font-semibold text-gray-500 uppercase tracking-wider">ID Number</label>
+                        <p class="mt-1 text-sm font-mono text-gray-800">{{ provider.idNumber ?? 'N/A' }}</p>
+                      </div>
+
+                      <div>
+                        <label class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Reference Name</label>
+                        <p class="mt-1 text-sm text-gray-800">{{ provider.referenceName ?? 'N/A' }}</p>
+                      </div>
+
+                      <div class="sm:col-span-2">
+                        <label class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Reference Contact</label>
+                        <p class="mt-1 text-sm text-gray-800">{{ provider.referenceContact ?? 'N/A' }}</p>
                       </div>
                     </div>
 
