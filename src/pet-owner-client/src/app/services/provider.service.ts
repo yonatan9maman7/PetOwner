@@ -127,8 +127,8 @@ export class ProviderService {
     return this.http.get<ProviderProfile>(`${this.baseUrl}/me`).pipe(
       tap((profile) => this.providerStatus.set(profile.status as ProviderStatus)),
       catchError((err: HttpErrorResponse) => {
-        this.providerStatus.set('None');
         if (err.status === 404) {
+          this.providerStatus.set('None');
           return of(null);
         }
         throw err;

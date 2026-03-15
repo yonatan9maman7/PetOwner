@@ -42,8 +42,19 @@ export class AppComponent {
   readonly isLoggedIn = computed(() => this.auth.isLoggedIn());
   readonly isAdmin = computed(() => this.auth.userRole() === 'Admin');
 
+  readonly providerStatus = computed(() => this.providerService.providerStatus());
+
   readonly canSwitchToProvider = computed(
-    () => this.isLoggedIn() && this.providerService.providerStatus() === 'Approved',
+    () => this.isLoggedIn() && this.providerStatus() === 'Approved',
+  );
+
+  readonly showBecomeASitter = computed(() => {
+    const s = this.providerStatus();
+    return this.isLoggedIn() && (s === 'None' || s === 'Rejected');
+  });
+
+  readonly isProviderPending = computed(
+    () => this.isLoggedIn() && this.providerStatus() === 'Pending',
   );
 
   readonly currentMode = signal<'Owner' | 'Provider'>('Owner');
