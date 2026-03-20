@@ -281,7 +281,7 @@ const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Frid
             rows="2"
             [value]="bookingNotes()"
             (input)="bookingNotes.set($any($event.target).value)"
-            placeholder="Any special instructions for the sitter..."
+            placeholder="Any special instructions for the provider..."
             class="w-full rounded-xl border-2 border-gray-200 px-4 py-2.5 text-sm text-gray-900 placeholder-gray-400
                    focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 outline-none transition resize-none mb-4">
           </textarea>
@@ -305,7 +305,7 @@ const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Frid
           <!-- Outside Working Hours Warning -->
           @if (isOutsideWorkingHours()) {
             <div class="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-4 rounded-r-xl">
-              <p class="text-sm text-yellow-700">⚠️ <b>Note:</b> The requested time is outside the sitter's regular working hours. You can still send the request, but it may take longer for them to approve.</p>
+              <p class="text-sm text-yellow-700">⚠️ <b>Note:</b> The requested time is outside the provider's regular working hours. You can still send the request, but it may take longer for them to approve.</p>
             </div>
           }
 
@@ -517,7 +517,7 @@ export class ProviderProfileComponent implements OnInit {
       next: () => {
         this.sendingRequest.set(false);
         this.closeRequestModal();
-        this.toast.success('Request sent successfully! Waiting for the sitter\'s approval.');
+        this.toast.success('Request sent successfully! Waiting for the provider\'s approval.');
       },
       error: () => {
         this.sendingRequest.set(false);

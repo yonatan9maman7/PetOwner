@@ -97,7 +97,7 @@ export class MapDashboardComponent implements OnInit, OnDestroy {
   selectedCategory = signal('');
   readonly categories = [
     { label: 'Walkers', icon: '🚶', value: 'Dog Walker' },
-    { label: 'Sitters', icon: '🏠', value: 'Pet Sitter' },
+    { label: 'Providers', icon: '🏠', value: 'Pet Sitter' },
     { label: 'Boarding', icon: '🛏️', value: 'Boarding' },
     { label: 'Vets', icon: '🩺', value: 'Vet' },
     { label: 'Groomers', icon: '✂️', value: 'Groomer' },
@@ -276,7 +276,7 @@ export class MapDashboardComponent implements OnInit, OnDestroy {
         this.sendingRequest.set(false);
         this.closeRequestModal();
         this.closeSheet();
-        this.toast.success('Request sent successfully! Waiting for the sitter\'s approval.');
+        this.toast.success('Request sent successfully! Waiting for the provider\'s approval.');
       },
       error: () => {
         this.sendingRequest.set(false);
@@ -405,7 +405,7 @@ export class MapDashboardComponent implements OnInit, OnDestroy {
   }
 
   revokeSitter(providerId: string): void {
-    if (!confirm('Are you sure you want to revoke this provider\'s sitter status? This action cannot be easily undone.')) {
+    if (!confirm('Are you sure you want to revoke this user\'s provider status? This action cannot be easily undone.')) {
       return;
     }
 
@@ -420,7 +420,7 @@ export class MapDashboardComponent implements OnInit, OnDestroy {
       },
       error: () => {
         this.revokingProvider.set(false);
-        this.toast.error('Failed to revoke sitter status.');
+        this.toast.error('Failed to revoke provider status.');
       },
     });
   }

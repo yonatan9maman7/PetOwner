@@ -39,7 +39,7 @@ import { ServiceRequest } from '../../models/service-request.model';
         <div class="flex flex-col items-center justify-center py-20 px-6 text-center">
           <span class="text-5xl mb-4">📋</span>
           <h2 class="text-lg font-semibold text-gray-700 mb-1">No requests yet</h2>
-          <p class="text-sm text-gray-500">Find a pet sitter on the map and send your first request!</p>
+          <p class="text-sm text-gray-500">Find a provider on the map and send your first request!</p>
         </div>
       } @else {
         <!-- Active Requests -->

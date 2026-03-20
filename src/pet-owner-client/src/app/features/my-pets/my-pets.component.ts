@@ -7,6 +7,15 @@ import { TeletriageService, TeletriageHistory } from '../../services/teletriage.
 import { ToastService } from '../../services/toast.service';
 
 const SPECIES_OPTIONS = ['Dog', 'Cat', 'Other'] as const;
+const BREED_OPTIONS = [
+  'Mixed / Mutt',
+  'Golden Retriever',
+  'Labrador',
+  'French Bulldog',
+  'Poodle',
+  'German Shepherd',
+  'Other',
+] as const;
 const RECORD_TYPES = ['Vaccination', 'Condition', 'Medication', 'VetVisit'] as const;
 
 @Component({
@@ -367,7 +376,7 @@ const RECORD_TYPES = ['Vaccination', 'Condition', 'Medication', 'VetVisit'] as c
                 🐾
               </div>
               <h2 class="text-xl font-semibold text-slate-800 mb-1">You haven't added any pets yet 🐾</h2>
-              <p class="text-sm text-slate-500 max-w-xs">Add your first pet below so sitters know who they'll be caring for.</p>
+              <p class="text-sm text-slate-500 max-w-xs">Add your first pet below so providers know who they'll be caring for.</p>
             </div>
           }
 
@@ -409,13 +418,16 @@ const RECORD_TYPES = ['Vaccination', 'Condition', 'Medication', 'VetVisit'] as c
               <div class="grid grid-cols-3 gap-4">
                 <div>
                   <label for="pet-breed" class="block text-sm font-medium text-slate-700 mb-1">Breed</label>
-                  <input
+                  <select
                     id="pet-breed"
-                    type="text"
                     formControlName="breed"
-                    placeholder="e.g., Golden Retriever"
-                    class="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 outline-none transition"
-                  />
+                    class="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm text-slate-900 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 outline-none transition bg-white"
+                  >
+                    <option value="">Optional — select breed</option>
+                    @for (b of breedOptions; track b) {
+                      <option [value]="b">{{ b }}</option>
+                    }
+                  </select>
                 </div>
 
                 <div>
@@ -513,6 +525,7 @@ export class MyPetsComponent implements OnInit {
   private readonly fb = inject(FormBuilder);
 
   readonly speciesOptions = SPECIES_OPTIONS;
+  readonly breedOptions = BREED_OPTIONS;
   readonly recordTypes = RECORD_TYPES;
 
   readonly pets = signal<Pet[]>([]);

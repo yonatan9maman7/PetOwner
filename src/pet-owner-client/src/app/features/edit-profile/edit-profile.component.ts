@@ -14,7 +14,7 @@ import { ScheduleManagerComponent } from './schedule-manager.component';
 
 const SERVICE_OPTIONS = [
   { key: 'DogWalker', label: 'Dog Walker' },
-  { key: 'PetSitter', label: 'Pet Sitter' },
+  { key: 'PetSitter', label: 'Pet Provider' },
   { key: 'Boarding', label: 'Boarding' },
 ] as const;
 
@@ -38,7 +38,7 @@ const SERVICE_OPTIONS = [
         <h1 class="text-2xl font-bold text-slate-900">
           Hello, {{ userName() }}! 👋
         </h1>
-        <p class="mt-1 text-sm text-slate-500">Update your sitter profile details.</p>
+        <p class="mt-1 text-sm text-slate-500">Update your provider profile details.</p>
         <span [class]="statusBadgeClass()">
           {{ status() }}
         </span>

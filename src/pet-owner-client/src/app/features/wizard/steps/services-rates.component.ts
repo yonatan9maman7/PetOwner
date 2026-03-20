@@ -20,7 +20,7 @@ import { WizardStore } from '../wizard.store';
 
         <label class="checkbox">
           <input formControlName="petSitter" type="checkbox" />
-          <span>Pet Sitter</span>
+          <span>Pet Provider</span>
         </label>
 
         <label class="checkbox">

@@ -10,7 +10,7 @@
                 bg-amber-50/95 backdrop-blur-sm border border-amber-200 rounded-2xl px-4 py-3 shadow-lg
                 flex items-center gap-3 text-sm text-amber-800 font-medium animate-[slideDown_0.4s_ease-out]">
       <span class="text-lg leading-none">&#9203;</span>
-      <span>Your sitter profile is pending admin approval.</span>
+      <span>Your provider profile is pending admin approval.</span>
     </div>
   }
 
@@ -313,7 +313,7 @@
           }
         </div>
 
-        <!-- Admin: Revoke Sitter -->
+        <!-- Admin: Revoke Provider -->
         @if (isAdmin()) {
           <button
             (click)="revokeSitter(pin.providerId)"
@@ -328,7 +328,7 @@
               Revoking...
             } @else {
               <span class="text-base leading-none">&#128683;</span>
-              Revoke Sitter Status
+              Revoke Provider Status
             }
           </button>
         }
@@ -481,7 +481,7 @@
         rows="2"
         [value]="bookingNotes()"
         (input)="bookingNotes.set($any($event.target).value)"
-        placeholder="Any special instructions for the sitter..."
+        placeholder="Any special instructions for the provider..."
         class="w-full rounded-xl border-2 border-gray-200 px-4 py-2.5 text-sm text-gray-900 placeholder-gray-400
                focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 outline-none transition resize-none mb-4">
       </textarea>
@@ -505,7 +505,7 @@
       <!-- Outside Working Hours Warning -->
       @if (isOutsideWorkingHours()) {
         <div class="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-4 rounded-r-xl">
-          <p class="text-sm text-yellow-700">⚠️ <b>Note:</b> The requested time is outside the sitter's regular working hours. You can still send the request, but it may take longer for them to approve.</p>
+          <p class="text-sm text-yellow-700">⚠️ <b>Note:</b> The requested time is outside the provider's regular working hours. You can still send the request, but it may take longer for them to approve.</p>
         </div>
       }
 
