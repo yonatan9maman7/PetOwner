@@ -94,6 +94,24 @@ import { AuthService } from '../../services/auth.service';
             }
           </div>
 
+          @if (isRegister()) {
+            <div class="flex items-start gap-2">
+              <input
+                id="agreeTerms"
+                formControlName="agreeTerms"
+                type="checkbox"
+                class="mt-1 h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+              />
+              <label for="agreeTerms" class="text-sm text-gray-600">
+                I agree to the
+                <a routerLink="/terms" target="_blank" class="text-indigo-600 hover:text-indigo-500 underline font-medium">Terms of Service</a>
+              </label>
+            </div>
+            @if (form.get('agreeTerms')?.invalid && form.get('agreeTerms')?.touched) {
+              <span class="text-xs text-red-500">You must accept the Terms of Service</span>
+            }
+          }
+
           @if (!isRegister()) {
             <div class="text-left">
               <a routerLink="/forgot-password" class="text-sm text-indigo-600 font-medium hover:underline">
@@ -144,22 +162,26 @@ export class LoginComponent {
     email: ['', [Validators.required, Validators.email]],
     phone: [''],
     password: ['', [Validators.required, Validators.minLength(6)]],
+    agreeTerms: [false],
   });
 
   toggleMode(): void {
     this.isRegister.update((v) => !v);
     this.errorMsg.set('');
-    this.form.reset({ name: '', email: '', phone: '', password: '' });
+    this.form.reset({ name: '', email: '', phone: '', password: '', agreeTerms: false });
 
     if (this.isRegister()) {
       this.form.controls.name.setValidators([Validators.required]);
       this.form.controls.phone.setValidators([Validators.required, Validators.pattern(/^05\d{8}$/)]);
+      this.form.controls.agreeTerms.setValidators([Validators.requiredTrue]);
     } else {
       this.form.controls.name.clearValidators();
       this.form.controls.phone.clearValidators();
+      this.form.controls.agreeTerms.clearValidators();
     }
     this.form.controls.name.updateValueAndValidity();
     this.form.controls.phone.updateValueAndValidity();
+    this.form.controls.agreeTerms.updateValueAndValidity();
   }
 
   onSubmit(): void {
@@ -168,12 +190,15 @@ export class LoginComponent {
     if (this.isRegister()) {
       this.form.controls.name.setValidators([Validators.required]);
       this.form.controls.phone.setValidators([Validators.required, Validators.pattern(/^05\d{8}$/)]);
+      this.form.controls.agreeTerms.setValidators([Validators.requiredTrue]);
     } else {
       this.form.controls.name.clearValidators();
       this.form.controls.phone.clearValidators();
+      this.form.controls.agreeTerms.clearValidators();
     }
     this.form.controls.name.updateValueAndValidity();
     this.form.controls.phone.updateValueAndValidity();
+    this.form.controls.agreeTerms.updateValueAndValidity();
 
     if (this.form.invalid) {
       this.form.markAllAsTouched();

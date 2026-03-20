@@ -25,6 +25,13 @@ export const routes: Routes = [
       ),
   },
   {
+    path: 'terms',
+    loadComponent: () =>
+      import('./features/terms/terms.component').then(
+        (m) => m.TermsComponent
+      ),
+  },
+  {
     path: '',
     loadComponent: () =>
       import('./features/map-dashboard/map-dashboard.component').then(
