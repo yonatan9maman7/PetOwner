@@ -14,7 +14,11 @@ public class ProviderProfile
     public bool AcceptsOffHoursRequests { get; set; } = true;
     public string? ReferenceName { get; set; }
     public string? ReferenceContact { get; set; }
-    public string? IdNumber { get; set; }
+
+    public string City { get; set; } = null!;
+    public string Street { get; set; } = null!;
+    public string BuildingNumber { get; set; } = null!;
+    public string? ApartmentNumber { get; set; }
 
     public User User { get; set; } = null!;
     public ICollection<ProviderService> ProviderServices { get; set; } = [];

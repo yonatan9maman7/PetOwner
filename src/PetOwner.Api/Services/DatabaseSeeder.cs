@@ -60,8 +60,9 @@ public class DatabaseSeeder
             {
                 Id = userId,
                 Phone = GenerateIsraeliPhone(faker, i),
+                Email = faker.Internet.Email(),
                 Name = faker.Name.FullName(),
-                Role = "Owner",
+                Role = "Provider",
                 PasswordHash = passwordHash,
                 CreatedAt = DateTime.UtcNow,
                 ProviderProfile = new ProviderProfile
@@ -71,6 +72,12 @@ public class DatabaseSeeder
                     HourlyRate = faker.Finance.Amount(40, 120, 0),
                     Status = "Approved",
                     IsAvailableNow = isAvailable,
+                    City = faker.Address.City(),
+                    Street = faker.Address.StreetName(),
+                    BuildingNumber = faker.Address.BuildingNumber(),
+                    ApartmentNumber = faker.Random.Int(0, 4) == 0 ? faker.Random.Int(1, 32).ToString() : null,
+                    ReferenceName = faker.Name.FullName(),
+                    ReferenceContact = faker.Phone.PhoneNumber("05########"),
                     ProviderServices = GenerateProviderServices(faker, userId, serviceIds)
                 },
                 Location = new Location
@@ -80,7 +87,6 @@ public class DatabaseSeeder
                         faker.Random.Double(MinLongitude, MaxLongitude),
                         faker.Random.Double(MinLatitude, MaxLatitude))
                     { SRID = 4326 },
-                    Address = $"{faker.Random.Int(1, 120)} {faker.Address.StreetName()}, Florentin, Tel Aviv"
                 }
             };
 

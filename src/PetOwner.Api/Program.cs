@@ -111,6 +111,7 @@ builder.Services.AddAuthentication(options =>
 });
 
 builder.Services.AddAuthorization();
+builder.Services.AddSingleton<ITokenService, TokenService>();
 builder.Services.AddScoped<IMapService, MapService>();
 builder.Services.AddScoped<DatabaseSeeder>();
 builder.Services.AddHostedService<BookingExpirationService>();

@@ -95,6 +95,11 @@ export class AuthService {
     this.router.navigateByUrl('/login');
   }
 
+  /** Replaces the stored JWT (e.g. after role change) and refreshes derived auth state. */
+  updateToken(token: string): void {
+    this.setToken(token);
+  }
+
   private setToken(token: string): void {
     localStorage.setItem(TOKEN_KEY, token);
     this.tokenSignal.set(token);

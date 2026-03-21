@@ -141,15 +141,57 @@ const SERVICE_OPTIONS = [
         </div>
 
         <div class="field">
-          <label class="field-label">Address</label>
+          <label class="field-label">Search map location</label>
+          <p class="text-xs text-slate-500 mb-1">Pick a suggestion to set your map pin (latitude / longitude).</p>
           <app-address-autocomplete
-            [(ngModel)]="address"
-            name="address"
+            [(ngModel)]="geoSearchQuery"
+            name="geoSearchQuery"
             (suggestionSelected)="onSuggestionSelected($event)"
           />
           @if (latitude() !== null && longitude() !== null) {
-            <p class="location-confirmation">Location set ✓</p>
+            <p class="location-confirmation">Map pin set ✓</p>
           }
+        </div>
+
+        <div class="field">
+          <label class="field-label" for="edit-city">City <span class="text-red-500">*</span></label>
+          <input
+            id="edit-city"
+            type="text"
+            required
+            [(ngModel)]="city"
+            name="city"
+            placeholder="e.g. Tel Aviv"
+          />
+        </div>
+        <div class="field">
+          <label class="field-label" for="edit-street">Street <span class="text-red-500">*</span></label>
+          <input
+            id="edit-street"
+            type="text"
+            required
+            [(ngModel)]="street"
+            name="street"
+          />
+        </div>
+        <div class="field">
+          <label class="field-label" for="edit-building">Building number <span class="text-red-500">*</span></label>
+          <input
+            id="edit-building"
+            type="text"
+            required
+            [(ngModel)]="buildingNumber"
+            name="buildingNumber"
+          />
+        </div>
+        <div class="field">
+          <label class="field-label" for="edit-apt">Apartment (optional)</label>
+          <input
+            id="edit-apt"
+            type="text"
+            [(ngModel)]="apartmentNumber"
+            name="apartmentNumber"
+          />
         </div>
 
         <label class="off-hours-toggle">
@@ -218,7 +260,11 @@ export class EditProfileComponent implements OnInit {
 
   bio = '';
   hourlyRate: number | null = null;
-  address = '';
+  geoSearchQuery = '';
+  city = '';
+  street = '';
+  buildingNumber = '';
+  apartmentNumber = '';
   aiNotes = '';
   readonly generatingBio = signal(false);
 
@@ -244,7 +290,11 @@ export class EditProfileComponent implements OnInit {
           .filter(Boolean);
         this.selectedServices.set(keys);
 
-        this.address = profile.address ?? '';
+        this.city = profile.city ?? '';
+        this.street = profile.street ?? '';
+        this.buildingNumber = profile.buildingNumber ?? '';
+        this.apartmentNumber = profile.apartmentNumber ?? '';
+        this.geoSearchQuery = '';
         this.latitude.set(profile.latitude ?? null);
         this.longitude.set(profile.longitude ?? null);
         this.acceptsOffHoursRequests.set(profile.acceptsOffHoursRequests);
@@ -264,7 +314,7 @@ export class EditProfileComponent implements OnInit {
   }
 
   onSuggestionSelected(suggestion: AddressSuggestion): void {
-    this.address = suggestion.displayName;
+    this.geoSearchQuery = suggestion.displayName;
     this.latitude.set(suggestion.lat);
     this.longitude.set(suggestion.lon);
   }
@@ -301,13 +351,25 @@ export class EditProfileComponent implements OnInit {
   onSubmit(): void {
     if (this.submitting()) return;
 
+    if (!this.city.trim() || !this.street.trim() || !this.buildingNumber.trim()) {
+      this.toast.error('Please fill in city, street, and building number.');
+      return;
+    }
+    if (this.latitude() == null || this.longitude() == null) {
+      this.toast.error('Please set your location using the map search.');
+      return;
+    }
+
     this.submitting.set(true);
 
     const payload: UpdateProfilePayload = {
       bio: this.bio,
       hourlyRate: this.hourlyRate,
       services: this.selectedServices(),
-      address: this.address.trim() || null,
+      city: this.city.trim(),
+      street: this.street.trim(),
+      buildingNumber: this.buildingNumber.trim(),
+      apartmentNumber: this.apartmentNumber.trim() || null,
       latitude: this.latitude(),
       longitude: this.longitude(),
       acceptsOffHoursRequests: this.acceptsOffHoursRequests(),

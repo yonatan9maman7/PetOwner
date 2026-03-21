@@ -133,7 +133,12 @@ public class TeletriageController : ControllerBase
                 l.User.Phone,
                 l.GeoLocation!.Y,
                 l.GeoLocation.X,
-                l.Address,
+                l.User.ProviderProfile!.Street + " " + l.User.ProviderProfile.BuildingNumber
+                    + (l.User.ProviderProfile.ApartmentNumber != null
+                        ? ", Apt " + l.User.ProviderProfile.ApartmentNumber
+                        : "")
+                    + ", "
+                    + l.User.ProviderProfile.City,
                 l.GeoLocation.Distance(userPoint) * 111.32,
                 l.User.ProviderProfile!.ProfileImageUrl,
                 string.Join(", ", l.User.ProviderProfile.ProviderServices.Select(ps => ps.Service.Name)),

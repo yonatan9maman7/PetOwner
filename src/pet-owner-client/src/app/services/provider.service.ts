@@ -10,7 +10,10 @@ export interface ProviderProfile {
   hourlyRate: number | null;
   serviceIds: number[];
   services: string[];
-  address: string | null;
+  city: string;
+  street: string;
+  buildingNumber: string;
+  apartmentNumber: string | null;
   latitude: number | null;
   longitude: number | null;
   profileImageUrl: string | null;
@@ -23,10 +26,20 @@ export interface UpdateProfilePayload {
   bio: string;
   hourlyRate: number | null;
   services: string[];
-  address: string | null;
+  city: string;
+  street: string;
+  buildingNumber: string;
+  apartmentNumber: string | null;
   latitude: number | null;
   longitude: number | null;
   acceptsOffHoursRequests?: boolean;
+}
+
+/** Response from POST /api/providers/onboarding */
+export interface ProviderOnboardingResponse {
+  message: string;
+  /** Present on success so the client can refresh JWT claims (e.g. Role → Provider). */
+  newAccessToken?: string;
 }
 
 export interface EarningsSummary {

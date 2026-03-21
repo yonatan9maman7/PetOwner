@@ -119,14 +119,6 @@ export const routes: Routes = [
       ),
   },
   {
-    path: 'messages',
-    canActivate: [authGuard],
-    loadComponent: () =>
-      import('./features/messaging/messaging.component').then(
-        (m) => m.MessagingComponent
-      ),
-  },
-  {
     path: 'provider-dashboard',
     canActivate: [authGuard],
     loadComponent: () =>

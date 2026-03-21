@@ -1,7 +1,16 @@
-import { computed, Injectable, signal } from '@angular/core';
+import { computed, inject, Injectable, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { tap } from 'rxjs';
-import { MagicBio, OnboardingApiPayload, OnboardingPayload, ServicesAndRates, TrustVerification } from './wizard.model';
+import { AuthService } from '../../services/auth.service';
+import { ProviderOnboardingResponse } from '../../services/provider.service';
+import {
+  MagicBio,
+  OnboardingApiPayload,
+  OnboardingPayload,
+  ServicesAndRates,
+  StructuredAddress,
+  TrustVerification,
+} from './wizard.model';
 
 export const TOTAL_STEPS = 3;
 
@@ -11,41 +20,61 @@ const SERVICE_KEY_MAP: Record<string, string> = {
   boarding: 'Boarding',
 };
 
-const ID_NUMBER_PATTERN = /^[0-9]{9}$/;
-
 @Injectable({ providedIn: 'root' })
 export class WizardStore {
+  private readonly http = inject(HttpClient);
+  private readonly auth = inject(AuthService);
+
   private readonly currentStep = signal(1);
-  private readonly services = signal<ServicesAndRates>({ dogWalker: false, petSitter: false, boarding: false, hourlyRate: null });
+  private readonly services = signal<ServicesAndRates>({
+    dogWalker: false,
+    petSitter: false,
+    boarding: false,
+    hourlyRate: null,
+  });
   private readonly bio = signal<MagicBio>({ userNotes: '', generatedBio: '' });
   private readonly latitude = signal<number | null>(null);
   private readonly longitude = signal<number | null>(null);
   private readonly address_ = signal('');
+  private readonly structuredAddress_ = signal<StructuredAddress>({
+    city: '',
+    street: '',
+    buildingNumber: '',
+    apartmentNumber: '',
+  });
   private readonly submitting = signal(false);
   private readonly generatingBio = signal(false);
-  private readonly verification_ = signal<TrustVerification>({ idNumber: '', referenceName: '', referenceContact: '' });
+  private readonly verification_ = signal<TrustVerification>({ referenceName: '', referenceContact: '' });
 
   readonly step = this.currentStep.asReadonly();
   readonly isSubmitting = this.submitting.asReadonly();
   readonly isGeneratingBio = this.generatingBio.asReadonly();
   readonly progressPercent = computed(() => (this.currentStep() / TOTAL_STEPS) * 100);
-  readonly hasLocation = computed(() =>
-    this.latitude() !== null && this.longitude() !== null && this.address_().trim().length > 0
+
+  readonly hasLocation = computed(
+    () => this.latitude() !== null && this.longitude() !== null,
   );
+
   readonly address = this.address_.asReadonly();
+  readonly structuredAddress = this.structuredAddress_.asReadonly();
   readonly verification = this.verification_.asReadonly();
 
-  readonly isVerificationValid = computed(() => {
-    const v = this.verification_();
+  readonly hasStructuredAddress = computed(() => {
+    const a = this.structuredAddress_();
     return (
-      ID_NUMBER_PATTERN.test(v.idNumber) &&
-      v.referenceName.trim().length > 0 &&
-      v.referenceContact.trim().length > 0
+      a.city.trim().length > 0 &&
+      a.street.trim().length > 0 &&
+      a.buildingNumber.trim().length > 0
     );
   });
 
-  readonly canSubmit = computed(() =>
-    this.hasLocation() && this.isVerificationValid()
+  readonly isVerificationValid = computed(() => {
+    const v = this.verification_();
+    return v.referenceName.trim().length > 0 && v.referenceContact.trim().length > 0;
+  });
+
+  readonly canSubmit = computed(
+    () => this.hasLocation() && this.hasStructuredAddress() && this.isVerificationValid(),
   );
 
   readonly formSnapshot = computed<OnboardingPayload>(() => ({
@@ -53,11 +82,9 @@ export class WizardStore {
     bio: this.bio(),
     latitude: this.latitude(),
     longitude: this.longitude(),
-    address: this.address_(),
+    structuredAddress: this.structuredAddress_(),
     verification: this.verification_(),
   }));
-
-  constructor(private readonly http: HttpClient) {}
 
   goTo(step: number): void {
     if (step >= 1 && step <= TOTAL_STEPS) {
@@ -90,6 +117,10 @@ export class WizardStore {
     this.address_.set(value);
   }
 
+  patchStructuredAddress(value: Partial<StructuredAddress>): void {
+    this.structuredAddress_.update((prev) => ({ ...prev, ...value }));
+  }
+
   clearCoordinates(): void {
     this.latitude.set(null);
     this.longitude.set(null);
@@ -115,6 +146,7 @@ export class WizardStore {
   submit() {
     this.submitting.set(true);
     const snap = this.formSnapshot();
+    const a = snap.structuredAddress;
 
     const payload: OnboardingApiPayload = {
       services: Object.entries(SERVICE_KEY_MAP)
@@ -124,14 +156,21 @@ export class WizardStore {
       bio: snap.bio.generatedBio || snap.bio.userNotes,
       latitude: snap.latitude,
       longitude: snap.longitude,
-      address: snap.address.trim() || null,
+      city: a.city.trim(),
+      street: a.street.trim(),
+      buildingNumber: a.buildingNumber.trim(),
+      apartmentNumber: a.apartmentNumber.trim() || null,
       referenceName: snap.verification.referenceName.trim(),
       referenceContact: snap.verification.referenceContact.trim(),
-      idNumber: snap.verification.idNumber.trim(),
     };
 
-    return this.http
-      .post<{ message: string }>('/api/providers/onboarding', payload)
-      .pipe(tap({ next: () => this.submitting.set(false), error: () => this.submitting.set(false) }));
+    return this.http.post<ProviderOnboardingResponse>('/api/providers/onboarding', payload).pipe(
+      tap((res) => {
+        if (res.newAccessToken) {
+          this.auth.updateToken(res.newAccessToken);
+        }
+      }),
+      tap({ next: () => this.submitting.set(false), error: () => this.submitting.set(false) }),
+    );
   }
 }

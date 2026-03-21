@@ -17,12 +17,18 @@ public class ProvidersController : ControllerBase
     private readonly ApplicationDbContext _db;
     private readonly IBlobService _blobService;
     private readonly IGeminiAiService _aiService;
+    private readonly ITokenService _tokenService;
 
-    public ProvidersController(ApplicationDbContext db, IBlobService blobService, IGeminiAiService aiService)
+    public ProvidersController(
+        ApplicationDbContext db,
+        IBlobService blobService,
+        IGeminiAiService aiService,
+        ITokenService tokenService)
     {
         _db = db;
         _blobService = blobService;
         _aiService = aiService;
+        _tokenService = tokenService;
     }
 
     [Authorize]
@@ -37,6 +43,9 @@ public class ProvidersController : ControllerBase
         if (existingProfile)
             return Conflict(new { message = "Provider profile already exists." });
 
+        var user = await _db.Users.FirstAsync(u => u.Id == userId);
+        user.Role = "Provider";
+
         var profile = new ProviderProfile
         {
             UserId = userId,
@@ -44,9 +53,14 @@ public class ProvidersController : ControllerBase
             HourlyRate = request.HourlyRate,
             Status = "Pending",
             IsAvailableNow = false,
-            ReferenceName = request.ReferenceName,
-            ReferenceContact = request.ReferenceContact,
-            IdNumber = request.IdNumber,
+            ReferenceName = request.ReferenceName.Trim(),
+            ReferenceContact = request.ReferenceContact.Trim(),
+            City = request.City.Trim(),
+            Street = request.Street.Trim(),
+            BuildingNumber = request.BuildingNumber.Trim(),
+            ApartmentNumber = string.IsNullOrWhiteSpace(request.ApartmentNumber)
+                ? null
+                : request.ApartmentNumber.Trim(),
         };
 
         _db.ProviderProfiles.Add(profile);
@@ -55,7 +69,6 @@ public class ProvidersController : ControllerBase
         {
             UserId = userId,
             GeoLocation = new Point(request.Longitude, request.Latitude) { SRID = 4326 },
-            Address = request.Address,
         };
 
         _db.Locations.Add(location);
@@ -91,7 +104,11 @@ public class ProvidersController : ControllerBase
 
         await _db.SaveChangesAsync();
 
-        return Ok(new { message = "Application submitted successfully." });
+        var newAccessToken = _tokenService.GenerateAccessToken(user);
+
+        return Ok(new ProviderOnboardingResponse(
+            "Application submitted successfully.",
+            newAccessToken));
     }
 
     [HttpPost("generate-bio")]
@@ -144,6 +161,12 @@ public class ProvidersController : ControllerBase
 
         profile.Bio = request.Bio;
         profile.HourlyRate = request.HourlyRate;
+        profile.City = request.City.Trim();
+        profile.Street = request.Street.Trim();
+        profile.BuildingNumber = request.BuildingNumber.Trim();
+        profile.ApartmentNumber = string.IsNullOrWhiteSpace(request.ApartmentNumber)
+            ? null
+            : request.ApartmentNumber.Trim();
 
         if (request.AcceptsOffHoursRequests.HasValue)
             profile.AcceptsOffHoursRequests = request.AcceptsOffHoursRequests.Value;
@@ -174,7 +197,6 @@ public class ProvidersController : ControllerBase
             });
         }
 
-        location.Address = request.Address;
         location.GeoLocation = new Point(request.Longitude, request.Latitude) { SRID = 4326 };
 
         await _db.SaveChangesAsync();
@@ -335,7 +357,10 @@ public class ProvidersController : ControllerBase
             profile.User.Name,
             profile.Bio,
             profile.HourlyRate,
-            location?.Address,
+            profile.City,
+            profile.Street,
+            profile.BuildingNumber,
+            profile.ApartmentNumber,
             location?.GeoLocation?.Y,
             location?.GeoLocation?.X,
             profile.ProviderServices.Select(ps => ps.ServiceId).ToList(),

@@ -130,8 +130,20 @@ public class ApplicationDbContext : DbContext
             entity.Property(p => p.ReferenceContact)
                 .HasMaxLength(200);
 
-            entity.Property(p => p.IdNumber)
-                .HasMaxLength(9);
+            entity.Property(p => p.City)
+                .IsRequired()
+                .HasMaxLength(100);
+
+            entity.Property(p => p.Street)
+                .IsRequired()
+                .HasMaxLength(200);
+
+            entity.Property(p => p.BuildingNumber)
+                .IsRequired()
+                .HasMaxLength(50);
+
+            entity.Property(p => p.ApartmentNumber)
+                .HasMaxLength(50);
 
             entity.HasOne(p => p.User)
                 .WithOne(u => u.ProviderProfile)
@@ -148,9 +160,6 @@ public class ApplicationDbContext : DbContext
 
             entity.Property(l => l.GeoLocation)
                 .HasColumnType("geography");
-
-            entity.Property(l => l.Address)
-                .HasMaxLength(200);
 
             entity.HasOne(l => l.User)
                 .WithOne(u => u.Location)

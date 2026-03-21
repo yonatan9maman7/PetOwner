@@ -12,6 +12,8 @@ export interface Post {
   commentCount: number;
   likedByMe: boolean;
   createdAt: string;
+  authorRole: string;
+  authorIsApprovedProvider: boolean;
 }
 
 export interface PostComment {

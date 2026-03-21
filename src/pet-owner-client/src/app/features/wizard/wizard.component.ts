@@ -146,33 +146,62 @@ import { AddressSuggestion } from '../../services/geocoding.service';
               @if (locationError()) {
                 <p class="location-error">{{ locationError() }}</p>
               }
+
+              <div class="structured-address-section mt-6 space-y-3">
+                <h3 class="step-title" style="font-size:1.1rem">Street address <span class="text-red-500">*</span></h3>
+                <p class="step-subtitle" style="margin-bottom:0.75rem">City, street, and building number (apartment optional).</p>
+
+                <div class="field">
+                  <label class="field-label" for="wiz-city">City <span class="text-red-500">*</span></label>
+                  <input
+                    id="wiz-city"
+                    type="text"
+                    class="w-full px-4 py-3 text-base border-[1.5px] rounded-xl bg-white text-slate-900 border-slate-300
+                           focus:border-indigo-500 focus:ring-[3px] focus:ring-indigo-500/15 outline-none"
+                    [ngModel]="store.structuredAddress().city"
+                    (ngModelChange)="store.patchStructuredAddress({ city: $event })"
+                  />
+                </div>
+                <div class="field">
+                  <label class="field-label" for="wiz-street">Street <span class="text-red-500">*</span></label>
+                  <input
+                    id="wiz-street"
+                    type="text"
+                    class="w-full px-4 py-3 text-base border-[1.5px] rounded-xl bg-white text-slate-900 border-slate-300
+                           focus:border-indigo-500 focus:ring-[3px] focus:ring-indigo-500/15 outline-none"
+                    [ngModel]="store.structuredAddress().street"
+                    (ngModelChange)="store.patchStructuredAddress({ street: $event })"
+                  />
+                </div>
+                <div class="field">
+                  <label class="field-label" for="wiz-building">Building number <span class="text-red-500">*</span></label>
+                  <input
+                    id="wiz-building"
+                    type="text"
+                    class="w-full px-4 py-3 text-base border-[1.5px] rounded-xl bg-white text-slate-900 border-slate-300
+                           focus:border-indigo-500 focus:ring-[3px] focus:ring-indigo-500/15 outline-none"
+                    [ngModel]="store.structuredAddress().buildingNumber"
+                    (ngModelChange)="store.patchStructuredAddress({ buildingNumber: $event })"
+                  />
+                </div>
+                <div class="field">
+                  <label class="field-label" for="wiz-apt">Apartment (optional)</label>
+                  <input
+                    id="wiz-apt"
+                    type="text"
+                    class="w-full px-4 py-3 text-base border-[1.5px] rounded-xl bg-white text-slate-900 border-slate-300
+                           focus:border-indigo-500 focus:ring-[3px] focus:ring-indigo-500/15 outline-none"
+                    [ngModel]="store.structuredAddress().apartmentNumber"
+                    (ngModelChange)="store.patchStructuredAddress({ apartmentNumber: $event })"
+                  />
+                </div>
+              </div>
             </div>
           }
           @case (3) {
             <div class="step-form">
               <h2 class="step-title">Trust & Verification</h2>
-              <p class="step-subtitle">We need a few details to prepare for future KYC verification.</p>
-
-              <div class="field">
-                <label class="field-label" for="idNumber">ID Number <span class="text-red-500">*</span></label>
-                <input
-                  id="idNumber"
-                  type="text"
-                  inputmode="numeric"
-                  maxlength="9"
-                  placeholder="123456789"
-                  class="w-full px-4 py-3 text-base border-[1.5px] rounded-xl bg-white text-slate-900 outline-none transition-all
-                         border-slate-300 focus:border-indigo-500 focus:ring-[3px] focus:ring-indigo-500/15
-                         placeholder:text-slate-400"
-                  [class.border-red-400]="verificationTouched() && !isIdNumberValid()"
-                  [class.focus:border-red-400]="verificationTouched() && !isIdNumberValid()"
-                  [ngModel]="store.verification().idNumber"
-                  (ngModelChange)="onIdNumberChange($event)"
-                />
-                @if (verificationTouched() && !isIdNumberValid()) {
-                  <span class="field-error">Must be exactly 9 digits.</span>
-                }
-              </div>
+              <p class="step-subtitle">Reference details so we can verify your application.</p>
 
               <fieldset class="reference-group">
                 <legend>Reference Details <span class="text-red-500">*</span></legend>
@@ -232,7 +261,7 @@ import { AddressSuggestion } from '../../services/geocoding.service';
         @if (store.step() < totalSteps) {
           <button
             class="btn btn-primary"
-            [disabled]="store.step() === 2 && !store.hasLocation()"
+            [disabled]="store.step() === 2 && (!store.hasLocation() || !store.hasStructuredAddress())"
             (click)="onNext()"
           >
             Next →
@@ -285,14 +314,10 @@ export class WizardComponent {
     { num: 3, label: 'Verification' },
   ];
 
-  isIdNumberValid(): boolean {
-    return /^[0-9]{9}$/.test(this.store.verification().idNumber);
-  }
-
   isCurrentStepValid(): boolean {
     switch (this.store.step()) {
       case 1: return this.servicesStep()?.form.valid ?? false;
-      case 2: return this.store.hasLocation();
+      case 2: return this.store.hasLocation() && this.store.hasStructuredAddress();
       case 3: return this.store.isVerificationValid();
       default: return false;
     }
@@ -304,17 +329,12 @@ export class WizardComponent {
     if (this.isCurrentStepValid()) {
       this.store.next();
     } else {
-      if (this.store.step() === 2 && !this.store.hasLocation()) {
-        this.errorMessage.set('Please provide a valid address with coordinates before continuing.');
+      if (this.store.step() === 2 && (!this.store.hasLocation() || !this.store.hasStructuredAddress())) {
+        this.errorMessage.set('Please set your map location and fill in city, street, and building number before continuing.');
       } else {
         this.errorMessage.set('Please fill in all required fields correctly before continuing.');
       }
     }
-  }
-
-  onIdNumberChange(value: string): void {
-    const digits = value.replace(/\D/g, '').slice(0, 9);
-    this.store.patchVerification({ idNumber: digits });
   }
 
   onImageSelected(event: Event): void {

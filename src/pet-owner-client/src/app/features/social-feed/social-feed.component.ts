@@ -268,13 +268,24 @@ import { MapService, UserMiniProfile } from '../../services/map.service';
                   }
                 </div>
               }
+            }
 
+            @if (miniProfile()!.id === currentUserId()) {
               <button
-                (click)="viewFullProfile(miniProfile()!.id)"
+                (click)="goToMyProfile()"
                 class="mt-4 inline-flex items-center gap-1.5 px-4 py-2 bg-indigo-600 text-white text-sm font-semibold rounded-xl hover:bg-indigo-500 transition-colors"
               >
-                View Full Profile
+                My profile
               </button>
+            } @else if (miniProfile()!.isProvider) {
+              <button
+                (click)="viewApprovedProviderProfile(miniProfile()!.id)"
+                class="mt-4 inline-flex items-center gap-1.5 px-4 py-2 bg-indigo-600 text-white text-sm font-semibold rounded-xl hover:bg-indigo-500 transition-colors"
+              >
+                View full provider profile
+              </button>
+            } @else {
+              <p class="mt-4 text-xs text-slate-400">Public provider profile is not available for this member.</p>
             }
           </div>
         </div>
@@ -346,7 +357,12 @@ export class SocialFeedComponent implements OnInit {
     this.miniProfile.set(null);
   }
 
-  viewFullProfile(userId: string): void {
+  goToMyProfile(): void {
+    this.closeMiniProfile();
+    this.router.navigate(['/profile']);
+  }
+
+  viewApprovedProviderProfile(userId: string): void {
     this.closeMiniProfile();
     this.router.navigate(['/provider', userId]);
   }

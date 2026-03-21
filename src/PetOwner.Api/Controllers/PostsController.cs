@@ -31,7 +31,9 @@ public class PostsController : ControllerBase
                 p.Id, p.UserId, p.User.Name, p.Content, p.ImageUrl,
                 p.LikeCount, p.CommentCount,
                 p.Likes.Any(l => l.UserId == userId),
-                p.CreatedAt))
+                p.CreatedAt,
+                p.User.Role,
+                p.User.ProviderProfile != null && p.User.ProviderProfile.Status == "Approved"))
             .ToListAsync();
 
         return Ok(posts);
@@ -55,11 +57,17 @@ public class PostsController : ControllerBase
         _db.Posts.Add(post);
         await _db.SaveChangesAsync();
 
-        var userName = await _db.Users.Where(u => u.Id == userId).Select(u => u.Name).FirstAsync();
+        var created = await _db.Posts
+            .AsNoTracking()
+            .Where(p => p.Id == post.Id)
+            .Select(p => new PostDto(
+                p.Id, p.UserId, p.User.Name, p.Content, p.ImageUrl,
+                0, 0, false, p.CreatedAt,
+                p.User.Role,
+                p.User.ProviderProfile != null && p.User.ProviderProfile.Status == "Approved"))
+            .FirstAsync();
 
-        return CreatedAtAction(nameof(GetFeed), null,
-            new PostDto(post.Id, post.UserId, userName, post.Content, post.ImageUrl,
-                0, 0, false, post.CreatedAt));
+        return CreatedAtAction(nameof(GetFeed), null, created);
     }
 
     [HttpDelete("{id:guid}")]

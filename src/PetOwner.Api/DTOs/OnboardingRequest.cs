@@ -8,13 +8,12 @@ public record ProviderOnboardingRequest(
     string Bio,
     [Required] double Latitude,
     [Required] double Longitude,
-    [Required] string Address,
+    [Required] string City,
+    [Required] string Street,
+    [Required] string BuildingNumber,
+    string? ApartmentNumber,
     [Required] string ReferenceName,
-    [Required] string ReferenceContact,
-    [Required]
-    [StringLength(9, MinimumLength = 9)]
-    [RegularExpression("^[0-9]{9}$", ErrorMessage = "ID Number must be exactly 9 digits.")]
-    string IdNumber
+    [Required] string ReferenceContact
 );
 
 public record ProviderMeResponse(
@@ -23,7 +22,10 @@ public record ProviderMeResponse(
     string UserName,
     string? Bio,
     decimal HourlyRate,
-    string? Address,
+    string City,
+    string Street,
+    string BuildingNumber,
+    string? ApartmentNumber,
     double? Latitude,
     double? Longitude,
     List<int> ServiceIds,
@@ -46,6 +48,9 @@ public record UpdateProfileDto(
     List<string> Services,
     double Latitude,
     double Longitude,
-    string Address,
+    string City,
+    string Street,
+    string BuildingNumber,
+    string? ApartmentNumber,
     bool? AcceptsOffHoursRequests
 );

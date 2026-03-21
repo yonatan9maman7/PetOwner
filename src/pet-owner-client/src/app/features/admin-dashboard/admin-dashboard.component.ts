@@ -148,11 +148,6 @@ import { PendingProvider } from '../../models/pending-provider.model';
                       </div>
 
                       <div>
-                        <label class="text-xs font-semibold text-gray-500 uppercase tracking-wider">ID Number</label>
-                        <p class="mt-1 text-sm font-mono text-gray-800">{{ provider.idNumber ?? 'N/A' }}</p>
-                      </div>
-
-                      <div>
                         <label class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Reference Name</label>
                         <p class="mt-1 text-sm text-gray-800">{{ provider.referenceName ?? 'N/A' }}</p>
                       </div>

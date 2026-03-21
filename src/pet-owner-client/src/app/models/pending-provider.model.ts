@@ -8,7 +8,6 @@ export interface PendingProvider {
   createdAt: string;
   address: string | null;
   services: string[];
-  idNumber: string | null;
   referenceName: string | null;
   referenceContact: string | null;
 }

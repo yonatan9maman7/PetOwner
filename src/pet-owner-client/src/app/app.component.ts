@@ -66,7 +66,9 @@ export class AppComponent {
   });
 
   private loggedInEffect = effect(() => {
+    this.auth.token();
     if (this.auth.isLoggedIn()) {
+      this.notificationService.stopConnection();
       this.notificationService.startConnection();
       this.notificationService.loadUnreadCount();
       this.notificationService.loadNotifications().subscribe({

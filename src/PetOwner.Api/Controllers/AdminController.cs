@@ -37,12 +37,10 @@ public class AdminController : ControllerBase
                 p.HourlyRate,
                 p.ProfileImageUrl,
                 p.User.CreatedAt,
-                Address = _db.Locations
-                    .Where(l => l.UserId == p.UserId)
-                    .Select(l => l.Address)
-                    .FirstOrDefault(),
+                Address = p.Street + " " + p.BuildingNumber
+                    + (p.ApartmentNumber != null ? ", Apt " + p.ApartmentNumber : "")
+                    + ", " + p.City,
                 Services = p.ProviderServices.Select(ps => ps.Service.Name).ToList(),
-                p.IdNumber,
                 p.ReferenceName,
                 p.ReferenceContact,
             })
@@ -63,6 +61,11 @@ public class AdminController : ControllerBase
             return BadRequest(new { message = "Provider is already approved." });
 
         profile.Status = "Approved";
+
+        var user = await _db.Users.FindAsync(providerId);
+        if (user is not null)
+            user.Role = "Provider";
+
         await _db.SaveChangesAsync();
 
         return Ok(new { message = "Provider approved successfully." });

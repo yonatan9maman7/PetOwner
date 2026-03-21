@@ -11,7 +11,9 @@ public record PostDto(
     int LikeCount,
     int CommentCount,
     bool LikedByMe,
-    DateTime CreatedAt
+    DateTime CreatedAt,
+    string AuthorRole,
+    bool AuthorIsApprovedProvider
 );
 
 public record CreateCommentDto(string Content);

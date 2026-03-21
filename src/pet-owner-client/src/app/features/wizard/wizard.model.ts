@@ -11,9 +11,15 @@ export interface MagicBio {
 }
 
 export interface TrustVerification {
-  idNumber: string;
   referenceName: string;
   referenceContact: string;
+}
+
+export interface StructuredAddress {
+  city: string;
+  street: string;
+  buildingNumber: string;
+  apartmentNumber: string;
 }
 
 export interface OnboardingPayload {
@@ -21,7 +27,7 @@ export interface OnboardingPayload {
   bio: MagicBio;
   latitude: number | null;
   longitude: number | null;
-  address: string;
+  structuredAddress: StructuredAddress;
   verification: TrustVerification;
 }
 
@@ -31,8 +37,10 @@ export interface OnboardingApiPayload {
   bio: string;
   latitude: number | null;
   longitude: number | null;
-  address: string | null;
+  city: string;
+  street: string;
+  buildingNumber: string;
+  apartmentNumber: string | null;
   referenceName: string;
   referenceContact: string;
-  idNumber: string;
 }

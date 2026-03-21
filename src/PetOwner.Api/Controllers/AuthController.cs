@@ -1,10 +1,6 @@
-using System.IdentityModel.Tokens.Jwt;
-using System.Security.Claims;
 using System.Security.Cryptography;
-using System.Text;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.IdentityModel.Tokens;
 using PetOwner.Api.DTOs;
 using PetOwner.Api.Services;
 using PetOwner.Data;
@@ -19,12 +15,18 @@ public class AuthController : ControllerBase
     private readonly ApplicationDbContext _db;
     private readonly IConfiguration _config;
     private readonly IEmailService _emailService;
+    private readonly ITokenService _tokenService;
 
-    public AuthController(ApplicationDbContext db, IConfiguration config, IEmailService emailService)
+    public AuthController(
+        ApplicationDbContext db,
+        IConfiguration config,
+        IEmailService emailService,
+        ITokenService tokenService)
     {
         _db = db;
         _config = config;
         _emailService = emailService;
+        _tokenService = tokenService;
     }
 
     [HttpPost("register")]
@@ -52,7 +54,7 @@ public class AuthController : ControllerBase
         _db.Users.Add(user);
         await _db.SaveChangesAsync();
 
-        var token = GenerateJwt(user);
+        var token = _tokenService.GenerateAccessToken(user);
         return Ok(new { token, userId = user.Id });
     }
 
@@ -64,7 +66,7 @@ public class AuthController : ControllerBase
         if (user is null || !BCrypt.Net.BCrypt.Verify(dto.Password, user.PasswordHash))
             return Unauthorized(new { message = "Invalid email or password." });
 
-        var token = GenerateJwt(user);
+        var token = _tokenService.GenerateAccessToken(user);
         return Ok(new { token, userId = user.Id });
     }
 
@@ -125,32 +127,5 @@ public class AuthController : ControllerBase
         await _db.SaveChangesAsync();
 
         return Ok(new { message = "Password has been reset successfully." });
-    }
-
-    private string GenerateJwt(User user)
-    {
-        var jwtKey = _config["Jwt:Key"]
-            ?? throw new InvalidOperationException("Jwt:Key is not configured.");
-
-        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey));
-        var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
-
-        var claims = new[]
-        {
-            new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
-            new Claim(ClaimTypes.Name, user.Name),
-            new Claim(ClaimTypes.Role, user.Role)
-        };
-
-        var expireMinutes = _config.GetValue("Jwt:ExpireMinutes", 60);
-
-        var token = new JwtSecurityToken(
-            issuer: _config["Jwt:Issuer"],
-            audience: _config["Jwt:Audience"],
-            claims: claims,
-            expires: DateTime.UtcNow.AddMinutes(expireMinutes),
-            signingCredentials: credentials);
-
-        return new JwtSecurityTokenHandler().WriteToken(token);
     }
 }
