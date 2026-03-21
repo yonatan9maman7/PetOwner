@@ -39,6 +39,7 @@ public class RequestsController : ControllerBase
         var providerProfile = await _db.ProviderProfiles
             .AsNoTracking()
             .Include(p => p.User)
+            .Include(p => p.ServiceRates)
             .FirstOrDefaultAsync(p => p.UserId == request.ProviderId);
 
         if (providerProfile is null)
@@ -87,8 +88,19 @@ public class RequestsController : ControllerBase
             if (hasConflict)
                 return Conflict(new { message = "The provider already has a booking during this time." });
 
+            var applicableRate = providerProfile.ServiceRates.FirstOrDefault()?.Rate ?? 0m;
+            if (request.ServiceId.HasValue)
+            {
+                var svcName = await _db.Services.Where(s => s.Id == request.ServiceId.Value)
+                    .Select(s => s.Name).FirstOrDefaultAsync();
+                var matched = providerProfile.ServiceRates
+                    .FirstOrDefault(r => r.Service.ToString() == svcName?.Replace(" ", "").Replace("-", ""));
+                if (matched is not null)
+                    applicableRate = matched.Rate;
+            }
+
             var hours = (decimal)(end - start).TotalHours;
-            totalPrice = Math.Round(providerProfile.HourlyRate * hours, 2);
+            totalPrice = Math.Round(applicableRate * hours, 2);
         }
 
         var serviceRequest = new ServiceRequest

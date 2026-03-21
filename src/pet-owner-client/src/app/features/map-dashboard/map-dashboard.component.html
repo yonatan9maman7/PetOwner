@@ -242,8 +242,8 @@
         <div class="bg-gray-50 rounded-2xl p-4 mb-4">
           <div class="flex items-center justify-between">
             <div>
-              <p class="text-xs text-gray-500 uppercase tracking-wide font-medium">Hourly Rate</p>
-              <p class="text-2xl font-bold text-gray-900 mt-0.5">₪{{ pin.hourlyRate }}</p>
+              <p class="text-xs text-gray-500 uppercase tracking-wide font-medium">Starting at</p>
+              <p class="text-2xl font-bold text-gray-900 mt-0.5">₪{{ pin.minRate }}</p>
             </div>
             <div class="text-right">
               <p class="text-xs text-gray-500 uppercase tracking-wide font-medium">Services</p>
@@ -400,7 +400,7 @@
 
     <h3 class="text-lg font-bold text-gray-900 mb-1">Book a Service</h3>
     @if (selectedPin(); as pin) {
-      <p class="text-sm text-gray-500 mb-4">With <span class="font-medium text-violet-600">{{ pin.name }}</span> · ₪{{ pin.hourlyRate }}/hr</p>
+      <p class="text-sm text-gray-500 mb-4">With <span class="font-medium text-violet-600">{{ pin.name }}</span></p>
     }
 
     @if (loadingPets()) {
@@ -430,10 +430,10 @@
               [checked]="selectedPetId() === pet.id"
               (change)="selectedPetId.set(pet.id)"
               class="sr-only" />
-            <span class="text-lg">{{ pet.species === 'Dog' ? '🐕' : pet.species === 'Cat' ? '🐈' : '🐾' }}</span>
+            <span class="text-lg">{{ petSpeciesEmoji(pet.species) }}</span>
             <div class="min-w-0 flex-1">
               <p class="font-medium text-gray-900 text-sm truncate">{{ pet.name }}</p>
-              <p class="text-xs text-gray-500">{{ pet.species }} · {{ pet.age }}y</p>
+              <p class="text-xs text-gray-500">{{ petSpeciesLabel(pet.species) }} · {{ pet.age }}y</p>
             </div>
             @if (selectedPetId() === pet.id) {
               <svg class="w-5 h-5 text-indigo-600 shrink-0" fill="currentColor" viewBox="0 0 20 20">

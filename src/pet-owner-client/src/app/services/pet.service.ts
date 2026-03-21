@@ -1,11 +1,12 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
+import { PetSpecies } from '../models/pet-species.model';
 
 export interface Pet {
   id: string;
   name: string;
-  species: string;
+  species: PetSpecies;
   age: number;
   notes: string | null;
   breed?: string;
@@ -17,7 +18,7 @@ export interface Pet {
 
 export interface CreatePetPayload {
   name: string;
-  species: string;
+  species: PetSpecies;
   age: number;
   notes: string | null;
   breed?: string;
@@ -29,7 +30,7 @@ export interface CreatePetPayload {
 
 export interface UpdatePetPayload {
   name: string;
-  species: string;
+  species: PetSpecies;
   age: number;
   notes: string | null;
   breed?: string;

@@ -1,9 +1,11 @@
+using PetOwner.Data.Models;
+
 namespace PetOwner.Api.DTOs;
 
 public record PetDto(
     Guid Id,
     string Name,
-    string Species,
+    PetSpecies Species,
     string? Breed,
     int Age,
     double? Weight,
@@ -13,9 +15,9 @@ public record PetDto(
     bool IsNeutered
 );
 
-public record CreatePetDto(
+public record CreatePetRequest(
     string Name,
-    string Species,
+    PetSpecies Species,
     string? Breed,
     int Age,
     double? Weight,
@@ -25,9 +27,9 @@ public record CreatePetDto(
     bool IsNeutered = false
 );
 
-public record UpdatePetDto(
+public record UpdatePetRequest(
     string Name,
-    string Species,
+    PetSpecies Species,
     string? Breed,
     int Age,
     double? Weight,

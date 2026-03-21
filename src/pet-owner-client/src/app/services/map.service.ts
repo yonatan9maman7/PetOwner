@@ -2,13 +2,14 @@ import { Injectable, inject } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { MapPin } from '../models/map-pin.model';
+import { ServiceRateDto } from '../features/wizard/wizard.model';
 
 export interface ProviderPublicProfile {
   providerId: string;
   name: string;
   bio: string | null;
   profileImageUrl: string | null;
-  hourlyRate: number;
+  serviceRates: ServiceRateDto[];
   averageRating: number | null;
   reviewCount: number;
   isAvailableNow: boolean;

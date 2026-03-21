@@ -5,17 +5,29 @@ import { Pet, PetService } from '../../services/pet.service';
 import { MedicalRecord, MedicalRecordService } from '../../services/medical-record.service';
 import { TeletriageService, TeletriageHistory } from '../../services/teletriage.service';
 import { ToastService } from '../../services/toast.service';
+import {
+  PET_SPECIES_OPTIONS,
+  PetSpecies,
+  petSpeciesEmoji,
+  petSpeciesIconBgClass,
+  petSpeciesLabel,
+} from '../../models/pet-species.model';
 
-const SPECIES_OPTIONS = ['Dog', 'Cat', 'Other'] as const;
 const BREED_OPTIONS = [
   'Mixed / Mutt',
   'Golden Retriever',
-  'Labrador',
+  'Labrador Retriever',
   'French Bulldog',
-  'Poodle',
   'German Shepherd',
+  'Persian',
+  'Poodle',
+  'Beagle',
+  'Maine Coon',
+  'Parakeet',
   'Other',
 ] as const;
+
+const ALLERGY_OPTIONS = ['None', 'Chicken', 'Beef', 'Grains', 'Fleas', 'Other'] as const;
 const RECORD_TYPES = ['Vaccination', 'Condition', 'Medication', 'VetVisit'] as const;
 
 @Component({
@@ -81,7 +93,7 @@ const RECORD_TYPES = ['Vaccination', 'Condition', 'Medication', 'VetVisit'] as c
                       <div class="min-w-0 flex-1 pr-16">
                         <h3 class="text-lg font-semibold text-slate-900 truncate">{{ pet.name }}</h3>
                         <p class="text-xs text-slate-500">
-                          {{ pet.species }}@if (pet.breed) {<span> · {{ pet.breed }}</span>} · {{ pet.age }} {{ pet.age === 1 ? 'year' : 'years' }} old@if (pet.weight) {<span> · {{ pet.weight }} kg</span>}@if (pet.isNeutered) {<span> · Neutered / spayed</span>}
+                          {{ speciesLabel(pet.species) }}@if (pet.breed) {<span> · {{ pet.breed }}</span>} · {{ pet.age }} {{ pet.age === 1 ? 'year' : 'years' }} old@if (pet.weight) {<span> · {{ pet.weight }} kg</span>}@if (pet.isNeutered) {<span> · Neutered / spayed</span>}
                         </p>
                       </div>
                     </div>
@@ -421,9 +433,9 @@ const RECORD_TYPES = ['Vaccination', 'Condition', 'Medication', 'VetVisit'] as c
                     formControlName="species"
                     class="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm text-slate-900 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 outline-none transition bg-white"
                   >
-                    <option value="" disabled>Select...</option>
-                    @for (s of speciesOptions; track s) {
-                      <option [value]="s">{{ s }}</option>
+                    <option [ngValue]="null" disabled>Select species...</option>
+                    @for (opt of petSpeciesOptions; track opt.value) {
+                      <option [ngValue]="opt.value">{{ opt.label }}</option>
                     }
                   </select>
                 </div>
@@ -471,12 +483,12 @@ const RECORD_TYPES = ['Vaccination', 'Condition', 'Medication', 'VetVisit'] as c
                 </div>
               </div>
 
-              <div class="flex items-center justify-between gap-4 rounded-xl border border-gray-200 bg-slate-50/60 px-4 py-3">
+              <div class="flex items-center justify-between gap-4 rounded-xl border border-slate-200/80 bg-gradient-to-r from-slate-50 to-indigo-50/30 px-4 py-3.5 shadow-sm">
                 <div class="min-w-0">
-                  <span class="block text-sm font-medium text-slate-700">Neutered / Spayed?</span>
+                  <span class="block text-sm font-semibold text-slate-800 tracking-tight">Neutered / Spayed?</span>
                   <p class="text-xs text-slate-500 mt-0.5">Helps caregivers with basic medical context</p>
                 </div>
-                <label for="pet-neutered" class="inline-flex cursor-pointer flex-shrink-0 items-center rounded-lg focus-within:outline-none focus-within:ring-2 focus-within:ring-indigo-200">
+                <label for="pet-neutered" class="group inline-flex cursor-pointer flex-shrink-0 items-center rounded-full focus-within:outline-none focus-within:ring-2 focus-within:ring-indigo-300 focus-within:ring-offset-2">
                   <input
                     id="pet-neutered"
                     type="checkbox"
@@ -484,7 +496,7 @@ const RECORD_TYPES = ['Vaccination', 'Condition', 'Medication', 'VetVisit'] as c
                     class="peer sr-only"
                   />
                   <span
-                    class="relative h-6 w-11 shrink-0 rounded-full bg-slate-200 transition-colors after:absolute after:left-[2px] after:top-[2px] after:block after:h-5 after:w-5 after:rounded-full after:border after:border-gray-200 after:bg-white after:transition-transform after:content-[''] peer-checked:bg-indigo-600 peer-checked:after:translate-x-5"
+                    class="relative h-7 w-12 shrink-0 rounded-full bg-slate-300/90 ring-1 ring-slate-200/80 transition-all duration-200 after:absolute after:left-[3px] after:top-[3px] after:block after:h-[22px] after:w-[22px] after:rounded-full after:bg-white after:shadow-md after:ring-1 after:ring-black/5 after:transition-transform after:duration-200 after:content-[''] peer-checked:bg-gradient-to-r peer-checked:from-indigo-600 peer-checked:to-violet-600 peer-checked:ring-indigo-500/30 peer-checked:after:translate-x-[1.35rem]"
                   ></span>
                 </label>
               </div>
@@ -501,18 +513,23 @@ const RECORD_TYPES = ['Vaccination', 'Condition', 'Medication', 'VetVisit'] as c
               </div>
 
               <div class="grid grid-cols-2 gap-4">
-                <div>
-                  <label for="pet-allergies" class="block text-sm font-medium text-slate-700 mb-1">Allergies</label>
-                  <input
-                    id="pet-allergies"
-                    type="text"
-                    formControlName="allergies"
-                    placeholder="e.g., Chicken, Pollen"
-                    class="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 outline-none transition"
-                  />
+                <div class="sm:col-span-2">
+                  <span class="block text-sm font-medium text-slate-700 mb-2">Allergies</span>
+                  <p class="text-xs text-slate-500 mb-2">Select all that apply — saved as a single list for your pet&apos;s profile.</p>
+                  <div class="flex flex-wrap gap-2">
+                    @for (a of allergyOptions; track a) {
+                      <button
+                        type="button"
+                        (click)="toggleAllergyChip(a)"
+                        [class]="allergyChipClass(a)"
+                      >
+                        {{ a }}
+                      </button>
+                    }
+                  </div>
                 </div>
 
-                <div>
+                <div class="sm:col-span-2">
                   <label for="pet-conditions" class="block text-sm font-medium text-slate-700 mb-1">Medical Conditions</label>
                   <input
                     id="pet-conditions"
@@ -556,9 +573,16 @@ export class MyPetsComponent implements OnInit {
   private readonly toast = inject(ToastService);
   private readonly fb = inject(FormBuilder);
 
-  readonly speciesOptions = SPECIES_OPTIONS;
+  readonly petSpeciesOptions = PET_SPECIES_OPTIONS;
   readonly breedOptions = BREED_OPTIONS;
+  readonly allergyOptions = ALLERGY_OPTIONS;
   readonly recordTypes = RECORD_TYPES;
+
+  readonly speciesEmoji = petSpeciesEmoji;
+  readonly speciesIconClass = petSpeciesIconBgClass;
+  readonly speciesLabel = petSpeciesLabel;
+
+  private readonly selectedAllergies = signal<Set<string>>(new Set(['None']));
 
   readonly pets = signal<Pet[]>([]);
   readonly loading = signal(true);
@@ -579,13 +603,12 @@ export class MyPetsComponent implements OnInit {
 
   readonly petForm = this.fb.group({
     name: ['', Validators.required],
-    species: ['', Validators.required],
+    species: [null as PetSpecies | null, Validators.required],
     breed: [''],
     age: [null as number | null, [Validators.required, Validators.min(0), Validators.max(100)]],
     weight: [null as number | null, [Validators.min(0)]],
     isNeutered: [false],
     notes: [''],
-    allergies: [''],
     medicalConditions: [''],
   });
 
@@ -629,7 +652,7 @@ export class MyPetsComponent implements OnInit {
       notes: v.notes?.trim() || null,
       breed: v.breed?.trim() || undefined,
       weight: v.weight ?? undefined,
-      allergies: v.allergies?.trim() || undefined,
+      allergies: this.allergiesCommaSeparated(),
       medicalConditions: v.medicalConditions?.trim() || undefined,
       isNeutered: !!v.isNeutered,
     };
@@ -643,7 +666,7 @@ export class MyPetsComponent implements OnInit {
       next: () => {
         this.toast.success(editId ? 'Pet updated!' : 'Pet added successfully!');
         this.editingPetId.set(null);
-        this.petForm.reset();
+        this.resetPetFormDefaults();
         this.refreshPets();
         this.submitting.set(false);
       },
@@ -656,6 +679,7 @@ export class MyPetsComponent implements OnInit {
 
   editPet(pet: Pet): void {
     this.editingPetId.set(pet.id);
+    this.hydrateAllergiesFromString(pet.allergies);
     this.petForm.patchValue({
       name: pet.name,
       species: pet.species,
@@ -664,14 +688,13 @@ export class MyPetsComponent implements OnInit {
       weight: pet.weight ?? null,
       isNeutered: pet.isNeutered ?? false,
       notes: pet.notes ?? '',
-      allergies: pet.allergies ?? '',
       medicalConditions: pet.medicalConditions ?? '',
     });
   }
 
   cancelPetEdit(): void {
     this.editingPetId.set(null);
-    this.petForm.reset();
+    this.resetPetFormDefaults();
   }
 
   confirmDelete(pet: Pet): void {
@@ -690,7 +713,7 @@ export class MyPetsComponent implements OnInit {
         }
         if (this.editingPetId() === pet.id) {
           this.editingPetId.set(null);
-          this.petForm.reset();
+          this.resetPetFormDefaults();
         }
         this.toast.success(`${pet.name} removed.`);
       },
@@ -836,6 +859,75 @@ export class MyPetsComponent implements OnInit {
 
   // ── UI helpers ──
 
+  toggleAllergyChip(key: string): void {
+    this.selectedAllergies.update((prev) => {
+      const next = new Set(prev);
+      if (key === 'None') {
+        next.clear();
+        next.add('None');
+        return next;
+      }
+      next.delete('None');
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      if (next.size === 0) next.add('None');
+      return next;
+    });
+  }
+
+  allergyChipClass(key: string): string {
+    const on = this.selectedAllergies().has(key);
+    const base =
+      'min-h-[2.25rem] rounded-full px-3.5 py-1.5 text-xs font-semibold tracking-wide transition-all duration-200 border';
+    if (on) {
+      return `${base} border-indigo-500 bg-indigo-600 text-white shadow-md shadow-indigo-500/25`;
+    }
+    return `${base} border-slate-200 bg-white text-slate-600 hover:border-indigo-200 hover:bg-indigo-50/60`;
+  }
+
+  private allergiesCommaSeparated(): string | undefined {
+    const set = this.selectedAllergies();
+    if (set.size === 0 || set.has('None')) return undefined;
+    return [...set].join(', ');
+  }
+
+  private hydrateAllergiesFromString(s: string | null | undefined): void {
+    const known = new Set<string>(ALLERGY_OPTIONS.filter((x) => x !== 'None'));
+    if (!s?.trim()) {
+      this.selectedAllergies.set(new Set(['None']));
+      return;
+    }
+    const parts = s.split(',').map((x) => x.trim()).filter(Boolean);
+    const next = new Set<string>();
+    let other = false;
+    for (const p of parts) {
+      const match = [...known].find((k) => k.toLowerCase() === p.toLowerCase());
+      if (match) next.add(match);
+      else other = true;
+    }
+    if (other) next.add('Other');
+    if (next.size === 0) next.add('None');
+    this.selectedAllergies.set(next);
+  }
+
+  private resetAllergiesToNone(): void {
+    this.selectedAllergies.set(new Set(['None']));
+  }
+
+  private resetPetFormDefaults(): void {
+    this.petForm.reset({
+      name: '',
+      species: null,
+      breed: '',
+      age: null,
+      weight: null,
+      isNeutered: false,
+      notes: '',
+      medicalConditions: '',
+    });
+    this.resetAllergiesToNone();
+  }
+
   triageSeverityDotClass(severity: string): string {
     switch (severity) {
       case 'Low': return 'bg-green-500';
@@ -893,22 +985,6 @@ export class MyPetsComponent implements OnInit {
       case 'Medication':  return 'bg-blue-100 text-blue-700';
       case 'VetVisit':    return 'bg-purple-100 text-purple-700';
       default:            return 'bg-slate-100 text-slate-700';
-    }
-  }
-
-  speciesEmoji(species: string): string {
-    switch (species) {
-      case 'Dog': return '🐶';
-      case 'Cat': return '🐱';
-      default:    return '🐾';
-    }
-  }
-
-  speciesIconClass(species: string): string {
-    switch (species) {
-      case 'Dog': return 'bg-amber-100';
-      case 'Cat': return 'bg-violet-100';
-      default:    return 'bg-emerald-100';
     }
   }
 

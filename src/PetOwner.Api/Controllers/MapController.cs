@@ -59,7 +59,7 @@ public class MapController : ControllerBase
                 u.Name,
                 u.ProviderProfile!.Bio,
                 u.ProviderProfile.ProfileImageUrl,
-                u.ProviderProfile.HourlyRate,
+                u.ProviderProfile.ServiceRates.Select(r => new ServiceRateDto(r.Service, r.Rate, r.Unit)).ToList(),
                 u.ProviderProfile.AverageRating,
                 u.ProviderProfile.ReviewCount,
                 u.ProviderProfile.IsAvailableNow,

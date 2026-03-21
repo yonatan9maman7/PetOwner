@@ -3,6 +3,7 @@ import { FormsModule } from '@angular/forms';
 import { DatePipe } from '@angular/common';
 import { Router } from '@angular/router';
 import { Pet, PetService } from '../../services/pet.service';
+import { petSpeciesEmoji } from '../../models/pet-species.model';
 import { Activity, ActivityService, CreateActivityPayload } from '../../services/activity.service';
 import { ToastService } from '../../services/toast.service';
 
@@ -46,7 +47,7 @@ const ACTIVITY_TYPES = ['Walk', 'Meal', 'Exercise', 'Weight'] as const;
                   ? 'bg-emerald-600 text-white shadow-md'
                   : 'bg-white border border-gray-200 text-slate-600 hover:border-emerald-300'"
               >
-                <span>{{ speciesEmoji(pet.species) }}</span>
+                <span>{{ petSpeciesEmoji(pet.species) }}</span>
                 {{ pet.name }}
               </button>
             }
@@ -207,6 +208,7 @@ export class PetActivityComponent implements OnInit {
   private readonly router = inject(Router);
 
   readonly activityTypes = ACTIVITY_TYPES;
+  readonly petSpeciesEmoji = petSpeciesEmoji;
 
   pets = signal<Pet[]>([]);
   petsLoading = signal(true);
@@ -329,14 +331,6 @@ export class PetActivityComponent implements OnInit {
       case 'Weight': return `${act.value} kg`;
       case 'Exercise': return `${act.value} cal`;
       default: return `${act.value}`;
-    }
-  }
-
-  speciesEmoji(species: string): string {
-    switch (species?.toLowerCase()) {
-      case 'dog': return '\uD83D\uDC36';
-      case 'cat': return '\uD83D\uDC31';
-      default: return '\uD83D\uDC3E';
     }
   }
 

@@ -1,10 +1,16 @@
 using System.ComponentModel.DataAnnotations;
+using PetOwner.Data.Models;
 
 namespace PetOwner.Api.DTOs;
 
+public record ServiceRateDto(
+    ServiceType ServiceType,
+    decimal Rate,
+    PricingUnit PricingUnit
+);
+
 public record ProviderOnboardingRequest(
-    List<string> Services,
-    decimal HourlyRate,
+    List<ServiceRateDto> SelectedServices,
     string Bio,
     [Required] double Latitude,
     [Required] double Longitude,
@@ -21,7 +27,7 @@ public record ProviderMeResponse(
     bool IsAvailableNow,
     string UserName,
     string? Bio,
-    decimal HourlyRate,
+    List<ServiceRateDto> ServiceRates,
     string City,
     string Street,
     string BuildingNumber,
@@ -44,8 +50,7 @@ public record UpdateAvailabilityRequest(bool IsAvailable);
 
 public record UpdateProfileDto(
     string Bio,
-    decimal HourlyRate,
-    List<string> Services,
+    List<ServiceRateDto> SelectedServices,
     double Latitude,
     double Longitude,
     string City,

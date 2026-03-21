@@ -28,13 +28,14 @@ public class AdminController : ControllerBase
             .Include(p => p.User)
             .Include(p => p.ProviderServices)
                 .ThenInclude(ps => ps.Service)
+            .Include(p => p.ServiceRates)
             .Select(p => new
             {
                 p.UserId,
                 p.User.Name,
                 p.User.Phone,
                 p.Bio,
-                p.HourlyRate,
+                ServiceRates = p.ServiceRates.Select(r => new { r.Service, r.Rate, r.Unit }).ToList(),
                 p.ProfileImageUrl,
                 p.User.CreatedAt,
                 Address = p.Street + " " + p.BuildingNumber
@@ -101,5 +102,12 @@ public class AdminController : ControllerBase
     {
         var count = await _seeder.SeedProvidersAsync();
         return Ok(new { message = $"Successfully seeded {count} dummy providers." });
+    }
+
+    [HttpPost("seed-bogus-pets")]
+    public async Task<IActionResult> SeedBogusPets()
+    {
+        var count = await _seeder.SeedBogusPetsForUsersWithoutPetsAsync();
+        return Ok(new { message = count == 0 ? "No eligible users without pets." : $"Seeded {count} bogus pets.", count });
     }
 }

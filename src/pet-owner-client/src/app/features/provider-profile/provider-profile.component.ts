@@ -6,6 +6,7 @@ import { MapService, ProviderPublicProfile } from '../../services/map.service';
 import { AuthService } from '../../services/auth.service';
 import { ToastService } from '../../services/toast.service';
 import { PetService, Pet } from '../../services/pet.service';
+import { petSpeciesEmoji, petSpeciesLabel } from '../../models/pet-species.model';
 import { RequestService } from '../../services/request.service';
 
 const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -67,20 +68,20 @@ const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Frid
         </div>
 
         <div class="px-5 -mt-8 pb-28 max-w-lg mx-auto space-y-4">
-          <!-- Rate + Services card -->
+          <!-- Services & Rates card -->
           <div class="bg-white rounded-2xl shadow-md p-5">
             <div class="flex items-baseline justify-between mb-3">
-              <div>
-                <p class="text-xs text-gray-500 uppercase tracking-wide font-medium">Hourly Rate</p>
-                <p class="text-3xl font-bold text-gray-900">₪{{ profile()!.hourlyRate }}</p>
-              </div>
+              <h2 class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Services & Rates</h2>
               @if (profile()!.acceptsOffHoursRequests) {
                 <span class="text-xs bg-amber-50 text-amber-700 font-medium px-2 py-1 rounded-full border border-amber-200">Off-hours OK</span>
               }
             </div>
-            <div class="flex flex-wrap gap-1.5">
-              @for (svc of profile()!.services; track svc) {
-                <span class="bg-violet-50 text-violet-700 text-xs font-medium px-2.5 py-1 rounded-full">{{ svc }}</span>
+            <div class="space-y-2">
+              @for (rate of profile()!.serviceRates; track rate.serviceType) {
+                <div class="flex items-center justify-between py-1.5">
+                  <span class="text-sm font-medium text-gray-800">{{ formatServiceType(rate.serviceType) }}</span>
+                  <span class="text-sm font-semibold text-indigo-700">₪{{ rate.rate }}/{{ formatUnit(rate.pricingUnit) }}</span>
+                </div>
               }
             </div>
           </div>
@@ -200,7 +201,7 @@ const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Frid
 
         <h3 class="text-lg font-bold text-gray-900 mb-1">Book a Service</h3>
         @if (profile(); as p) {
-          <p class="text-sm text-gray-500 mb-4">With <span class="font-medium text-violet-600">{{ p.name }}</span> · ₪{{ p.hourlyRate }}/hr</p>
+          <p class="text-sm text-gray-500 mb-4">With <span class="font-medium text-violet-600">{{ p.name }}</span></p>
         }
 
         @if (loadingPets()) {
@@ -230,10 +231,10 @@ const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Frid
                   [checked]="selectedPetId() === pet.id"
                   (change)="selectedPetId.set(pet.id)"
                   class="sr-only" />
-                <span class="text-lg">{{ pet.species === 'Dog' ? '🐕' : pet.species === 'Cat' ? '🐈' : '🐾' }}</span>
+                <span class="text-lg">{{ petSpeciesEmoji(pet.species) }}</span>
                 <div class="min-w-0 flex-1">
                   <p class="font-medium text-gray-900 text-sm truncate">{{ pet.name }}</p>
-                  <p class="text-xs text-gray-500">{{ pet.species }} · {{ pet.age }}y</p>
+                  <p class="text-xs text-gray-500">{{ petSpeciesLabel(pet.species) }} · {{ pet.age }}y</p>
                 </div>
                 @if (selectedPetId() === pet.id) {
                   <svg class="w-5 h-5 text-indigo-600 shrink-0" fill="currentColor" viewBox="0 0 20 20">
@@ -362,6 +363,9 @@ export class ProviderProfileComponent implements OnInit {
   private readonly petService = inject(PetService);
   private readonly requestService = inject(RequestService);
 
+  readonly petSpeciesEmoji = petSpeciesEmoji;
+  readonly petSpeciesLabel = petSpeciesLabel;
+
   readonly isLoggedIn = computed(() => this.auth.isLoggedIn());
 
   profile = signal<ProviderPublicProfile | null>(null);
@@ -391,10 +395,14 @@ export class ProviderProfileComponent implements OnInit {
     const hours = (eh * 60 + em - sh * 60 - sm) / 60;
     if (hours <= 0) return null;
 
+    const minRate = p.serviceRates.length > 0
+      ? Math.min(...p.serviceRates.map(r => r.rate))
+      : 0;
+
     return {
       hours: Math.round(hours * 10) / 10,
-      rate: p.hourlyRate,
-      total: Math.round(p.hourlyRate * hours * 100) / 100,
+      rate: minRate,
+      total: Math.round(minRate * hours * 100) / 100,
     };
   });
 
@@ -439,6 +447,21 @@ export class ProviderProfileComponent implements OnInit {
       next: (p) => { this.profile.set(p); this.loading.set(false); },
       error: () => { this.error.set(true); this.loading.set(false); },
     });
+  }
+
+  formatServiceType(type: string): string {
+    const map: Record<string, string> = {
+      DogWalking: 'Dog Walking', PetSitting: 'Pet Sitting',
+      Boarding: 'Boarding', DropInVisit: 'Drop-in Visit',
+    };
+    return map[type] ?? type;
+  }
+
+  formatUnit(unit: string): string {
+    const map: Record<string, string> = {
+      PerHour: 'hr', PerNight: 'night', PerVisit: 'visit',
+    };
+    return map[unit] ?? unit;
   }
 
   dayName(day: number): string {

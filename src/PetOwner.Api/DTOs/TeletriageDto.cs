@@ -39,7 +39,7 @@ public record NearbyVetDto(
     double DistanceKm,
     string? ProfileImageUrl,
     string Services,
-    decimal HourlyRate,
+    decimal MinRate,
     double AverageRating,
     int ReviewCount
 );

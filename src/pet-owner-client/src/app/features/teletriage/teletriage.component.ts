@@ -2,6 +2,7 @@ import { Component, inject, OnInit, signal, computed, ElementRef, ViewChild } fr
 import { FormsModule } from '@angular/forms';
 import { DatePipe } from '@angular/common';
 import { Pet, PetService } from '../../services/pet.service';
+import { petSpeciesEmoji, petSpeciesIconBgClass, petSpeciesLabel } from '../../models/pet-species.model';
 import { TeletriageService, TeletriageResponse, TeletriageHistory, NearbyVet } from '../../services/teletriage.service';
 import { ToastService } from '../../services/toast.service';
 
@@ -150,7 +151,7 @@ interface ChatMessage {
                         </div>
                         <div>
                           <p class="font-medium text-slate-800 text-sm">{{ pet.name }}</p>
-                          <p class="text-xs text-slate-400">{{ pet.species }} · {{ pet.age }} {{ pet.age === 1 ? 'year' : 'years' }} old</p>
+                          <p class="text-xs text-slate-400">{{ speciesLabel(pet.species) }} · {{ pet.age }} {{ pet.age === 1 ? 'year' : 'years' }} old</p>
                         </div>
                       </button>
                     }
@@ -495,6 +496,10 @@ export class TeletriageComponent implements OnInit {
   private readonly triageService = inject(TeletriageService);
   private readonly toast = inject(ToastService);
 
+  readonly speciesEmoji = petSpeciesEmoji;
+  readonly speciesAvatarClass = petSpeciesIconBgClass;
+  readonly speciesLabel = petSpeciesLabel;
+
   pets = signal<Pet[]>([]);
   petsLoading = signal(true);
   selectedPet = signal<Pet | null>(null);
@@ -760,22 +765,6 @@ export class TeletriageComponent implements OnInit {
         behavior: 'smooth',
       });
     }, 100);
-  }
-
-  speciesEmoji(species: string): string {
-    switch (species?.toLowerCase()) {
-      case 'dog': return '\uD83D\uDC36';
-      case 'cat': return '\uD83D\uDC31';
-      default: return '\uD83D\uDC3E';
-    }
-  }
-
-  speciesAvatarClass(species: string): string {
-    switch (species?.toLowerCase()) {
-      case 'dog': return 'bg-amber-100';
-      case 'cat': return 'bg-purple-100';
-      default: return 'bg-emerald-100';
-    }
   }
 
   severityBadgeClass(severity: string): string {

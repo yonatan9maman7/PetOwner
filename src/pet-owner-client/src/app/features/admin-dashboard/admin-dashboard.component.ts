@@ -80,9 +80,11 @@ import { PendingProvider } from '../../models/pending-provider.model';
                           {{ svc }}
                         </span>
                       }
-                      <span class="inline-block rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-medium text-emerald-700">
-                        {{ provider.hourlyRate }} ILS/hr
-                      </span>
+                      @for (rate of provider.serviceRates; track rate.serviceType) {
+                        <span class="inline-block rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-medium text-emerald-700">
+                          {{ rate.rate }} ILS
+                        </span>
+                      }
                     </div>
                   </div>
 
@@ -119,8 +121,10 @@ import { PendingProvider } from '../../models/pending-provider.model';
                       }
 
                       <div>
-                        <label class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Hourly Rate</label>
-                        <p class="mt-1 text-sm font-medium text-gray-800">{{ provider.hourlyRate }} ILS</p>
+                        <label class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Service Rates</label>
+                        @for (rate of provider.serviceRates; track rate.serviceType) {
+                          <p class="mt-1 text-sm font-medium text-gray-800">{{ rate.serviceType }}: {{ rate.rate }} ILS</p>
+                        }
                       </div>
 
                       <div>

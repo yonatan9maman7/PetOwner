@@ -142,7 +142,9 @@ public class TeletriageController : ControllerBase
                 l.GeoLocation.Distance(userPoint) * 111.32,
                 l.User.ProviderProfile!.ProfileImageUrl,
                 string.Join(", ", l.User.ProviderProfile.ProviderServices.Select(ps => ps.Service.Name)),
-                l.User.ProviderProfile.HourlyRate,
+                l.User.ProviderProfile.ServiceRates.Any()
+                    ? l.User.ProviderProfile.ServiceRates.Min(r => r.Rate)
+                    : 0m,
                 (double)(l.User.ProviderProfile.AverageRating ?? 0m),
                 l.User.ProviderProfile.ReviewCount
             ))

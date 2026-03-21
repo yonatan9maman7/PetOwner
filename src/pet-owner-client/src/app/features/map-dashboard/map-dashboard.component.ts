@@ -19,6 +19,7 @@ import { AuthService } from '../../services/auth.service';
 import { AdminService } from '../../services/admin.service';
 import { ToastService } from '../../services/toast.service';
 import { PetService, Pet } from '../../services/pet.service';
+import { petSpeciesEmoji, petSpeciesLabel } from '../../models/pet-species.model';
 import { RequestService } from '../../services/request.service';
 import { ReviewService, ProviderReview } from '../../services/review.service';
 import { MapPin } from '../../models/map-pin.model';
@@ -47,6 +48,9 @@ export class MapDashboardComponent implements OnInit, OnDestroy {
   private readonly reviewService = inject(ReviewService);
   private readonly adminService = inject(AdminService);
   private readonly router = inject(Router);
+
+  readonly petSpeciesEmoji = petSpeciesEmoji;
+  readonly petSpeciesLabel = petSpeciesLabel;
 
   readonly isLoggedIn = computed(() => this.auth.isLoggedIn());
   readonly isAdmin = computed(() => this.auth.userRole() === 'Admin');
@@ -131,10 +135,12 @@ export class MapDashboardComponent implements OnInit, OnDestroy {
     const hours = (eh * 60 + em - sh * 60 - sm) / 60;
     if (hours <= 0) return null;
 
+    const rate = pin.minRate;
+
     return {
       hours: Math.round(hours * 10) / 10,
-      rate: pin.hourlyRate,
-      total: Math.round(pin.hourlyRate * hours * 100) / 100,
+      rate,
+      total: Math.round(rate * hours * 100) / 100,
     };
   });
 

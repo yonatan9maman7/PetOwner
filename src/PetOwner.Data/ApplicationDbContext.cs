@@ -27,6 +27,7 @@ public class ApplicationDbContext : DbContext
     public DbSet<Conversation> Conversations => Set<Conversation>();
     public DbSet<Message> Messages => Set<Message>();
     public DbSet<Notification> Notifications => Set<Notification>();
+    public DbSet<ProviderServiceRate> ProviderServiceRates => Set<ProviderServiceRate>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -37,6 +38,7 @@ public class ApplicationDbContext : DbContext
         ConfigureLocation(modelBuilder);
         ConfigureService(modelBuilder);
         ConfigureProviderService(modelBuilder);
+        ConfigureProviderServiceRate(modelBuilder);
         ConfigurePet(modelBuilder);
         ConfigureServiceRequest(modelBuilder);
         ConfigureReview(modelBuilder);
@@ -100,10 +102,6 @@ public class ApplicationDbContext : DbContext
         modelBuilder.Entity<ProviderProfile>(entity =>
         {
             entity.HasKey(p => p.UserId);
-
-            entity.Property(p => p.HourlyRate)
-                .HasColumnType("decimal(18,2)")
-                .IsRequired();
 
             entity.Property(p => p.Status)
                 .HasMaxLength(20)
@@ -205,6 +203,39 @@ public class ApplicationDbContext : DbContext
         });
     }
 
+    private static void ConfigureProviderServiceRate(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<ProviderServiceRate>(entity =>
+        {
+            entity.HasKey(r => r.Id);
+
+            entity.Property(r => r.Id)
+                .HasDefaultValueSql("NEWSEQUENTIALID()");
+
+            entity.Property(r => r.Service)
+                .IsRequired()
+                .HasConversion<string>()
+                .HasMaxLength(50);
+
+            entity.Property(r => r.Rate)
+                .HasColumnType("decimal(18,2)")
+                .IsRequired();
+
+            entity.Property(r => r.Unit)
+                .IsRequired()
+                .HasConversion<string>()
+                .HasMaxLength(20);
+
+            entity.HasIndex(r => new { r.ProviderProfileId, r.Service })
+                .IsUnique();
+
+            entity.HasOne(r => r.ProviderProfile)
+                .WithMany(p => p.ServiceRates)
+                .HasForeignKey(r => r.ProviderProfileId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+    }
+
     private static void ConfigurePet(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<Pet>(entity =>
@@ -220,7 +251,10 @@ public class ApplicationDbContext : DbContext
 
             entity.Property(p => p.Species)
                 .IsRequired()
-                .HasMaxLength(50);
+                .HasConversion<int>();
+
+            entity.Property(p => p.IsNeutered)
+                .HasDefaultValue(false);
 
             entity.Property(p => p.Notes)
                 .HasMaxLength(500);

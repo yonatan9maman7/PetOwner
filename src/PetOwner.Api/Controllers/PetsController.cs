@@ -28,18 +28,16 @@ public class PetsController : ControllerBase
         var pets = await _db.Pets
             .AsNoTracking()
             .Where(p => p.UserId == userId)
-            // IsNeutered: placeholder until DB column exists (see future migration).
-            .Select(p => new PetDto(p.Id, p.Name, p.Species, p.Breed, p.Age, p.Weight, p.Allergies, p.MedicalConditions, p.Notes, false))
+            .Select(p => new PetDto(p.Id, p.Name, p.Species, p.Breed, p.Age, p.Weight, p.Allergies, p.MedicalConditions, p.Notes, p.IsNeutered))
             .ToListAsync();
 
         return Ok(pets);
     }
 
     [HttpPost]
-    public async Task<IActionResult> CreatePet([FromBody] CreatePetDto request)
+    public async Task<IActionResult> CreatePet([FromBody] CreatePetRequest request)
     {
         var userId = GetUserId();
-        // request.IsNeutered is part of the API contract; map to Pet when the column exists.
 
         var pet = new Pet
         {
@@ -52,17 +50,18 @@ public class PetsController : ControllerBase
             Allergies = request.Allergies,
             MedicalConditions = request.MedicalConditions,
             Notes = request.Notes,
+            IsNeutered = request.IsNeutered,
         };
 
         _db.Pets.Add(pet);
         await _db.SaveChangesAsync();
 
-        var dto = new PetDto(pet.Id, pet.Name, pet.Species, pet.Breed, pet.Age, pet.Weight, pet.Allergies, pet.MedicalConditions, pet.Notes, false);
+        var dto = new PetDto(pet.Id, pet.Name, pet.Species, pet.Breed, pet.Age, pet.Weight, pet.Allergies, pet.MedicalConditions, pet.Notes, pet.IsNeutered);
         return CreatedAtAction(nameof(GetMyPets), dto);
     }
 
     [HttpPut("{id:guid}")]
-    public async Task<IActionResult> UpdatePet(Guid id, [FromBody] UpdatePetDto request)
+    public async Task<IActionResult> UpdatePet(Guid id, [FromBody] UpdatePetRequest request)
     {
         var userId = GetUserId();
 
@@ -72,7 +71,6 @@ public class PetsController : ControllerBase
         if (pet is null)
             return NotFound(new { message = "Pet not found." });
 
-        // request.IsNeutered: apply to pet when the column exists.
         pet.Name = request.Name;
         pet.Species = request.Species;
         pet.Breed = request.Breed;
@@ -81,10 +79,11 @@ public class PetsController : ControllerBase
         pet.Allergies = request.Allergies;
         pet.MedicalConditions = request.MedicalConditions;
         pet.Notes = request.Notes;
+        pet.IsNeutered = request.IsNeutered;
 
         await _db.SaveChangesAsync();
 
-        var dto = new PetDto(pet.Id, pet.Name, pet.Species, pet.Breed, pet.Age, pet.Weight, pet.Allergies, pet.MedicalConditions, pet.Notes, false);
+        var dto = new PetDto(pet.Id, pet.Name, pet.Species, pet.Breed, pet.Age, pet.Weight, pet.Allergies, pet.MedicalConditions, pet.Notes, pet.IsNeutered);
         return Ok(dto);
     }
 

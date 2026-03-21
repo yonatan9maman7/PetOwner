@@ -35,7 +35,7 @@ export interface NearbyVet {
   distanceKm: number;
   profileImageUrl: string | null;
   services: string;
-  hourlyRate: number;
+  minRate: number;
   averageRating: number;
   reviewCount: number;
 }

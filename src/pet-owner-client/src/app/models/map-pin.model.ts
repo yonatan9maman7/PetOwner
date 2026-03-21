@@ -3,7 +3,7 @@ export interface MapPin {
   name: string;
   latitude: number;
   longitude: number;
-  hourlyRate: number;
+  minRate: number;
   profileImageUrl: string | null;
   services: string;
   phone: string;

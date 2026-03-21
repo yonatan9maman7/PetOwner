@@ -19,6 +19,14 @@ public class ProvidersController : ControllerBase
     private readonly IGeminiAiService _aiService;
     private readonly ITokenService _tokenService;
 
+    private static readonly Dictionary<ServiceType, string> ServiceTypeToName = new()
+    {
+        [ServiceType.DogWalking] = "Dog Walker",
+        [ServiceType.PetSitting] = "Pet Sitter",
+        [ServiceType.Boarding] = "Boarding",
+        [ServiceType.DropInVisit] = "Drop-in Visit",
+    };
+
     public ProvidersController(
         ApplicationDbContext db,
         IBlobService blobService,
@@ -50,7 +58,6 @@ public class ProvidersController : ControllerBase
         {
             UserId = userId,
             Bio = request.Bio,
-            HourlyRate = request.HourlyRate,
             Status = "Pending",
             IsAvailableNow = false,
             ReferenceName = request.ReferenceName.Trim(),
@@ -73,16 +80,17 @@ public class ProvidersController : ControllerBase
 
         _db.Locations.Add(location);
 
-        var serviceMap = new Dictionary<string, string>
+        foreach (var svcRate in request.SelectedServices)
         {
-            ["DogWalker"] = "Dog Walker",
-            ["PetSitter"] = "Pet Sitter",
-            ["Boarding"] = "Boarding",
-        };
+            _db.ProviderServiceRates.Add(new ProviderServiceRate
+            {
+                ProviderProfileId = userId,
+                Service = svcRate.ServiceType,
+                Rate = svcRate.Rate,
+                Unit = svcRate.PricingUnit,
+            });
 
-        foreach (var key in request.Services)
-        {
-            if (!serviceMap.TryGetValue(key, out var serviceName))
+            if (!ServiceTypeToName.TryGetValue(svcRate.ServiceType, out var serviceName))
                 continue;
 
             var service = await _db.Services
@@ -148,6 +156,7 @@ public class ProvidersController : ControllerBase
 
         var profile = await _db.ProviderProfiles
             .Include(p => p.ProviderServices)
+            .Include(p => p.ServiceRates)
             .FirstOrDefaultAsync(p => p.UserId == userId);
 
         if (profile is null)
@@ -160,7 +169,6 @@ public class ProvidersController : ControllerBase
             return NotFound(new { message = "Location not found." });
 
         profile.Bio = request.Bio;
-        profile.HourlyRate = request.HourlyRate;
         profile.City = request.City.Trim();
         profile.Street = request.Street.Trim();
         profile.BuildingNumber = request.BuildingNumber.Trim();
@@ -171,17 +179,20 @@ public class ProvidersController : ControllerBase
         if (request.AcceptsOffHoursRequests.HasValue)
             profile.AcceptsOffHoursRequests = request.AcceptsOffHoursRequests.Value;
 
-        var serviceMap = new Dictionary<string, string>
-        {
-            ["DogWalker"] = "Dog Walker",
-            ["PetSitter"] = "Pet Sitter",
-            ["Boarding"] = "Boarding",
-        };
-
+        _db.ProviderServiceRates.RemoveRange(profile.ServiceRates);
         _db.ProviderServices.RemoveRange(profile.ProviderServices);
-        foreach (var key in request.Services)
+
+        foreach (var svcRate in request.SelectedServices)
         {
-            if (!serviceMap.TryGetValue(key, out var serviceName))
+            _db.ProviderServiceRates.Add(new ProviderServiceRate
+            {
+                ProviderProfileId = userId,
+                Service = svcRate.ServiceType,
+                Rate = svcRate.Rate,
+                Unit = svcRate.PricingUnit,
+            });
+
+            if (!ServiceTypeToName.TryGetValue(svcRate.ServiceType, out var serviceName))
                 continue;
 
             var service = await _db.Services
@@ -342,6 +353,7 @@ public class ProvidersController : ControllerBase
             .Include(p => p.User)
             .Include(p => p.ProviderServices)
                 .ThenInclude(ps => ps.Service)
+            .Include(p => p.ServiceRates)
             .FirstOrDefaultAsync(p => p.UserId == userId);
 
         if (profile is null)
@@ -356,7 +368,7 @@ public class ProvidersController : ControllerBase
             profile.IsAvailableNow,
             profile.User.Name,
             profile.Bio,
-            profile.HourlyRate,
+            profile.ServiceRates.Select(r => new ServiceRateDto(r.Service, r.Rate, r.Unit)).ToList(),
             profile.City,
             profile.Street,
             profile.BuildingNumber,
@@ -479,7 +491,6 @@ public class ProvidersController : ControllerBase
         var monthlyEarnings = thisMonth.Where(r => r.Status == "Completed" && r.TotalPrice.HasValue).Sum(r => r.TotalPrice!.Value);
 
         var today = DateTime.UtcNow.Date;
-        var tomorrow = today.AddDays(1);
 
         var todaySchedule = allRequests
             .Where(r => r.ScheduledStart.HasValue && r.ScheduledStart.Value.Date == today && r.Status is "Accepted" or "Completed")

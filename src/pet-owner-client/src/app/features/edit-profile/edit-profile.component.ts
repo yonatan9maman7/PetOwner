@@ -7,16 +7,23 @@ import {
   ProviderProfile,
   UpdateProfilePayload,
 } from '../../services/provider.service';
+import {
+  ServiceRateDto,
+  ServiceType,
+  PricingUnit,
+  SERVICE_CARDS,
+} from '../wizard/wizard.model';
 import { ToastService } from '../../services/toast.service';
 import { AddressAutocompleteComponent } from '../../shared/address-autocomplete.component';
 import { AddressSuggestion } from '../../services/geocoding.service';
 import { ScheduleManagerComponent } from './schedule-manager.component';
 
-const SERVICE_OPTIONS = [
-  { key: 'DogWalker', label: 'Dog Walker' },
-  { key: 'PetSitter', label: 'Pet Provider' },
-  { key: 'Boarding', label: 'Boarding' },
-] as const;
+const SERVICE_TYPE_MAP: Record<string, ServiceType> = {
+  'Dog Walker': 'DogWalking',
+  'Pet Sitter': 'PetSitting',
+  Boarding: 'Boarding',
+  'Drop-in Visit': 'DropInVisit',
+};
 
 @Component({
   selector: 'app-edit-profile',
@@ -76,32 +83,35 @@ const SERVICE_OPTIONS = [
           />
         </div>
 
-        <fieldset class="checkbox-group">
-          <legend class="field-label">Services</legend>
-          @for (svc of serviceOptions; track svc.key) {
-            <label class="checkbox">
-              <input
-                type="checkbox"
-                [checked]="selectedServices().includes(svc.key)"
-                (change)="toggleService(svc.key)"
-              />
-              {{ svc.label }}
-            </label>
-          }
+        <fieldset class="border-0 p-0 m-0 min-w-0">
+          <legend class="field-label mb-3">Services & Rates</legend>
+          <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            @for (card of serviceCards; track card.type) {
+              <div
+                class="cursor-pointer select-none rounded-xl border-2 p-4 transition-all duration-200"
+                [class]="isServiceSelected(card.type)
+                  ? 'border-primary bg-indigo-50/70 shadow-sm'
+                  : 'border-slate-200 bg-white hover:border-slate-300'"
+                (click)="toggleServiceCard(card.type)">
+                <span class="text-sm font-semibold text-slate-900">{{ card.label }}</span>
+                <p class="mt-0.5 text-xs text-slate-500">{{ card.description }}</p>
+                @if (isServiceSelected(card.type)) {
+                  <div class="mt-2" (click)="$event.stopPropagation()">
+                    <label class="text-xs font-medium text-slate-600">{{ card.rateLabel }} (ILS)</label>
+                    <input
+                      type="number"
+                      min="1"
+                      class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm"
+                      [value]="getServiceRate(card.type)"
+                      (input)="setServiceRate(card.type, $any($event.target).value, card.pricingUnit)"
+                      placeholder="e.g. 60"
+                    />
+                  </div>
+                }
+              </div>
+            }
+          </div>
         </fieldset>
-
-        <div class="field">
-          <label class="field-label" for="edit-rate">Hourly Rate (ILS)</label>
-          <input
-            id="edit-rate"
-            type="number"
-            min="1"
-            required
-            [(ngModel)]="hourlyRate"
-            name="hourlyRate"
-            placeholder="e.g. 60"
-          />
-        </div>
 
         <div class="ai-bio-section">
           <div class="field">
@@ -225,18 +235,12 @@ export class EditProfileComponent implements OnInit {
   private readonly toast = inject(ToastService);
   private readonly router = inject(Router);
 
-  readonly serviceOptions = SERVICE_OPTIONS;
-
-  private static readonly SERVICE_NAME_TO_KEY: Record<string, string> = {
-    'Dog Walker': 'DogWalker',
-    'Pet Sitter': 'PetSitter',
-    'Boarding': 'Boarding',
-  };
+  readonly serviceCards = SERVICE_CARDS;
 
   readonly loading = signal(true);
   readonly error = signal('');
   readonly submitting = signal(false);
-  readonly selectedServices = signal<string[]>([]);
+  readonly selectedServiceRates = signal<ServiceRateDto[]>([]);
   readonly latitude = signal<number | null>(null);
   readonly longitude = signal<number | null>(null);
   readonly userName = signal('');
@@ -259,7 +263,6 @@ export class EditProfileComponent implements OnInit {
   });
 
   bio = '';
-  hourlyRate: number | null = null;
   geoSearchQuery = '';
   city = '';
   street = '';
@@ -282,13 +285,9 @@ export class EditProfileComponent implements OnInit {
         this.userName.set(profile.userName ?? '');
         this.status.set(profile.status ?? '');
         this.bio = profile.bio ?? '';
-        this.hourlyRate = profile.hourlyRate;
         this.imagePreview.set(profile.profileImageUrl ?? null);
 
-        const keys = (profile.services ?? [])
-          .map((name) => EditProfileComponent.SERVICE_NAME_TO_KEY[name] ?? name)
-          .filter(Boolean);
-        this.selectedServices.set(keys);
+        this.selectedServiceRates.set(profile.serviceRates ?? []);
 
         this.city = profile.city ?? '';
         this.street = profile.street ?? '';
@@ -307,9 +306,31 @@ export class EditProfileComponent implements OnInit {
     });
   }
 
-  toggleService(key: string): void {
-    this.selectedServices.update((list) =>
-      list.includes(key) ? list.filter((s) => s !== key) : [...list, key],
+  isServiceSelected(type: ServiceType): boolean {
+    return this.selectedServiceRates().some(r => r.serviceType === type);
+  }
+
+  getServiceRate(type: ServiceType): number | null {
+    return this.selectedServiceRates().find(r => r.serviceType === type)?.rate ?? null;
+  }
+
+  toggleServiceCard(type: ServiceType): void {
+    if (this.isServiceSelected(type)) {
+      this.selectedServiceRates.update(list => list.filter(r => r.serviceType !== type));
+    } else {
+      const card = this.serviceCards.find(c => c.type === type);
+      this.selectedServiceRates.update(list => [...list, {
+        serviceType: type,
+        rate: 0,
+        pricingUnit: card?.pricingUnit ?? 'PerHour',
+      }]);
+    }
+  }
+
+  setServiceRate(type: ServiceType, value: string, unit: PricingUnit): void {
+    const rate = parseFloat(value) || 0;
+    this.selectedServiceRates.update(list =>
+      list.map(r => r.serviceType === type ? { ...r, rate, pricingUnit: unit } : r),
     );
   }
 
@@ -364,8 +385,7 @@ export class EditProfileComponent implements OnInit {
 
     const payload: UpdateProfilePayload = {
       bio: this.bio,
-      hourlyRate: this.hourlyRate,
-      services: this.selectedServices(),
+      selectedServices: this.selectedServiceRates(),
       city: this.city.trim(),
       street: this.street.trim(),
       buildingNumber: this.buildingNumber.trim(),

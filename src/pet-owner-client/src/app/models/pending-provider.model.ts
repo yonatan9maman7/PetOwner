@@ -1,9 +1,11 @@
+import { ServiceRateDto } from '../features/wizard/wizard.model';
+
 export interface PendingProvider {
   userId: string;
   name: string;
   phone: string;
   bio: string | null;
-  hourlyRate: number;
+  serviceRates: ServiceRateDto[];
   profileImageUrl: string | null;
   createdAt: string;
   address: string | null;

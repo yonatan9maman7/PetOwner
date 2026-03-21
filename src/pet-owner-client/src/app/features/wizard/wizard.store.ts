@@ -7,18 +7,12 @@ import {
   MagicBio,
   OnboardingApiPayload,
   OnboardingPayload,
-  ServicesAndRates,
+  ServiceRateDto,
   StructuredAddress,
   TrustVerification,
 } from './wizard.model';
 
 export const TOTAL_STEPS = 3;
-
-const SERVICE_KEY_MAP: Record<string, string> = {
-  dogWalker: 'DogWalker',
-  petSitter: 'PetSitter',
-  boarding: 'Boarding',
-};
 
 @Injectable({ providedIn: 'root' })
 export class WizardStore {
@@ -26,12 +20,7 @@ export class WizardStore {
   private readonly auth = inject(AuthService);
 
   private readonly currentStep = signal(1);
-  private readonly services = signal<ServicesAndRates>({
-    dogWalker: false,
-    petSitter: false,
-    boarding: false,
-    hourlyRate: null,
-  });
+  private readonly selectedServices = signal<ServiceRateDto[]>([]);
   private readonly bio = signal<MagicBio>({ userNotes: '', generatedBio: '' });
   private readonly latitude = signal<number | null>(null);
   private readonly longitude = signal<number | null>(null);
@@ -58,6 +47,7 @@ export class WizardStore {
   readonly address = this.address_.asReadonly();
   readonly structuredAddress = this.structuredAddress_.asReadonly();
   readonly verification = this.verification_.asReadonly();
+  readonly services = this.selectedServices.asReadonly();
 
   readonly hasStructuredAddress = computed(() => {
     const a = this.structuredAddress_();
@@ -78,7 +68,7 @@ export class WizardStore {
   );
 
   readonly formSnapshot = computed<OnboardingPayload>(() => ({
-    services: this.services(),
+    selectedServices: this.selectedServices(),
     bio: this.bio(),
     latitude: this.latitude(),
     longitude: this.longitude(),
@@ -100,8 +90,8 @@ export class WizardStore {
     this.goTo(this.currentStep() - 1);
   }
 
-  patchServices(value: ServicesAndRates): void {
-    this.services.set(value);
+  patchServices(value: ServiceRateDto[]): void {
+    this.selectedServices.set(value);
   }
 
   patchBio(value: MagicBio): void {
@@ -149,10 +139,7 @@ export class WizardStore {
     const a = snap.structuredAddress;
 
     const payload: OnboardingApiPayload = {
-      services: Object.entries(SERVICE_KEY_MAP)
-        .filter(([key]) => snap.services[key as keyof ServicesAndRates] === true)
-        .map(([, value]) => value),
-      hourlyRate: snap.services.hourlyRate,
+      selectedServices: snap.selectedServices,
       bio: snap.bio.generatedBio || snap.bio.userNotes,
       latitude: snap.latitude,
       longitude: snap.longitude,

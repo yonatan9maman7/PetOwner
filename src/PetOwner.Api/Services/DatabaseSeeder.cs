@@ -35,7 +35,15 @@ public class DatabaseSeeder
     private const double MinLongitude = 34.7640;
     private const double MaxLongitude = 34.7750;
 
-    private static readonly string[] ServiceDefinitions = ["Dog Walker", "Pet Sitter", "Boarding"];
+    private static readonly string[] ServiceDefinitions = ["Dog Walker", "Pet Sitter", "Boarding", "Drop-in Visit"];
+
+    private static readonly (ServiceType Type, string Name, PricingUnit Unit, decimal MinRate, decimal MaxRate)[] ServiceRateDefinitions =
+    [
+        (ServiceType.DogWalking, "Dog Walker", PricingUnit.PerHour, 40, 120),
+        (ServiceType.PetSitting, "Pet Sitter", PricingUnit.PerHour, 50, 150),
+        (ServiceType.Boarding, "Boarding", PricingUnit.PerNight, 80, 250),
+        (ServiceType.DropInVisit, "Drop-in Visit", PricingUnit.PerVisit, 30, 80),
+    ];
 
     public DatabaseSeeder(ApplicationDbContext db, ILogger<DatabaseSeeder> logger)
     {
@@ -56,6 +64,9 @@ public class DatabaseSeeder
             var userId = Guid.NewGuid();
             var isAvailable = faker.Random.Double() < 0.8;
 
+            var providerServices = GenerateProviderServices(faker, userId, serviceIds);
+            var serviceRates = GenerateServiceRates(faker, userId, providerServices, serviceIds);
+
             var user = new User
             {
                 Id = userId,
@@ -69,7 +80,6 @@ public class DatabaseSeeder
                 {
                     UserId = userId,
                     Bio = faker.PickRandom(DogLoverBios),
-                    HourlyRate = faker.Finance.Amount(40, 120, 0),
                     Status = "Approved",
                     IsAvailableNow = isAvailable,
                     City = faker.Address.City(),
@@ -78,7 +88,8 @@ public class DatabaseSeeder
                     ApartmentNumber = faker.Random.Int(0, 4) == 0 ? faker.Random.Int(1, 32).ToString() : null,
                     ReferenceName = faker.Name.FullName(),
                     ReferenceContact = faker.Phone.PhoneNumber("05########"),
-                    ProviderServices = GenerateProviderServices(faker, userId, serviceIds)
+                    ProviderServices = providerServices,
+                    ServiceRates = serviceRates,
                 },
                 Location = new Location
                 {
@@ -136,8 +147,83 @@ public class DatabaseSeeder
             .ToList();
     }
 
+    private static List<ProviderServiceRate> GenerateServiceRates(
+        Faker faker, Guid providerId, List<ProviderService> providerServices, List<int> allServiceIds)
+    {
+        var rates = new List<ProviderServiceRate>();
+
+        foreach (var ps in providerServices)
+        {
+            var idx = allServiceIds.IndexOf(ps.ServiceId);
+            if (idx < 0 || idx >= ServiceRateDefinitions.Length) continue;
+
+            var def = ServiceRateDefinitions[idx];
+            rates.Add(new ProviderServiceRate
+            {
+                ProviderProfileId = providerId,
+                Service = def.Type,
+                Rate = faker.Finance.Amount(def.MinRate, def.MaxRate, 0),
+                Unit = def.Unit,
+            });
+        }
+
+        return rates;
+    }
+
     private static string GenerateIsraeliPhone(Faker faker, int index)
     {
         return $"05{faker.Random.Int(0, 9)}{900_0000 + index:D7}";
+    }
+
+    /// <summary>
+    /// Creates demo pets for non-provider, non-admin users that have no pets yet (e.g. after manual owner registration).
+    /// </summary>
+    public async Task<int> SeedBogusPetsForUsersWithoutPetsAsync(int maxUsers = 15, int petsPerUser = 1)
+    {
+        var faker = new Faker("en");
+
+        var eligibleIds = await _db.Users
+            .AsNoTracking()
+            .Where(u => u.Role != "Provider" && u.Role != "Admin")
+            .Where(u => !_db.Pets.Any(p => p.UserId == u.Id))
+            .OrderBy(u => u.CreatedAt)
+            .Select(u => u.Id)
+            .Take(maxUsers)
+            .ToListAsync();
+
+        if (eligibleIds.Count == 0)
+            return 0;
+
+        var pets = new List<Pet>();
+        foreach (var userId in eligibleIds)
+        {
+            for (var i = 0; i < petsPerUser; i++)
+                pets.Add(CreateBogusPet(faker, userId));
+        }
+
+        _db.Pets.AddRange(pets);
+        await _db.SaveChangesAsync();
+
+        _logger.LogInformation("Seeded {PetCount} bogus pets for {UserCount} users without pets", pets.Count, eligibleIds.Count);
+        return pets.Count;
+    }
+
+    private static Pet CreateBogusPet(Faker faker, Guid userId)
+    {
+        return new Pet
+        {
+            UserId = userId,
+            Name = faker.Name.FirstName(),
+            Species = faker.PickRandom<PetSpecies>(),
+            Breed = faker.PickRandom("Mixed / Mutt", "Golden Retriever", "Labrador Retriever", "French Bulldog", "Persian", "Poodle", "Other"),
+            Age = faker.Random.Int(1, 16),
+            Weight = faker.Random.Bool(0.7f) ? Math.Round(faker.Random.Double(2, 45), 1) : null,
+            IsNeutered = faker.Random.Bool(),
+            Allergies = faker.Random.Bool(0.25f)
+                ? faker.PickRandom("Chicken", "Beef, Grains", "Fleas", "Chicken, Beef")
+                : null,
+            MedicalConditions = faker.Random.Bool(0.12f) ? faker.Lorem.Word() : null,
+            Notes = faker.Random.Bool(0.35f) ? faker.Lorem.Sentence() : null,
+        };
     }
 }

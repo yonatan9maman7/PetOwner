@@ -1,134 +1,130 @@
-import { NgClass } from '@angular/common';
-import { Component, inject, OnInit } from '@angular/core';
-import { ReactiveFormsModule, FormBuilder, Validators } from '@angular/forms';
+import { Component, inject, OnInit, signal } from '@angular/core';
 import { WizardStore } from '../wizard.store';
+import {
+  ServiceRateDto,
+  ServiceType,
+  PricingUnit,
+  SERVICE_CARDS,
+  ServiceCardConfig,
+} from '../wizard.model';
 
 @Component({
   selector: 'app-step-services-rates',
   standalone: true,
-  imports: [NgClass, ReactiveFormsModule],
   template: `
     <h2 class="step-title">Services &amp; Rates</h2>
 
-    <form [formGroup]="form" class="step-form">
-      <fieldset class="border-0 p-0 m-0 min-w-0">
-        <legend class="mb-4 text-base font-semibold text-slate-900">
-          Which services do you offer?
-        </legend>
+    <fieldset class="border-0 p-0 m-0 min-w-0">
+      <legend class="mb-4 text-base font-semibold text-slate-900">
+        Which services do you offer?
+      </legend>
 
-        <input
-          id="wizard-svc-petsitter"
-          type="checkbox"
-          formControlName="petSitter"
-          class="sr-only"
-        />
+      <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+        @for (card of cards; track card.type) {
+          <div
+            class="cursor-pointer select-none rounded-2xl border-2 p-5 shadow-md transition-all duration-200"
+            [class]="isSelected(card.type)
+              ? 'border-primary bg-gradient-to-br from-indigo-50/90 to-violet-50/50 shadow-md ring-2 ring-primary/15'
+              : 'border-slate-200/90 bg-white hover:border-primary hover:shadow-lg'"
+            (click)="toggle(card.type)">
 
-        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2" role="presentation">
-          <label class="block cursor-pointer select-none">
-            <input type="checkbox" formControlName="dogWalker" class="peer sr-only" />
             <div
-              class="flex h-full flex-col rounded-2xl border-2 border-slate-200/90 bg-white p-5 shadow-md transition-all duration-200 hover:border-primary hover:shadow-lg peer-focus-visible:ring-2 peer-focus-visible:ring-primary/30 peer-checked:border-primary peer-checked:bg-gradient-to-br peer-checked:from-indigo-50/90 peer-checked:to-violet-50/50 peer-checked:shadow-md peer-checked:ring-2 peer-checked:ring-primary/15"
-            >
-              <div
-                class="icon-placeholder mb-4 flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-slate-100 to-slate-50 text-slate-400 ring-1 ring-slate-200/80"
-              ></div>
-              <span class="text-lg font-semibold tracking-tight text-slate-900">Dog Walker</span>
-              <span class="mt-1.5 text-sm leading-relaxed text-slate-600"
-                >Leashed walks and exercise for pups in your neighborhood.</span
-              >
+              class="icon-placeholder mb-4 flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br text-2xl"
+              [class]="isSelected(card.type)
+                ? 'from-indigo-100 to-violet-100 ring-1 ring-primary/20'
+                : 'from-slate-100 to-slate-50 ring-1 ring-slate-200/80 text-slate-400'">
+              {{ iconFor(card.type) }}
             </div>
-          </label>
+            <span class="text-lg font-semibold tracking-tight text-slate-900">{{ card.label }}</span>
+            <span class="mt-1.5 block text-sm leading-relaxed text-slate-600">{{ card.description }}</span>
 
-          <label class="block cursor-pointer select-none" for="wizard-svc-petsitter">
-            <div
-              class="flex h-full flex-col rounded-2xl border-2 bg-white p-5 shadow-md transition-all duration-200 hover:border-primary hover:shadow-lg"
-              [ngClass]="
-                form.controls.petSitter.value
-                  ? 'border-primary bg-gradient-to-br from-indigo-50/90 to-violet-50/50 shadow-md ring-2 ring-primary/15'
-                  : 'border-slate-200/90'
-              "
-            >
-              <div
-                class="icon-placeholder mb-4 flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-slate-100 to-slate-50 text-slate-400 ring-1 ring-slate-200/80"
-              ></div>
-              <span class="text-lg font-semibold tracking-tight text-slate-900">Pet Sitter</span>
-              <span class="mt-1.5 text-sm leading-relaxed text-slate-600"
-                >In-home care and companionship while owners are away.</span
-              >
-            </div>
-          </label>
-
-          <label class="block cursor-pointer select-none">
-            <input type="checkbox" formControlName="boarding" class="peer sr-only" />
-            <div
-              class="flex h-full flex-col rounded-2xl border-2 border-slate-200/90 bg-white p-5 shadow-md transition-all duration-200 hover:border-primary hover:shadow-lg peer-focus-visible:ring-2 peer-focus-visible:ring-primary/30 peer-checked:border-primary peer-checked:bg-gradient-to-br peer-checked:from-indigo-50/90 peer-checked:to-violet-50/50 peer-checked:shadow-md peer-checked:ring-2 peer-checked:ring-primary/15"
-            >
-              <div
-                class="icon-placeholder mb-4 flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-slate-100 to-slate-50 text-slate-400 ring-1 ring-slate-200/80"
-              ></div>
-              <span class="text-lg font-semibold tracking-tight text-slate-900">Boarding</span>
-              <span class="mt-1.5 text-sm leading-relaxed text-slate-600"
-                >Overnight stays in a trusted, comfortable environment.</span
-              >
-            </div>
-          </label>
-
-          <label class="block cursor-pointer select-none" for="wizard-svc-petsitter">
-            <div
-              class="flex h-full flex-col rounded-2xl border-2 bg-white p-5 shadow-md transition-all duration-200 hover:border-primary hover:shadow-lg"
-              [ngClass]="
-                form.controls.petSitter.value
-                  ? 'border-primary bg-gradient-to-br from-indigo-50/90 to-violet-50/50 shadow-md ring-2 ring-primary/15'
-                  : 'border-slate-200/90'
-              "
-            >
-              <div
-                class="icon-placeholder mb-4 flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-slate-100 to-slate-50 text-slate-400 ring-1 ring-slate-200/80"
-              ></div>
-              <span class="text-lg font-semibold tracking-tight text-slate-900">Drop-in Visit</span>
-              <span class="mt-1.5 text-sm leading-relaxed text-slate-600"
-                >Short pop-in visits for feeding, potty breaks, and peace of mind.</span
-              >
-            </div>
-          </label>
-        </div>
-      </fieldset>
-
-      <label class="field">
-        <span class="field-label">Hourly Rate</span>
-        <input formControlName="hourlyRate" type="number" min="0" placeholder="50" inputmode="decimal" />
-        @if (form.controls.hourlyRate.touched && form.controls.hourlyRate.hasError('required')) {
-          <span class="field-error">Hourly rate is required</span>
+            @if (isSelected(card.type)) {
+              <div class="mt-4 pt-3 border-t border-slate-200/70" (click)="$event.stopPropagation()">
+                <label class="block text-xs font-medium text-indigo-700 mb-1.5">{{ card.rateLabel }} (ILS)</label>
+                <input
+                  type="number"
+                  min="1"
+                  inputmode="decimal"
+                  class="w-full rounded-xl border-2 border-indigo-200 bg-white px-4 py-2.5 text-sm text-slate-900
+                         placeholder-slate-400 outline-none transition
+                         focus:border-primary focus:ring-2 focus:ring-primary/20"
+                  [value]="rateFor(card.type)"
+                  (input)="updateRate(card.type, $any($event.target).value, card.pricingUnit)"
+                  placeholder="e.g. 60"
+                />
+              </div>
+            }
+          </div>
         }
-        @if (form.controls.hourlyRate.touched && form.controls.hourlyRate.hasError('min')) {
-          <span class="field-error">Rate must be positive</span>
-        }
-      </label>
-    </form>
+      </div>
+    </fieldset>
   `,
 })
 export class ServicesRatesComponent implements OnInit {
-  private readonly fb = inject(FormBuilder);
   private readonly store = inject(WizardStore);
 
-  readonly form = this.fb.nonNullable.group({
-    dogWalker: [false],
-    petSitter: [false],
-    boarding: [false],
-    hourlyRate: [null as number | null, [Validators.required, Validators.min(1)]],
-  });
+  readonly cards = SERVICE_CARDS;
+  readonly selected = signal<ServiceRateDto[]>([]);
+
+  /** Exposes a form-like interface so the parent wizard can check validity. */
+  get form() {
+    const sel = this.selected();
+    return {
+      valid: sel.length > 0 && sel.every((r) => r.rate > 0),
+      markAllAsTouched(): void {},
+    };
+  }
+
+  private readonly icons: Record<ServiceType, string> = {
+    DogWalking: '🐕',
+    PetSitting: '🏠',
+    Boarding: '🛏️',
+    DropInVisit: '👋',
+  };
 
   ngOnInit(): void {
-    const saved = this.store.formSnapshot().services;
-    this.form.patchValue(saved);
+    const saved = this.store.formSnapshot().selectedServices;
+    if (saved.length > 0) {
+      this.selected.set([...saved]);
+    }
+  }
 
-    this.form.valueChanges.subscribe((val) => {
-      this.store.patchServices({
-        dogWalker: val.dogWalker ?? false,
-        petSitter: val.petSitter ?? false,
-        boarding: val.boarding ?? false,
-        hourlyRate: val.hourlyRate ?? null,
-      });
-    });
+  isSelected(type: ServiceType): boolean {
+    return this.selected().some((r) => r.serviceType === type);
+  }
+
+  rateFor(type: ServiceType): number | null {
+    return this.selected().find((r) => r.serviceType === type)?.rate ?? null;
+  }
+
+  iconFor(type: ServiceType): string {
+    return this.icons[type] ?? '🐾';
+  }
+
+  toggle(type: ServiceType): void {
+    if (this.isSelected(type)) {
+      this.selected.update((list) => list.filter((r) => r.serviceType !== type));
+    } else {
+      const card = this.cards.find((c) => c.type === type)!;
+      this.selected.update((list) => [
+        ...list,
+        { serviceType: type, rate: 0, pricingUnit: card.pricingUnit },
+      ]);
+    }
+    this.sync();
+  }
+
+  updateRate(type: ServiceType, value: string, unit: PricingUnit): void {
+    const rate = parseFloat(value) || 0;
+    this.selected.update((list) =>
+      list.map((r) =>
+        r.serviceType === type ? { ...r, rate, pricingUnit: unit } : r,
+      ),
+    );
+    this.sync();
+  }
+
+  private sync(): void {
+    this.store.patchServices(this.selected());
   }
 }

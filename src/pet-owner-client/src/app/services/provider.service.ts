@@ -1,13 +1,14 @@
 import { Injectable, inject, signal } from '@angular/core';
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { Observable, tap, catchError, of } from 'rxjs';
+import { ServiceRateDto } from '../features/wizard/wizard.model';
 
 export interface ProviderProfile {
   status: string;
   isAvailableNow: boolean;
   userName: string;
   bio: string | null;
-  hourlyRate: number | null;
+  serviceRates: ServiceRateDto[];
   serviceIds: number[];
   services: string[];
   city: string;
@@ -24,8 +25,7 @@ export interface ProviderProfile {
 
 export interface UpdateProfilePayload {
   bio: string;
-  hourlyRate: number | null;
-  services: string[];
+  selectedServices: ServiceRateDto[];
   city: string;
   street: string;
   buildingNumber: string;
