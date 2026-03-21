@@ -2,6 +2,7 @@ import { Injectable, inject, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import * as signalR from '@microsoft/signalr';
+import { API_BASE_URL } from '../api-base.token';
 import { AuthService } from './auth.service';
 
 export interface AppNotification {
@@ -18,7 +19,13 @@ export interface AppNotification {
 export class NotificationService {
   private readonly http = inject(HttpClient);
   private readonly auth = inject(AuthService);
+  private readonly apiBaseUrl = inject(API_BASE_URL);
   private connection: signalR.HubConnection | null = null;
+
+  private notificationsHubUrl(): string {
+    const base = this.apiBaseUrl.trim().replace(/\/$/, '');
+    return base ? `${base}/hubs/notifications` : '/hubs/notifications';
+  }
 
   readonly unreadCount = signal(0);
   readonly notifications = signal<AppNotification[]>([]);
@@ -29,7 +36,7 @@ export class NotificationService {
     if (!token || this.connection) return;
 
     this.connection = new signalR.HubConnectionBuilder()
-      .withUrl('/hubs/notifications', { accessTokenFactory: () => token })
+      .withUrl(this.notificationsHubUrl(), { accessTokenFactory: () => token })
       .withAutomaticReconnect()
       .build();
 

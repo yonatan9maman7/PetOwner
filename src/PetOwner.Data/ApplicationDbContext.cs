@@ -28,6 +28,7 @@ public class ApplicationDbContext : DbContext
     public DbSet<Message> Messages => Set<Message>();
     public DbSet<Notification> Notifications => Set<Notification>();
     public DbSet<ProviderServiceRate> ProviderServiceRates => Set<ProviderServiceRate>();
+    public DbSet<Booking> Bookings => Set<Booking>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -50,6 +51,7 @@ public class ApplicationDbContext : DbContext
         ConfigurePost(modelBuilder);
         ConfigureConversation(modelBuilder);
         ConfigureNotification(modelBuilder);
+        ConfigureBooking(modelBuilder);
     }
 
     private static void ConfigureUser(ModelBuilder modelBuilder)
@@ -671,6 +673,63 @@ public class ApplicationDbContext : DbContext
                 .WithMany(u => u.Notifications)
                 .HasForeignKey(n => n.UserId)
                 .OnDelete(DeleteBehavior.Cascade);
+        });
+    }
+
+    private static void ConfigureBooking(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<Booking>(entity =>
+        {
+            entity.HasKey(b => b.Id);
+
+            entity.Property(b => b.Id)
+                .HasDefaultValueSql("NEWSEQUENTIALID()");
+
+            entity.Property(b => b.Service)
+                .IsRequired()
+                .HasConversion<string>()
+                .HasMaxLength(50);
+
+            entity.Property(b => b.TotalPrice)
+                .HasColumnType("decimal(18,2)")
+                .IsRequired();
+
+            entity.Property(b => b.Status)
+                .IsRequired()
+                .HasConversion<string>()
+                .HasMaxLength(20)
+                .HasDefaultValue(BookingStatus.Pending);
+
+            entity.Property(b => b.CreatedAt)
+                .HasDefaultValueSql("GETUTCDATE()");
+
+            entity.Property(b => b.PaymentStatus)
+                .IsRequired()
+                .HasConversion<string>()
+                .HasMaxLength(20)
+                .HasDefaultValue(PaymentStatus.Pending);
+
+            entity.Property(b => b.PaymentUrl)
+                .HasMaxLength(500);
+
+            entity.Property(b => b.TransactionId)
+                .HasMaxLength(200);
+
+            entity.Property(b => b.Notes)
+                .HasMaxLength(500);
+
+            entity.HasIndex(b => new { b.OwnerId, b.Status });
+            entity.HasIndex(b => new { b.ProviderProfileId, b.Status });
+
+            entity.HasOne(b => b.Owner)
+                .WithMany(u => u.Bookings)
+                .HasForeignKey(b => b.OwnerId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasOne(b => b.ProviderProfile)
+                .WithMany()
+                .HasForeignKey(b => b.ProviderProfileId)
+                .OnDelete(DeleteBehavior.Restrict);
         });
     }
 }

@@ -2,6 +2,7 @@ import { Component, inject, OnInit, signal, HostListener } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { DatePipe, DecimalPipe } from '@angular/common';
 import { Router } from '@angular/router';
+import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { Post, PostComment, PostService } from '../../services/post.service';
 import { AuthService } from '../../services/auth.service';
 import { FileUploadService } from '../../services/file-upload.service';
@@ -11,15 +12,15 @@ import { MapService, UserMiniProfile } from '../../services/map.service';
 @Component({
   selector: 'app-social-feed',
   standalone: true,
-  imports: [FormsModule, DatePipe, DecimalPipe],
+  imports: [FormsModule, DatePipe, DecimalPipe, TranslatePipe],
   template: `
     <div class="min-h-screen bg-gradient-to-b from-sky-50 to-white px-4 py-8">
       <div class="max-w-xl mx-auto">
 
         <!-- Header -->
         <div class="text-center mb-6">
-          <h1 class="text-3xl font-bold text-slate-900">Community</h1>
-          <p class="mt-1 text-sm text-slate-500">Share moments with fellow pet lovers</p>
+          <h1 class="text-3xl font-bold text-slate-900" dir="auto">{{ 'COMMUNITY.FEED_TITLE' | translate }}</h1>
+          <p class="mt-1 text-sm text-slate-500" dir="auto">{{ 'COMMUNITY.SUBTITLE' | translate }}</p>
         </div>
 
         <!-- Create Post -->
@@ -29,13 +30,14 @@ import { MapService, UserMiniProfile } from '../../services/map.service';
               [(ngModel)]="newPostContent"
               name="content"
               rows="3"
-              placeholder="What's on your mind? Share a pet story..."
-              class="w-full resize-none rounded-xl border border-gray-200 px-4 py-3 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent transition"
+              dir="auto"
+              [attr.placeholder]="'COMMUNITY.WRITE_POST' | translate"
+              class="w-full resize-none rounded-xl border border-gray-200 px-4 py-3 text-sm text-start placeholder:text-start text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent transition"
             ></textarea>
 
             @if (uploadedImageUrl()) {
               <div class="relative mt-3 inline-block">
-                <img [src]="uploadedImageUrl()" class="h-24 rounded-lg object-cover" alt="Upload preview" />
+                <img [src]="uploadedImageUrl()" class="h-24 rounded-lg object-cover" [attr.alt]="'COMMUNITY.POST_IMAGE_ALT' | translate" />
                 <button type="button" (click)="removeImage()"
                         class="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full text-xs flex items-center justify-center hover:bg-red-600">
                   &times;
@@ -48,7 +50,7 @@ import { MapService, UserMiniProfile } from '../../services/map.service';
                 <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                   <path stroke-linecap="round" stroke-linejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                 </svg>
-                {{ uploading() ? 'Uploading...' : 'Photo' }}
+                {{ uploading() ? ('COMMUNITY.UPLOADING' | translate) : ('COMMUNITY.PHOTO' | translate) }}
                 <input type="file" accept="image/*" class="hidden" (change)="onImageSelected($event)" [disabled]="uploading()" />
               </label>
               <button
@@ -56,7 +58,7 @@ import { MapService, UserMiniProfile } from '../../services/map.service';
                 [disabled]="posting() || !newPostContent().trim()"
                 class="px-5 py-2 bg-sky-600 text-white text-sm font-semibold rounded-xl hover:bg-sky-500 disabled:opacity-40 disabled:cursor-not-allowed transition"
               >
-                {{ posting() ? 'Posting...' : 'Post' }}
+                {{ posting() ? ('COMMUNITY.POSTING' | translate) : ('COMMUNITY.POST' | translate) }}
               </button>
             </div>
           </form>
@@ -73,8 +75,8 @@ import { MapService, UserMiniProfile } from '../../services/map.service';
         } @else if (posts().length === 0) {
           <div class="text-center py-16 text-slate-400">
             <div class="w-16 h-16 rounded-full bg-sky-100 flex items-center justify-center mx-auto mb-3 text-3xl">&#x1F4AC;</div>
-            <p class="font-medium">No posts yet</p>
-            <p class="text-sm mt-1">Be the first to share something!</p>
+            <p class="font-medium" dir="auto">{{ 'COMMUNITY.NO_POSTS' | translate }}</p>
+            <p class="text-sm mt-1" dir="auto">{{ 'COMMUNITY.NO_POSTS_HINT' | translate }}</p>
           </div>
         } @else {
           <div class="space-y-4">
@@ -112,28 +114,34 @@ import { MapService, UserMiniProfile } from '../../services/map.service';
                 </div>
 
                 @if (post.imageUrl) {
-                  <img [src]="post.imageUrl" class="w-full max-h-80 object-cover" [alt]="'Post by ' + post.userName" />
+                  <img [src]="post.imageUrl" class="w-full max-h-80 object-cover" [attr.alt]="'COMMUNITY.POST_BY' | translate: { name: post.userName }" />
                 }
 
                 <!-- Actions -->
                 <div class="flex items-center gap-1 px-5 py-3 border-t border-gray-50">
                   <button
+                    type="button"
                     (click)="toggleLike(post)"
                     class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors"
                     [class]="post.likedByMe ? 'text-red-500 bg-red-50' : 'text-slate-400 hover:text-red-500 hover:bg-red-50'"
+                    [attr.aria-label]="'COMMUNITY.LIKE' | translate"
                   >
-                    <svg class="w-4.5 h-4.5" [attr.fill]="post.likedByMe ? 'currentColor' : 'none'" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <svg class="w-4.5 h-4.5" [attr.fill]="post.likedByMe ? 'currentColor' : 'none'" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
                       <path stroke-linecap="round" stroke-linejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
                     </svg>
+                    <span class="sr-only">{{ 'COMMUNITY.LIKE' | translate }}</span>
                     {{ post.likeCount || '' }}
                   </button>
                   <button
+                    type="button"
                     (click)="toggleComments(post)"
                     class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium text-slate-400 hover:text-sky-500 hover:bg-sky-50 transition-colors"
+                    [attr.aria-label]="'COMMUNITY.COMMENT' | translate"
                   >
-                    <svg class="w-4.5 h-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <svg class="w-4.5 h-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
                       <path stroke-linecap="round" stroke-linejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
                     </svg>
+                    <span class="sr-only">{{ 'COMMUNITY.COMMENT' | translate }}</span>
                     {{ post.commentCount || '' }}
                   </button>
                 </div>
@@ -178,12 +186,13 @@ import { MapService, UserMiniProfile } from '../../services/map.service';
                       <input
                         [(ngModel)]="commentInput"
                         name="comment"
-                        placeholder="Write a comment..."
-                        class="flex-1 rounded-xl border border-gray-200 px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-400 focus:border-transparent"
+                        dir="auto"
+                        [attr.placeholder]="'COMMUNITY.COMMENT_PLACEHOLDER' | translate"
+                        class="flex-1 rounded-xl border border-gray-200 px-3 py-2 text-sm text-start placeholder:text-start text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-400 focus:border-transparent"
                       />
                       <button type="submit" [disabled]="!commentInput().trim()"
                               class="px-3 py-2 bg-sky-600 text-white text-sm rounded-xl hover:bg-sky-500 disabled:opacity-40 transition">
-                        Send
+                        {{ 'COMMUNITY.SEND' | translate }}
                       </button>
                     </form>
                   </div>
@@ -198,7 +207,7 @@ import { MapService, UserMiniProfile } from '../../services/map.service';
                 [disabled]="loadingMore()"
                 class="w-full py-3 text-sm font-medium text-sky-600 hover:bg-sky-50 rounded-xl transition-colors"
               >
-                {{ loadingMore() ? 'Loading...' : 'Load more' }}
+                {{ loadingMore() ? ('COMMUNITY.LOADING' | translate) : ('COMMUNITY.LOAD_MORE' | translate) }}
               </button>
             }
           </div>
@@ -235,10 +244,10 @@ import { MapService, UserMiniProfile } from '../../services/map.service';
             <div class="flex items-center justify-center gap-2 mt-1">
               <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium"
                     [class]="miniProfile()!.isProvider ? 'bg-emerald-50 text-emerald-700' : 'bg-sky-50 text-sky-700'">
-                {{ miniProfile()!.isProvider ? 'Pet Care Provider' : 'Pet Owner' }}
+                {{ miniProfile()!.isProvider ? ('COMMUNITY.PET_CARE_PROVIDER' | translate) : ('COMMUNITY.PET_OWNER' | translate) }}
               </span>
-              <span class="text-xs text-slate-400">
-                Member since {{ miniProfile()!.memberSince | date:'MMM yyyy' }}
+              <span class="text-xs text-slate-400" dir="auto">
+                {{ 'COMMUNITY.MEMBER_SINCE_PREFIX' | translate }} {{ miniProfile()!.memberSince | date:'MMM yyyy' }}
               </span>
             </div>
 
@@ -275,17 +284,17 @@ import { MapService, UserMiniProfile } from '../../services/map.service';
                 (click)="goToMyProfile()"
                 class="mt-4 inline-flex items-center gap-1.5 px-4 py-2 bg-indigo-600 text-white text-sm font-semibold rounded-xl hover:bg-indigo-500 transition-colors"
               >
-                My profile
+                {{ 'COMMUNITY.MY_PROFILE' | translate }}
               </button>
             } @else if (miniProfile()!.isProvider) {
               <button
                 (click)="viewApprovedProviderProfile(miniProfile()!.id)"
                 class="mt-4 inline-flex items-center gap-1.5 px-4 py-2 bg-indigo-600 text-white text-sm font-semibold rounded-xl hover:bg-indigo-500 transition-colors"
               >
-                View full provider profile
+                {{ 'COMMUNITY.VIEW_PROVIDER' | translate }}
               </button>
             } @else {
-              <p class="mt-4 text-xs text-slate-400">Public provider profile is not available for this member.</p>
+              <p class="mt-4 text-xs text-slate-400" dir="auto">{{ 'COMMUNITY.NO_PUBLIC_PROVIDER' | translate }}</p>
             }
           </div>
         </div>
@@ -309,6 +318,7 @@ export class SocialFeedComponent implements OnInit {
   private readonly toast = inject(ToastService);
   private readonly mapService = inject(MapService);
   private readonly router = inject(Router);
+  private readonly translate = inject(TranslateService);
 
   posts = signal<Post[]>([]);
   feedLoading = signal(true);
@@ -421,7 +431,7 @@ export class SocialFeedComponent implements OnInit {
   }
 
   deletePost(post: Post): void {
-    if (!confirm('Delete this post?')) return;
+    if (!confirm(this.translate.instant('COMMUNITY.DELETE_POST_CONFIRM'))) return;
     this.postService.delete(post.id).subscribe({
       next: () => this.posts.update((prev) => prev.filter((p) => p.id !== post.id)),
       error: () => this.toast.error('Failed to delete post.'),

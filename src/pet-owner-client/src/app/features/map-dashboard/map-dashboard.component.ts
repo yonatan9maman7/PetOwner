@@ -23,6 +23,7 @@ import { petSpeciesEmoji, petSpeciesLabel } from '../../models/pet-species.model
 import { RequestService } from '../../services/request.service';
 import { ReviewService, ProviderReview } from '../../services/review.service';
 import { MapPin } from '../../models/map-pin.model';
+import { TranslatePipe } from '@ngx-translate/core';
 
 const FLORENTIN_LAT = 32.0563;
 const FLORENTIN_LNG = 34.7668;
@@ -31,7 +32,7 @@ const DEFAULT_ZOOM = 15;
 @Component({
   selector: 'app-map-dashboard',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, TranslatePipe],
   templateUrl: './map-dashboard.component.html',
   styleUrl: './map-dashboard.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -100,13 +101,13 @@ export class MapDashboardComponent implements OnInit, OnDestroy {
   searchQuery = signal('');
   selectedCategory = signal('');
   readonly categories = [
-    { label: 'Walkers', icon: '🚶', value: 'Dog Walker' },
-    { label: 'Providers', icon: '🏠', value: 'Pet Sitter' },
-    { label: 'Boarding', icon: '🛏️', value: 'Boarding' },
-    { label: 'Vets', icon: '🩺', value: 'Vet' },
-    { label: 'Groomers', icon: '✂️', value: 'Groomer' },
-    { label: 'Shops', icon: '🛒', value: 'Shop' },
-    { label: 'Parks', icon: '🌳', value: 'Park' },
+    { labelKey: 'MAP.FILTER_WALKERS', icon: '🚶', value: 'Dog Walker' },
+    { labelKey: 'MAP.FILTER_PROVIDERS', icon: '🏠', value: 'Pet Sitter' },
+    { labelKey: 'MAP.FILTER_BOARDING', icon: '🛏️', value: 'Boarding' },
+    { labelKey: 'MAP.FILTER_VETS', icon: '🩺', value: 'Vet' },
+    { labelKey: 'MAP.FILTER_GROOMERS', icon: '✂️', value: 'Groomer' },
+    { labelKey: 'MAP.FILTER_SHOPS', icon: '🛒', value: 'Shop' },
+    { labelKey: 'MAP.FILTER_PARKS', icon: '🌳', value: 'Park' },
   ];
   serviceTypes = signal<string[]>([]);
   isFilterActive = computed(() =>
@@ -367,15 +368,16 @@ export class MapDashboardComponent implements OnInit, OnDestroy {
     this.showFilterPanel.update(v => !v);
   }
 
-  scrollChips(direction: 'left' | 'right'): void {
+  /** Scroll chip strip toward inline-start or inline-end (respects RTL). */
+  scrollChips(towardStart: boolean): void {
     const container = this.chipsContainer?.nativeElement;
-    if (container) {
-      const scrollAmount = 200;
-      container.scrollBy({
-        left: direction === 'left' ? -scrollAmount : scrollAmount,
-        behavior: 'smooth',
-      });
-    }
+    if (!container) return;
+    const scrollAmount = 200;
+    const rtl = getComputedStyle(container).direction === 'rtl';
+    const delta = towardStart
+      ? (rtl ? scrollAmount : -scrollAmount)
+      : (rtl ? -scrollAmount : scrollAmount);
+    container.scrollBy({ left: delta, behavior: 'smooth' });
   }
 
   selectCategory(value: string): void {

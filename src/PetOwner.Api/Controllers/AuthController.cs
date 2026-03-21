@@ -32,7 +32,8 @@ public class AuthController : ControllerBase
     [HttpPost("register")]
     public async Task<IActionResult> Register([FromBody] RegisterDto dto)
     {
-        var emailExists = await _db.Users.AnyAsync(u => u.Email == dto.Email);
+        var emailNorm = NormalizeEmail(dto.Email);
+        var emailExists = await _db.Users.AnyAsync(u => u.Email.ToLower() == emailNorm);
         if (emailExists)
             return BadRequest(new { message = "A user with this email already exists." });
 
@@ -43,7 +44,7 @@ public class AuthController : ControllerBase
         var user = new User
         {
             Id = Guid.NewGuid(),
-            Email = dto.Email,
+            Email = emailNorm,
             Phone = dto.Phone,
             Name = dto.Name,
             Role = dto.Role,
@@ -61,7 +62,8 @@ public class AuthController : ControllerBase
     [HttpPost("login")]
     public async Task<IActionResult> Login([FromBody] LoginDto dto)
     {
-        var user = await _db.Users.FirstOrDefaultAsync(u => u.Email == dto.Email);
+        var emailNorm = NormalizeEmail(dto.Email);
+        var user = await _db.Users.FirstOrDefaultAsync(u => u.Email.ToLower() == emailNorm);
 
         if (user is null || !BCrypt.Net.BCrypt.Verify(dto.Password, user.PasswordHash))
             return Unauthorized(new { message = "Invalid email or password." });
@@ -73,7 +75,8 @@ public class AuthController : ControllerBase
     [HttpPost("forgot-password")]
     public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordDto dto)
     {
-        var user = await _db.Users.FirstOrDefaultAsync(u => u.Email == dto.Email);
+        var emailNorm = NormalizeEmail(dto.Email);
+        var user = await _db.Users.FirstOrDefaultAsync(u => u.Email.ToLower() == emailNorm);
 
         if (user is not null)
         {
@@ -85,7 +88,7 @@ public class AuthController : ControllerBase
             await _db.SaveChangesAsync();
 
             var encodedToken = Uri.EscapeDataString(resetToken);
-            var encodedEmail = Uri.EscapeDataString(dto.Email);
+            var encodedEmail = Uri.EscapeDataString(emailNorm);
             var baseUrl = _config["FrontendBaseUrl"]?.TrimEnd('/');
             var resetLink = $"{baseUrl}/reset-password?token={encodedToken}&email={encodedEmail}";
 
@@ -102,7 +105,7 @@ public class AuthController : ControllerBase
     <p>Best regards,<br/>The PetOwner Team</p>
 </div>";
 
-            await _emailService.SendEmailAsync(dto.Email, "Reset Your Password - PetOwner", body);
+            await _emailService.SendEmailAsync(emailNorm, "Reset Your Password - PetOwner", body);
         }
 
         return Ok(new { message = "If the email exists in our system, a reset link has been sent." });
@@ -111,7 +114,8 @@ public class AuthController : ControllerBase
     [HttpPost("reset-password")]
     public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordDto dto)
     {
-        var user = await _db.Users.FirstOrDefaultAsync(u => u.Email == dto.Email);
+        var emailNorm = NormalizeEmail(dto.Email);
+        var user = await _db.Users.FirstOrDefaultAsync(u => u.Email.ToLower() == emailNorm);
 
         if (user is null
             || user.ResetPasswordToken != dto.Token
@@ -128,4 +132,6 @@ public class AuthController : ControllerBase
 
         return Ok(new { message = "Password has been reset successfully." });
     }
+
+    private static string NormalizeEmail(string email) => email.Trim().ToLowerInvariant();
 }

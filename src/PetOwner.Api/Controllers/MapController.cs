@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using PetOwner.Api.DTOs;
+using PetOwner.Api.Infrastructure;
 using PetOwner.Api.Services;
 using PetOwner.Data;
 
@@ -38,15 +39,8 @@ public class MapController : ControllerBase
     }
 
     [HttpGet("service-types")]
-    public async Task<IActionResult> GetServiceTypes()
-    {
-        var types = await _db.Services
-            .AsNoTracking()
-            .OrderBy(s => s.Name)
-            .Select(s => s.Name)
-            .ToListAsync();
-        return Ok(types);
-    }
+    public IActionResult GetServiceTypes() =>
+        Ok(ServiceTypeCatalog.AllDisplayNamesOrdered);
 
     [HttpGet("~/api/providers/{providerId:guid}/profile")]
     public async Task<IActionResult> GetProviderProfile(Guid providerId)

@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using NetTopologySuite.Geometries;
 using PetOwner.Api.DTOs;
+using PetOwner.Api.Infrastructure;
 using PetOwner.Data;
 
 namespace PetOwner.Api.Services;
@@ -43,10 +44,12 @@ public class MapService : IMapService
                     && slot.EndTime > timeOfDay));
         }
 
-        if (!string.IsNullOrWhiteSpace(filter.ServiceType))
+        var parsedServiceType = ServiceTypeCatalog.TryParseDisplayName(filter.ServiceType);
+        if (parsedServiceType.HasValue)
         {
+            var st = parsedServiceType.Value;
             query = query.Where(l =>
-                l.User!.ProviderProfile!.ProviderServices.Any(ps => ps.Service.Name == filter.ServiceType));
+                l.User!.ProviderProfile!.ServiceRates.Any(r => r.Service == st));
         }
 
         if (filter.MinRating.HasValue)
@@ -73,26 +76,49 @@ public class MapService : IMapService
         if (!string.IsNullOrWhiteSpace(filter.SearchTerm))
         {
             var term = filter.SearchTerm.Trim();
-            query = query.Where(l =>
-                l.User!.Name.Contains(term) ||
-                l.User.ProviderProfile!.ProviderServices.Any(ps => ps.Service.Name.Contains(term)));
+            var matchingTypes = ServiceTypeCatalog.ServiceTypesWithDisplayNameContaining(term);
+            if (matchingTypes.Count > 0)
+            {
+                query = query.Where(l =>
+                    l.User!.Name.Contains(term) ||
+                    l.User.ProviderProfile!.ServiceRates.Any(r => matchingTypes.Contains(r.Service)));
+            }
+            else
+            {
+                query = query.Where(l => l.User!.Name.Contains(term));
+            }
         }
 
-        return await query
-            .Select(l => new MapPinDto(
+        // Avoid string.Join / enum formatting inside EF projection (often fails SQL translation).
+        var rows = await query
+            .Select(l => new
+            {
                 l.UserId,
-                l.User!.Name,
-                l.GeoLocation!.Y,
-                l.GeoLocation.X,
-                l.User.ProviderProfile!.ServiceRates.Any()
+                Name = l.User!.Name,
+                Latitude = l.GeoLocation!.Y,
+                Longitude = l.GeoLocation.X,
+                MinRate = l.User.ProviderProfile!.ServiceRates.Any()
                     ? l.User.ProviderProfile.ServiceRates.Min(r => r.Rate)
                     : 0m,
                 l.User.ProviderProfile.ProfileImageUrl,
-                string.Join(", ", l.User.ProviderProfile.ProviderServices
-                    .Select(ps => ps.Service.Name)),
+                ServiceKinds = l.User.ProviderProfile.ServiceRates.Select(r => r.Service),
                 l.User.ProviderProfile.AverageRating,
                 l.User.ProviderProfile.ReviewCount,
-                l.User.ProviderProfile.AcceptsOffHoursRequests))
+                l.User.ProviderProfile.AcceptsOffHoursRequests,
+            })
             .ToListAsync();
+
+        return rows.Select(r => new MapPinDto(
+            r.UserId,
+            r.Name,
+            r.Latitude,
+            r.Longitude,
+            r.MinRate,
+            r.ProfileImageUrl,
+            string.Join(", ", r.ServiceKinds.OrderBy(s => s).Select(ServiceTypeCatalog.ToDisplayName)),
+            r.AverageRating,
+            r.ReviewCount,
+            r.AcceptsOffHoursRequests))
+            .ToList();
     }
 }

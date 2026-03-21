@@ -1,8 +1,9 @@
-import { Component, inject, OnInit, signal, computed, ElementRef, ViewChild } from '@angular/core';
+import { Component, inject, OnInit, signal, ElementRef, ViewChild } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { DatePipe } from '@angular/common';
+import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { Pet, PetService } from '../../services/pet.service';
-import { petSpeciesEmoji, petSpeciesIconBgClass, petSpeciesLabel } from '../../models/pet-species.model';
+import { PetSpecies, normalizePetSpecies, petSpeciesEmoji, petSpeciesIconBgClass } from '../../models/pet-species.model';
 import { TeletriageService, TeletriageResponse, TeletriageHistory, NearbyVet } from '../../services/teletriage.service';
 import { ToastService } from '../../services/toast.service';
 
@@ -19,7 +20,7 @@ interface ChatMessage {
 @Component({
   selector: 'app-teletriage',
   standalone: true,
-  imports: [FormsModule, DatePipe],
+  imports: [FormsModule, DatePipe, TranslatePipe],
   template: `
     <div class="min-h-screen bg-gradient-to-b from-indigo-50 to-white flex flex-col">
 
@@ -32,8 +33,8 @@ interface ChatMessage {
             </svg>
           </div>
           <div class="flex-1">
-            <h1 class="text-lg font-bold text-slate-900">Pet Health Triage</h1>
-            <p class="text-xs text-slate-500">AI-powered preliminary health assessment</p>
+            <h1 class="text-lg font-bold text-slate-900" dir="auto">{{ 'TRIAGE.SYMPTOM_CHECKER' | translate }}</h1>
+            <p class="text-xs text-slate-500" dir="auto">{{ 'TRIAGE.SUBTITLE' | translate }}</p>
           </div>
 
           @if (!showHistory()) {
@@ -44,7 +45,7 @@ interface ChatMessage {
               <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
-              History
+              {{ 'TRIAGE.HISTORY' | translate }}
             </button>
           } @else {
             <button
@@ -54,7 +55,7 @@ interface ChatMessage {
               <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
               </svg>
-              Back
+              {{ 'TRIAGE.BACK' | translate }}
             </button>
           }
         </div>
@@ -76,14 +77,14 @@ interface ChatMessage {
                 <svg xmlns="http://www.w3.org/2000/svg" class="w-12 h-12 mx-auto mb-3 opacity-40" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
                   <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
-                <p class="font-medium">No assessment history</p>
-                <p class="text-sm mt-1">Run your first triage to see results here</p>
+                <p class="font-medium" dir="auto">{{ 'TRIAGE.NO_HISTORY_TITLE' | translate }}</p>
+                <p class="text-sm mt-1" dir="auto">{{ 'TRIAGE.NO_HISTORY_SUBTITLE' | translate }}</p>
               </div>
             } @else {
               @for (item of historyItems(); track item.id) {
                 <button
                   (click)="loadHistoryItem(item)"
-                  class="w-full text-left bg-white rounded-xl border border-gray-200 p-4 hover:border-indigo-300 hover:shadow-md transition-all"
+                  class="w-full text-start bg-white rounded-xl border border-gray-200 p-4 hover:border-indigo-300 hover:shadow-md transition-all"
                 >
                   <div class="flex items-start justify-between gap-3">
                     <div class="flex-1 min-w-0">
@@ -92,7 +93,7 @@ interface ChatMessage {
                           {{ item.severity }}
                         </span>
                         @if (item.isEmergency) {
-                          <span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-red-100 text-red-700">Emergency</span>
+                          <span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-red-100 text-red-700" dir="auto">{{ 'TRIAGE.EMERGENCY' | translate }}</span>
                         }
                         <span class="text-xs text-slate-400">{{ item.petName }}</span>
                       </div>
@@ -122,10 +123,10 @@ interface ChatMessage {
                       <path stroke-linecap="round" stroke-linejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
                     </svg>
                   </div>
-                  <span class="text-sm font-semibold text-slate-700">Pet Health Assistant</span>
+                  <span class="text-sm font-semibold text-slate-700" dir="auto">{{ 'TRIAGE.ASSISTANT_TITLE' | translate }}</span>
                 </div>
-                <p class="text-sm text-slate-600 mb-4">
-                  Which pet are you concerned about? Select one to start the health assessment.
+                <p class="text-sm text-slate-600 mb-4" dir="auto">
+                  {{ 'TRIAGE.SELECT_PET_PROMPT' | translate }}
                 </p>
 
                 @if (petsLoading()) {
@@ -137,21 +138,21 @@ interface ChatMessage {
                   </div>
                 } @else if (pets().length === 0) {
                   <div class="text-center py-4 text-slate-400">
-                    <p class="text-sm">No pets found. Add a pet first from the My Pets page.</p>
+                    <p class="text-sm" dir="auto">{{ 'TRIAGE.NO_PETS_TRIAGE' | translate }}</p>
                   </div>
                 } @else {
                   <div class="grid gap-2">
                     @for (pet of pets(); track pet.id) {
                       <button
                         (click)="selectPet(pet)"
-                        class="flex items-center gap-3 p-3 rounded-xl border border-gray-200 hover:border-indigo-300 hover:bg-indigo-50/50 transition-all text-left"
+                        class="flex items-center gap-3 p-3 rounded-xl border border-gray-200 hover:border-indigo-300 hover:bg-indigo-50/50 transition-all text-start"
                       >
                         <div class="w-10 h-10 rounded-full flex items-center justify-center text-lg" [class]="speciesAvatarClass(pet.species)">
                           {{ speciesEmoji(pet.species) }}
                         </div>
                         <div>
                           <p class="font-medium text-slate-800 text-sm">{{ pet.name }}</p>
-                          <p class="text-xs text-slate-400">{{ speciesLabel(pet.species) }} · {{ pet.age }} {{ pet.age === 1 ? 'year' : 'years' }} old</p>
+                          <p class="text-xs text-slate-400" dir="auto">{{ speciesI18nKey(pet.species) | translate }} · @if (pet.age === 1) {{{ 'PETS.ONE_YEAR_OLD' | translate }}} @else {{{ 'PETS.N_YEARS_OLD' | translate: { years: pet.age } }}}</p>
                         </div>
                       </button>
                     }
@@ -169,12 +170,11 @@ interface ChatMessage {
                   </svg>
                 </div>
                 <div class="bg-white rounded-2xl rounded-tl-md shadow-sm border border-gray-100 p-4 max-w-[85%]">
-                  <p class="text-sm text-slate-700">
-                    I'm ready to help assess <strong>{{ selectedPet()!.name }}</strong>'s health.
-                    Please describe the symptoms you've noticed — be as specific as possible about what's happening, when it started, and any changes in behavior.
+                  <p class="text-sm text-slate-700" dir="auto">
+                    {{ 'TRIAGE.WELCOME' | translate: { name: selectedPet()!.name } }}
                   </p>
-                  <p class="text-xs text-slate-400 mt-2">
-                    This is a preliminary AI assessment and does not replace professional veterinary care.
+                  <p class="text-xs text-slate-400 mt-2" dir="auto">
+                    {{ 'TRIAGE.DISCLAIMER_INLINE' | translate }}
                   </p>
                 </div>
               </div>
@@ -186,7 +186,7 @@ interface ChatMessage {
                 <div class="flex justify-end">
                   <div class="bg-indigo-600 text-white rounded-2xl rounded-tr-md px-4 py-3 max-w-[85%] shadow-sm">
                     @if (msg.imagePreview) {
-                      <img [src]="msg.imagePreview" alt="Attached photo" class="w-32 h-32 object-cover rounded-lg mb-2 border border-indigo-400/30" />
+                      <img [src]="msg.imagePreview" [attr.alt]="'TRIAGE.ATTACHED_PHOTO_ALT' | translate" class="w-32 h-32 object-cover rounded-lg mb-2 border border-indigo-400/30" />
                     }
                     <p class="text-sm whitespace-pre-wrap">{{ msg.content }}</p>
                     <p class="text-xs text-indigo-200 mt-1 text-right">{{ msg.timestamp | date:'shortTime' }}</p>
@@ -211,11 +211,11 @@ interface ChatMessage {
                             </svg>
                           </div>
                           <div>
-                            <p class="font-bold text-red-800 text-sm">Emergency — Seek Immediate Veterinary Care</p>
-                            <p class="text-xs text-red-600 mt-1">This assessment suggests your pet may need urgent attention. Please contact a veterinarian immediately.</p>
+                            <p class="font-bold text-red-800 text-sm" dir="auto">{{ 'TRIAGE.EMERGENCY_TITLE' | translate }}</p>
+                            <p class="text-xs text-red-600 mt-1" dir="auto">{{ 'TRIAGE.EMERGENCY_TEXT' | translate }}</p>
                           </div>
                         </div>
-                        <div class="flex gap-2 pl-[52px]">
+                        <div class="flex gap-2 ps-[52px]">
                           <a
                             href="tel:911"
                             class="inline-flex items-center gap-1.5 px-3 py-2 bg-red-600 text-white text-xs font-semibold rounded-lg hover:bg-red-700 transition-colors"
@@ -223,7 +223,7 @@ interface ChatMessage {
                             <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                               <path stroke-linecap="round" stroke-linejoin="round" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
                             </svg>
-                            Call Emergency Services
+                            {{ 'TRIAGE.CALL_EMERGENCY' | translate }}
                           </a>
                           <a
                             href="https://www.google.com/maps/search/emergency+veterinary+clinic+near+me"
@@ -234,7 +234,7 @@ interface ChatMessage {
                               <path stroke-linecap="round" stroke-linejoin="round" d="M17.657 16.657L13.414 20.9a2 2 0 01-2.828 0l-4.243-4.243a8 8 0 1111.314 0z" />
                               <path stroke-linecap="round" stroke-linejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
                             </svg>
-                            Find Emergency Vet
+                            {{ 'TRIAGE.FIND_EMERGENCY_VET' | translate }}
                           </a>
                         </div>
                       </div>
@@ -245,33 +245,34 @@ interface ChatMessage {
                       <!-- Severity Header -->
                       <div class="px-4 py-3 border-b border-gray-100 flex items-center gap-2" [class]="severityHeaderClass(msg.assessment.severity)">
                         <div class="w-3 h-3 rounded-full" [class]="severityDotClass(msg.assessment.severity)"></div>
-                        <span class="text-sm font-semibold">Severity: {{ msg.assessment.severity }}</span>
+                        <span class="text-sm font-semibold" dir="auto">{{ 'TRIAGE.SEVERITY' | translate }}: {{ msg.assessment.severity }}</span>
                       </div>
 
                       <!-- Assessment Body -->
                       <div class="p-4 space-y-3">
                         <div>
-                          <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Assessment</p>
+                          <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1" dir="auto">{{ 'TRIAGE.ASSESSMENT' | translate }}</p>
                           <p class="text-sm text-slate-700 whitespace-pre-wrap">{{ msg.assessment.assessment }}</p>
                         </div>
                         @if (msg.assessment.recommendations) {
                           <div>
-                            <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Recommendations</p>
+                            <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1" dir="auto">{{ 'TRIAGE.RECOMMENDATIONS' | translate }}</p>
                             <p class="text-sm text-slate-700 whitespace-pre-wrap">{{ msg.assessment.recommendations }}</p>
                           </div>
                         }
+                        <p class="text-xs font-medium text-indigo-600 pt-1" dir="auto">{{ 'TRIAGE.CONSULT_VET' | translate }}</p>
                       </div>
 
                       <!-- Footer -->
                       <div class="px-4 py-2 bg-gray-50 border-t border-gray-100 flex items-center justify-between">
                         <span class="text-xs text-slate-400">{{ msg.timestamp | date:'medium' }}</span>
-                        <span class="text-xs text-slate-400">AI Assessment</span>
+                        <span class="text-xs text-slate-400" dir="auto">{{ 'TRIAGE.AI_ASSESSMENT' | translate }}</span>
                       </div>
                     </div>
 
                     <!-- Disclaimer -->
-                    <p class="text-xs text-slate-400 px-1">
-                      This is a preliminary AI assessment. Always consult a licensed veterinarian for accurate diagnosis and treatment.
+                    <p class="text-xs text-slate-400 px-1" dir="auto">
+                      {{ 'TRIAGE.DISCLAIMER_FOOTER' | translate }}
                     </p>
                   </div>
                 </div>
@@ -306,7 +307,7 @@ interface ChatMessage {
                       <div class="w-2 h-2 bg-indigo-400 rounded-full animate-bounce" style="animation-delay: 150ms"></div>
                       <div class="w-2 h-2 bg-indigo-400 rounded-full animate-bounce" style="animation-delay: 300ms"></div>
                     </div>
-                    <span class="text-xs text-slate-400">Analyzing symptoms{{ messages().at(-1)?.imagePreview ? ' & photo' : '' }}...</span>
+                    <span class="text-xs text-slate-400" dir="auto">{{ messages().at(-1)?.imagePreview ? ('TRIAGE.ANALYZING_WITH_PHOTO' | translate) : ('TRIAGE.ANALYZING' | translate) }}</span>
                   </div>
                 </div>
               </div>
@@ -327,7 +328,7 @@ interface ChatMessage {
                       <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                       <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
                     </svg>
-                    <span class="text-xs text-slate-400">Finding nearby pet care providers...</span>
+                    <span class="text-xs text-slate-400" dir="auto">{{ 'TRIAGE.FINDING_PROVIDERS' | translate }}</span>
                   </div>
                 </div>
               </div>
@@ -342,7 +343,7 @@ interface ChatMessage {
                   </svg>
                 </div>
                 <div class="max-w-[90%] space-y-2">
-                  <p class="text-xs font-semibold text-emerald-700 px-1">Nearby Pet Care Providers</p>
+                  <p class="text-xs font-semibold text-emerald-700 px-1" dir="auto">{{ 'TRIAGE.NEARBY_PROVIDERS' | translate }}</p>
                   @for (vet of nearbyVets(); track vet.providerId) {
                     <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-3 hover:border-emerald-300 transition-colors">
                       <div class="flex items-start gap-3">
@@ -368,13 +369,13 @@ interface ChatMessage {
                             }
                           </div>
                           <p class="text-xs text-slate-500">{{ vet.services }}</p>
-                          <p class="text-xs text-slate-400 mt-0.5">{{ vet.distanceKm.toFixed(1) }} km away</p>
+                          <p class="text-xs text-slate-400 mt-0.5" dir="auto">{{ 'TRIAGE.KM_AWAY' | translate: { km: vet.distanceKm.toFixed(1) } }}</p>
                           @if (vet.address) {
                             <p class="text-xs text-slate-400 truncate">{{ vet.address }}</p>
                           }
                         </div>
                       </div>
-                      <div class="flex gap-2 mt-2 pl-[52px]">
+                      <div class="flex gap-2 mt-2 ps-[52px]">
                         @if (vet.phone) {
                           <a
                             [href]="'tel:' + vet.phone"
@@ -383,7 +384,7 @@ interface ChatMessage {
                             <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                               <path stroke-linecap="round" stroke-linejoin="round" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
                             </svg>
-                            Call
+                            {{ 'TRIAGE.CALL' | translate }}
                           </a>
                         }
                         <button
@@ -394,7 +395,7 @@ interface ChatMessage {
                             <path stroke-linecap="round" stroke-linejoin="round" d="M17.657 16.657L13.414 20.9a2 2 0 01-2.828 0l-4.243-4.243a8 8 0 1111.314 0z" />
                             <path stroke-linecap="round" stroke-linejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
                           </svg>
-                          Directions
+                          {{ 'TRIAGE.DIRECTIONS' | translate }}
                         </button>
                       </div>
                     </div>
@@ -416,13 +417,13 @@ interface ChatMessage {
                     (click)="startNewAssessment()"
                     class="text-xs px-3 py-1.5 bg-indigo-50 text-indigo-600 rounded-full hover:bg-indigo-100 transition-colors font-medium"
                   >
-                    New assessment
+                    {{ 'TRIAGE.NEW_ASSESSMENT' | translate }}
                   </button>
                   <button
                     (click)="changePet()"
                     class="text-xs px-3 py-1.5 bg-gray-100 text-slate-600 rounded-full hover:bg-gray-200 transition-colors font-medium"
                   >
-                    Change pet
+                    {{ 'TRIAGE.CHANGE_PET' | translate }}
                   </button>
                 </div>
               }
@@ -435,14 +436,14 @@ interface ChatMessage {
                       type="button"
                       (click)="removeAttachedImage()"
                       class="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-slate-700 text-white flex items-center justify-center text-xs hover:bg-red-600 transition-colors shadow-sm opacity-0 group-hover:opacity-100 focus:opacity-100"
-                      aria-label="Remove photo"
+                      [attr.aria-label]="'TRIAGE.REMOVE_PHOTO' | translate"
                     >
                       <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
                       </svg>
                     </button>
                   </div>
-                  <span class="text-xs text-slate-400">Photo attached</span>
+                  <span class="text-xs text-slate-400" dir="auto">{{ 'TRIAGE.PHOTO_ATTACHED' | translate }}</span>
                 </div>
               }
 
@@ -454,7 +455,7 @@ interface ChatMessage {
                   (click)="fileInput.click()"
                   [disabled]="assessing()"
                   class="flex-shrink-0 w-10 h-10 rounded-xl border border-gray-300 text-slate-500 flex items-center justify-center hover:border-indigo-400 hover:text-indigo-600 hover:bg-indigo-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
-                  title="Attach a photo"
+                  [attr.title]="'TRIAGE.ATTACH_PHOTO' | translate"
                 >
                   <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
@@ -465,9 +466,10 @@ interface ChatMessage {
                   <textarea
                     [(ngModel)]="symptomInput"
                     name="symptoms"
-                    placeholder="Describe the symptoms you've noticed..."
+                    dir="auto"
+                    [attr.placeholder]="'TRIAGE.DESCRIBE_ISSUE' | translate"
                     rows="1"
-                    class="w-full resize-none rounded-xl border border-gray-300 px-4 py-3 pr-12 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-shadow"
+                    class="w-full resize-none rounded-xl border border-gray-300 px-4 py-3 pe-12 text-sm text-start placeholder:text-start text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-shadow"
                     [disabled]="assessing()"
                     (keydown.enter)="onEnterKey($event)"
                     (input)="autoResize($event)"
@@ -477,6 +479,8 @@ interface ChatMessage {
                 <button
                   type="submit"
                   [disabled]="assessing() || !symptomInput().trim()"
+                  [attr.title]="'TRIAGE.CHECK_SYMPTOMS' | translate"
+                  [attr.aria-label]="'TRIAGE.CHECK_SYMPTOMS' | translate"
                   class="flex-shrink-0 w-10 h-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                 >
                   <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -495,10 +499,23 @@ export class TeletriageComponent implements OnInit {
   private readonly petService = inject(PetService);
   private readonly triageService = inject(TeletriageService);
   private readonly toast = inject(ToastService);
+  private readonly translate = inject(TranslateService);
 
   readonly speciesEmoji = petSpeciesEmoji;
   readonly speciesAvatarClass = petSpeciesIconBgClass;
-  readonly speciesLabel = petSpeciesLabel;
+
+  speciesI18nKey(species: PetSpecies | number | string | null | undefined): string {
+    const n = normalizePetSpecies(species);
+    const map: Record<PetSpecies, string> = {
+      [PetSpecies.Dog]: 'PETS.SPECIES_DOG',
+      [PetSpecies.Cat]: 'PETS.SPECIES_CAT',
+      [PetSpecies.Bird]: 'PETS.SPECIES_BIRD',
+      [PetSpecies.Rabbit]: 'PETS.SPECIES_RABBIT',
+      [PetSpecies.Reptile]: 'PETS.SPECIES_REPTILE',
+      [PetSpecies.Other]: 'PETS.SPECIES_OTHER',
+    };
+    return map[n];
+  }
 
   pets = signal<Pet[]>([]);
   petsLoading = signal(true);
@@ -593,7 +610,7 @@ export class TeletriageComponent implements OnInit {
       error: () => {
         const errorMsg: ChatMessage = {
           role: 'assistant',
-          content: 'Sorry, I was unable to complete the assessment. Please try again or consult a veterinarian directly.',
+          content: this.translate.instant('TRIAGE.ERROR_ASSESSMENT'),
           timestamp: new Date(),
         };
         this.messages.update((msgs) => [...msgs, errorMsg]);

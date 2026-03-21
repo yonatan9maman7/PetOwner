@@ -44,6 +44,17 @@ export class WizardStore {
     () => this.latitude() !== null && this.longitude() !== null,
   );
 
+  /** Map pin coordinates, or null if not set. */
+  readonly locationPoint = computed(() => {
+    const lat = this.latitude();
+    const lng = this.longitude();
+    if (lat === null || lng === null) return null;
+    return { lat, lng };
+  });
+
+  private readonly locationStepTouched_ = signal(false);
+  readonly locationStepTouched = this.locationStepTouched_.asReadonly();
+
   readonly address = this.address_.asReadonly();
   readonly structuredAddress = this.structuredAddress_.asReadonly();
   readonly verification = this.verification_.asReadonly();
@@ -75,6 +86,10 @@ export class WizardStore {
     structuredAddress: this.structuredAddress_(),
     verification: this.verification_(),
   }));
+
+  touchLocationStep(): void {
+    this.locationStepTouched_.set(true);
+  }
 
   goTo(step: number): void {
     if (step >= 1 && step <= TOTAL_STEPS) {

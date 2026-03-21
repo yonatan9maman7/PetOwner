@@ -17,7 +17,12 @@ public sealed class GlobalExceptionHandler : IExceptionHandler
         Exception exception,
         CancellationToken cancellationToken)
     {
-        _logger.LogError(exception, "Unhandled exception for request {Method} {Path}", httpContext.Request.Method, httpContext.Request.Path);
+        _logger.LogError(
+            exception,
+            "Unhandled exception for request {Method} {Path}. Inner: {Inner}",
+            httpContext.Request.Method,
+            httpContext.Request.Path,
+            exception.InnerException?.Message);
 
         var problemDetails = new ProblemDetails
         {

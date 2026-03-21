@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using NetTopologySuite.Geometries;
 using PetOwner.Api.DTOs;
+using PetOwner.Api.Infrastructure;
 using PetOwner.Api.Services;
 using PetOwner.Data;
 using PetOwner.Data.Models;
@@ -18,14 +19,6 @@ public class ProvidersController : ControllerBase
     private readonly IBlobService _blobService;
     private readonly IGeminiAiService _aiService;
     private readonly ITokenService _tokenService;
-
-    private static readonly Dictionary<ServiceType, string> ServiceTypeToName = new()
-    {
-        [ServiceType.DogWalking] = "Dog Walker",
-        [ServiceType.PetSitting] = "Pet Sitter",
-        [ServiceType.Boarding] = "Boarding",
-        [ServiceType.DropInVisit] = "Drop-in Visit",
-    };
 
     public ProvidersController(
         ApplicationDbContext db,
@@ -90,7 +83,7 @@ public class ProvidersController : ControllerBase
                 Unit = svcRate.PricingUnit,
             });
 
-            if (!ServiceTypeToName.TryGetValue(svcRate.ServiceType, out var serviceName))
+            if (!ServiceTypeCatalog.TryGetDisplayName(svcRate.ServiceType, out var serviceName))
                 continue;
 
             var service = await _db.Services
@@ -192,7 +185,7 @@ public class ProvidersController : ControllerBase
                 Unit = svcRate.PricingUnit,
             });
 
-            if (!ServiceTypeToName.TryGetValue(svcRate.ServiceType, out var serviceName))
+            if (!ServiceTypeCatalog.TryGetDisplayName(svcRate.ServiceType, out var serviceName))
                 continue;
 
             var service = await _db.Services

@@ -2,6 +2,21 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Logical alignment for placeholders + typed text when dir="auto" (Hebrew vs English). */
+@layer base {
+  input[dir='auto'],
+  textarea[dir='auto'],
+  select[dir='auto'] {
+    unicode-bidi: plaintext;
+  }
+
+  input[dir='auto']::placeholder,
+  textarea[dir='auto']::placeholder {
+    text-align: start;
+    unicode-bidi: plaintext;
+  }
+}
+
 html, body {
   margin: 0;
   padding: 0;

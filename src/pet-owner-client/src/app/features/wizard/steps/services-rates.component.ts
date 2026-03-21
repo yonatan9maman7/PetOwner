@@ -1,22 +1,23 @@
 import { Component, inject, OnInit, signal } from '@angular/core';
+import { TranslatePipe } from '@ngx-translate/core';
 import { WizardStore } from '../wizard.store';
 import {
   ServiceRateDto,
   ServiceType,
   PricingUnit,
   SERVICE_CARDS,
-  ServiceCardConfig,
 } from '../wizard.model';
 
 @Component({
   selector: 'app-step-services-rates',
   standalone: true,
+  imports: [TranslatePipe],
   template: `
-    <h2 class="step-title">Services &amp; Rates</h2>
+    <h2 class="step-title">{{ 'WIZARD.SERVICES_RATES' | translate }}</h2>
 
     <fieldset class="border-0 p-0 m-0 min-w-0">
-      <legend class="mb-4 text-base font-semibold text-slate-900">
-        Which services do you offer?
+      <legend class="mb-4 block text-start text-base font-semibold text-slate-900">
+        {{ 'WIZARD.WHICH_SERVICES' | translate }}
       </legend>
 
       <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -35,22 +36,29 @@ import {
                 : 'from-slate-100 to-slate-50 ring-1 ring-slate-200/80 text-slate-400'">
               {{ iconFor(card.type) }}
             </div>
-            <span class="text-lg font-semibold tracking-tight text-slate-900">{{ card.label }}</span>
-            <span class="mt-1.5 block text-sm leading-relaxed text-slate-600">{{ card.description }}</span>
+            <span class="block text-start text-lg font-semibold tracking-tight text-slate-900" dir="auto">
+              {{ serviceTitleKey(card.type) | translate }}
+            </span>
+            <div dir="auto" class="text-start mt-1.5 text-sm leading-relaxed text-slate-600">
+              {{ serviceDescKey(card.type) | translate }}
+            </div>
 
             @if (isSelected(card.type)) {
               <div class="mt-4 pt-3 border-t border-slate-200/70" (click)="$event.stopPropagation()">
-                <label class="block text-xs font-medium text-indigo-700 mb-1.5">{{ card.rateLabel }} (ILS)</label>
+                <label class="mb-1.5 block text-start text-xs font-medium text-indigo-700">
+                  {{ serviceRateKey(card.type) | translate }} (ILS)
+                </label>
                 <input
                   type="number"
                   min="1"
+                  dir="auto"
                   inputmode="decimal"
-                  class="w-full rounded-xl border-2 border-indigo-200 bg-white px-4 py-2.5 text-sm text-slate-900
+                  class="w-full text-start placeholder:text-start rounded-xl border-2 border-indigo-200 bg-white px-4 py-2.5 text-sm text-slate-900
                          placeholder-slate-400 outline-none transition
                          focus:border-primary focus:ring-2 focus:ring-primary/20"
                   [value]="rateFor(card.type)"
                   (input)="updateRate(card.type, $any($event.target).value, card.pricingUnit)"
-                  placeholder="e.g. 60"
+                  [attr.placeholder]="'WIZARD.RATE_PLACEHOLDER' | translate"
                 />
               </div>
             }
@@ -81,6 +89,39 @@ export class ServicesRatesComponent implements OnInit {
     Boarding: '🛏️',
     DropInVisit: '👋',
   };
+
+  private readonly titleKeys: Record<ServiceType, string> = {
+    DogWalking: 'WIZARD.SERVICE_DOG_WALKING_TITLE',
+    PetSitting: 'WIZARD.SERVICE_PET_SITTING_TITLE',
+    Boarding: 'WIZARD.SERVICE_BOARDING_TITLE',
+    DropInVisit: 'WIZARD.SERVICE_DROP_IN_TITLE',
+  };
+
+  private readonly descKeys: Record<ServiceType, string> = {
+    DogWalking: 'WIZARD.SERVICE_DOG_WALKING_DESC',
+    PetSitting: 'WIZARD.SERVICE_PET_SITTING_DESC',
+    Boarding: 'WIZARD.SERVICE_BOARDING_DESC',
+    DropInVisit: 'WIZARD.SERVICE_DROP_IN_DESC',
+  };
+
+  private readonly rateKeys: Record<ServiceType, string> = {
+    DogWalking: 'WIZARD.RATE_PER_HOUR',
+    PetSitting: 'WIZARD.RATE_PER_HOUR',
+    Boarding: 'WIZARD.RATE_PER_NIGHT',
+    DropInVisit: 'WIZARD.RATE_PER_VISIT',
+  };
+
+  serviceTitleKey(type: ServiceType): string {
+    return this.titleKeys[type];
+  }
+
+  serviceDescKey(type: ServiceType): string {
+    return this.descKeys[type];
+  }
+
+  serviceRateKey(type: ServiceType): string {
+    return this.rateKeys[type];
+  }
 
   ngOnInit(): void {
     const saved = this.store.formSnapshot().selectedServices;

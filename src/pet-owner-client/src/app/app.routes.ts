@@ -119,6 +119,14 @@ export const routes: Routes = [
       ),
   },
   {
+    path: 'bookings',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./features/my-bookings/my-bookings.component').then(
+        (m) => m.MyBookingsComponent
+      ),
+  },
+  {
     path: 'provider-dashboard',
     canActivate: [authGuard],
     loadComponent: () =>

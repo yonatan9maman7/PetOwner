@@ -1,14 +1,25 @@
 import { Component, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
+import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { AuthService } from '../../services/auth.service';
+import { LanguageService } from '../../services/language.service';
+import { TermsModalComponent } from '../../shared/terms-modal/terms-modal.component';
 
 @Component({
   selector: 'app-login',
   standalone: true,
-  imports: [ReactiveFormsModule, RouterLink],
+  imports: [ReactiveFormsModule, RouterLink, TranslatePipe, TermsModalComponent],
   template: `
-    <div class="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-50 to-white px-4">
+    <div class="relative min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-50 to-white px-4">
+      <button
+        type="button"
+        (click)="languageService.toggleLanguage()"
+        class="absolute top-4 end-4 z-50 p-2 bg-white/80 rounded-full shadow-sm hover:bg-gray-100 transition-colors
+               text-xs font-bold text-gray-700 tabular-nums"
+        aria-label="Switch language">
+        {{ languageService.currentLang() === 'he' ? 'EN' : 'HE' }}
+      </button>
       <div class="w-full max-w-sm">
         <div class="text-center mb-8">
           <div class="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-indigo-600 text-white mb-4">
@@ -18,79 +29,83 @@ import { AuthService } from '../../services/auth.service';
             </svg>
           </div>
           <h1 class="text-2xl font-bold text-gray-900">
-            {{ isRegister() ? 'Create Account' : 'Welcome Back' }}
+            {{ (isRegister() ? 'AUTH.CREATE_ACCOUNT' : 'AUTH.WELCOME_BACK') | translate }}
           </h1>
           <p class="text-sm text-gray-500 mt-1">
-            {{ isRegister() ? 'Sign up to get started' : 'Log in to your account' }}
+            {{ (isRegister() ? 'AUTH.SUBTITLE_REGISTER' : 'AUTH.SUBTITLE_LOGIN') | translate }}
           </p>
         </div>
 
         <form [formGroup]="form" (ngSubmit)="onSubmit()" class="space-y-4">
           @if (isRegister()) {
             <div>
-              <label for="name" class="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
+              <label for="name" class="block text-start text-sm font-medium text-gray-700 mb-1">{{ 'AUTH.FULL_NAME' | translate }}</label>
               <input
                 id="name"
                 formControlName="name"
                 type="text"
-                placeholder="Your name"
-                class="w-full px-4 py-3 rounded-xl border border-gray-300 bg-white text-gray-900
+                dir="auto"
+                [attr.placeholder]="'AUTH.PLACEHOLDER_NAME' | translate"
+                class="w-full text-start placeholder:text-start px-4 py-3 rounded-xl border border-gray-300 bg-white text-gray-900
                        placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500
                        focus:border-transparent transition"
               />
               @if (form.get('name')?.invalid && form.get('name')?.touched) {
-                <span class="text-xs text-red-500">Full name is required</span>
+                <span class="block text-start text-xs text-red-500">{{ 'AUTH.ERROR_NAME' | translate }}</span>
               }
             </div>
           }
 
           <div>
-            <label for="email" class="block text-sm font-medium text-gray-700 mb-1">Email Address</label>
+            <label for="email" class="block text-start text-sm font-medium text-gray-700 mb-1">{{ 'AUTH.EMAIL_ADDRESS' | translate }}</label>
             <input
               id="email"
               formControlName="email"
               type="email"
-              placeholder="you&#64;example.com"
-              class="w-full px-4 py-3 rounded-xl border border-gray-300 bg-white text-gray-900
+              dir="auto"
+              [attr.placeholder]="'AUTH.PLACEHOLDER_EMAIL' | translate"
+              class="w-full text-start placeholder:text-start px-4 py-3 rounded-xl border border-gray-300 bg-white text-gray-900
                      placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500
                      focus:border-transparent transition"
             />
             @if (form.get('email')?.invalid && form.get('email')?.touched) {
-              <span class="text-xs text-red-500">Please enter a valid email address</span>
+              <span class="block text-start text-xs text-red-500">{{ 'AUTH.ERROR_EMAIL' | translate }}</span>
             }
           </div>
 
           @if (isRegister()) {
             <div>
-              <label for="phone" class="block text-sm font-medium text-gray-700 mb-1">Phone</label>
+              <label for="phone" class="block text-start text-sm font-medium text-gray-700 mb-1">{{ 'AUTH.PHONE' | translate }}</label>
               <input
                 id="phone"
                 formControlName="phone"
                 type="tel"
-                placeholder="05X-XXXXXXX"
-                class="w-full px-4 py-3 rounded-xl border border-gray-300 bg-white text-gray-900
+                dir="auto"
+                [attr.placeholder]="'AUTH.PLACEHOLDER_PHONE' | translate"
+                class="w-full text-start placeholder:text-start px-4 py-3 rounded-xl border border-gray-300 bg-white text-gray-900
                        placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500
                        focus:border-transparent transition"
               />
               @if (form.get('phone')?.invalid && form.get('phone')?.touched) {
-                <span class="text-xs text-red-500">Please enter a valid phone number (e.g. 05XXXXXXXX)</span>
+                <span class="block text-start text-xs text-red-500">{{ 'AUTH.ERROR_PHONE' | translate }}</span>
               }
             </div>
           }
 
           <div>
-            <label for="password" class="block text-sm font-medium text-gray-700 mb-1">Password</label>
+            <label for="password" class="block text-start text-sm font-medium text-gray-700 mb-1">{{ 'AUTH.PASSWORD' | translate }}</label>
             <input
               id="password"
               formControlName="password"
               type="password"
-              placeholder="••••••••"
-              class="w-full px-4 py-3 rounded-xl border border-gray-300 bg-white text-gray-900
+              dir="auto"
+              [attr.placeholder]="'AUTH.PLACEHOLDER_PASSWORD' | translate"
+              class="w-full text-start placeholder:text-start px-4 py-3 rounded-xl border border-gray-300 bg-white text-gray-900
                      placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500
                      focus:border-transparent transition"
             />
             @if (form.get('password')?.invalid && form.get('password')?.touched) {
-              <span class="text-xs text-red-500">Password must be at least 6 characters</span>
+              <span class="block text-start text-xs text-red-500">{{ 'AUTH.ERROR_PASSWORD' | translate }}</span>
             }
           </div>
 
@@ -102,26 +117,31 @@ import { AuthService } from '../../services/auth.service';
                 type="checkbox"
                 class="mt-1 h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
               />
-              <label for="agreeTerms" class="text-sm text-gray-600">
-                I agree to the
-                <a routerLink="/terms" target="_blank" class="text-indigo-600 hover:text-indigo-500 underline font-medium">Terms of Service</a>
+              <label for="agreeTerms" class="text-sm text-start text-gray-600">
+                {{ 'AUTH.TERMS_PREFIX' | translate }}
+                <button
+                  type="button"
+                  (click)="termsModalOpen.set(true)"
+                  class="text-indigo-600 hover:text-indigo-500 underline font-medium p-0 border-0 bg-transparent cursor-pointer inline">
+                  {{ 'AUTH.TERMS_OF_SERVICE' | translate }}
+                </button>
               </label>
             </div>
             @if (form.get('agreeTerms')?.invalid && form.get('agreeTerms')?.touched) {
-              <span class="text-xs text-red-500">You must accept the Terms of Service</span>
+              <span class="block text-start text-xs text-red-500">{{ 'AUTH.ERROR_TERMS' | translate }}</span>
             }
           }
 
           @if (!isRegister()) {
-            <div class="text-left">
+            <div class="text-start">
               <a routerLink="/forgot-password" class="text-sm text-indigo-600 font-medium hover:underline">
-                Forgot password?
+                {{ 'AUTH.FORGOT_PASSWORD' | translate }}
               </a>
             </div>
           }
 
           @if (errorMsg()) {
-            <p class="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{{ errorMsg() }}</p>
+            <p class="text-start text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{{ errorMsg() }}</p>
           }
 
           <button
@@ -131,20 +151,21 @@ import { AuthService } from '../../services/auth.service';
                    hover:bg-indigo-700 active:bg-indigo-800 disabled:opacity-50
                    disabled:cursor-not-allowed transition"
           >
-            {{ loading() ? 'Please wait...' : (isRegister() ? 'Create Account' : 'Login') }}
+            {{ loading() ? ('AUTH.PLEASE_WAIT' | translate) : ((isRegister() ? 'AUTH.CREATE_ACCOUNT' : 'AUTH.SIGN_IN') | translate) }}
           </button>
         </form>
 
         <p class="text-center text-sm text-gray-500 mt-6">
           @if (isRegister()) {
-            Already have an account?
-            <button (click)="toggleMode()" class="text-indigo-600 font-medium hover:underline">Login</button>
+            {{ 'AUTH.ALREADY_HAVE_ACCOUNT' | translate }}
+            <button type="button" (click)="toggleMode()" class="text-indigo-600 font-medium hover:underline">{{ 'AUTH.LOGIN' | translate }}</button>
           } @else {
-            Don't have an account?
-            <button (click)="toggleMode()" class="text-indigo-600 font-medium hover:underline">Sign up</button>
+            {{ 'AUTH.NO_ACCOUNT' | translate }}
+            <button type="button" (click)="toggleMode()" class="text-indigo-600 font-medium hover:underline">{{ 'AUTH.SIGN_UP' | translate }}</button>
           }
         </p>
       </div>
+      <app-terms-modal [isOpen]="termsModalOpen()" (close)="termsModalOpen.set(false)" />
     </div>
   `,
 })
@@ -152,10 +173,13 @@ export class LoginComponent {
   private readonly fb = inject(FormBuilder);
   private readonly auth = inject(AuthService);
   private readonly router = inject(Router);
+  private readonly translate = inject(TranslateService);
+  readonly languageService = inject(LanguageService);
 
   readonly isRegister = signal(false);
   readonly loading = signal(false);
   readonly errorMsg = signal('');
+  readonly termsModalOpen = signal(false);
 
   readonly form = this.fb.nonNullable.group({
     name: [''],
@@ -219,7 +243,9 @@ export class LoginComponent {
       },
       error: (err) => {
         this.loading.set(false);
-        this.errorMsg.set(err.error?.message ?? 'Something went wrong. Please try again.');
+        this.errorMsg.set(
+          err.error?.message ?? this.translate.instant('AUTH.ERROR_GENERIC'),
+        );
       },
     });
   }

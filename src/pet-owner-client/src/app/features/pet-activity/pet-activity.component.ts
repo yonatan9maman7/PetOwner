@@ -84,34 +84,39 @@ const ACTIVITY_TYPES = ['Walk', 'Meal', 'Exercise', 'Weight'] as const;
                       <div>
                         <label class="block text-xs font-medium text-slate-600 mb-1">Duration (min)</label>
                         <input type="number" [(ngModel)]="formDuration" name="duration" min="1" placeholder="e.g., 30"
-                               class="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100 outline-none transition" />
+                               dir="auto"
+                               class="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm text-start placeholder:text-start text-slate-900 placeholder-slate-400 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100 outline-none transition" />
                       </div>
                     }
                     @if (activeType() === 'Walk') {
                       <div>
                         <label class="block text-xs font-medium text-slate-600 mb-1">Distance (km)</label>
                         <input type="number" [(ngModel)]="formValue" name="value" min="0" step="0.1" placeholder="e.g., 2.5"
-                               class="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100 outline-none transition" />
+                               dir="auto"
+                               class="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm text-start placeholder:text-start text-slate-900 placeholder-slate-400 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100 outline-none transition" />
                       </div>
                     }
                     @if (activeType() === 'Weight') {
                       <div>
                         <label class="block text-xs font-medium text-slate-600 mb-1">Weight (kg)</label>
                         <input type="number" [(ngModel)]="formValue" name="value" min="0" step="0.1" placeholder="e.g., 8.5" required
-                               class="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100 outline-none transition" />
+                               dir="auto"
+                               class="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm text-start placeholder:text-start text-slate-900 placeholder-slate-400 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100 outline-none transition" />
                       </div>
                     }
                     @if (activeType() === 'Exercise') {
                       <div>
                         <label class="block text-xs font-medium text-slate-600 mb-1">Calories</label>
                         <input type="number" [(ngModel)]="formValue" name="value" min="0" placeholder="e.g., 150"
-                               class="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100 outline-none transition" />
+                               dir="auto"
+                               class="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm text-start placeholder:text-start text-slate-900 placeholder-slate-400 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100 outline-none transition" />
                       </div>
                     }
                     <div>
                       <label class="block text-xs font-medium text-slate-600 mb-1">Date</label>
                       <input type="date" [(ngModel)]="formDate" name="date" required
-                             class="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm text-slate-900 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100 outline-none transition" />
+                             dir="auto"
+                             class="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm text-start text-slate-900 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100 outline-none transition" />
                     </div>
                   </div>
 
@@ -119,7 +124,8 @@ const ACTIVITY_TYPES = ['Walk', 'Meal', 'Exercise', 'Weight'] as const;
                     <div>
                       <label class="block text-xs font-medium text-slate-600 mb-1">Notes (optional)</label>
                       <input type="text" [(ngModel)]="formNotes" name="notes" placeholder="Quick note..."
-                             class="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100 outline-none transition" />
+                             dir="auto"
+                             class="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm text-start placeholder:text-start text-slate-900 placeholder-slate-400 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100 outline-none transition" />
                     </div>
                   }
 

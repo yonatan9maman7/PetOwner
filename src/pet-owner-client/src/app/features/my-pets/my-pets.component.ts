@@ -1,6 +1,7 @@
 import { Component, inject, OnInit, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { DatePipe } from '@angular/common';
+import { TranslatePipe } from '@ngx-translate/core';
 import { Pet, PetService } from '../../services/pet.service';
 import { MedicalRecord, MedicalRecordService } from '../../services/medical-record.service';
 import { TeletriageService, TeletriageHistory } from '../../services/teletriage.service';
@@ -8,9 +9,9 @@ import { ToastService } from '../../services/toast.service';
 import {
   PET_SPECIES_OPTIONS,
   PetSpecies,
+  normalizePetSpecies,
   petSpeciesEmoji,
   petSpeciesIconBgClass,
-  petSpeciesLabel,
 } from '../../models/pet-species.model';
 
 const BREED_OPTIONS = [
@@ -33,15 +34,15 @@ const RECORD_TYPES = ['Vaccination', 'Condition', 'Medication', 'VetVisit'] as c
 @Component({
   selector: 'app-my-pets',
   standalone: true,
-  imports: [ReactiveFormsModule, DatePipe],
+  imports: [ReactiveFormsModule, DatePipe, TranslatePipe],
   template: `
     <div class="min-h-screen bg-gradient-to-b from-indigo-50 to-white px-4 py-8">
       <div class="max-w-2xl mx-auto">
 
         <!-- Header -->
         <div class="text-center mb-8">
-          <h1 class="text-3xl font-bold text-slate-900">My Pets</h1>
-          <p class="mt-1 text-sm text-slate-500">Manage your furry (or scaly) family members</p>
+          <h1 class="text-3xl font-bold text-slate-900">{{ 'PROFILE.MY_PETS' | translate }}</h1>
+          <p class="mt-1 text-sm text-slate-500">{{ 'PROFILE.MY_PETS_SUBTITLE' | translate }}</p>
         </div>
 
         <!-- Loading State -->
@@ -51,7 +52,7 @@ const RECORD_TYPES = ['Vaccination', 'Condition', 'Medication', 'VetVisit'] as c
               <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
               <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
             </svg>
-            <p class="text-sm">Loading your pets...</p>
+            <p class="text-sm">{{ 'PROFILE.LOADING_PETS' | translate }}</p>
           </div>
         } @else {
 
@@ -62,12 +63,12 @@ const RECORD_TYPES = ['Vaccination', 'Condition', 'Medication', 'VetVisit'] as c
                 <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
                   <div class="relative p-5">
                     <!-- Action buttons -->
-                    <div class="absolute top-3 right-3 flex items-center gap-0.5">
+                    <div class="absolute top-3 end-3 flex items-center gap-0.5">
                       <button
                         type="button"
                         (click)="editPet(pet)"
                         class="p-1.5 rounded-lg text-gray-300 hover:text-indigo-500 hover:bg-indigo-50 transition-colors duration-150"
-                        title="Edit pet"
+                        [attr.title]="'PROFILE.EDIT_PET_ARIA' | translate"
                       >
                         <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                           <path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -77,7 +78,7 @@ const RECORD_TYPES = ['Vaccination', 'Condition', 'Medication', 'VetVisit'] as c
                         type="button"
                         (click)="confirmDelete(pet)"
                         class="p-1.5 rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 transition-colors duration-150"
-                        title="Remove pet"
+                        [attr.title]="'PROFILE.REMOVE_PET_ARIA' | translate"
                       >
                         <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                           <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -90,10 +91,10 @@ const RECORD_TYPES = ['Vaccination', 'Condition', 'Medication', 'VetVisit'] as c
                            [class]="speciesIconClass(pet.species)">
                         {{ speciesEmoji(pet.species) }}
                       </div>
-                      <div class="min-w-0 flex-1 pr-16">
+                      <div class="min-w-0 flex-1 pe-16">
                         <h3 class="text-lg font-semibold text-slate-900 truncate">{{ pet.name }}</h3>
                         <p class="text-xs text-slate-500">
-                          {{ speciesLabel(pet.species) }}@if (pet.breed) {<span> · {{ pet.breed }}</span>} · {{ pet.age }} {{ pet.age === 1 ? 'year' : 'years' }} old@if (pet.weight) {<span> · {{ pet.weight }} kg</span>}@if (pet.isNeutered) {<span> · Neutered / spayed</span>}
+                          {{ speciesI18nKey(pet.species) | translate }}@if (pet.breed) {<span> · {{ pet.breed }}</span>} · @if (pet.age === 1) {<span>{{ 'PETS.ONE_YEAR_OLD' | translate }}</span>} @else {<span>{{ 'PETS.N_YEARS_OLD' | translate: { years: pet.age } }}</span>}@if (pet.weight) {<span> · {{ pet.weight }} {{ 'PETS.KG' | translate }}</span>}@if (pet.isNeutered) {<span> · {{ 'PETS.NEUTERED_SHORT' | translate }}</span>}
                         </p>
                       </div>
                     </div>
@@ -267,34 +268,34 @@ const RECORD_TYPES = ['Vaccination', 'Condition', 'Medication', 'VetVisit'] as c
                             <form [formGroup]="recordForm" (ngSubmit)="submitRecord()" class="space-y-3">
                               <div class="grid grid-cols-2 gap-3">
                                 <div>
-                                  <label class="block text-xs font-medium text-slate-600 mb-1">Type</label>
-                                  <select formControlName="type"
-                                          class="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-slate-900 bg-white focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 outline-none transition">
+                                  <label class="block text-start text-xs font-medium text-slate-600 mb-1">Type</label>
+                                  <select formControlName="type" dir="auto"
+                                          class="w-full text-start rounded-lg border border-gray-200 px-3 py-2 text-sm text-slate-900 bg-white focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 outline-none transition">
                                     @for (t of recordTypes; track t) {
                                       <option [value]="t">{{ t === 'VetVisit' ? 'Vet Visit' : t }}</option>
                                     }
                                   </select>
                                 </div>
                                 <div>
-                                  <label class="block text-xs font-medium text-slate-600 mb-1">Date</label>
-                                  <input type="date" formControlName="date"
-                                         class="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-slate-900 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 outline-none transition" />
+                                  <label class="block text-start text-xs font-medium text-slate-600 mb-1">Date</label>
+                                  <input type="date" formControlName="date" dir="auto"
+                                         class="w-full text-start rounded-lg border border-gray-200 px-3 py-2 text-sm text-slate-900 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 outline-none transition" />
                                 </div>
                               </div>
                               <div>
-                                <label class="block text-xs font-medium text-slate-600 mb-1">Title</label>
-                                <input type="text" formControlName="title" placeholder="e.g., Rabies vaccine"
-                                       class="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 outline-none transition" />
+                                <label class="block text-start text-xs font-medium text-slate-600 mb-1">Title</label>
+                                <input type="text" formControlName="title" dir="auto" placeholder="e.g., Rabies vaccine"
+                                       class="w-full text-start placeholder:text-start rounded-lg border border-gray-200 px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 outline-none transition" />
                               </div>
                               <div>
-                                <label class="block text-xs font-medium text-slate-600 mb-1">Description (optional)</label>
-                                <textarea formControlName="description" rows="2" placeholder="Additional details..."
-                                          class="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 outline-none transition resize-none"></textarea>
+                                <label class="block text-start text-xs font-medium text-slate-600 mb-1">Description (optional)</label>
+                                <textarea formControlName="description" rows="2" dir="auto" placeholder="Additional details..."
+                                          class="w-full text-start placeholder:text-start rounded-lg border border-gray-200 px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 outline-none transition resize-none"></textarea>
                               </div>
                               <div>
-                                <label class="block text-xs font-medium text-slate-600 mb-1">Document URL (optional)</label>
-                                <input type="url" formControlName="documentUrl" placeholder="https://..."
-                                       class="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 outline-none transition" />
+                                <label class="block text-start text-xs font-medium text-slate-600 mb-1">Document URL (optional)</label>
+                                <input type="url" formControlName="documentUrl" dir="auto" placeholder="https://..."
+                                       class="w-full text-start placeholder:text-start rounded-lg border border-gray-200 px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 outline-none transition" />
                               </div>
                               <div class="flex gap-2">
                                 <button type="submit" [disabled]="recordSubmitting() || recordForm.invalid"
@@ -393,15 +394,15 @@ const RECORD_TYPES = ['Vaccination', 'Condition', 'Medication', 'VetVisit'] as c
                   <path d="M58 40l8-11M66 32l7-9" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" opacity="0.45"/>
                 </svg>
               </div>
-              <h3 class="text-lg font-semibold tracking-tight text-gray-900">No Pets Yet</h3>
+              <h3 class="text-lg font-semibold tracking-tight text-gray-900">{{ 'PROFILE.NO_PETS_TITLE' | translate }}</h3>
               <p class="mt-2 max-w-sm text-sm text-gray-500 leading-relaxed">
-                When you add a pet, sitters and walkers can see who they're caring for and you can keep health records in one place.
+                {{ 'PROFILE.NO_PETS_DESCRIPTION' | translate }}
               </p>
               <a
                 href="#add-pet-form"
                 class="mt-6 inline-flex items-center justify-center rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 focus-visible:ring-offset-2"
               >
-                Add Pet
+                {{ 'PROFILE.ADD_PET' | translate }}
               </a>
             </div>
           }
@@ -409,33 +410,35 @@ const RECORD_TYPES = ['Vaccination', 'Condition', 'Medication', 'VetVisit'] as c
           <!-- ─── Add / Edit Pet Form ─── -->
           <div id="add-pet-form" class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 scroll-mt-24">
             <h2 class="text-lg font-semibold text-slate-900 mb-4">
-              {{ editingPetId() ? 'Edit Pet' : 'Add a New Pet' }}
+              {{ (editingPetId() ? 'PETS.EDIT_PET' : 'PETS.ADD_NEW_PET') | translate }}
             </h2>
 
             <form [formGroup]="petForm" (ngSubmit)="onSubmit()" class="space-y-4">
 
               <div class="grid grid-cols-2 gap-4">
                 <div>
-                  <label for="pet-name" class="block text-sm font-medium text-slate-700 mb-1">Name</label>
+                  <label for="pet-name" class="block text-start text-sm font-medium text-slate-700 mb-1"><span dir="auto">{{ 'PETS.NAME' | translate }}</span></label>
                   <input
                     id="pet-name"
                     type="text"
                     formControlName="name"
-                    placeholder="e.g., Buddy"
-                    class="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 outline-none transition"
+                    dir="auto"
+                    [attr.placeholder]="'PETS.PLACEHOLDER_NAME' | translate"
+                    class="w-full text-start placeholder:text-start rounded-xl border border-gray-200 px-4 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 outline-none transition"
                   />
                 </div>
 
                 <div>
-                  <label for="pet-species" class="block text-sm font-medium text-slate-700 mb-1">Species</label>
+                  <label for="pet-species" class="block text-start text-sm font-medium text-slate-700 mb-1"><span dir="auto">{{ 'PETS.SPECIES' | translate }}</span></label>
                   <select
                     id="pet-species"
                     formControlName="species"
-                    class="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm text-slate-900 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 outline-none transition bg-white"
+                    dir="auto"
+                    class="w-full text-start rounded-xl border border-gray-200 px-4 py-2.5 text-sm text-slate-900 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 outline-none transition bg-white"
                   >
-                    <option [ngValue]="null" disabled>Select species...</option>
+                    <option [ngValue]="null" disabled>{{ 'PETS.SELECT_SPECIES' | translate }}</option>
                     @for (opt of petSpeciesOptions; track opt.value) {
-                      <option [ngValue]="opt.value">{{ opt.label }}</option>
+                      <option [ngValue]="opt.value">{{ speciesI18nKey(opt.value) | translate }}</option>
                     }
                   </select>
                 </div>
@@ -443,13 +446,14 @@ const RECORD_TYPES = ['Vaccination', 'Condition', 'Medication', 'VetVisit'] as c
 
               <div class="grid grid-cols-3 gap-4">
                 <div>
-                  <label for="pet-breed" class="block text-sm font-medium text-slate-700 mb-1">Breed</label>
+                  <label for="pet-breed" class="block text-start text-sm font-medium text-slate-700 mb-1"><span dir="auto">{{ 'PETS.BREED' | translate }}</span></label>
                   <select
                     id="pet-breed"
                     formControlName="breed"
-                    class="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm text-slate-900 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 outline-none transition bg-white"
+                    dir="auto"
+                    class="w-full text-start rounded-xl border border-gray-200 px-4 py-2.5 text-sm text-slate-900 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 outline-none transition bg-white"
                   >
-                    <option value="">Optional — select breed</option>
+                    <option value="">{{ 'PETS.BREED_OPTIONAL' | translate }}</option>
                     @for (b of breedOptions; track b) {
                       <option [value]="b">{{ b }}</option>
                     }
@@ -457,36 +461,38 @@ const RECORD_TYPES = ['Vaccination', 'Condition', 'Medication', 'VetVisit'] as c
                 </div>
 
                 <div>
-                  <label for="pet-age" class="block text-sm font-medium text-slate-700 mb-1">Age</label>
+                  <label for="pet-age" class="block text-start text-sm font-medium text-slate-700 mb-1"><span dir="auto">{{ 'PETS.AGE' | translate }}</span></label>
                   <input
                     id="pet-age"
                     type="number"
                     min="0"
                     max="100"
                     formControlName="age"
-                    placeholder="e.g., 3"
-                    class="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 outline-none transition"
+                    dir="auto"
+                    [attr.placeholder]="'PETS.PLACEHOLDER_AGE' | translate"
+                    class="w-full text-start placeholder:text-start rounded-xl border border-gray-200 px-4 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 outline-none transition"
                   />
                 </div>
 
                 <div>
-                  <label for="pet-weight" class="block text-sm font-medium text-slate-700 mb-1">Weight (kg)</label>
+                  <label for="pet-weight" class="block text-start text-sm font-medium text-slate-700 mb-1"><span dir="auto">{{ 'PETS.WEIGHT' | translate }}</span></label>
                   <input
                     id="pet-weight"
                     type="number"
                     min="0"
                     step="0.1"
                     formControlName="weight"
-                    placeholder="e.g., 12.5"
-                    class="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 outline-none transition"
+                    dir="auto"
+                    [attr.placeholder]="'PETS.PLACEHOLDER_WEIGHT' | translate"
+                    class="w-full text-start placeholder:text-start rounded-xl border border-gray-200 px-4 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 outline-none transition"
                   />
                 </div>
               </div>
 
               <div class="flex items-center justify-between gap-4 rounded-xl border border-slate-200/80 bg-gradient-to-r from-slate-50 to-indigo-50/30 px-4 py-3.5 shadow-sm">
-                <div class="min-w-0">
-                  <span class="block text-sm font-semibold text-slate-800 tracking-tight">Neutered / Spayed?</span>
-                  <p class="text-xs text-slate-500 mt-0.5">Helps caregivers with basic medical context</p>
+                <div class="min-w-0 text-start">
+                  <span class="block text-sm font-semibold text-slate-800 tracking-tight" dir="auto">{{ 'PETS.NEUTERED_QUESTION' | translate }}</span>
+                  <p class="text-xs text-slate-500 mt-0.5" dir="auto">{{ 'PETS.NEUTERED_HELP' | translate }}</p>
                 </div>
                 <label for="pet-neutered" class="group inline-flex cursor-pointer flex-shrink-0 items-center rounded-full focus-within:outline-none focus-within:ring-2 focus-within:ring-indigo-300 focus-within:ring-offset-2">
                   <input
@@ -496,26 +502,27 @@ const RECORD_TYPES = ['Vaccination', 'Condition', 'Medication', 'VetVisit'] as c
                     class="peer sr-only"
                   />
                   <span
-                    class="relative h-7 w-12 shrink-0 rounded-full bg-slate-300/90 ring-1 ring-slate-200/80 transition-all duration-200 after:absolute after:left-[3px] after:top-[3px] after:block after:h-[22px] after:w-[22px] after:rounded-full after:bg-white after:shadow-md after:ring-1 after:ring-black/5 after:transition-transform after:duration-200 after:content-[''] peer-checked:bg-gradient-to-r peer-checked:from-indigo-600 peer-checked:to-violet-600 peer-checked:ring-indigo-500/30 peer-checked:after:translate-x-[1.35rem]"
+                    class="relative h-7 w-12 shrink-0 rounded-full bg-slate-300/90 ring-1 ring-slate-200/80 transition-all duration-200 after:absolute after:top-[3px] after:block after:h-[22px] after:w-[22px] after:rounded-full after:bg-white after:shadow-md after:ring-1 after:ring-black/5 after:transition-transform after:duration-200 after:content-[''] after:[inset-inline-start:3px] peer-checked:bg-gradient-to-r peer-checked:from-indigo-600 peer-checked:to-violet-600 peer-checked:ring-indigo-500/30 ltr:peer-checked:after:translate-x-[1.35rem] rtl:peer-checked:after:-translate-x-[1.35rem]"
                   ></span>
                 </label>
               </div>
 
               <div>
-                <label for="pet-notes" class="block text-sm font-medium text-slate-700 mb-1">Notes</label>
+                <label for="pet-notes" class="block text-start text-sm font-medium text-slate-700 mb-1"><span dir="auto">{{ 'PETS.NOTES' | translate }}</span></label>
                 <textarea
                   id="pet-notes"
                   rows="2"
                   formControlName="notes"
-                  placeholder="e.g., 15-year-old cat, needs gentle care and quiet environment..."
-                  class="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 outline-none transition resize-none"
+                  dir="auto"
+                  [attr.placeholder]="'PETS.PLACEHOLDER_NOTES' | translate"
+                  class="w-full text-start placeholder:text-start rounded-xl border border-gray-200 px-4 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 outline-none transition resize-none"
                 ></textarea>
               </div>
 
               <div class="grid grid-cols-2 gap-4">
                 <div class="sm:col-span-2">
-                  <span class="block text-sm font-medium text-slate-700 mb-2">Allergies</span>
-                  <p class="text-xs text-slate-500 mb-2">Select all that apply — saved as a single list for your pet&apos;s profile.</p>
+                  <span class="block text-start text-sm font-medium text-slate-700 mb-2" dir="auto">{{ 'PETS.ALLERGIES' | translate }}</span>
+                  <p class="text-xs text-start text-slate-500 mb-2" dir="auto">{{ 'PETS.ALLERGIES_HELP' | translate }}</p>
                   <div class="flex flex-wrap gap-2">
                     @for (a of allergyOptions; track a) {
                       <button
@@ -523,20 +530,21 @@ const RECORD_TYPES = ['Vaccination', 'Condition', 'Medication', 'VetVisit'] as c
                         (click)="toggleAllergyChip(a)"
                         [class]="allergyChipClass(a)"
                       >
-                        {{ a }}
+                        {{ allergyLabelKey(a) | translate }}
                       </button>
                     }
                   </div>
                 </div>
 
                 <div class="sm:col-span-2">
-                  <label for="pet-conditions" class="block text-sm font-medium text-slate-700 mb-1">Medical Conditions</label>
+                  <label for="pet-conditions" class="block text-start text-sm font-medium text-slate-700 mb-1"><span dir="auto">{{ 'PETS.MEDICAL_CONDITIONS' | translate }}</span></label>
                   <input
                     id="pet-conditions"
                     type="text"
                     formControlName="medicalConditions"
-                    placeholder="e.g., Hip dysplasia"
-                    class="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 outline-none transition"
+                    dir="auto"
+                    [attr.placeholder]="'PETS.PLACEHOLDER_MEDICAL' | translate"
+                    class="w-full text-start placeholder:text-start rounded-xl border border-gray-200 px-4 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 outline-none transition"
                   />
                 </div>
               </div>
@@ -547,7 +555,7 @@ const RECORD_TYPES = ['Vaccination', 'Condition', 'Medication', 'VetVisit'] as c
                   [disabled]="submitting() || petForm.invalid"
                   class="flex-1 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 focus:ring-2 focus:ring-indigo-300 disabled:opacity-50 disabled:cursor-not-allowed transition"
                 >
-                  {{ submitting() ? 'Saving...' : (editingPetId() ? 'Update Pet' : '+ Add Pet') }}
+                  {{ submitting() ? ('PROFILE.SAVING' | translate) : ('PETS.SAVE_PET' | translate) }}
                 </button>
                 @if (editingPetId()) {
                   <button
@@ -555,7 +563,7 @@ const RECORD_TYPES = ['Vaccination', 'Condition', 'Medication', 'VetVisit'] as c
                     (click)="cancelPetEdit()"
                     class="rounded-xl border border-gray-200 px-4 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50 transition"
                   >
-                    Cancel
+                    {{ 'PETS.CANCEL' | translate }}
                   </button>
                 }
               </div>
@@ -580,7 +588,32 @@ export class MyPetsComponent implements OnInit {
 
   readonly speciesEmoji = petSpeciesEmoji;
   readonly speciesIconClass = petSpeciesIconBgClass;
-  readonly speciesLabel = petSpeciesLabel;
+
+  private readonly allergyI18nKeys: Record<string, string> = {
+    None: 'PETS.ALLERGY_NONE',
+    Chicken: 'PETS.ALLERGY_CHICKEN',
+    Beef: 'PETS.ALLERGY_BEEF',
+    Grains: 'PETS.ALLERGY_GRAINS',
+    Fleas: 'PETS.ALLERGY_FLEAS',
+    Other: 'PETS.ALLERGY_OTHER',
+  };
+
+  allergyLabelKey(key: string): string {
+    return this.allergyI18nKeys[key] ?? key;
+  }
+
+  speciesI18nKey(species: PetSpecies | number | string | null | undefined): string {
+    const n = normalizePetSpecies(species);
+    const map: Record<PetSpecies, string> = {
+      [PetSpecies.Dog]: 'PETS.SPECIES_DOG',
+      [PetSpecies.Cat]: 'PETS.SPECIES_CAT',
+      [PetSpecies.Bird]: 'PETS.SPECIES_BIRD',
+      [PetSpecies.Rabbit]: 'PETS.SPECIES_RABBIT',
+      [PetSpecies.Reptile]: 'PETS.SPECIES_REPTILE',
+      [PetSpecies.Other]: 'PETS.SPECIES_OTHER',
+    };
+    return map[n];
+  }
 
   private readonly selectedAllergies = signal<Set<string>>(new Set(['None']));
 

@@ -1,21 +1,34 @@
 import { Component, inject, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import {
   ProviderService,
   AvailabilitySlot,
 } from '../../services/provider.service';
 import { ToastService } from '../../services/toast.service';
 
-const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+const DAY_KEYS = [
+  'SUNDAY',
+  'MONDAY',
+  'TUESDAY',
+  'WEDNESDAY',
+  'THURSDAY',
+  'FRIDAY',
+  'SATURDAY',
+] as const;
 
 @Component({
   selector: 'app-schedule-manager',
   standalone: true,
-  imports: [FormsModule],
+  imports: [FormsModule, TranslatePipe],
   template: `
     <section class="schedule-section">
-      <h2 class="text-lg font-semibold text-slate-900 mb-1">Weekly Availability</h2>
-      <p class="text-sm text-slate-500 mb-4">Set the hours you're available each day. Changes save instantly.</p>
+      <h2 class="text-lg font-semibold text-slate-900 mb-1 text-start" dir="auto">
+        {{ 'SCHEDULE.TITLE' | translate }}
+      </h2>
+      <p class="text-sm text-slate-500 mb-4 text-start" dir="auto">
+        {{ 'SCHEDULE.SUBTITLE' | translate }}
+      </p>
 
       @if (loading()) {
         <div class="flex items-center justify-center py-8 text-slate-400">
@@ -23,24 +36,24 @@ const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Frid
             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
             <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
           </svg>
-          <span class="ml-2 text-sm">Loading schedule...</span>
+          <span class="ms-2 text-sm" dir="auto">{{ 'SCHEDULE.LOADING' | translate }}</span>
         </div>
       } @else {
         <div class="space-y-3">
           @for (day of days; track day.index) {
             <div class="day-card">
               <div class="day-header">
-                <span class="day-name">{{ day.name }}</span>
+                <span class="day-name text-start" dir="auto">{{ ('SCHEDULE.DAYS.' + day.key) | translate }}</span>
                 <button
                   type="button"
-                  class="add-btn"
+                  class="add-btn shrink-0"
                   (click)="startAdding(day.index)"
                   [disabled]="saving()"
                 >
-                  <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                  <svg class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
                   </svg>
-                  Add
+                  <span dir="auto">{{ 'SCHEDULE.ADD' | translate }}</span>
                 </button>
               </div>
 
@@ -48,9 +61,9 @@ const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Frid
                 <div class="slot-row">
                   @if (editingSlotId() === slot.id) {
                     <div class="slot-form">
-                      <input type="time" [(ngModel)]="editStart" class="time-input" />
-                      <span class="text-slate-400">to</span>
-                      <input type="time" [(ngModel)]="editEnd" class="time-input" />
+                      <input type="time" [(ngModel)]="editStart" dir="auto" class="time-input text-start" />
+                      <span class="text-slate-400 shrink-0" dir="auto">{{ 'SCHEDULE.TIME_TO' | translate }}</span>
+                      <input type="time" [(ngModel)]="editEnd" dir="auto" class="time-input text-start" />
                       <button type="button" class="icon-btn save" (click)="saveEdit(slot)" [disabled]="saving()">
                         <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                           <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" />
@@ -85,9 +98,9 @@ const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Frid
               @if (addingDay() === day.index) {
                 <div class="slot-row">
                   <div class="slot-form">
-                    <input type="time" [(ngModel)]="editStart" class="time-input" />
-                    <span class="text-slate-400">to</span>
-                    <input type="time" [(ngModel)]="editEnd" class="time-input" />
+                    <input type="time" [(ngModel)]="editStart" dir="auto" class="time-input text-start" />
+                    <span class="text-slate-400 shrink-0" dir="auto">{{ 'SCHEDULE.TIME_TO' | translate }}</span>
+                    <input type="time" [(ngModel)]="editEnd" dir="auto" class="time-input text-start" />
                     <button type="button" class="icon-btn save" (click)="saveNew(day.index)" [disabled]="saving()">
                       <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" />
@@ -103,7 +116,7 @@ const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Frid
               }
 
               @if (slotsForDay(day.index).length === 0 && addingDay() !== day.index) {
-                <p class="no-slots">No availability set</p>
+                <p class="no-slots text-start" dir="auto">{{ 'SCHEDULE.NO_AVAILABILITY' | translate }}</p>
               }
             </div>
           }
@@ -127,6 +140,7 @@ const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Frid
       display: flex;
       align-items: center;
       justify-content: space-between;
+      gap: 0.5rem;
       padding: 0.6rem 0.85rem;
       background: #f8fafc;
       border-bottom: 1px solid #f1f5f9;
@@ -198,6 +212,8 @@ const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Frid
       border: 1.5px solid #cbd5e1;
       border-radius: 8px;
       outline: none;
+      text-align: start;
+      unicode-bidi: plaintext;
       transition: border-color 0.2s;
 
       &:focus {
@@ -257,8 +273,9 @@ const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Frid
 export class ScheduleManagerComponent implements OnInit {
   private readonly providerService = inject(ProviderService);
   private readonly toast = inject(ToastService);
+  private readonly translate = inject(TranslateService);
 
-  readonly days = DAY_NAMES.map((name, index) => ({ name, index }));
+  readonly days = DAY_KEYS.map((key, index) => ({ key, index }));
 
   readonly loading = signal(true);
   readonly saving = signal(false);
@@ -313,12 +330,12 @@ export class ScheduleManagerComponent implements OnInit {
         this.slots.update((list) =>
           [...list, created].sort((a, b) => a.dayOfWeek - b.dayOfWeek || a.startTime.localeCompare(b.startTime))
         );
-        this.toast.success('Slot added.');
+        this.toast.success(this.translate.instant('SCHEDULE.TOAST_SLOT_ADDED'));
         this.cancelForm();
         this.saving.set(false);
       },
       error: () => {
-        this.toast.error('Failed to add slot. Check for overlaps.');
+        this.toast.error(this.translate.instant('SCHEDULE.ERROR_ADD_SLOT'));
         this.saving.set(false);
       },
     });
@@ -338,31 +355,33 @@ export class ScheduleManagerComponent implements OnInit {
           list.map((s) => (s.id === updated.id ? updated : s))
             .sort((a, b) => a.dayOfWeek - b.dayOfWeek || a.startTime.localeCompare(b.startTime))
         );
-        this.toast.success('Slot updated.');
+        this.toast.success(this.translate.instant('SCHEDULE.TOAST_SLOT_UPDATED'));
         this.cancelForm();
         this.saving.set(false);
       },
       error: () => {
-        this.toast.error('Failed to update slot. Check for overlaps.');
+        this.toast.error(this.translate.instant('SCHEDULE.ERROR_UPDATE_SLOT'));
         this.saving.set(false);
       },
     });
   }
 
   confirmDelete(slot: AvailabilitySlot): void {
-    const dayName = DAY_NAMES[slot.dayOfWeek];
+    const dayKey = DAY_KEYS[slot.dayOfWeek];
+    const dayLabel = this.translate.instant(`SCHEDULE.DAYS.${dayKey}`);
     const time = `${this.formatTime(slot.startTime)} – ${this.formatTime(slot.endTime)}`;
-    if (!confirm(`Remove ${dayName} ${time}?`)) return;
+    const msg = this.translate.instant('SCHEDULE.CONFIRM_REMOVE', { day: dayLabel, time });
+    if (!confirm(msg)) return;
 
     this.saving.set(true);
     this.providerService.deleteSlot(slot.id).subscribe({
       next: () => {
         this.slots.update((list) => list.filter((s) => s.id !== slot.id));
-        this.toast.success('Slot removed.');
+        this.toast.success(this.translate.instant('SCHEDULE.TOAST_SLOT_REMOVED'));
         this.saving.set(false);
       },
       error: () => {
-        this.toast.error('Failed to remove slot.');
+        this.toast.error(this.translate.instant('SCHEDULE.ERROR_REMOVE_SLOT'));
         this.saving.set(false);
       },
     });
@@ -376,7 +395,7 @@ export class ScheduleManagerComponent implements OnInit {
         this.loading.set(false);
       },
       error: () => {
-        this.toast.error('Failed to load schedule.');
+        this.toast.error(this.translate.instant('SCHEDULE.ERROR_LOAD_SCHEDULE'));
         this.loading.set(false);
       },
     });

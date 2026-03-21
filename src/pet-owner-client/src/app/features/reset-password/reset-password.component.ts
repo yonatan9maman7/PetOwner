@@ -29,8 +29,9 @@ import { ToastService } from '../../services/toast.service';
               id="newPassword"
               formControlName="newPassword"
               type="password"
+              dir="auto"
               placeholder="••••••••"
-              class="w-full px-4 py-3 rounded-xl border border-gray-300 bg-white text-gray-900
+              class="w-full px-4 py-3 rounded-xl border border-gray-300 bg-white text-start placeholder:text-start text-gray-900
                      placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500
                      focus:border-transparent transition"
             />
@@ -45,8 +46,9 @@ import { ToastService } from '../../services/toast.service';
               id="confirmPassword"
               formControlName="confirmPassword"
               type="password"
+              dir="auto"
               placeholder="••••••••"
-              class="w-full px-4 py-3 rounded-xl border border-gray-300 bg-white text-gray-900
+              class="w-full px-4 py-3 rounded-xl border border-gray-300 bg-white text-start placeholder:text-start text-gray-900
                      placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500
                      focus:border-transparent transition"
             />

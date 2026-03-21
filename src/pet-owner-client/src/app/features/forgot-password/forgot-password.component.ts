@@ -29,8 +29,9 @@ import { ToastService } from '../../services/toast.service';
               id="email"
               formControlName="email"
               type="email"
+              dir="auto"
               placeholder="you&#64;example.com"
-              class="w-full px-4 py-3 rounded-xl border border-gray-300 bg-white text-gray-900
+              class="w-full px-4 py-3 rounded-xl border border-gray-300 bg-white text-start placeholder:text-start text-gray-900
                      placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500
                      focus:border-transparent transition"
             />

@@ -1,22 +1,25 @@
 import { Component, inject, OnInit } from '@angular/core';
 import { ReactiveFormsModule, FormBuilder } from '@angular/forms';
+import { TranslatePipe } from '@ngx-translate/core';
 import { WizardStore } from '../wizard.store';
 
 @Component({
   selector: 'app-step-magic-bio',
   standalone: true,
-  imports: [ReactiveFormsModule],
+  imports: [ReactiveFormsModule, TranslatePipe],
   template: `
-    <h2 class="step-title">Magic Bio</h2>
-    <p class="step-subtitle">Tell the AI about yourself and we'll craft a professional bio for you.</p>
+    <h2 class="step-title">{{ 'WIZARD.MAGIC_BIO_TITLE' | translate }}</h2>
+    <p class="step-subtitle">{{ 'WIZARD.MAGIC_BIO_SUBTITLE' | translate }}</p>
 
     <form [formGroup]="form" class="step-form">
       <label class="field">
-        <span class="field-label">Tell the AI about your experience</span>
+        <span class="field-label">{{ 'WIZARD.AI_EXPERIENCE_LABEL' | translate }}</span>
         <textarea
           formControlName="userNotes"
           rows="3"
-          placeholder="e.g. 10 years with dogs, energetic, love cats, certified pet first-aid"
+          dir="auto"
+          class="w-full text-start placeholder:text-start"
+          [attr.placeholder]="'WIZARD.AI_NOTES_PLACEHOLDER' | translate"
         ></textarea>
       </label>
 
@@ -27,18 +30,20 @@ import { WizardStore } from '../wizard.store';
         (click)="onGenerate()"
       >
         @if (store.isGeneratingBio()) {
-          <span class="magic-spinner"></span> Generating...
+          <span class="magic-spinner"></span> {{ 'WIZARD.GENERATING' | translate }}
         } @else {
-          ✨ Magic AI Bio
+          {{ 'WIZARD.MAGIC_BUTTON' | translate }}
         }
       </button>
 
       <label class="field">
-        <span class="field-label">Your Bio</span>
+        <span class="field-label">{{ 'WIZARD.YOUR_BIO_LABEL' | translate }}</span>
         <textarea
           formControlName="generatedBio"
           rows="5"
-          placeholder="Your AI-generated bio will appear here — feel free to edit it!"
+          dir="auto"
+          class="w-full text-start placeholder:text-start"
+          [attr.placeholder]="'WIZARD.BIO_PLACEHOLDER' | translate"
         ></textarea>
       </label>
     </form>
@@ -59,7 +64,7 @@ import { WizardStore } from '../wizard.store';
       color: #fff;
       transition: opacity 0.2s, transform 0.1s;
       min-height: 48px;
-      align-self: flex-start;
+      align-self: start;
 
       &:hover:not(:disabled) {
         opacity: 0.9;

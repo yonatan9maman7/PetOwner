@@ -1,6 +1,7 @@
 import { Component, inject, OnInit, signal, computed } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { DatePipe } from '@angular/common';
+import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { Pet, PetService } from '../../services/pet.service';
 import { ActivityService, ActivitySummary, WeightEntry } from '../../services/activity.service';
 import { ToastService } from '../../services/toast.service';
@@ -8,24 +9,27 @@ import { ToastService } from '../../services/toast.service';
 @Component({
   selector: 'app-fitness-dashboard',
   standalone: true,
-  imports: [DatePipe],
+  imports: [DatePipe, TranslatePipe],
   template: `
-    <div class="min-h-screen bg-gradient-to-b from-emerald-50 to-white px-4 py-8">
+    <div class="min-h-screen bg-gradient-to-b from-emerald-50 to-white px-4 py-8" dir="auto">
       <div class="max-w-2xl mx-auto">
 
         <!-- Header -->
-        <div class="flex items-center justify-between mb-6">
-          <div>
-            <h1 class="text-2xl font-bold text-slate-900">Fitness Dashboard</h1>
+        <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-6">
+          <div class="text-start min-w-0">
+            <h1 class="text-2xl font-bold text-slate-900">{{ 'FITNESS.TITLE' | translate }}</h1>
             @if (selectedPet()) {
-              <p class="text-sm text-slate-500">{{ selectedPet()!.name }}'s activity overview</p>
+              <p class="text-sm text-slate-500 mt-0.5">
+                {{ 'FITNESS.SUBTITLE_PET' | translate: { name: selectedPet()!.name } }}
+              </p>
             }
           </div>
           <button
+            type="button"
             (click)="goToLog()"
-            class="px-4 py-2 bg-emerald-600 text-white text-sm font-semibold rounded-xl hover:bg-emerald-500 transition-colors"
+            class="px-4 py-2 bg-emerald-600 text-white text-sm font-semibold rounded-xl hover:bg-emerald-500 transition-colors shrink-0 self-start"
           >
-            + Log Activity
+            {{ 'FITNESS.LOG_ACTIVITY' | translate }}
           </button>
         </div>
 
@@ -34,6 +38,7 @@ import { ToastService } from '../../services/toast.service';
           <div class="flex gap-2 mb-6 overflow-x-auto pb-1">
             @for (pet of pets(); track pet.id) {
               <button
+                type="button"
                 (click)="selectPet(pet)"
                 class="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-all"
                 [class]="selectedPet()?.id === pet.id
@@ -59,12 +64,14 @@ import { ToastService } from '../../services/toast.service';
           @if (summary()!.currentStreak > 0) {
             <div class="bg-gradient-to-r from-amber-400 to-orange-500 rounded-2xl p-5 mb-6 text-white shadow-lg">
               <div class="flex items-center gap-4">
-                <div class="text-4xl font-black">{{ summary()!.currentStreak }}</div>
-                <div>
-                  <p class="font-bold text-sm">Day Streak!</p>
-                  <p class="text-xs opacity-80">Keep up the great work with {{ selectedPet()?.name }}</p>
+                <div class="text-4xl font-black shrink-0">{{ summary()!.currentStreak }}</div>
+                <div class="min-w-0 text-start flex-1">
+                  <p class="font-bold text-sm">{{ 'FITNESS.STREAK_TITLE' | translate }}</p>
+                  <p class="text-xs opacity-80">
+                    {{ 'FITNESS.STREAK_SUB' | translate: { name: selectedPet()?.name ?? '' } }}
+                  </p>
                 </div>
-                <div class="ml-auto text-5xl opacity-70">&#x1F525;</div>
+                <div class="ms-auto text-5xl opacity-70 shrink-0">&#x1F525;</div>
               </div>
             </div>
           }
@@ -72,49 +79,49 @@ import { ToastService } from '../../services/toast.service';
           <!-- Stat Cards -->
           <div class="grid grid-cols-2 gap-3 mb-6">
             <!-- Walks -->
-            <div class="bg-white rounded-2xl border border-gray-100 p-4">
+            <div class="bg-white rounded-2xl border border-gray-100 p-4 text-start">
               <div class="flex items-center gap-2 mb-2">
-                <div class="w-8 h-8 rounded-lg bg-emerald-100 flex items-center justify-center text-sm">&#x1F6B6;</div>
-                <span class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Walks</span>
+                <div class="w-8 h-8 rounded-lg bg-emerald-100 flex items-center justify-center text-sm shrink-0">&#x1F6B6;</div>
+                <span class="text-xs font-semibold text-slate-500 uppercase tracking-wide">{{ 'FITNESS.STAT_WALKS' | translate }}</span>
               </div>
               <p class="text-2xl font-bold text-slate-900">{{ summary()!.totalWalks }}</p>
-              <div class="flex gap-3 mt-1">
-                <span class="text-xs text-slate-400">{{ summary()!.totalWalkMinutes }} min</span>
-                <span class="text-xs text-slate-400">{{ summary()!.totalWalkDistance.toFixed(1) }} km</span>
+              <div class="flex flex-wrap gap-x-3 gap-y-0 mt-1">
+                <span class="text-xs text-slate-400">{{ 'FITNESS.WALK_MIN' | translate: { n: summary()!.totalWalkMinutes } }}</span>
+                <span class="text-xs text-slate-400">{{ 'FITNESS.WALK_KM' | translate: { n: summary()!.totalWalkDistance.toFixed(1) } }}</span>
               </div>
             </div>
 
             <!-- Exercise -->
-            <div class="bg-white rounded-2xl border border-gray-100 p-4">
+            <div class="bg-white rounded-2xl border border-gray-100 p-4 text-start">
               <div class="flex items-center gap-2 mb-2">
-                <div class="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center text-sm">&#x1F3CB;&#xFE0F;</div>
-                <span class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Exercise</span>
+                <div class="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center text-sm shrink-0">&#x1F3CB;&#xFE0F;</div>
+                <span class="text-xs font-semibold text-slate-500 uppercase tracking-wide">{{ 'FITNESS.STAT_EXERCISE' | translate }}</span>
               </div>
               <p class="text-2xl font-bold text-slate-900">{{ summary()!.totalExercises }}</p>
-              <span class="text-xs text-slate-400">{{ summary()!.totalExerciseMinutes }} min total</span>
+              <span class="text-xs text-slate-400">{{ 'FITNESS.EXERCISE_MIN_TOTAL' | translate: { n: summary()!.totalExerciseMinutes } }}</span>
             </div>
 
             <!-- Meals -->
-            <div class="bg-white rounded-2xl border border-gray-100 p-4">
+            <div class="bg-white rounded-2xl border border-gray-100 p-4 text-start">
               <div class="flex items-center gap-2 mb-2">
-                <div class="w-8 h-8 rounded-lg bg-orange-100 flex items-center justify-center text-sm">&#x1F37D;&#xFE0F;</div>
-                <span class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Meals</span>
+                <div class="w-8 h-8 rounded-lg bg-orange-100 flex items-center justify-center text-sm shrink-0">&#x1F37D;&#xFE0F;</div>
+                <span class="text-xs font-semibold text-slate-500 uppercase tracking-wide">{{ 'FITNESS.STAT_MEALS' | translate }}</span>
               </div>
               <p class="text-2xl font-bold text-slate-900">{{ summary()!.totalMeals }}</p>
-              <span class="text-xs text-slate-400">in the last 30 days</span>
+              <span class="text-xs text-slate-400">{{ 'FITNESS.MEALS_LAST_30' | translate }}</span>
             </div>
 
             <!-- Current Weight -->
-            <div class="bg-white rounded-2xl border border-gray-100 p-4">
+            <div class="bg-white rounded-2xl border border-gray-100 p-4 text-start">
               <div class="flex items-center gap-2 mb-2">
-                <div class="w-8 h-8 rounded-lg bg-purple-100 flex items-center justify-center text-sm">&#x2696;&#xFE0F;</div>
-                <span class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Weight</span>
+                <div class="w-8 h-8 rounded-lg bg-purple-100 flex items-center justify-center text-sm shrink-0">&#x2696;&#xFE0F;</div>
+                <span class="text-xs font-semibold text-slate-500 uppercase tracking-wide">{{ 'FITNESS.STAT_WEIGHT' | translate }}</span>
               </div>
               @if (latestWeight()) {
-                <p class="text-2xl font-bold text-slate-900">{{ latestWeight()!.value }} kg</p>
+                <p class="text-2xl font-bold text-slate-900" dir="auto">{{ latestWeight()!.value }} kg</p>
                 <span class="text-xs text-slate-400">{{ latestWeight()!.date | date:'mediumDate' }}</span>
               } @else {
-                <p class="text-lg font-semibold text-slate-300">No data</p>
+                <p class="text-lg font-semibold text-slate-300">{{ 'FITNESS.NO_WEIGHT' | translate }}</p>
               }
             </div>
           </div>
@@ -122,29 +129,25 @@ import { ToastService } from '../../services/toast.service';
           <!-- Weight Trend Chart -->
           @if (summary()!.weightHistory.length >= 2) {
             <div class="bg-white rounded-2xl border border-gray-100 p-5 mb-6">
-              <h3 class="text-sm font-semibold text-slate-700 mb-4">Weight Trend</h3>
+              <h3 class="text-sm font-semibold text-slate-700 mb-4 text-start">{{ 'FITNESS.WEIGHT_TREND' | translate }}</h3>
               <div class="relative h-40">
                 <svg class="w-full h-full" viewBox="0 0 400 160" preserveAspectRatio="none">
-                  <!-- Grid lines -->
                   <line x1="0" y1="0" x2="400" y2="0" stroke="#e2e8f0" stroke-width="0.5" />
                   <line x1="0" y1="40" x2="400" y2="40" stroke="#e2e8f0" stroke-width="0.5" />
                   <line x1="0" y1="80" x2="400" y2="80" stroke="#e2e8f0" stroke-width="0.5" />
                   <line x1="0" y1="120" x2="400" y2="120" stroke="#e2e8f0" stroke-width="0.5" />
                   <line x1="0" y1="160" x2="400" y2="160" stroke="#e2e8f0" stroke-width="0.5" />
 
-                  <!-- Area fill -->
-                  <path [attr.d]="weightAreaPath()" fill="url(#weightGrad)" />
+                  <path [attr.d]="weightAreaPath()" fill="url(#weightGradFitness)" />
 
-                  <!-- Line -->
                   <path [attr.d]="weightLinePath()" fill="none" stroke="#8b5cf6" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" />
 
-                  <!-- Dots -->
                   @for (pt of weightPoints(); track $index) {
                     <circle [attr.cx]="pt.x" [attr.cy]="pt.y" r="4" fill="#8b5cf6" stroke="white" stroke-width="2" />
                   }
 
                   <defs>
-                    <linearGradient id="weightGrad" x1="0" y1="0" x2="0" y2="1">
+                    <linearGradient id="weightGradFitness" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="0%" stop-color="#8b5cf6" stop-opacity="0.3" />
                       <stop offset="100%" stop-color="#8b5cf6" stop-opacity="0.02" />
                     </linearGradient>
@@ -161,7 +164,7 @@ import { ToastService } from '../../services/toast.service';
           <!-- Weekly Activity Bars -->
           @if (weeklyBars().length > 0) {
             <div class="bg-white rounded-2xl border border-gray-100 p-5 mb-6">
-              <h3 class="text-sm font-semibold text-slate-700 mb-4">Weekly Activity</h3>
+              <h3 class="text-sm font-semibold text-slate-700 mb-4 text-start">{{ 'FITNESS.WEEKLY_ACTIVITY' | translate }}</h3>
               <div class="flex items-end gap-2 h-32">
                 @for (bar of weeklyBars(); track bar.label) {
                   <div class="flex-1 flex flex-col items-center gap-1">
@@ -181,12 +184,12 @@ import { ToastService } from '../../services/toast.service';
 
           <!-- No data fallback -->
           @if (summary()!.totalWalks === 0 && summary()!.totalMeals === 0 && summary()!.totalExercises === 0 && summary()!.weightHistory.length === 0) {
-            <div class="text-center py-12 text-slate-400">
+            <div class="text-center py-12 text-slate-400 px-2">
               <div class="w-16 h-16 rounded-full bg-emerald-100 flex items-center justify-center mx-auto mb-3 text-3xl">
                 &#x1F3C3;
               </div>
-              <p class="font-medium">No activity data yet</p>
-              <p class="text-sm mt-1">Start logging walks, meals, and exercise to see your dashboard</p>
+              <p class="font-medium">{{ 'FITNESS.EMPTY_TITLE' | translate }}</p>
+              <p class="text-sm mt-1">{{ 'FITNESS.EMPTY_HINT' | translate }}</p>
             </div>
           }
         }
@@ -198,6 +201,7 @@ export class FitnessDashboardComponent implements OnInit {
   private readonly petService = inject(PetService);
   private readonly activityService = inject(ActivityService);
   private readonly toast = inject(ToastService);
+  private readonly translate = inject(TranslateService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
 
@@ -255,7 +259,7 @@ export class FitnessDashboardComponent implements OnInit {
         else this.loading.set(false);
       },
       error: () => {
-        this.toast.error('Failed to load pets.');
+        this.toast.error(this.translate.instant('FITNESS.TOAST_PETS_FAIL'));
         this.loading.set(false);
       },
     });
@@ -278,7 +282,7 @@ export class FitnessDashboardComponent implements OnInit {
         this.loading.set(false);
       },
       error: () => {
-        this.toast.error('Failed to load fitness data.');
+        this.toast.error(this.translate.instant('FITNESS.TOAST_SUMMARY_FAIL'));
         this.loading.set(false);
       },
     });

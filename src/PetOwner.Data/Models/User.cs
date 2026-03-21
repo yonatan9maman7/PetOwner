@@ -22,4 +22,5 @@ public class User
     public ICollection<Review> ReviewsReceived { get; set; } = [];
     public ICollection<Post> Posts { get; set; } = [];
     public ICollection<Notification> Notifications { get; set; } = [];
+    public ICollection<Booking> Bookings { get; set; } = [];
 }

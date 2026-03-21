@@ -1,0 +1,357 @@
+:host {
+  display: block;
+}
+
+.location-section {
+  margin-top: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.75rem;
+}
+
+.location-heading {
+  font-size: 1.1rem;
+  font-weight: 700;
+  margin-bottom: 0.25rem;
+  color: #0f172a;
+}
+
+.location-subtitle {
+  margin-bottom: 0.5rem;
+}
+
+.location-toggle {
+  display: flex;
+  gap: 0;
+  border: 1.5px solid #cbd5e1;
+  border-radius: 12px;
+  overflow: hidden;
+
+  &__btn {
+    flex: 1;
+    padding: 0.65rem 1rem;
+    font-size: 0.9rem;
+    font-weight: 600;
+    border: none;
+    cursor: pointer;
+    background: #fff;
+    color: #64748b;
+    transition: background 0.2s, color 0.2s;
+
+    &:not(:last-child) {
+      border-right: 1.5px solid #cbd5e1;
+    }
+
+    &:hover:not(&--active) {
+      background: #f8fafc;
+    }
+
+    &--active {
+      background: #eef2ff;
+      color: #4f46e5;
+    }
+  }
+}
+
+.wizard-search-above-map {
+  margin-top: 0.25rem;
+}
+
+.wizard-map-search-help {
+  margin: 0;
+  font-size: 0.8rem;
+  line-height: 1.45;
+  color: #64748b;
+}
+
+.wizard-map-frame {
+  position: relative;
+  margin-top: 0.25rem;
+}
+
+.wizard-map-host {
+  z-index: 0;
+}
+
+/* Leaflet sits above frame background */
+:host ::ng-deep .wizard-map-host .leaflet-container {
+  font-family: inherit;
+  background: #e2e8f0;
+}
+
+.wizard-map-gps-bar {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 500;
+  padding: 0.75rem 1rem 1rem;
+  background: linear-gradient(to top, rgba(255, 255, 255, 0.96) 70%, transparent);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+  pointer-events: none;
+}
+
+.wizard-map-gps-btn,
+.wizard-map-gps-confirm {
+  pointer-events: auto;
+}
+
+.wizard-map-gps-btn {
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.12);
+}
+
+.wizard-map-gps-confirm {
+  margin: 0;
+}
+
+.wizard-location-map-hint {
+  font-size: 0.8rem;
+  color: #64748b;
+  line-height: 1.45;
+  margin: 0.25rem 0 0;
+}
+
+.wizard-apartment-card {
+  margin-top: 0.75rem;
+  padding: 1rem 1.1rem;
+  border-radius: 14px;
+  background: linear-gradient(180deg, #fafbfc 0%, #f1f5f9 100%);
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+
+.wizard-apartment-label {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #334155;
+  margin-bottom: 0.4rem;
+  display: block;
+}
+
+.field-label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #334155;
+}
+
+.field-error {
+  font-size: 0.78rem;
+  color: #dc2626;
+}
+
+.location-confirmation {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #22c55e;
+}
+
+.location-error {
+  font-size: 0.875rem;
+  color: #dc2626;
+}
+
+.address-incomplete-card {
+  margin-top: 1rem;
+  padding: 1rem 1.15rem;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #f8fafc 0%, #eef2ff 100%);
+  border: 1px solid #c7d2fe;
+}
+
+.address-incomplete-card__title {
+  margin: 0 0 0.35rem;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #312e81;
+}
+
+.address-incomplete-card__hint {
+  margin: 0 0 0.85rem;
+  font-size: 0.82rem;
+  line-height: 1.45;
+  color: #4c1d95;
+  opacity: 0.9;
+}
+
+.address-incomplete-card__btn {
+  width: 100%;
+  padding: 0.65rem 1rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #fff;
+  background: linear-gradient(135deg, #6366f1, #7c3aed);
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: opacity 0.15s, transform 0.1s;
+
+  &:hover {
+    opacity: 0.95;
+  }
+
+  &:active {
+    transform: scale(0.99);
+  }
+}
+
+.address-summary-card__edit--muted {
+  background: #f1f5f9;
+  color: #64748b;
+
+  &:hover {
+    background: #e2e8f0;
+  }
+}
+
+.address-summary-card {
+  margin-top: 1rem;
+  padding: 1rem 1.15rem;
+  border-radius: 14px;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.06);
+}
+
+.address-summary-card__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.address-summary-card__title {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.address-summary-card__edit {
+  flex-shrink: 0;
+  padding: 0.35rem 0.75rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #4f46e5;
+  background: #eef2ff;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.15s;
+
+  &:hover {
+    background: #e0e7ff;
+  }
+}
+
+.address-summary-card__dl {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.address-summary-row {
+  display: grid;
+  grid-template-columns: minmax(5rem, 28%) 1fr;
+  gap: 0.5rem 1rem;
+  align-items: baseline;
+  font-size: 0.875rem;
+
+  dt {
+    margin: 0;
+    color: #64748b;
+    font-weight: 500;
+  }
+
+  dd {
+    margin: 0;
+    color: #0f172a;
+    font-weight: 600;
+    word-break: break-word;
+  }
+}
+
+.address-grid-section {
+  margin-top: 1rem;
+}
+
+.address-grid-section__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.address-grid-title {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 0;
+}
+
+.address-grid-subtitle {
+  margin-top: 0.35rem;
+  margin-bottom: 0.65rem;
+  font-size: 0.875rem;
+  color: #64748b;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.85rem 1.75rem;
+  font-size: 1rem;
+  font-weight: 600;
+  border: none;
+  border-radius: 12px;
+  cursor: pointer;
+  min-height: 50px;
+  transition: background 0.2s, opacity 0.2s, transform 0.1s;
+
+  &:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+
+  &:active:not(:disabled) {
+    transform: scale(0.97);
+  }
+}
+
+.btn-location {
+  border: 2px solid #6366f1;
+  background: #fff;
+  color: #4f46e5;
+
+  &:hover:not(:disabled) {
+    background: #eef2ff;
+  }
+}
+
+/* Pin marker (Leaflet divIcon) */
+:host ::ng-deep .wizard-loc-pin {
+  background: transparent !important;
+  border: none !important;
+}
+
+:host ::ng-deep .wizard-loc-pin__inner {
+  width: 28px;
+  height: 28px;
+  border-radius: 50% 50% 50% 0;
+  transform: rotate(-45deg);
+  background: linear-gradient(145deg, #6366f1, #7c3aed);
+  border: 3px solid #fff;
+  box-shadow: 0 4px 12px rgba(79, 70, 229, 0.45);
+  margin: 4px auto 0;
+}

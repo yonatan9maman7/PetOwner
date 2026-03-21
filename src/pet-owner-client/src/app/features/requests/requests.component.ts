@@ -386,9 +386,10 @@ import { ServiceRequest } from '../../models/service-request.model';
         <!-- Comment -->
         <textarea
           [(ngModel)]="reviewCommentValue"
+          dir="auto"
           placeholder="Tell others about your experience..."
           rows="3"
-          class="w-full border border-gray-200 rounded-xl p-3 text-sm text-gray-800
+          class="w-full border border-gray-200 rounded-xl p-3 text-sm text-start placeholder:text-start text-gray-800
                  placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/40
                  focus:border-indigo-400 resize-none mb-4"></textarea>
 

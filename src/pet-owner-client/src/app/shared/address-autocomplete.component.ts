@@ -27,6 +27,8 @@ import { GeocodingService, AddressSuggestion } from '../services/geocoding.servi
     <div class="autocomplete-wrapper">
       <input
         type="text"
+        dir="auto"
+        class="addr-ac-input w-full text-start placeholder:text-start"
         [placeholder]="'e.g. 123 Main St, Tel Aviv'"
         [value]="displayValue()"
         (input)="onInput($event)"
@@ -56,7 +58,7 @@ import { GeocodingService, AddressSuggestion } from '../services/geocoding.servi
       position: relative;
     }
 
-    input {
+    .addr-ac-input {
       width: 100%;
       padding: 0.85rem 1rem;
       font-size: 1rem;
@@ -64,6 +66,8 @@ import { GeocodingService, AddressSuggestion } from '../services/geocoding.servi
       border-radius: 12px;
       background: #fff;
       color: #0f172a;
+      text-align: start;
+      unicode-bidi: plaintext;
       transition: border-color 0.2s, box-shadow 0.2s;
       outline: none;
 
@@ -74,6 +78,8 @@ import { GeocodingService, AddressSuggestion } from '../services/geocoding.servi
 
       &::placeholder {
         color: #94a3b8;
+        text-align: start;
+        unicode-bidi: plaintext;
       }
     }
 
@@ -82,7 +88,7 @@ import { GeocodingService, AddressSuggestion } from '../services/geocoding.servi
       top: 100%;
       left: 0;
       right: 0;
-      z-index: 50;
+      z-index: 600;
       margin: 4px 0 0;
       padding: 0;
       list-style: none;

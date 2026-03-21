@@ -1,12 +1,9 @@
-import { Component, computed, inject, OnInit, signal } from '@angular/core';
+import { Component, computed, inject, model, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
+import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { Observable, of, switchMap } from 'rxjs';
-import {
-  ProviderService,
-  ProviderProfile,
-  UpdateProfilePayload,
-} from '../../services/provider.service';
+import { ProviderService, UpdateProfilePayload } from '../../services/provider.service';
 import {
   ServiceRateDto,
   ServiceType,
@@ -14,40 +11,63 @@ import {
   SERVICE_CARDS,
 } from '../wizard/wizard.model';
 import { ToastService } from '../../services/toast.service';
-import { AddressAutocompleteComponent } from '../../shared/address-autocomplete.component';
-import { AddressSuggestion } from '../../services/geocoding.service';
+import { ProviderLocationBlockComponent } from '../../shared/provider-location-block/provider-location-block.component';
+import {
+  emptyProviderLocationDraft,
+  ProviderLocationDraft,
+} from '../../shared/provider-location-block/provider-location-draft.model';
 import { ScheduleManagerComponent } from './schedule-manager.component';
 
-const SERVICE_TYPE_MAP: Record<string, ServiceType> = {
-  'Dog Walker': 'DogWalking',
-  'Pet Sitter': 'PetSitting',
-  Boarding: 'Boarding',
-  'Drop-in Visit': 'DropInVisit',
+const SERVICE_CARD_I18N: Record<
+  ServiceType,
+  { titleKey: string; descKey: string; rateKey: string }
+> = {
+  DogWalking: {
+    titleKey: 'WIZARD.SERVICE_DOG_WALKING_TITLE',
+    descKey: 'WIZARD.SERVICE_DOG_WALKING_DESC',
+    rateKey: 'WIZARD.RATE_PER_HOUR',
+  },
+  PetSitting: {
+    titleKey: 'WIZARD.SERVICE_PET_SITTING_TITLE',
+    descKey: 'WIZARD.SERVICE_PET_SITTING_DESC',
+    rateKey: 'WIZARD.RATE_PER_HOUR',
+  },
+  Boarding: {
+    titleKey: 'WIZARD.SERVICE_BOARDING_TITLE',
+    descKey: 'WIZARD.SERVICE_BOARDING_DESC',
+    rateKey: 'WIZARD.RATE_PER_NIGHT',
+  },
+  DropInVisit: {
+    titleKey: 'WIZARD.SERVICE_DROP_IN_TITLE',
+    descKey: 'WIZARD.SERVICE_DROP_IN_DESC',
+    rateKey: 'WIZARD.RATE_PER_VISIT',
+  },
 };
 
 @Component({
   selector: 'app-edit-profile',
   standalone: true,
-  imports: [FormsModule, AddressAutocompleteComponent, ScheduleManagerComponent],
+  imports: [FormsModule, ProviderLocationBlockComponent, ScheduleManagerComponent, TranslatePipe],
   template: `
     @if (loading()) {
       <div class="loading-state">
         <div class="spinner"></div>
-        <p>Loading your profile...</p>
+        <p>{{ 'PROFILE.LOADING_EDIT_PROFILE' | translate }}</p>
       </div>
     } @else if (error()) {
       <div class="error-state">
-        <p>{{ error() }}</p>
-        <button class="btn btn-primary" (click)="loadProfile()">Retry</button>
+        <p class="text-start" dir="auto">{{ error() }}</p>
+        <button type="button" class="btn btn-primary" (click)="loadProfile()">{{ 'PROFILE.RETRY' | translate }}</button>
       </div>
     } @else {
       <div class="profile-header">
-        <h1 class="text-2xl font-bold text-slate-900">
-          Hello, {{ userName() }}! 👋
+        <h1 class="text-2xl font-bold text-slate-900 text-start w-full" dir="auto">
+          {{ 'PROFILE.HELLO' | translate: { name: userName() } }}
+          <span class="ms-1" aria-hidden="true">👋</span>
         </h1>
-        <p class="mt-1 text-sm text-slate-500">Update your provider profile details.</p>
-        <span [class]="statusBadgeClass()">
-          {{ status() }}
+        <p class="mt-1 text-sm text-slate-500 text-start" dir="auto">{{ 'PROFILE.UPDATE_DETAILS' | translate }}</p>
+        <span [class]="statusBadgeClass()" dir="auto">
+          {{ statusTranslationKey() | translate }}
         </span>
       </div>
 
@@ -73,7 +93,7 @@ const SERVICE_TYPE_MAP: Record<string, ServiceType> = {
               </svg>
             </span>
           </button>
-          <p class="mt-2 text-xs text-slate-500">Click to upload photo</p>
+          <p class="mt-2 text-xs text-start text-slate-500" dir="auto">{{ 'PROFILE.UPLOAD_PHOTO' | translate }}</p>
           <input
             #fileInput
             type="file"
@@ -84,7 +104,8 @@ const SERVICE_TYPE_MAP: Record<string, ServiceType> = {
         </div>
 
         <fieldset class="border-0 p-0 m-0 min-w-0">
-          <legend class="field-label mb-3">Services & Rates</legend>
+          <legend class="field-label mb-1 text-start" dir="auto">{{ 'WIZARD.SERVICES_RATES' | translate }}</legend>
+          <p class="mb-3 text-start text-xs text-slate-500" dir="auto">{{ 'WIZARD.WHICH_SERVICES' | translate }}</p>
           <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
             @for (card of serviceCards; track card.type) {
               <div
@@ -93,18 +114,19 @@ const SERVICE_TYPE_MAP: Record<string, ServiceType> = {
                   ? 'border-primary bg-indigo-50/70 shadow-sm'
                   : 'border-slate-200 bg-white hover:border-slate-300'"
                 (click)="toggleServiceCard(card.type)">
-                <span class="text-sm font-semibold text-slate-900">{{ card.label }}</span>
-                <p class="mt-0.5 text-xs text-slate-500">{{ card.description }}</p>
+                <span class="block text-start text-sm font-semibold text-slate-900" dir="auto">{{ serviceCardKeys(card.type).titleKey | translate }}</span>
+                <p class="mt-0.5 text-start text-xs text-slate-500" dir="auto">{{ serviceCardKeys(card.type).descKey | translate }}</p>
                 @if (isServiceSelected(card.type)) {
                   <div class="mt-2" (click)="$event.stopPropagation()">
-                    <label class="text-xs font-medium text-slate-600">{{ card.rateLabel }} (ILS)</label>
+                    <label class="block text-start text-xs font-medium text-slate-600" dir="auto">{{ serviceCardKeys(card.type).rateKey | translate }} (ILS)</label>
                     <input
                       type="number"
                       min="1"
-                      class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm"
+                      dir="auto"
+                      class="mt-1 w-full text-start placeholder:text-start rounded-lg border border-slate-300 px-3 py-1.5 text-sm"
                       [value]="getServiceRate(card.type)"
                       (input)="setServiceRate(card.type, $any($event.target).value, card.pricingUnit)"
-                      placeholder="e.g. 60"
+                      [attr.placeholder]="'WIZARD.RATE_PLACEHOLDER' | translate"
                     />
                   </div>
                 }
@@ -115,13 +137,15 @@ const SERVICE_TYPE_MAP: Record<string, ServiceType> = {
 
         <div class="ai-bio-section">
           <div class="field">
-            <label class="field-label" for="edit-ai-notes">Tell the AI about your experience</label>
+            <label class="field-label text-start block w-full" dir="auto" for="edit-ai-notes">{{ 'PROFILE.TELL_AI' | translate }}</label>
             <textarea
               id="edit-ai-notes"
               rows="2"
+              dir="auto"
+              class="text-start placeholder:text-start w-full"
               [(ngModel)]="aiNotes"
               name="aiNotes"
-              placeholder="e.g. 10 years with dogs, energetic, love cats, certified pet first-aid"
+              [attr.placeholder]="'PROFILE.AI_PLACEHOLDER' | translate"
             ></textarea>
           </div>
           <button
@@ -131,78 +155,31 @@ const SERVICE_TYPE_MAP: Record<string, ServiceType> = {
             (click)="onGenerateBio()"
           >
             @if (generatingBio()) {
-              <span class="magic-spinner"></span> Generating...
+              <span class="magic-spinner"></span> {{ 'WIZARD.GENERATING' | translate }}
             } @else {
-              ✨ Magic AI Bio
+              {{ 'WIZARD.MAGIC_BUTTON' | translate }}
             }
           </button>
         </div>
 
         <div class="field">
-          <label class="field-label" for="edit-bio">Bio</label>
+          <label class="field-label text-start block w-full" dir="auto" for="edit-bio">{{ 'WIZARD.YOUR_BIO_LABEL' | translate }}</label>
           <textarea
             id="edit-bio"
             rows="4"
+            dir="auto"
+            class="text-start placeholder:text-start w-full"
             required
             [(ngModel)]="bio"
             name="bio"
-            placeholder="Tell pet owners about yourself..."
+            [attr.placeholder]="'WIZARD.BIO_PLACEHOLDER' | translate"
           ></textarea>
         </div>
 
-        <div class="field">
-          <label class="field-label">Search map location</label>
-          <p class="text-xs text-slate-500 mb-1">Pick a suggestion to set your map pin (latitude / longitude).</p>
-          <app-address-autocomplete
-            [(ngModel)]="geoSearchQuery"
-            name="geoSearchQuery"
-            (suggestionSelected)="onSuggestionSelected($event)"
-          />
-          @if (latitude() !== null && longitude() !== null) {
-            <p class="location-confirmation">Map pin set ✓</p>
-          }
-        </div>
-
-        <div class="field">
-          <label class="field-label" for="edit-city">City <span class="text-red-500">*</span></label>
-          <input
-            id="edit-city"
-            type="text"
-            required
-            [(ngModel)]="city"
-            name="city"
-            placeholder="e.g. Tel Aviv"
-          />
-        </div>
-        <div class="field">
-          <label class="field-label" for="edit-street">Street <span class="text-red-500">*</span></label>
-          <input
-            id="edit-street"
-            type="text"
-            required
-            [(ngModel)]="street"
-            name="street"
-          />
-        </div>
-        <div class="field">
-          <label class="field-label" for="edit-building">Building number <span class="text-red-500">*</span></label>
-          <input
-            id="edit-building"
-            type="text"
-            required
-            [(ngModel)]="buildingNumber"
-            name="buildingNumber"
-          />
-        </div>
-        <div class="field">
-          <label class="field-label" for="edit-apt">Apartment (optional)</label>
-          <input
-            id="edit-apt"
-            type="text"
-            [(ngModel)]="apartmentNumber"
-            name="apartmentNumber"
-          />
-        </div>
+        <app-provider-location-block
+          [(draft)]="locationDraft"
+          [showValidationErrors]="locationValidationTouched()"
+        />
 
         <label class="off-hours-toggle">
           <input
@@ -210,9 +187,9 @@ const SERVICE_TYPE_MAP: Record<string, ServiceType> = {
             [checked]="acceptsOffHoursRequests()"
             (change)="acceptsOffHoursRequests.set($any($event.target).checked)"
           />
-          <div class="off-hours-content">
-            <span class="off-hours-label">Accept off-hours requests</span>
-            <span class="off-hours-hint">Pet owners can send you flexible requests outside your scheduled availability</span>
+          <div class="off-hours-content text-start" dir="auto">
+            <span class="off-hours-label">{{ 'PROFILE.OFF_HOURS_LABEL' | translate }}</span>
+            <span class="off-hours-hint">{{ 'PROFILE.OFF_HOURS_HINT' | translate }}</span>
           </div>
         </label>
 
@@ -221,7 +198,7 @@ const SERVICE_TYPE_MAP: Record<string, ServiceType> = {
           class="btn btn-primary btn-submit"
           [disabled]="submitting()"
         >
-          {{ submitting() ? 'Saving...' : 'Save Changes' }}
+          {{ submitting() ? ('PROFILE.SAVING' | translate) : ('PROFILE.SAVE_CHANGES' | translate) }}
         </button>
       </form>
 
@@ -234,6 +211,7 @@ export class EditProfileComponent implements OnInit {
   private readonly providerService = inject(ProviderService);
   private readonly toast = inject(ToastService);
   private readonly router = inject(Router);
+  private readonly translate = inject(TranslateService);
 
   readonly serviceCards = SERVICE_CARDS;
 
@@ -241,8 +219,8 @@ export class EditProfileComponent implements OnInit {
   readonly error = signal('');
   readonly submitting = signal(false);
   readonly selectedServiceRates = signal<ServiceRateDto[]>([]);
-  readonly latitude = signal<number | null>(null);
-  readonly longitude = signal<number | null>(null);
+  readonly locationDraft = model<ProviderLocationDraft>(emptyProviderLocationDraft());
+  readonly locationValidationTouched = signal(false);
   readonly userName = signal('');
   readonly status = signal('');
   readonly imagePreview = signal<string | null>(null);
@@ -251,7 +229,8 @@ export class EditProfileComponent implements OnInit {
   selectedImageFile: File | null = null;
 
   readonly statusBadgeClass = computed(() => {
-    const base = 'mt-3 inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold';
+    const base =
+      'mt-3 inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold text-start';
     switch (this.status()) {
       case 'Approved':
         return `${base} bg-emerald-100 text-emerald-700`;
@@ -262,12 +241,18 @@ export class EditProfileComponent implements OnInit {
     }
   });
 
+  readonly statusTranslationKey = computed(() => {
+    switch (this.status()) {
+      case 'Approved':
+        return 'PROFILE.STATUS_APPROVED';
+      case 'Rejected':
+        return 'PROFILE.STATUS_REJECTED';
+      default:
+        return 'PROFILE.STATUS_PENDING';
+    }
+  });
+
   bio = '';
-  geoSearchQuery = '';
-  city = '';
-  street = '';
-  buildingNumber = '';
-  apartmentNumber = '';
   aiNotes = '';
   readonly generatingBio = signal(false);
 
@@ -281,7 +266,11 @@ export class EditProfileComponent implements OnInit {
 
     this.providerService.getMe().subscribe({
       next: (profile) => {
-        if (!profile) { this.error.set('Provider profile not found.'); this.loading.set(false); return; }
+        if (!profile) {
+          this.error.set(this.translate.instant('PROFILE.ERROR_PROVIDER_NOT_FOUND'));
+          this.loading.set(false);
+          return;
+        }
         this.userName.set(profile.userName ?? '');
         this.status.set(profile.status ?? '');
         this.bio = profile.bio ?? '';
@@ -289,18 +278,21 @@ export class EditProfileComponent implements OnInit {
 
         this.selectedServiceRates.set(profile.serviceRates ?? []);
 
-        this.city = profile.city ?? '';
-        this.street = profile.street ?? '';
-        this.buildingNumber = profile.buildingNumber ?? '';
-        this.apartmentNumber = profile.apartmentNumber ?? '';
-        this.geoSearchQuery = '';
-        this.latitude.set(profile.latitude ?? null);
-        this.longitude.set(profile.longitude ?? null);
+        this.locationDraft.set({
+          latitude: profile.latitude ?? null,
+          longitude: profile.longitude ?? null,
+          addressSearchText: '',
+          city: profile.city ?? '',
+          street: profile.street ?? '',
+          buildingNumber: profile.buildingNumber ?? '',
+          apartmentNumber: profile.apartmentNumber ?? '',
+        });
+        this.locationValidationTouched.set(false);
         this.acceptsOffHoursRequests.set(profile.acceptsOffHoursRequests);
         this.loading.set(false);
       },
       error: () => {
-        this.error.set('Failed to load profile. Please try again.');
+        this.error.set(this.translate.instant('PROFILE.ERROR_LOAD_PROFILE'));
         this.loading.set(false);
       },
     });
@@ -327,17 +319,15 @@ export class EditProfileComponent implements OnInit {
     }
   }
 
+  serviceCardKeys(type: ServiceType): { titleKey: string; descKey: string; rateKey: string } {
+    return SERVICE_CARD_I18N[type];
+  }
+
   setServiceRate(type: ServiceType, value: string, unit: PricingUnit): void {
     const rate = parseFloat(value) || 0;
     this.selectedServiceRates.update(list =>
       list.map(r => r.serviceType === type ? { ...r, rate, pricingUnit: unit } : r),
     );
-  }
-
-  onSuggestionSelected(suggestion: AddressSuggestion): void {
-    this.geoSearchQuery = suggestion.displayName;
-    this.latitude.set(suggestion.lat);
-    this.longitude.set(suggestion.lon);
   }
 
   onImageSelected(event: Event): void {
@@ -363,7 +353,7 @@ export class EditProfileComponent implements OnInit {
         this.generatingBio.set(false);
       },
       error: () => {
-        this.toast.error('Failed to generate bio. Please try again.');
+        this.toast.error(this.translate.instant('PROFILE.TOAST_BIO_FAIL'));
         this.generatingBio.set(false);
       },
     });
@@ -372,11 +362,14 @@ export class EditProfileComponent implements OnInit {
   onSubmit(): void {
     if (this.submitting()) return;
 
-    if (!this.city.trim() || !this.street.trim() || !this.buildingNumber.trim()) {
+    const loc = this.locationDraft();
+    this.locationValidationTouched.set(true);
+
+    if (!loc.city.trim() || !loc.street.trim() || !loc.buildingNumber.trim()) {
       this.toast.error('Please fill in city, street, and building number.');
       return;
     }
-    if (this.latitude() == null || this.longitude() == null) {
+    if (loc.latitude == null || loc.longitude == null) {
       this.toast.error('Please set your location using the map search.');
       return;
     }
@@ -386,12 +379,12 @@ export class EditProfileComponent implements OnInit {
     const payload: UpdateProfilePayload = {
       bio: this.bio,
       selectedServices: this.selectedServiceRates(),
-      city: this.city.trim(),
-      street: this.street.trim(),
-      buildingNumber: this.buildingNumber.trim(),
-      apartmentNumber: this.apartmentNumber.trim() || null,
-      latitude: this.latitude(),
-      longitude: this.longitude(),
+      city: loc.city.trim(),
+      street: loc.street.trim(),
+      buildingNumber: loc.buildingNumber.trim(),
+      apartmentNumber: loc.apartmentNumber.trim() || null,
+      latitude: loc.latitude,
+      longitude: loc.longitude,
       acceptsOffHoursRequests: this.acceptsOffHoursRequests(),
     };
 
@@ -403,12 +396,13 @@ export class EditProfileComponent implements OnInit {
       switchMap(() => this.providerService.updateProfile(payload)),
     ).subscribe({
       next: () => {
-        this.toast.success('Profile updated successfully!');
+        this.toast.success(this.translate.instant('PROFILE.TOAST_UPDATE_OK'));
+        this.locationValidationTouched.set(false);
         this.submitting.set(false);
         this.router.navigateByUrl('/');
       },
       error: () => {
-        this.toast.error('Failed to update profile. Please try again.');
+        this.toast.error(this.translate.instant('PROFILE.TOAST_UPDATE_FAIL'));
         this.submitting.set(false);
       },
     });

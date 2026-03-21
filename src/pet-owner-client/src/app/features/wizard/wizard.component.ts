@@ -2,25 +2,25 @@ import { Component, inject, signal, viewChild } from '@angular/core';
 import { NgClass } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
+import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { Observable, of, switchMap } from 'rxjs';
 import { WizardStore, TOTAL_STEPS } from './wizard.store';
 import { ServicesRatesComponent } from './steps/services-rates.component';
 import { MagicBioComponent } from './steps/magic-bio.component';
 import { ToastService } from '../../services/toast.service';
 import { ProviderService } from '../../services/provider.service';
-import { AddressAutocompleteComponent } from '../../shared/address-autocomplete.component';
-import { AddressSuggestion } from '../../services/geocoding.service';
+import { WizardLocationPanelComponent } from './wizard-location-panel.component';
 
 @Component({
   selector: 'app-wizard',
   standalone: true,
-  imports: [NgClass, FormsModule, ServicesRatesComponent, MagicBioComponent, AddressAutocompleteComponent],
+  imports: [NgClass, FormsModule, ServicesRatesComponent, MagicBioComponent, WizardLocationPanelComponent, TranslatePipe],
   template: `
     @if (submitted()) {
       <div class="wizard-done">
         <div class="wizard-done__icon">&#10003;</div>
-        <h2>Application Submitted!</h2>
-        <p>We'll review your application and get back to you soon.</p>
+        <h2>{{ 'WIZARD.DONE_TITLE' | translate }}</h2>
+        <p>{{ 'WIZARD.DONE_SUBTITLE' | translate }}</p>
       </div>
     } @else {
       <div class="wizard-progress" role="progressbar"
@@ -32,7 +32,7 @@ import { AddressSuggestion } from '../../services/geocoding.service';
                [style.width.%]="store.progressPercent()">
           </div>
         </div>
-        <span class="wizard-progress__label">Step {{ store.step() }} of {{ totalSteps }}</span>
+        <span class="wizard-progress__label">{{ 'WIZARD.STEP_OF' | translate: { current: store.step(), total: totalSteps } }}</span>
       </div>
 
       <nav class="step-indicators" aria-label="Wizard steps">
@@ -48,7 +48,7 @@ import { AddressSuggestion } from '../../services/geocoding.service';
             (click)="store.goTo(s.num)"
           >
             <span class="step-dot__number">{{ s.num }}</span>
-            <span class="step-dot__label">{{ s.label }}</span>
+            <span class="step-dot__label">{{ s.labelKey | translate }}</span>
           </button>
         }
       </nav>
@@ -77,7 +77,7 @@ import { AddressSuggestion } from '../../services/geocoding.service';
                   </svg>
                 </span>
               </button>
-              <p class="mt-2 text-xs text-slate-500">Upload a profile photo</p>
+              <p class="mt-2 text-xs text-slate-500">{{ 'WIZARD.UPLOAD_PROFILE_PHOTO' | translate }}</p>
               <input
                 #avatarInput
                 type="file"
@@ -89,130 +89,25 @@ import { AddressSuggestion } from '../../services/geocoding.service';
 
             <app-step-magic-bio />
 
-            <div class="location-section">
-              <h3 class="step-title" style="font-size:1.1rem">Location <span class="text-red-500">*</span></h3>
-              <p class="step-subtitle" style="margin-bottom:0.75rem">A verified address with coordinates is required.</p>
-
-              <div class="location-toggle">
-                <button
-                  type="button"
-                  class="location-toggle__btn"
-                  [class.location-toggle__btn--active]="locationMode() === 'auto'"
-                  (click)="switchLocationMode('auto')"
-                >
-                  Use My Location
-                </button>
-                <button
-                  type="button"
-                  class="location-toggle__btn"
-                  [class.location-toggle__btn--active]="locationMode() === 'manual'"
-                  (click)="switchLocationMode('manual')"
-                >
-                  Enter Address
-                </button>
-              </div>
-
-              @if (locationMode() === 'auto') {
-                <button
-                  type="button"
-                  class="btn btn-location"
-                  [disabled]="locating()"
-                  (click)="useMyLocation()"
-                >
-                  {{ locating() ? 'Locating...' : 'Detect My Location' }}
-                </button>
-                @if (store.hasLocation()) {
-                  <p class="location-confirmation">Location captured ✓</p>
-                }
-              }
-
-              @if (locationMode() === 'manual') {
-                <div class="field">
-                  <label class="field-label">Address <span class="text-red-500">*</span></label>
-                  <app-address-autocomplete
-                    [ngModel]="store.address()"
-                    (ngModelChange)="onAddressChange($event)"
-                    (suggestionSelected)="onSuggestionSelected($event)"
-                  />
-                  @if (addressTouched() && !store.hasLocation()) {
-                    <span class="field-error">Please select an address from the suggestions to capture coordinates.</span>
-                  }
-                </div>
-                @if (store.hasLocation()) {
-                  <p class="location-confirmation">Address set ✓</p>
-                }
-              }
-
-              @if (locationError()) {
-                <p class="location-error">{{ locationError() }}</p>
-              }
-
-              <div class="structured-address-section mt-6 space-y-3">
-                <h3 class="step-title" style="font-size:1.1rem">Street address <span class="text-red-500">*</span></h3>
-                <p class="step-subtitle" style="margin-bottom:0.75rem">City, street, and building number (apartment optional).</p>
-
-                <div class="field">
-                  <label class="field-label" for="wiz-city">City <span class="text-red-500">*</span></label>
-                  <input
-                    id="wiz-city"
-                    type="text"
-                    class="w-full px-4 py-3 text-base border-[1.5px] rounded-xl bg-white text-slate-900 border-slate-300
-                           focus:border-indigo-500 focus:ring-[3px] focus:ring-indigo-500/15 outline-none"
-                    [ngModel]="store.structuredAddress().city"
-                    (ngModelChange)="store.patchStructuredAddress({ city: $event })"
-                  />
-                </div>
-                <div class="field">
-                  <label class="field-label" for="wiz-street">Street <span class="text-red-500">*</span></label>
-                  <input
-                    id="wiz-street"
-                    type="text"
-                    class="w-full px-4 py-3 text-base border-[1.5px] rounded-xl bg-white text-slate-900 border-slate-300
-                           focus:border-indigo-500 focus:ring-[3px] focus:ring-indigo-500/15 outline-none"
-                    [ngModel]="store.structuredAddress().street"
-                    (ngModelChange)="store.patchStructuredAddress({ street: $event })"
-                  />
-                </div>
-                <div class="field">
-                  <label class="field-label" for="wiz-building">Building number <span class="text-red-500">*</span></label>
-                  <input
-                    id="wiz-building"
-                    type="text"
-                    class="w-full px-4 py-3 text-base border-[1.5px] rounded-xl bg-white text-slate-900 border-slate-300
-                           focus:border-indigo-500 focus:ring-[3px] focus:ring-indigo-500/15 outline-none"
-                    [ngModel]="store.structuredAddress().buildingNumber"
-                    (ngModelChange)="store.patchStructuredAddress({ buildingNumber: $event })"
-                  />
-                </div>
-                <div class="field">
-                  <label class="field-label" for="wiz-apt">Apartment (optional)</label>
-                  <input
-                    id="wiz-apt"
-                    type="text"
-                    class="w-full px-4 py-3 text-base border-[1.5px] rounded-xl bg-white text-slate-900 border-slate-300
-                           focus:border-indigo-500 focus:ring-[3px] focus:ring-indigo-500/15 outline-none"
-                    [ngModel]="store.structuredAddress().apartmentNumber"
-                    (ngModelChange)="store.patchStructuredAddress({ apartmentNumber: $event })"
-                  />
-                </div>
-              </div>
-            </div>
+            <!-- Location + map + address: single source in WizardLocationPanelComponent (no duplicate inputs here). -->
+            <app-wizard-location-panel />
           }
           @case (3) {
             <div class="step-form">
-              <h2 class="step-title">Trust & Verification</h2>
-              <p class="step-subtitle">Reference details so we can verify your application.</p>
+              <h2 class="step-title">{{ 'WIZARD.TRUST_TITLE' | translate }}</h2>
+              <p class="step-subtitle">{{ 'WIZARD.TRUST_SUBTITLE' | translate }}</p>
 
               <fieldset class="reference-group">
-                <legend>Reference Details <span class="text-red-500">*</span></legend>
+                <legend>{{ 'WIZARD.REFERENCE_LEGEND' | translate }} <span class="text-red-500">*</span></legend>
 
                 <div class="field">
-                  <label class="field-label" for="referenceName">Reference Name</label>
+                  <label class="field-label" for="referenceName">{{ 'WIZARD.REFERENCE_NAME_LABEL' | translate }}</label>
                   <input
                     id="referenceName"
                     type="text"
-                    placeholder="Someone who can vouch for your experience"
-                    class="w-full px-4 py-3 text-base border-[1.5px] rounded-xl bg-white text-slate-900 outline-none transition-all
+                    dir="auto"
+                    [attr.placeholder]="'WIZARD.REFERENCE_NAME_PLACEHOLDER' | translate"
+                    class="w-full text-start placeholder:text-start px-4 py-3 text-base border-[1.5px] rounded-xl bg-white text-slate-900 outline-none transition-all
                            border-slate-300 focus:border-indigo-500 focus:ring-[3px] focus:ring-indigo-500/15
                            placeholder:text-slate-400"
                     [class.border-red-400]="verificationTouched() && !store.verification().referenceName.trim()"
@@ -221,17 +116,18 @@ import { AddressSuggestion } from '../../services/geocoding.service';
                     (ngModelChange)="store.patchVerification({ referenceName: $event })"
                   />
                   @if (verificationTouched() && !store.verification().referenceName.trim()) {
-                    <span class="field-error">Reference name is required.</span>
+                    <span class="field-error">{{ 'WIZARD.REFERENCE_NAME_ERROR' | translate }}</span>
                   }
                 </div>
 
                 <div class="field">
-                  <label class="field-label" for="referenceContact">Reference Contact</label>
+                  <label class="field-label" for="referenceContact">{{ 'WIZARD.REFERENCE_CONTACT_LABEL' | translate }}</label>
                   <input
                     id="referenceContact"
                     type="text"
-                    placeholder="Phone number or email address"
-                    class="w-full px-4 py-3 text-base border-[1.5px] rounded-xl bg-white text-slate-900 outline-none transition-all
+                    dir="auto"
+                    [attr.placeholder]="'WIZARD.REFERENCE_CONTACT_PLACEHOLDER' | translate"
+                    class="w-full text-start placeholder:text-start px-4 py-3 text-base border-[1.5px] rounded-xl bg-white text-slate-900 outline-none transition-all
                            border-slate-300 focus:border-indigo-500 focus:ring-[3px] focus:ring-indigo-500/15
                            placeholder:text-slate-400"
                     [class.border-red-400]="verificationTouched() && !store.verification().referenceContact.trim()"
@@ -240,7 +136,7 @@ import { AddressSuggestion } from '../../services/geocoding.service';
                     (ngModelChange)="store.patchVerification({ referenceContact: $event })"
                   />
                   @if (verificationTouched() && !store.verification().referenceContact.trim()) {
-                    <span class="field-error">Reference contact is required.</span>
+                    <span class="field-error">{{ 'WIZARD.REFERENCE_CONTACT_ERROR' | translate }}</span>
                   }
                 </div>
               </fieldset>
@@ -252,7 +148,7 @@ import { AddressSuggestion } from '../../services/geocoding.service';
       <footer class="wizard-nav">
         @if (store.step() > 1) {
           <button class="btn btn-outline" (click)="store.previous()">
-            ← Back
+            {{ 'WIZARD.BACK' | translate }}
           </button>
         } @else {
           <span></span>
@@ -264,7 +160,7 @@ import { AddressSuggestion } from '../../services/geocoding.service';
             [disabled]="store.step() === 2 && (!store.hasLocation() || !store.hasStructuredAddress())"
             (click)="onNext()"
           >
-            Next →
+            {{ 'WIZARD.NEXT' | translate }}
           </button>
         } @else {
           <button
@@ -272,7 +168,7 @@ import { AddressSuggestion } from '../../services/geocoding.service';
             [disabled]="uploading() || store.isSubmitting() || !store.canSubmit()"
             (click)="onSubmit()"
           >
-            {{ uploading() ? 'Uploading image...' : store.isSubmitting() ? 'Submitting...' : 'Submit Application' }}
+            {{ uploading() ? ('WIZARD.UPLOADING_IMAGE' | translate) : store.isSubmitting() ? ('WIZARD.SUBMITTING' | translate) : ('WIZARD.SUBMIT_APPLICATION' | translate) }}
           </button>
         }
       </footer>
@@ -291,16 +187,13 @@ export class WizardComponent {
   private readonly router = inject(Router);
   private readonly toast = inject(ToastService);
   private readonly providerService = inject(ProviderService);
+  private readonly translate = inject(TranslateService);
 
   readonly totalSteps = TOTAL_STEPS;
   readonly submitted = signal(false);
   readonly errorMessage = signal('');
-  readonly locating = signal(false);
-  readonly locationError = signal('');
-  readonly locationMode = signal<'auto' | 'manual'>('auto');
   readonly imagePreview = signal<string | null>(null);
   readonly uploading = signal(false);
-  readonly addressTouched = signal(false);
   readonly verificationTouched = signal(false);
 
   selectedImageFile: File | null = null;
@@ -309,9 +202,9 @@ export class WizardComponent {
   readonly bioStep = viewChild(MagicBioComponent);
 
   readonly steps = [
-    { num: 1, label: 'Services' },
-    { num: 2, label: 'Bio' },
-    { num: 3, label: 'Verification' },
+    { num: 1, labelKey: 'WIZARD.STEP_SERVICES' },
+    { num: 2, labelKey: 'WIZARD.STEP_BIO' },
+    { num: 3, labelKey: 'WIZARD.STEP_VERIFICATION' },
   ];
 
   isCurrentStepValid(): boolean {
@@ -330,9 +223,9 @@ export class WizardComponent {
       this.store.next();
     } else {
       if (this.store.step() === 2 && (!this.store.hasLocation() || !this.store.hasStructuredAddress())) {
-        this.errorMessage.set('Please set your map location and fill in city, street, and building number before continuing.');
+        this.errorMessage.set(this.translate.instant('WIZARD.ERROR_LOCATION_STREET'));
       } else {
-        this.errorMessage.set('Please fill in all required fields correctly before continuing.');
+        this.errorMessage.set(this.translate.instant('WIZARD.ERROR_FILL_FIELDS'));
       }
     }
   }
@@ -354,7 +247,7 @@ export class WizardComponent {
     this.verificationTouched.set(true);
 
     if (!this.store.canSubmit()) {
-      this.errorMessage.set('Please fill in all required fields correctly before submitting.');
+      this.errorMessage.set(this.translate.instant('WIZARD.ERROR_SUBMIT_FIELDS'));
       return;
     }
 
@@ -371,61 +264,20 @@ export class WizardComponent {
       }),
     ).subscribe({
       next: () => {
-        this.toast.success('Profile submitted! We\'ll review it shortly.');
+        this.toast.success(this.translate.instant('WIZARD.PROFILE_SUBMITTED_TOAST'));
         this.providerService.providerStatus.set('Pending');
         this.router.navigateByUrl('/');
       },
       error: () => {
         this.uploading.set(false);
-        this.errorMessage.set('Submission failed. Please try again.');
+        this.errorMessage.set(this.translate.instant('WIZARD.ERROR_SUBMIT_FAILED'));
       },
     });
   }
 
-  switchLocationMode(mode: 'auto' | 'manual'): void {
-    this.locationMode.set(mode);
-    this.locationError.set('');
-    if (mode === 'manual') {
-      this.store.clearCoordinates();
-    } else {
-      this.store.setAddress('');
-    }
-  }
-
-  onAddressChange(value: string): void {
-    this.store.setAddress(value);
-    this.addressTouched.set(true);
-  }
-
-  onSuggestionSelected(suggestion: AddressSuggestion): void {
-    this.store.setAddress(suggestion.displayName);
-    this.store.setLocation(suggestion.lat, suggestion.lon);
-  }
-
-  useMyLocation(): void {
-    if (!navigator.geolocation) {
-      this.locationError.set('Geolocation is not supported by your browser.');
-      return;
-    }
-
-    this.locating.set(true);
-    this.locationError.set('');
-
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        this.store.setLocation(pos.coords.latitude, pos.coords.longitude);
-        this.locating.set(false);
-      },
-      () => {
-        this.locationError.set('Unable to get your location. Please allow location access.');
-        this.locating.set(false);
-      },
-    );
-  }
-
   private markCurrentStepTouched(): void {
     if (this.store.step() === 2) {
-      this.addressTouched.set(true);
+      this.store.touchLocationStep();
     }
     if (this.store.step() === 3) {
       this.verificationTouched.set(true);

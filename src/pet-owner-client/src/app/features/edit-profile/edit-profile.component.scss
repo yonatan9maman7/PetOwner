@@ -25,6 +25,7 @@
   font-size: 0.85rem;
   font-weight: 600;
   color: #334155;
+  text-align: start;
 }
 
 input[type='text'],
@@ -37,6 +38,7 @@ textarea {
   border-radius: 12px;
   background: #fff;
   color: #0f172a;
+  text-align: start;
   transition: border-color 0.2s, box-shadow 0.2s;
   outline: none;
 
@@ -66,6 +68,7 @@ textarea {
     font-weight: 600;
     color: #334155;
     margin-bottom: 0.5rem;
+    text-align: start;
   }
 }
 
@@ -161,12 +164,14 @@ textarea {
   font-size: 0.95rem;
   font-weight: 600;
   color: #1e293b;
+  text-align: start;
 }
 
 .off-hours-hint {
   font-size: 0.8rem;
   color: #64748b;
   line-height: 1.4;
+  text-align: start;
 }
 
 .btn {
@@ -231,7 +236,7 @@ textarea {
   color: #fff;
   transition: opacity 0.2s, transform 0.1s;
   min-height: 48px;
-  align-self: flex-start;
+  align-self: start;
 
   &:hover:not(:disabled) {
     opacity: 0.9;
@@ -295,11 +300,11 @@ textarea {
   justify-content: center;
   min-height: 300px;
   gap: 1rem;
-  text-align: center;
 
   p {
     font-size: 1rem;
     color: #dc2626;
     font-weight: 600;
+    max-width: 100%;
   }
 }

@@ -3,15 +3,25 @@ import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/rou
 import { CommonModule, DatePipe } from '@angular/common';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { map } from 'rxjs';
+import { TranslatePipe } from '@ngx-translate/core';
 import { AuthService } from './services/auth.service';
 import { ProviderService } from './services/provider.service';
 import { NotificationService, AppNotification } from './services/notification.service';
+import { LanguageService } from './services/language.service';
 import { ToastContainerComponent } from './shared/toast-container.component';
 
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [RouterOutlet, RouterLink, RouterLinkActive, CommonModule, DatePipe, ToastContainerComponent],
+  imports: [
+    RouterOutlet,
+    RouterLink,
+    RouterLinkActive,
+    CommonModule,
+    DatePipe,
+    ToastContainerComponent,
+    TranslatePipe,
+  ],
   templateUrl: './app.component.html',
   styleUrl: './app.component.scss',
 })
@@ -20,6 +30,7 @@ export class AppComponent {
   readonly auth = inject(AuthService);
   readonly providerService = inject(ProviderService);
   readonly notificationService = inject(NotificationService);
+  readonly language = inject(LanguageService);
 
   showNotificationPanel = signal(false);
   isProfileMenuOpen = signal(false);

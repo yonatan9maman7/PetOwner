@@ -1,0 +1,187 @@
+<div class="location-section">
+  <h3 class="step-title location-heading">
+    {{ 'WIZARD.LOCATION_TITLE' | translate }} <span class="text-red-500">*</span>
+  </h3>
+  <p class="step-subtitle location-subtitle">{{ 'WIZARD.LOCATION_SUBTITLE' | translate }}</p>
+
+  <div class="location-toggle">
+    <button
+      type="button"
+      class="location-toggle__btn"
+      [class.location-toggle__btn--active]="locationMode() === 'auto'"
+      (click)="switchLocationMode('auto')"
+    >
+      {{ 'WIZARD.USE_MY_LOCATION' | translate }}
+    </button>
+    <button
+      type="button"
+      class="location-toggle__btn"
+      [class.location-toggle__btn--active]="locationMode() === 'manual'"
+      (click)="switchLocationMode('manual')"
+    >
+      {{ 'WIZARD.ENTER_ADDRESS' | translate }}
+    </button>
+  </div>
+
+  @if (locationMode() === 'manual') {
+    <div class="wizard-search-above-map space-y-1.5">
+      <label class="field-label">
+        {{ 'WIZARD.MAP_SEARCH' | translate }} <span class="text-red-500">*</span>
+      </label>
+      <app-address-autocomplete
+        [ngModel]="store.address()"
+        (ngModelChange)="onAddressChange($event)"
+        (suggestionSelected)="onSuggestionSelected($event)"
+      />
+      <p class="wizard-map-search-help">{{ 'WIZARD.MAP_SEARCH_HELP' | translate }}</p>
+      @if (store.locationStepTouched() && !store.hasLocation()) {
+        <span class="field-error">{{ 'WIZARD.ADDRESS_COORDS_ERROR' | translate }}</span>
+      }
+    </div>
+  }
+
+  <div class="wizard-map-frame rounded-xl shadow-inner ring-1 ring-slate-200/90 overflow-hidden bg-slate-100">
+    <div #mapHost class="wizard-map-host h-80 w-full min-h-[16rem]"></div>
+
+    @if (locationMode() === 'auto') {
+      <div class="wizard-map-gps-bar">
+        <button
+          type="button"
+          class="btn btn-location wizard-map-gps-btn"
+          [disabled]="locating()"
+          (click)="useMyLocation()"
+        >
+          {{ locating() ? ('WIZARD.LOCATING' | translate) : ('WIZARD.DETECT_LOCATION' | translate) }}
+        </button>
+        @if (store.hasLocation()) {
+          <p class="location-confirmation wizard-map-gps-confirm">{{ 'WIZARD.LOCATION_CAPTURED' | translate }}</p>
+        }
+        @if (store.locationStepTouched() && !store.hasLocation()) {
+          <span class="field-error block text-center mt-1">{{ 'WIZARD.PIN_REQUIRED' | translate }}</span>
+        }
+      </div>
+    }
+  </div>
+
+  @if (locationMode() === 'manual' && store.hasLocation()) {
+    <p class="location-confirmation text-center text-sm -mt-1">{{ 'WIZARD.ADDRESS_SET' | translate }}</p>
+  }
+
+  @if (locationError()) {
+    <p class="location-error">{{ locationError() }}</p>
+  }
+
+  <p class="wizard-location-map-hint">{{ 'WIZARD.LOCATION_MAP_HINT' | translate }}</p>
+
+  <div class="wizard-apartment-card">
+    <label class="field-label wizard-apartment-label" for="wiz-apt">
+      {{ 'WIZARD.APARTMENT_OPTIONAL' | translate }}
+    </label>
+    <input
+      id="wiz-apt"
+      type="text"
+      dir="auto"
+      autocomplete="off"
+      class="wizard-input-prominent w-full text-start placeholder:text-start px-4 py-3.5 text-base border-[1.5px] rounded-xl bg-white text-slate-900 border-slate-300
+             focus:border-indigo-500 focus:ring-[3px] focus:ring-indigo-500/15 outline-none transition-shadow"
+      [attr.placeholder]="'WIZARD.APARTMENT_PLACEHOLDER' | translate"
+      [ngModel]="store.structuredAddress().apartmentNumber"
+      (ngModelChange)="store.patchStructuredAddress({ apartmentNumber: $event })"
+    />
+  </div>
+
+  @if (showAddressIncompletePrompt()) {
+    <div class="address-incomplete-card" role="status">
+      <p class="address-incomplete-card__title">{{ 'WIZARD.COMPLETE_ADDRESS_PROMPT' | translate }}</p>
+      <p class="address-incomplete-card__hint">{{ 'WIZARD.COMPLETE_ADDRESS_HINT' | translate }}</p>
+      <button type="button" class="address-incomplete-card__btn" (click)="addressFieldsExpanded.set(true)">
+        {{ 'WIZARD.COMPLETE_ADDRESS_BUTTON' | translate }}
+      </button>
+    </div>
+  }
+
+  @if (showAddressSummary()) {
+    <div class="address-summary-card">
+      <div class="address-summary-card__header">
+        <span class="address-summary-card__title">{{ 'WIZARD.EXACT_ADDRESS' | translate }}</span>
+        <button type="button" class="address-summary-card__edit" (click)="addressFieldsExpanded.set(true)">
+          {{ 'WIZARD.EDIT_ADDRESS_DETAILS' | translate }}
+        </button>
+      </div>
+      <dl class="address-summary-card__dl">
+        <div class="address-summary-row">
+          <dt>{{ 'WIZARD.CITY' | translate }}</dt>
+          <dd dir="auto" class="text-start">{{ store.structuredAddress().city }}</dd>
+        </div>
+        <div class="address-summary-row">
+          <dt>{{ 'WIZARD.STREET' | translate }}</dt>
+          <dd dir="auto" class="text-start">{{ store.structuredAddress().street }}</dd>
+        </div>
+        <div class="address-summary-row">
+          <dt>{{ 'WIZARD.BUILDING' | translate }}</dt>
+          <dd dir="auto" class="text-start">{{ store.structuredAddress().buildingNumber }}</dd>
+        </div>
+      </dl>
+    </div>
+  }
+
+  @if (showAddressGrid()) {
+    <div class="address-grid-section">
+      <div class="address-grid-section__head">
+        <h4 class="address-grid-title">{{ 'WIZARD.EXACT_ADDRESS' | translate }}</h4>
+        @if (store.hasStructuredAddress()) {
+          <button type="button" class="address-summary-card__edit" (click)="addressFieldsExpanded.set(false)">
+            {{ 'WIZARD.DONE_EDIT_ADDRESS' | translate }}
+          </button>
+        } @else {
+          <button type="button" class="address-summary-card__edit address-summary-card__edit--muted" (click)="addressFieldsExpanded.set(false)">
+            {{ 'WIZARD.CLOSE_ADDRESS_FORM' | translate }}
+          </button>
+        }
+      </div>
+      <p class="address-grid-subtitle">{{ 'WIZARD.STREET_ADDRESS_SUBTITLE' | translate }}</p>
+
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div class="field sm:col-span-1">
+          <label class="field-label" for="wiz-city">{{ 'WIZARD.CITY' | translate }} <span class="text-red-500">*</span></label>
+          <input
+            id="wiz-city"
+            type="text"
+            dir="auto"
+            class="wizard-input-grid w-full text-start placeholder:text-start px-3 py-2.5 text-sm border-[1.5px] rounded-lg bg-slate-50 text-slate-900 border-slate-200
+                   focus:border-indigo-500 focus:ring-[3px] focus:ring-indigo-500/15 focus:bg-white outline-none"
+            [class.border-amber-300]="store.hasLocation() && !store.structuredAddress().city.trim()"
+            [ngModel]="store.structuredAddress().city"
+            (ngModelChange)="store.patchStructuredAddress({ city: $event })"
+          />
+        </div>
+        <div class="field sm:col-span-1">
+          <label class="field-label" for="wiz-street">{{ 'WIZARD.STREET' | translate }} <span class="text-red-500">*</span></label>
+          <input
+            id="wiz-street"
+            type="text"
+            dir="auto"
+            class="wizard-input-grid w-full text-start placeholder:text-start px-3 py-2.5 text-sm border-[1.5px] rounded-lg bg-slate-50 text-slate-900 border-slate-200
+                   focus:border-indigo-500 focus:ring-[3px] focus:ring-indigo-500/15 focus:bg-white outline-none"
+            [class.border-amber-300]="store.hasLocation() && !store.structuredAddress().street.trim()"
+            [ngModel]="store.structuredAddress().street"
+            (ngModelChange)="store.patchStructuredAddress({ street: $event })"
+          />
+        </div>
+        <div class="field sm:col-span-1">
+          <label class="field-label" for="wiz-building">{{ 'WIZARD.BUILDING' | translate }} <span class="text-red-500">*</span></label>
+          <input
+            id="wiz-building"
+            type="text"
+            dir="auto"
+            class="wizard-input-grid w-full text-start placeholder:text-start px-3 py-2.5 text-sm border-[1.5px] rounded-lg bg-slate-50 text-slate-900 border-slate-200
+                   focus:border-indigo-500 focus:ring-[3px] focus:ring-indigo-500/15 focus:bg-white outline-none"
+            [class.border-amber-300]="store.hasLocation() && !store.structuredAddress().buildingNumber.trim()"
+            [ngModel]="store.structuredAddress().buildingNumber"
+            (ngModelChange)="store.patchStructuredAddress({ buildingNumber: $event })"
+          />
+        </div>
+      </div>
+    </div>
+  }
+</div>
