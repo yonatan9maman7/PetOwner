@@ -81,7 +81,7 @@ const RECORD_TYPES = ['Vaccination', 'Condition', 'Medication', 'VetVisit'] as c
                       <div class="min-w-0 flex-1 pr-16">
                         <h3 class="text-lg font-semibold text-slate-900 truncate">{{ pet.name }}</h3>
                         <p class="text-xs text-slate-500">
-                          {{ pet.species }}@if (pet.breed) {<span> · {{ pet.breed }}</span>} · {{ pet.age }} {{ pet.age === 1 ? 'year' : 'years' }} old@if (pet.weight) {<span> · {{ pet.weight }} kg</span>}
+                          {{ pet.species }}@if (pet.breed) {<span> · {{ pet.breed }}</span>} · {{ pet.age }} {{ pet.age === 1 ? 'year' : 'years' }} old@if (pet.weight) {<span> · {{ pet.weight }} kg</span>}@if (pet.isNeutered) {<span> · Neutered / spayed</span>}
                         </p>
                       </div>
                     </div>
@@ -370,18 +370,32 @@ const RECORD_TYPES = ['Vaccination', 'Condition', 'Medication', 'VetVisit'] as c
               }
             </div>
           } @else {
-            <!-- Empty state -->
-            <div class="flex flex-col items-center justify-center py-16 text-center">
-              <div class="w-20 h-20 rounded-full bg-indigo-100 flex items-center justify-center text-4xl mb-4">
-                🐾
+            <div class="flex flex-col items-center justify-center p-8 text-center mb-6 rounded-2xl border border-gray-100 bg-white/80 shadow-sm">
+              <div class="mb-5 flex h-28 w-28 items-center justify-center rounded-full bg-gray-100" aria-hidden="true">
+                <svg class="h-16 w-16 text-gray-300" viewBox="0 0 88 88" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                  <path d="M44 58c-14 0-26 9-26 16 0 5 22 8 26 8s26-3 26-8c0-7-12-16-26-16z" fill="currentColor" fill-opacity="0.12" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
+                  <ellipse cx="44" cy="56" rx="22" ry="13" stroke="currentColor" stroke-width="1.5"/>
+                  <circle cx="32" cy="48" r="11" stroke="currentColor" stroke-width="1.5"/>
+                  <path d="M22 44c-1.5-7 3.5-14 11-11" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                  <path d="M28 49h6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" opacity="0.65"/>
+                  <path d="M58 40l8-11M66 32l7-9" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" opacity="0.45"/>
+                </svg>
               </div>
-              <h2 class="text-xl font-semibold text-slate-800 mb-1">You haven't added any pets yet 🐾</h2>
-              <p class="text-sm text-slate-500 max-w-xs">Add your first pet below so providers know who they'll be caring for.</p>
+              <h3 class="text-lg font-semibold tracking-tight text-gray-900">No Pets Yet</h3>
+              <p class="mt-2 max-w-sm text-sm text-gray-500 leading-relaxed">
+                When you add a pet, sitters and walkers can see who they're caring for and you can keep health records in one place.
+              </p>
+              <a
+                href="#add-pet-form"
+                class="mt-6 inline-flex items-center justify-center rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 focus-visible:ring-offset-2"
+              >
+                Add Pet
+              </a>
             </div>
           }
 
           <!-- ─── Add / Edit Pet Form ─── -->
-          <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+          <div id="add-pet-form" class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 scroll-mt-24">
             <h2 class="text-lg font-semibold text-slate-900 mb-4">
               {{ editingPetId() ? 'Edit Pet' : 'Add a New Pet' }}
             </h2>
@@ -455,6 +469,24 @@ const RECORD_TYPES = ['Vaccination', 'Condition', 'Medication', 'VetVisit'] as c
                     class="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 outline-none transition"
                   />
                 </div>
+              </div>
+
+              <div class="flex items-center justify-between gap-4 rounded-xl border border-gray-200 bg-slate-50/60 px-4 py-3">
+                <div class="min-w-0">
+                  <span class="block text-sm font-medium text-slate-700">Neutered / Spayed?</span>
+                  <p class="text-xs text-slate-500 mt-0.5">Helps caregivers with basic medical context</p>
+                </div>
+                <label for="pet-neutered" class="inline-flex cursor-pointer flex-shrink-0 items-center rounded-lg focus-within:outline-none focus-within:ring-2 focus-within:ring-indigo-200">
+                  <input
+                    id="pet-neutered"
+                    type="checkbox"
+                    formControlName="isNeutered"
+                    class="peer sr-only"
+                  />
+                  <span
+                    class="relative h-6 w-11 shrink-0 rounded-full bg-slate-200 transition-colors after:absolute after:left-[2px] after:top-[2px] after:block after:h-5 after:w-5 after:rounded-full after:border after:border-gray-200 after:bg-white after:transition-transform after:content-[''] peer-checked:bg-indigo-600 peer-checked:after:translate-x-5"
+                  ></span>
+                </label>
               </div>
 
               <div>
@@ -551,6 +583,7 @@ export class MyPetsComponent implements OnInit {
     breed: [''],
     age: [null as number | null, [Validators.required, Validators.min(0), Validators.max(100)]],
     weight: [null as number | null, [Validators.min(0)]],
+    isNeutered: [false],
     notes: [''],
     allergies: [''],
     medicalConditions: [''],
@@ -598,6 +631,7 @@ export class MyPetsComponent implements OnInit {
       weight: v.weight ?? undefined,
       allergies: v.allergies?.trim() || undefined,
       medicalConditions: v.medicalConditions?.trim() || undefined,
+      isNeutered: !!v.isNeutered,
     };
 
     const editId = this.editingPetId();
@@ -628,6 +662,7 @@ export class MyPetsComponent implements OnInit {
       breed: pet.breed ?? '',
       age: pet.age,
       weight: pet.weight ?? null,
+      isNeutered: pet.isNeutered ?? false,
       notes: pet.notes ?? '',
       allergies: pet.allergies ?? '',
       medicalConditions: pet.medicalConditions ?? '',

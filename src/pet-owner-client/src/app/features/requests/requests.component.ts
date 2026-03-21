@@ -8,6 +8,7 @@ import {
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { RouterLink } from '@angular/router';
 import { AuthService } from '../../services/auth.service';
 import { RequestService } from '../../services/request.service';
 import { ReviewService } from '../../services/review.service';
@@ -20,7 +21,7 @@ import { ServiceRequest } from '../../models/service-request.model';
 @Component({
   selector: 'app-requests',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, RouterLink],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="min-h-screen bg-gray-50 pb-24">
@@ -36,10 +37,40 @@ import { ServiceRequest } from '../../models/service-request.model';
           <span class="text-sm">Loading requests...</span>
         </div>
       } @else if (requests().length === 0) {
-        <div class="flex flex-col items-center justify-center py-20 px-6 text-center">
-          <span class="text-5xl mb-4">📋</span>
-          <h2 class="text-lg font-semibold text-gray-700 mb-1">No requests yet</h2>
-          <p class="text-sm text-gray-500">Find a provider on the map and send your first request!</p>
+        <div class="flex flex-col items-center justify-center p-8 text-center mx-4 mt-6 rounded-2xl border border-gray-100 bg-white shadow-sm">
+          <div class="mb-5 flex h-28 w-28 items-center justify-center rounded-full bg-gray-100" aria-hidden="true">
+            <svg class="h-16 w-16 text-gray-300" viewBox="0 0 88 88" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+              <rect x="18" y="26" width="52" height="44" rx="6" stroke="currentColor" stroke-width="1.5"/>
+              <path d="M18 38h52" stroke="currentColor" stroke-width="1.5"/>
+              <path d="M30 18v12M44 18v12M58 18v12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+              <rect x="34" y="48" width="8" height="8" rx="1" fill="currentColor" fill-opacity="0.2"/>
+              <rect x="46" y="48" width="8" height="8" rx="1" fill="currentColor" fill-opacity="0.12"/>
+              <path d="M38 62h20" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" opacity="0.35"/>
+            </svg>
+          </div>
+          <h3 class="text-lg font-semibold tracking-tight text-gray-900">No Upcoming Bookings</h3>
+          <p class="mt-2 max-w-sm text-sm text-gray-500 leading-relaxed">
+            @if (isProvider()) {
+              When pet owners send requests, they'll show up here so you can accept and schedule.
+            } @else {
+              Browse trusted providers on the map and book a walk, sitting, or visit when you're ready.
+            }
+          </p>
+          @if (isProvider()) {
+            <a
+              routerLink="/provider-dashboard"
+              class="mt-6 inline-flex items-center justify-center rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 focus-visible:ring-offset-2"
+            >
+              Go to Dashboard
+            </a>
+          } @else {
+            <a
+              routerLink="/"
+              class="mt-6 inline-flex items-center justify-center rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 focus-visible:ring-offset-2"
+            >
+              Find a Provider
+            </a>
+          }
         </div>
       } @else {
         <!-- Active Requests -->

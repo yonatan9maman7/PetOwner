@@ -28,7 +28,8 @@ public class PetsController : ControllerBase
         var pets = await _db.Pets
             .AsNoTracking()
             .Where(p => p.UserId == userId)
-            .Select(p => new PetDto(p.Id, p.Name, p.Species, p.Breed, p.Age, p.Weight, p.Allergies, p.MedicalConditions, p.Notes))
+            // IsNeutered: placeholder until DB column exists (see future migration).
+            .Select(p => new PetDto(p.Id, p.Name, p.Species, p.Breed, p.Age, p.Weight, p.Allergies, p.MedicalConditions, p.Notes, false))
             .ToListAsync();
 
         return Ok(pets);
@@ -38,6 +39,7 @@ public class PetsController : ControllerBase
     public async Task<IActionResult> CreatePet([FromBody] CreatePetDto request)
     {
         var userId = GetUserId();
+        // request.IsNeutered is part of the API contract; map to Pet when the column exists.
 
         var pet = new Pet
         {
@@ -55,7 +57,7 @@ public class PetsController : ControllerBase
         _db.Pets.Add(pet);
         await _db.SaveChangesAsync();
 
-        var dto = new PetDto(pet.Id, pet.Name, pet.Species, pet.Breed, pet.Age, pet.Weight, pet.Allergies, pet.MedicalConditions, pet.Notes);
+        var dto = new PetDto(pet.Id, pet.Name, pet.Species, pet.Breed, pet.Age, pet.Weight, pet.Allergies, pet.MedicalConditions, pet.Notes, false);
         return CreatedAtAction(nameof(GetMyPets), dto);
     }
 
@@ -70,6 +72,7 @@ public class PetsController : ControllerBase
         if (pet is null)
             return NotFound(new { message = "Pet not found." });
 
+        // request.IsNeutered: apply to pet when the column exists.
         pet.Name = request.Name;
         pet.Species = request.Species;
         pet.Breed = request.Breed;
@@ -81,7 +84,7 @@ public class PetsController : ControllerBase
 
         await _db.SaveChangesAsync();
 
-        var dto = new PetDto(pet.Id, pet.Name, pet.Species, pet.Breed, pet.Age, pet.Weight, pet.Allergies, pet.MedicalConditions, pet.Notes);
+        var dto = new PetDto(pet.Id, pet.Name, pet.Species, pet.Breed, pet.Age, pet.Weight, pet.Allergies, pet.MedicalConditions, pet.Notes, false);
         return Ok(dto);
     }
 

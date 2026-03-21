@@ -9,7 +9,8 @@ public record PetDto(
     double? Weight,
     string? Allergies,
     string? MedicalConditions,
-    string? Notes
+    string? Notes,
+    bool IsNeutered
 );
 
 public record CreatePetDto(
@@ -20,7 +21,8 @@ public record CreatePetDto(
     double? Weight,
     string? Allergies,
     string? MedicalConditions,
-    string? Notes
+    string? Notes,
+    bool IsNeutered = false
 );
 
 public record UpdatePetDto(
@@ -31,5 +33,6 @@ public record UpdatePetDto(
     double? Weight,
     string? Allergies,
     string? MedicalConditions,
-    string? Notes
+    string? Notes,
+    bool IsNeutered = false
 );

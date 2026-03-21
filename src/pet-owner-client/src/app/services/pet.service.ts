@@ -12,6 +12,7 @@ export interface Pet {
   weight?: number;
   allergies?: string;
   medicalConditions?: string;
+  isNeutered?: boolean;
 }
 
 export interface CreatePetPayload {
@@ -23,6 +24,7 @@ export interface CreatePetPayload {
   weight?: number;
   allergies?: string;
   medicalConditions?: string;
+  isNeutered?: boolean;
 }
 
 export interface UpdatePetPayload {
@@ -34,6 +36,7 @@ export interface UpdatePetPayload {
   weight?: number;
   allergies?: string;
   medicalConditions?: string;
+  isNeutered?: boolean;
 }
 
 @Injectable({ providedIn: 'root' })
