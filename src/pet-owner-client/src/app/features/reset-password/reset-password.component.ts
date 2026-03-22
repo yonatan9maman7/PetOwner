@@ -1,15 +1,19 @@
 import { Component, inject, OnInit, signal } from '@angular/core';
 import { AbstractControl, FormBuilder, ReactiveFormsModule, ValidationErrors, Validators } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { TranslatePipe, TranslateService } from '@ngx-translate/core';
+import { take } from 'rxjs';
 import { AuthService } from '../../services/auth.service';
 import { ToastService } from '../../services/toast.service';
 
 @Component({
   selector: 'app-reset-password',
   standalone: true,
-  imports: [ReactiveFormsModule, RouterLink],
+  imports: [ReactiveFormsModule, RouterLink, TranslatePipe],
   template: `
-    <div class="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-50 to-white px-4" dir="ltr">
+    <div
+      class="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-50 to-white px-4"
+      dir="auto">
       <div class="w-full max-w-sm">
         <div class="text-center mb-8">
           <div class="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-indigo-600 text-white mb-4">
@@ -18,47 +22,47 @@ import { ToastService } from '../../services/toast.service';
                 d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
             </svg>
           </div>
-          <h1 class="text-2xl font-bold text-gray-900">Reset Password</h1>
-          <p class="text-sm text-gray-500 mt-1">Enter your new password below.</p>
+          <h1 class="text-2xl font-bold text-gray-900 text-start">{{ 'AUTH.RESET_PASSWORD_TITLE' | translate }}</h1>
+          <p class="text-sm text-gray-500 mt-1 text-start">{{ 'AUTH.RESET_PASSWORD_SUBTITLE' | translate }}</p>
         </div>
 
         <form [formGroup]="form" (ngSubmit)="onSubmit()" class="space-y-4">
           <div>
-            <label for="newPassword" class="block text-sm font-medium text-gray-700 mb-1">New Password</label>
+            <label for="newPassword" class="block text-sm font-medium text-gray-700 mb-1 text-start">{{ 'AUTH.NEW_PASSWORD' | translate }}</label>
             <input
               id="newPassword"
               formControlName="newPassword"
               type="password"
               dir="auto"
-              placeholder="••••••••"
+              [attr.placeholder]="'AUTH.PLACEHOLDER_PASSWORD' | translate"
               class="w-full px-4 py-3 rounded-xl border border-gray-300 bg-white text-start placeholder:text-start text-gray-900
                      placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500
                      focus:border-transparent transition"
             />
             @if (form.get('newPassword')?.invalid && form.get('newPassword')?.touched) {
-              <span class="text-xs text-red-500">Password must be at least 6 characters</span>
+              <span class="text-xs text-red-500 text-start block">{{ 'AUTH.ERROR_PASSWORD' | translate }}</span>
             }
           </div>
 
           <div>
-            <label for="confirmPassword" class="block text-sm font-medium text-gray-700 mb-1">Confirm Password</label>
+            <label for="confirmPassword" class="block text-sm font-medium text-gray-700 mb-1 text-start">{{ 'AUTH.CONFIRM_PASSWORD' | translate }}</label>
             <input
               id="confirmPassword"
               formControlName="confirmPassword"
               type="password"
               dir="auto"
-              placeholder="••••••••"
+              [attr.placeholder]="'AUTH.PLACEHOLDER_PASSWORD' | translate"
               class="w-full px-4 py-3 rounded-xl border border-gray-300 bg-white text-start placeholder:text-start text-gray-900
                      placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500
                      focus:border-transparent transition"
             />
             @if (form.get('confirmPassword')?.touched && form.hasError('passwordsMismatch')) {
-              <span class="text-xs text-red-500">Passwords do not match</span>
+              <span class="text-xs text-red-500 text-start block">{{ 'AUTH.PASSWORDS_MISMATCH' | translate }}</span>
             }
           </div>
 
           @if (errorMsg()) {
-            <p class="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{{ errorMsg() }}</p>
+            <p class="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2 text-start">{{ errorMsg() }}</p>
           }
 
           <button
@@ -68,12 +72,12 @@ import { ToastService } from '../../services/toast.service';
                    hover:bg-indigo-700 active:bg-indigo-800 disabled:opacity-50
                    disabled:cursor-not-allowed transition"
           >
-            {{ loading() ? 'Resetting...' : 'Reset My Password' }}
+            {{ loading() ? ('AUTH.SAVING_PASSWORD' | translate) : ('AUTH.SAVE_PASSWORD' | translate) }}
           </button>
         </form>
 
         <p class="text-center text-sm text-gray-500 mt-6">
-          <a routerLink="/login" class="text-indigo-600 font-medium hover:underline">Back to Login</a>
+          <a routerLink="/login" class="text-indigo-600 font-medium hover:underline">{{ 'AUTH.BACK_TO_LOGIN' | translate }}</a>
         </p>
       </div>
     </div>
@@ -85,6 +89,7 @@ export class ResetPasswordComponent implements OnInit {
   private readonly router = inject(Router);
   private readonly auth = inject(AuthService);
   private readonly toast = inject(ToastService);
+  private readonly translate = inject(TranslateService);
 
   readonly loading = signal(false);
   readonly errorMsg = signal('');
@@ -101,16 +106,23 @@ export class ResetPasswordComponent implements OnInit {
   );
 
   ngOnInit(): void {
-    this.token = this.route.snapshot.queryParamMap.get('token') ?? '';
-    this.email = this.route.snapshot.queryParamMap.get('email') ?? '';
+    this.route.queryParams.pipe(take(1)).subscribe((params) => {
+      this.token = params['token'] ?? '';
+      this.email = params['email'] ?? '';
 
-    if (!this.token || !this.email) {
-      this.router.navigateByUrl('/login');
-    }
+      if (!this.token || !this.email) {
+        void this.router.navigateByUrl('/login');
+      }
+    });
   }
 
   onSubmit(): void {
     this.errorMsg.set('');
+
+    if (!this.token || !this.email) {
+      void this.router.navigateByUrl('/login');
+      return;
+    }
 
     if (this.form.invalid) {
       this.form.markAllAsTouched();
@@ -123,12 +135,16 @@ export class ResetPasswordComponent implements OnInit {
     this.auth.resetPassword({ email: this.email, token: this.token, newPassword }).subscribe({
       next: () => {
         this.loading.set(false);
-        this.toast.success('Password successfully reset.');
-        this.router.navigateByUrl('/login');
+        this.toast.success(this.translate.instant('AUTH.RESET_SUCCESS'));
+        setTimeout(() => {
+          void this.router.navigateByUrl('/login');
+        }, 1500);
       },
       error: (err) => {
         this.loading.set(false);
-        this.errorMsg.set(err.error?.message ?? 'The link is invalid or has expired. Please request a new one.');
+        this.errorMsg.set(
+          err.error?.message ?? this.translate.instant('AUTH.RESET_INVALID_TOKEN'),
+        );
       },
     });
   }

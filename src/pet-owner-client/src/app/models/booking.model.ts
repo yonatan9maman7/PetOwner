@@ -6,6 +6,7 @@ export interface CreateBookingPayload {
   startDate: string;
   endDate: string;
   notes?: string | null;
+  petIds?: string[];
 }
 
 export interface BookingDto {

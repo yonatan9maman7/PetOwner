@@ -21,11 +21,14 @@ interface ChatMessage {
   selector: 'app-teletriage',
   standalone: true,
   imports: [FormsModule, DatePipe, TranslatePipe],
+  host: {
+    class: 'flex min-h-0 w-full flex-1 flex-col',
+  },
   template: `
-    <div class="min-h-screen bg-gradient-to-b from-indigo-50 to-white flex flex-col">
+    <div class="flex min-h-0 flex-1 flex-col bg-gradient-to-b from-indigo-50 to-white">
 
       <!-- Header -->
-      <div class="bg-white border-b border-gray-200 px-4 py-4 shadow-sm">
+      <div class="shrink-0 bg-white border-b border-gray-200 px-4 py-4 shadow-sm">
         <div class="max-w-2xl mx-auto flex items-center gap-3">
           <div class="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center flex-shrink-0">
             <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -63,7 +66,7 @@ interface ChatMessage {
 
       @if (showHistory()) {
         <!-- History View -->
-        <div class="flex-1 overflow-y-auto px-4 py-6">
+        <div class="flex-1 min-h-0 overflow-y-auto px-4 py-6">
           <div class="max-w-2xl mx-auto space-y-3">
             @if (historyLoading()) {
               <div class="flex justify-center py-12">
@@ -111,7 +114,7 @@ interface ChatMessage {
         </div>
       } @else {
         <!-- Chat View -->
-        <div class="flex-1 overflow-y-auto px-4 py-6" #chatContainer>
+        <div class="flex-1 min-h-0 overflow-y-auto px-4 py-6" #chatContainer>
           <div class="max-w-2xl mx-auto space-y-4">
 
             @if (messages().length === 0 && !selectedPet()) {
@@ -408,7 +411,7 @@ interface ChatMessage {
 
         <!-- Input Area -->
         @if (selectedPet()) {
-          <div class="border-t border-gray-200 bg-white px-4 py-3 shadow-[0_-2px_10px_rgba(0,0,0,0.04)]">
+          <div class="shrink-0 sticky bottom-0 border-t border-gray-200 bg-white p-4 shadow-[0_-2px_10px_rgba(0,0,0,0.04)]">
             <div class="max-w-2xl mx-auto">
               <!-- New Assessment / Change Pet buttons -->
               @if (messages().length > 0 && !assessing()) {

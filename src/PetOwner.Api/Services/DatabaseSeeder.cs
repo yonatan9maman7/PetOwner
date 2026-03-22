@@ -77,8 +77,8 @@ public class DatabaseSeeder
     public async Task<(int Providers, int Owners, int Pets, int Bookings, int Reviews, int GroupPosts, int SocialPosts)>
         SeedFullDemoEcosystemAsync()
     {
-        var faker = new Faker("he");
-        var fakerEn = new Faker("en");
+        var faker = new Faker("en");
+        var fakerEn = faker;
         var serviceIds = await EnsureServicesExistAsync();
         var passwordHash = BCrypt.Net.BCrypt.HashPassword(SeedPassword);
         var allServiceTypes = Enum.GetValues<ServiceType>();

@@ -14,17 +14,28 @@ import {
   petSpeciesIconBgClass,
 } from '../../models/pet-species.model';
 
-const BREED_OPTIONS = [
+const DOG_BREED_OPTIONS = [
   'Mixed / Mutt',
   'Golden Retriever',
-  'Labrador Retriever',
-  'French Bulldog',
+  'Labrador',
   'German Shepherd',
-  'Persian',
+  'French Bulldog',
   'Poodle',
   'Beagle',
+  'Bulldog',
+  'Canaan Dog',
+  'Other',
+] as const;
+
+const CAT_BREED_OPTIONS = [
+  'Mixed',
+  'Persian',
+  'Siamese',
+  'British Shorthair',
   'Maine Coon',
-  'Parakeet',
+  'Sphynx',
+  'Tricolor / Calico',
+  'Ginger',
   'Other',
 ] as const;
 
@@ -94,7 +105,7 @@ const RECORD_TYPES = ['Vaccination', 'Condition', 'Medication', 'VetVisit'] as c
                       <div class="min-w-0 flex-1 pe-16">
                         <h3 class="text-lg font-semibold text-slate-900 truncate">{{ pet.name }}</h3>
                         <p class="text-xs text-slate-500">
-                          {{ speciesI18nKey(pet.species) | translate }}@if (pet.breed) {<span> · {{ pet.breed }}</span>} · @if (pet.age === 1) {<span>{{ 'PETS.ONE_YEAR_OLD' | translate }}</span>} @else {<span>{{ 'PETS.N_YEARS_OLD' | translate: { years: pet.age } }}</span>}@if (pet.weight) {<span> · {{ pet.weight }} {{ 'PETS.KG' | translate }}</span>}@if (pet.isNeutered) {<span> · {{ 'PETS.NEUTERED_SHORT' | translate }}</span>}
+                          {{ speciesI18nKey(pet.species) | translate }}@if (pet.breed) {<span> · {{ breedI18nKey(pet.breed) | translate }}</span>} · @if (pet.age === 1) {<span>{{ 'PETS.ONE_YEAR_OLD' | translate }}</span>} @else {<span>{{ 'PETS.N_YEARS_OLD' | translate: { years: pet.age } }}</span>}@if (pet.weight) {<span> · {{ pet.weight }} {{ 'PETS.KG' | translate }}</span>}@if (pet.isNeutered) {<span> · {{ 'PETS.NEUTERED_SHORT' | translate }}</span>}
                         </p>
                       </div>
                     </div>
@@ -149,7 +160,7 @@ const RECORD_TYPES = ['Vaccination', 'Condition', 'Medication', 'VetVisit'] as c
                         <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                           <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                         </svg>
-                        Health Records
+                        {{ 'PETS.HEALTH_RECORDS' | translate }}
                         <svg class="w-3.5 h-3.5 transition-transform duration-200" [class.rotate-180]="expandedPetId() === pet.id" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                           <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
                         </svg>
@@ -163,7 +174,7 @@ const RECORD_TYPES = ['Vaccination', 'Condition', 'Medication', 'VetVisit'] as c
                         <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                           <path stroke-linecap="round" stroke-linejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
                         </svg>
-                        Triage History
+                        {{ 'PETS.TRIAGE_HISTORY' | translate }}
                         <svg class="w-3.5 h-3.5 transition-transform duration-200" [class.rotate-180]="triagePetId() === pet.id" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                           <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
                         </svg>
@@ -284,14 +295,14 @@ const RECORD_TYPES = ['Vaccination', 'Condition', 'Medication', 'VetVisit'] as c
                             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                             <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
                           </svg>
-                          <span class="text-sm">Loading records...</span>
+                          <span class="text-sm">{{ 'PETS.LOADING_RECORDS' | translate }}</span>
                         </div>
                       } @else {
 
                         <!-- ─── Medical Timeline ─── -->
                         @if (records().length > 0) {
                           <div class="mb-4">
-                            <h4 class="text-[11px] font-semibold uppercase tracking-widest text-slate-400 mb-5">Medical Timeline</h4>
+                            <h4 class="text-[11px] font-semibold uppercase tracking-widest text-slate-400 mb-5">{{ 'PETS.MEDICAL_TIMELINE' | translate }}</h4>
 
                             <div class="relative pl-9">
                               <!-- Vertical line -->
@@ -317,7 +328,7 @@ const RECORD_TYPES = ['Vaccination', 'Condition', 'Medication', 'VetVisit'] as c
                                               <h5 class="text-sm font-semibold text-slate-900">{{ rec.title }}</h5>
                                               <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold tracking-wide"
                                                     [class]="recordTypeBadgeClass(rec.type)">
-                                                {{ rec.type === 'VetVisit' ? 'Vet Visit' : rec.type }}
+                                                {{ recordTypeI18nKey(rec.type) | translate }}
                                               </span>
                                             </div>
 
@@ -339,7 +350,7 @@ const RECORD_TYPES = ['Vaccination', 'Condition', 'Medication', 'VetVisit'] as c
                                                   <path stroke-linecap="round" stroke-linejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101" />
                                                   <path stroke-linecap="round" stroke-linejoin="round" d="M10.172 13.828a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.102 1.101" />
                                                 </svg>
-                                                View Document
+                                                {{ 'PETS.VIEW_DOCUMENT' | translate }}
                                               </a>
                                             }
                                           </div>
@@ -371,8 +382,8 @@ const RECORD_TYPES = ['Vaccination', 'Condition', 'Medication', 'VetVisit'] as c
                             <div class="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center text-xl mx-auto mb-2">
                               📋
                             </div>
-                            <p class="text-sm text-slate-500 mb-1">No health records yet</p>
-                            <p class="text-xs text-slate-400">Add vaccinations, conditions, medications, or vet visits</p>
+                            <p class="text-sm text-slate-500 mb-1">{{ 'PETS.NO_HEALTH_RECORDS' | translate }}</p>
+                            <p class="text-xs text-slate-400">{{ 'PETS.NO_HEALTH_RECORDS_HINT' | translate }}</p>
                           </div>
                         }
 
@@ -380,48 +391,48 @@ const RECORD_TYPES = ['Vaccination', 'Condition', 'Medication', 'VetVisit'] as c
                         @if (showRecordForm()) {
                           <div class="bg-white rounded-xl border border-indigo-100 p-4">
                             <h4 class="text-sm font-semibold text-slate-900 mb-3">
-                              {{ editingRecordId() ? 'Edit Record' : 'Add Record' }}
+                              {{ (editingRecordId() ? 'PETS.EDIT_RECORD' : 'PETS.ADD_RECORD') | translate }}
                             </h4>
                             <form [formGroup]="recordForm" (ngSubmit)="submitRecord()" class="space-y-3">
                               <div class="grid grid-cols-2 gap-3">
                                 <div>
-                                  <label class="block text-start text-xs font-medium text-slate-600 mb-1">Type</label>
+                                  <label class="block text-start text-xs font-medium text-slate-600 mb-1">{{ 'PETS.RECORD_TYPE' | translate }}</label>
                                   <select formControlName="type" dir="auto"
                                           class="w-full text-start rounded-lg border border-gray-200 px-3 py-2 text-sm text-slate-900 bg-white focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 outline-none transition">
                                     @for (t of recordTypes; track t) {
-                                      <option [value]="t">{{ t === 'VetVisit' ? 'Vet Visit' : t }}</option>
+                                      <option [value]="t">{{ recordTypeI18nKey(t) | translate }}</option>
                                     }
                                   </select>
                                 </div>
                                 <div>
-                                  <label class="block text-start text-xs font-medium text-slate-600 mb-1">Date</label>
+                                  <label class="block text-start text-xs font-medium text-slate-600 mb-1">{{ 'PETS.RECORD_DATE' | translate }}</label>
                                   <input type="date" formControlName="date" dir="auto"
                                          class="w-full text-start rounded-lg border border-gray-200 px-3 py-2 text-sm text-slate-900 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 outline-none transition" />
                                 </div>
                               </div>
                               <div>
-                                <label class="block text-start text-xs font-medium text-slate-600 mb-1">Title</label>
+                                <label class="block text-start text-xs font-medium text-slate-600 mb-1">{{ 'PETS.RECORD_TITLE' | translate }}</label>
                                 <input type="text" formControlName="title" dir="auto" placeholder="e.g., Rabies vaccine"
                                        class="w-full text-start placeholder:text-start rounded-lg border border-gray-200 px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 outline-none transition" />
                               </div>
                               <div>
-                                <label class="block text-start text-xs font-medium text-slate-600 mb-1">Description (optional)</label>
+                                <label class="block text-start text-xs font-medium text-slate-600 mb-1">{{ 'PETS.RECORD_DESCRIPTION' | translate }}</label>
                                 <textarea formControlName="description" rows="2" dir="auto" placeholder="Additional details..."
                                           class="w-full text-start placeholder:text-start rounded-lg border border-gray-200 px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 outline-none transition resize-none"></textarea>
                               </div>
                               <div>
-                                <label class="block text-start text-xs font-medium text-slate-600 mb-1">Document URL (optional)</label>
+                                <label class="block text-start text-xs font-medium text-slate-600 mb-1">{{ 'PETS.RECORD_DOCUMENT_URL' | translate }}</label>
                                 <input type="url" formControlName="documentUrl" dir="auto" placeholder="https://..."
                                        class="w-full text-start placeholder:text-start rounded-lg border border-gray-200 px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 outline-none transition" />
                               </div>
                               <div class="flex gap-2">
                                 <button type="submit" [disabled]="recordSubmitting() || recordForm.invalid"
                                         class="flex-1 rounded-lg bg-indigo-600 px-3 py-2 text-sm font-semibold text-white hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed transition">
-                                  {{ recordSubmitting() ? 'Saving...' : (editingRecordId() ? 'Update' : 'Add Record') }}
+                                  {{ recordSubmitting() ? ('PETS.RECORD_SAVING' | translate) : ((editingRecordId() ? 'PETS.RECORD_UPDATE' : 'PETS.ADD_RECORD') | translate) }}
                                 </button>
                                 <button type="button" (click)="cancelRecordForm()"
                                         class="rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 transition">
-                                  Cancel
+                                  {{ 'PETS.CANCEL' | translate }}
                                 </button>
                               </div>
                             </form>
@@ -429,7 +440,7 @@ const RECORD_TYPES = ['Vaccination', 'Condition', 'Medication', 'VetVisit'] as c
                         } @else {
                           <button type="button" (click)="openAddRecordForm()"
                                   class="w-full rounded-xl border-2 border-dashed border-gray-200 px-4 py-3 text-sm font-medium text-slate-400 hover:border-indigo-300 hover:text-indigo-500 transition-colors duration-150">
-                            + Add Health Record
+                            {{ 'PETS.ADD_HEALTH_RECORD' | translate }}
                           </button>
                         }
                       }
@@ -445,7 +456,7 @@ const RECORD_TYPES = ['Vaccination', 'Condition', 'Medication', 'VetVisit'] as c
                             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                             <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
                           </svg>
-                          <span class="text-sm">Loading triage history...</span>
+                          <span class="text-sm">{{ 'PETS.LOADING_TRIAGE' | translate }}</span>
                         </div>
                       } @else if (triageHistory().length === 0) {
                         <div class="text-center py-6">
@@ -454,8 +465,8 @@ const RECORD_TYPES = ['Vaccination', 'Condition', 'Medication', 'VetVisit'] as c
                               <path stroke-linecap="round" stroke-linejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
                             </svg>
                           </div>
-                          <p class="text-sm text-slate-500 mb-1">No triage assessments yet</p>
-                          <p class="text-xs text-slate-400">Run a health triage from the Triage page to see results here</p>
+                          <p class="text-sm text-slate-500 mb-1">{{ 'PETS.NO_TRIAGE' | translate }}</p>
+                          <p class="text-xs text-slate-400">{{ 'PETS.NO_TRIAGE_HINT' | translate }}</p>
                         </div>
                       } @else {
                         <div class="space-y-3">
@@ -479,7 +490,7 @@ const RECORD_TYPES = ['Vaccination', 'Condition', 'Medication', 'VetVisit'] as c
                                     <span class="text-xs text-slate-400">{{ session.createdAt | date:'medium' }}</span>
                                   </div>
                                   <p class="text-xs text-slate-500 mt-1.5">
-                                    <span class="font-medium text-slate-600">Symptoms:</span> {{ session.symptoms }}
+                                    <span class="font-medium text-slate-600">{{ 'PETS.SYMPTOMS' | translate }}:</span> {{ session.symptoms }}
                                   </p>
                                   <p class="text-sm text-slate-700 mt-2 whitespace-pre-wrap leading-relaxed">{{ session.assessment }}</p>
                                   @if (session.recommendations) {
@@ -535,7 +546,7 @@ const RECORD_TYPES = ['Vaccination', 'Condition', 'Medication', 'VetVisit'] as c
 
               <div class="grid grid-cols-2 gap-4">
                 <div>
-                  <label for="pet-name" class="block text-start text-sm font-medium text-slate-700 mb-1"><span dir="auto">{{ 'PETS.NAME' | translate }}</span></label>
+                  <label for="pet-name" class="block text-start text-sm font-medium text-slate-700 mb-1"><span dir="auto">{{ 'PETS.NAME' | translate }}</span> <span class="text-red-500">*</span></label>
                   <input
                     id="pet-name"
                     type="text"
@@ -547,7 +558,7 @@ const RECORD_TYPES = ['Vaccination', 'Condition', 'Medication', 'VetVisit'] as c
                 </div>
 
                 <div>
-                  <label for="pet-species" class="block text-start text-sm font-medium text-slate-700 mb-1"><span dir="auto">{{ 'PETS.SPECIES' | translate }}</span></label>
+                  <label for="pet-species" class="block text-start text-sm font-medium text-slate-700 mb-1"><span dir="auto">{{ 'PETS.SPECIES' | translate }}</span> <span class="text-red-500">*</span></label>
                   <select
                     id="pet-species"
                     formControlName="species"
@@ -562,24 +573,39 @@ const RECORD_TYPES = ['Vaccination', 'Condition', 'Medication', 'VetVisit'] as c
                 </div>
               </div>
 
-              <div class="grid grid-cols-3 gap-4">
+              @if (showSpecifyAnimal()) {
                 <div>
-                  <label for="pet-breed" class="block text-start text-sm font-medium text-slate-700 mb-1"><span dir="auto">{{ 'PETS.BREED' | translate }}</span></label>
-                  <select
-                    id="pet-breed"
-                    formControlName="breed"
+                  <label for="pet-specify-animal" class="block text-start text-sm font-medium text-slate-700 mb-1"><span dir="auto">{{ 'PETS.SPECIFY_ANIMAL' | translate }}</span> <span class="text-red-500">*</span></label>
+                  <input
+                    id="pet-specify-animal"
+                    type="text"
+                    formControlName="specifyAnimalType"
                     dir="auto"
-                    class="w-full text-start rounded-xl border border-gray-200 px-4 py-2.5 text-sm text-slate-900 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 outline-none transition bg-white"
-                  >
-                    <option value="">{{ 'PETS.BREED_OPTIONAL' | translate }}</option>
-                    @for (b of breedOptions; track b) {
-                      <option [value]="b">{{ b }}</option>
-                    }
-                  </select>
+                    class="w-full text-start placeholder:text-start rounded-xl border border-gray-200 px-4 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 outline-none transition"
+                  />
                 </div>
+              }
+
+              <div [class]="'grid gap-4 ' + (currentBreedOptions().length > 0 ? 'grid-cols-3' : 'grid-cols-2')">
+                @if (currentBreedOptions().length > 0) {
+                  <div>
+                    <label for="pet-breed" class="block text-start text-sm font-medium text-slate-700 mb-1"><span dir="auto">{{ 'PETS.BREED' | translate }}</span> <span class="text-red-500">*</span></label>
+                    <select
+                      id="pet-breed"
+                      formControlName="breed"
+                      dir="auto"
+                      class="w-full text-start rounded-xl border border-gray-200 px-4 py-2.5 text-sm text-slate-900 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 outline-none transition bg-white"
+                    >
+                      <option value="" disabled>{{ 'PETS.SELECT_BREED' | translate }}</option>
+                      @for (b of currentBreedOptions(); track b) {
+                        <option [value]="b">{{ breedI18nKey(b) | translate }}</option>
+                      }
+                    </select>
+                  </div>
+                }
 
                 <div>
-                  <label for="pet-age" class="block text-start text-sm font-medium text-slate-700 mb-1"><span dir="auto">{{ 'PETS.AGE' | translate }}</span></label>
+                  <label for="pet-age" class="block text-start text-sm font-medium text-slate-700 mb-1"><span dir="auto">{{ 'PETS.AGE' | translate }}</span> <span class="text-red-500">*</span></label>
                   <input
                     id="pet-age"
                     type="number"
@@ -593,7 +619,7 @@ const RECORD_TYPES = ['Vaccination', 'Condition', 'Medication', 'VetVisit'] as c
                 </div>
 
                 <div>
-                  <label for="pet-weight" class="block text-start text-sm font-medium text-slate-700 mb-1"><span dir="auto">{{ 'PETS.WEIGHT' | translate }}</span></label>
+                  <label for="pet-weight" class="block text-start text-sm font-medium text-slate-700 mb-1"><span dir="auto">{{ 'PETS.WEIGHT' | translate }}</span> <span class="text-red-500">*</span></label>
                   <input
                     id="pet-weight"
                     type="number"
@@ -606,6 +632,19 @@ const RECORD_TYPES = ['Vaccination', 'Condition', 'Medication', 'VetVisit'] as c
                   />
                 </div>
               </div>
+
+              @if (showSpecifyBreed()) {
+                <div>
+                  <label for="pet-specify-breed" class="block text-start text-sm font-medium text-slate-700 mb-1"><span dir="auto">{{ 'PETS.SPECIFY_BREED' | translate }}</span> <span class="text-red-500">*</span></label>
+                  <input
+                    id="pet-specify-breed"
+                    type="text"
+                    formControlName="specifyBreed"
+                    dir="auto"
+                    class="w-full text-start placeholder:text-start rounded-xl border border-gray-200 px-4 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 outline-none transition"
+                  />
+                </div>
+              }
 
               <div class="flex items-center justify-between gap-4 rounded-xl border border-slate-200/80 bg-gradient-to-r from-slate-50 to-indigo-50/30 px-4 py-3.5 shadow-sm">
                 <div class="min-w-0 text-start">
@@ -652,6 +691,18 @@ const RECORD_TYPES = ['Vaccination', 'Condition', 'Medication', 'VetVisit'] as c
                       </button>
                     }
                   </div>
+                  @if (selectedAllergies().has('Other')) {
+                    <div class="mt-2">
+                      <label for="pet-specify-allergy" class="block text-start text-xs font-medium text-slate-600 mb-1"><span dir="auto">{{ 'PETS.SPECIFY_ALLERGY' | translate }}</span> <span class="text-red-500">*</span></label>
+                      <input
+                        id="pet-specify-allergy"
+                        type="text"
+                        formControlName="specifyAllergy"
+                        dir="auto"
+                        class="w-full text-start placeholder:text-start rounded-xl border border-gray-200 px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 outline-none transition"
+                      />
+                    </div>
+                  }
                 </div>
 
                 <div class="sm:col-span-2">
@@ -786,9 +837,13 @@ export class MyPetsComponent implements OnInit {
   private readonly fb = inject(FormBuilder);
 
   readonly petSpeciesOptions = PET_SPECIES_OPTIONS;
-  readonly breedOptions = BREED_OPTIONS;
   readonly allergyOptions = ALLERGY_OPTIONS;
   readonly recordTypes = RECORD_TYPES;
+
+  readonly currentBreedOptions = signal<readonly string[]>([]);
+  readonly showSpecifyAnimal = signal(false);
+  readonly showSpecifyBreed = signal(false);
+  private hydrating = false;
 
   readonly speciesEmoji = petSpeciesEmoji;
   readonly speciesIconClass = petSpeciesIconBgClass;
@@ -819,7 +874,52 @@ export class MyPetsComponent implements OnInit {
     return map[n];
   }
 
-  private readonly selectedAllergies = signal<Set<string>>(new Set(['None']));
+  private readonly breedI18nMap: Record<string, string> = {
+    'Mixed / Mutt': 'PETS.BREED_MIXED_MUTT',
+    'Golden Retriever': 'PETS.BREED_GOLDEN_RETRIEVER',
+    'Labrador': 'PETS.BREED_LABRADOR',
+    'Labrador Retriever': 'PETS.BREED_LABRADOR',
+    'German Shepherd': 'PETS.BREED_GERMAN_SHEPHERD',
+    'French Bulldog': 'PETS.BREED_FRENCH_BULLDOG',
+    'Poodle': 'PETS.BREED_POODLE',
+    'Beagle': 'PETS.BREED_BEAGLE',
+    'Bulldog': 'PETS.BREED_BULLDOG',
+    'Canaan Dog': 'PETS.BREED_CANAAN_DOG',
+    'Mixed': 'PETS.BREED_MIXED',
+    'Persian': 'PETS.BREED_PERSIAN',
+    'Siamese': 'PETS.BREED_SIAMESE',
+    'British Shorthair': 'PETS.BREED_BRITISH_SHORTHAIR',
+    'Maine Coon': 'PETS.BREED_MAINE_COON',
+    'Sphynx': 'PETS.BREED_SPHYNX',
+    'Tricolor / Calico': 'PETS.BREED_TRICOLOR',
+    'Ginger': 'PETS.BREED_GINGER',
+    'Other': 'PETS.BREED_OTHER',
+  };
+
+  breedI18nKey(breed: string): string {
+    return this.breedI18nMap[breed] ?? breed;
+  }
+
+  private readonly recordTypeI18nMap: Record<string, string> = {
+    'Vaccination': 'PETS.RECORD_TYPE_VACCINATION',
+    'Condition': 'PETS.RECORD_TYPE_CONDITION',
+    'Medication': 'PETS.RECORD_TYPE_MEDICATION',
+    'VetVisit': 'PETS.RECORD_TYPE_VET_VISIT',
+  };
+
+  recordTypeI18nKey(type: string): string {
+    return this.recordTypeI18nMap[type] ?? type;
+  }
+
+  private getBreedOptionsForSpecies(species: PetSpecies | null): readonly string[] {
+    switch (species) {
+      case PetSpecies.Dog: return DOG_BREED_OPTIONS;
+      case PetSpecies.Cat: return CAT_BREED_OPTIONS;
+      default: return [];
+    }
+  }
+
+  readonly selectedAllergies = signal<Set<string>>(new Set(['None']));
 
   readonly pets = signal<Pet[]>([]);
   readonly loading = signal(true);
@@ -846,10 +946,13 @@ export class MyPetsComponent implements OnInit {
     name: ['', Validators.required],
     species: [null as PetSpecies | null, Validators.required],
     breed: [''],
+    specifyAnimalType: [''],
+    specifyBreed: [''],
     age: [null as number | null, [Validators.required, Validators.min(0), Validators.max(100)]],
-    weight: [null as number | null, [Validators.min(0)]],
+    weight: [null as number | null, [Validators.required, Validators.min(0)]],
     isNeutered: [false],
     notes: [''],
+    specifyAllergy: [''],
     medicalConditions: [''],
     medicalNotes: [''],
     feedingSchedule: [''],
@@ -868,6 +971,45 @@ export class MyPetsComponent implements OnInit {
 
   ngOnInit(): void {
     this.loadPets();
+
+    this.petForm.get('species')!.valueChanges.subscribe(species => {
+      const opts = this.getBreedOptionsForSpecies(species);
+      this.currentBreedOptions.set(opts);
+      this.showSpecifyAnimal.set(species === PetSpecies.Other);
+
+      if (!this.hydrating) {
+        this.petForm.get('breed')!.setValue('');
+        this.petForm.get('specifyBreed')!.setValue('');
+        this.petForm.get('specifyAnimalType')!.setValue('');
+      }
+
+      const breedCtrl = this.petForm.get('breed')!;
+      if (opts.length > 0) {
+        breedCtrl.setValidators(Validators.required);
+      } else {
+        breedCtrl.clearValidators();
+      }
+      breedCtrl.updateValueAndValidity({ emitEvent: false });
+
+      const specifyAnimalCtrl = this.petForm.get('specifyAnimalType')!;
+      if (species === PetSpecies.Other) {
+        specifyAnimalCtrl.setValidators(Validators.required);
+      } else {
+        specifyAnimalCtrl.clearValidators();
+      }
+      specifyAnimalCtrl.updateValueAndValidity({ emitEvent: false });
+    });
+
+    this.petForm.get('breed')!.valueChanges.subscribe(breed => {
+      this.showSpecifyBreed.set(breed === 'Other');
+      const specifyBreedCtrl = this.petForm.get('specifyBreed')!;
+      if (breed === 'Other') {
+        specifyBreedCtrl.setValidators(Validators.required);
+      } else {
+        specifyBreedCtrl.clearValidators();
+      }
+      specifyBreedCtrl.updateValueAndValidity({ emitEvent: false });
+    });
   }
 
   loadPets(): void {
@@ -895,12 +1037,16 @@ export class MyPetsComponent implements OnInit {
 
     this.submitting.set(true);
     const v = this.petForm.getRawValue();
+    const rawBreed = v.breed?.trim();
+    const finalBreed = rawBreed === 'Other'
+      ? (v.specifyBreed?.trim() || undefined)
+      : (rawBreed || undefined);
     const payload = {
       name: v.name!.trim(),
       species: v.species!,
       age: v.age!,
       notes: v.notes?.trim() || null,
-      breed: v.breed?.trim() || undefined,
+      breed: finalBreed,
       weight: v.weight ?? undefined,
       allergies: this.allergiesCommaSeparated(),
       medicalConditions: v.medicalConditions?.trim() || undefined,
@@ -933,12 +1079,13 @@ export class MyPetsComponent implements OnInit {
   }
 
   editPet(pet: Pet): void {
+    this.hydrating = true;
     this.editingPetId.set(pet.id);
     this.hydrateAllergiesFromString(pet.allergies);
+
     this.petForm.patchValue({
       name: pet.name,
       species: pet.species,
-      breed: pet.breed ?? '',
       age: pet.age,
       weight: pet.weight ?? null,
       isNeutered: pet.isNeutered ?? false,
@@ -950,6 +1097,21 @@ export class MyPetsComponent implements OnInit {
       vetName: pet.vetName ?? '',
       vetPhone: pet.vetPhone ?? '',
     });
+
+    const breedList = this.getBreedOptionsForSpecies(pet.species);
+    if (pet.breed && (breedList as readonly string[]).includes(pet.breed)) {
+      this.petForm.get('breed')!.setValue(pet.breed);
+      this.petForm.get('specifyBreed')!.setValue('');
+    } else if (pet.breed) {
+      this.petForm.get('breed')!.setValue('Other');
+      this.petForm.get('specifyBreed')!.setValue(pet.breed);
+    } else {
+      this.petForm.get('breed')!.setValue('');
+      this.petForm.get('specifyBreed')!.setValue('');
+    }
+
+    this.hydrating = false;
+
     if (pet.medicalNotes || pet.feedingSchedule || pet.microchipNumber || pet.vetName || pet.vetPhone) {
       this.showMedicalSection.set(true);
     }
@@ -1161,6 +1323,15 @@ export class MyPetsComponent implements OnInit {
       if (next.size === 0) next.add('None');
       return next;
     });
+    const hasOther = this.selectedAllergies().has('Other');
+    const ctrl = this.petForm.get('specifyAllergy')!;
+    if (hasOther) {
+      ctrl.setValidators(Validators.required);
+    } else {
+      ctrl.clearValidators();
+      ctrl.setValue('');
+    }
+    ctrl.updateValueAndValidity();
   }
 
   allergyChipClass(key: string): string {
@@ -1175,25 +1346,36 @@ export class MyPetsComponent implements OnInit {
 
   private allergiesCommaSeparated(): string | undefined {
     const set = this.selectedAllergies();
-    if (set.size === 0 || set.has('None')) return undefined;
-    return [...set].join(', ');
+    if (set.size === 0 || (set.size === 1 && set.has('None'))) return undefined;
+    const parts = [...set].filter(a => a !== 'None' && a !== 'Other');
+    if (set.has('Other')) {
+      const custom = this.petForm.get('specifyAllergy')?.value?.trim();
+      if (custom) parts.push(custom);
+    }
+    return parts.length > 0 ? parts.join(', ') : undefined;
   }
 
   private hydrateAllergiesFromString(s: string | null | undefined): void {
     const known = new Set<string>(ALLERGY_OPTIONS.filter((x) => x !== 'None'));
     if (!s?.trim()) {
       this.selectedAllergies.set(new Set(['None']));
+      this.petForm.get('specifyAllergy')?.setValue('');
       return;
     }
     const parts = s.split(',').map((x) => x.trim()).filter(Boolean);
     const next = new Set<string>();
-    let other = false;
+    const customParts: string[] = [];
     for (const p of parts) {
       const match = [...known].find((k) => k.toLowerCase() === p.toLowerCase());
       if (match) next.add(match);
-      else other = true;
+      else customParts.push(p);
     }
-    if (other) next.add('Other');
+    if (customParts.length > 0) {
+      next.add('Other');
+      this.petForm.get('specifyAllergy')?.setValue(customParts.join(', '));
+    } else {
+      this.petForm.get('specifyAllergy')?.setValue('');
+    }
     if (next.size === 0) next.add('None');
     this.selectedAllergies.set(next);
   }
@@ -1207,10 +1389,13 @@ export class MyPetsComponent implements OnInit {
       name: '',
       species: null,
       breed: '',
+      specifyAnimalType: '',
+      specifyBreed: '',
       age: null,
       weight: null,
       isNeutered: false,
       notes: '',
+      specifyAllergy: '',
       medicalConditions: '',
       medicalNotes: '',
       feedingSchedule: '',
@@ -1220,6 +1405,9 @@ export class MyPetsComponent implements OnInit {
     });
     this.resetAllergiesToNone();
     this.showMedicalSection.set(false);
+    this.currentBreedOptions.set([]);
+    this.showSpecifyAnimal.set(false);
+    this.showSpecifyBreed.set(false);
   }
 
   triageSeverityDotClass(severity: string): string {

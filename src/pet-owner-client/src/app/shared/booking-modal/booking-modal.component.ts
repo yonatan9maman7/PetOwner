@@ -14,9 +14,17 @@ import { CommonModule } from '@angular/common';
 import { ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { Subject, takeUntil } from 'rxjs';
-import { ServiceRateDto, PricingUnit, ServiceType } from '../../features/wizard/wizard.model';
+import { ServiceRateDto, ServiceType } from '../../features/wizard/wizard.model';
 import { BookingService } from '../../services/booking.service';
 import { ToastService } from '../../services/toast.service';
+import { PetService, Pet } from '../../services/pet.service';
+import { petSpeciesEmoji } from '../../models/pet-species.model';
+import {
+  normalizeServiceType,
+  normalizePricingUnit,
+  ServiceTypePipe,
+  PricingUnitPipe,
+} from '../service-type.utils';
 
 export interface BookingModalInput {
   providerId: string;
@@ -27,7 +35,7 @@ export interface BookingModalInput {
 @Component({
   selector: 'app-booking-modal',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, TranslatePipe],
+  imports: [CommonModule, ReactiveFormsModule, TranslatePipe, ServiceTypePipe, PricingUnitPipe],
   template: `
     <div
       class="fixed inset-0 z-[2000] flex items-end sm:items-center justify-center transition-opacity duration-200"
@@ -66,12 +74,56 @@ export interface BookingModalInput {
               class="w-full rounded-xl border-2 border-gray-200 px-4 py-2.5 text-sm text-start text-gray-900
                      focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 outline-none transition bg-white">
               <option value="" disabled>{{ 'BOOKING.SELECT_SERVICE' | translate }}</option>
-              @for (rate of data?.serviceRates ?? []; track rate.serviceType) {
-                <option [value]="rate.serviceType">
-                  {{ serviceTypeI18nKey(rate.serviceType) | translate }} — ₪{{ rate.rate }}/{{ pricingUnitKey(rate.pricingUnit) | translate }}
+              @for (rate of data?.serviceRates ?? []; track $index) {
+                <option [value]="toNormalizedType(rate.serviceType)">
+                  {{ rate.serviceType | serviceType | translate }} — ₪{{ rate.rate }}/{{ rate.pricingUnit | pricingUnit | translate }}
                 </option>
               }
             </select>
+          </div>
+
+          <!-- Select Pets -->
+          <div>
+            <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2 text-start">
+              {{ 'BOOKING.SELECT_PETS' | translate }}
+            </label>
+            @if (loadingPets()) {
+              <p class="text-sm text-gray-400 py-2">{{ 'BOOKING.LOADING_PETS' | translate }}</p>
+            } @else if (pets().length === 0) {
+              <div class="bg-amber-50 border border-amber-200 rounded-xl p-3 text-sm text-amber-700 text-start">
+                {{ 'BOOKING.NO_PETS_YET' | translate }}
+              </div>
+            } @else {
+              <div class="flex flex-wrap gap-2">
+                @for (pet of pets(); track pet.id) {
+                  <button
+                    type="button"
+                    (click)="togglePet(pet.id)"
+                    class="px-3 py-2 rounded-xl border-2 text-sm font-medium transition-all duration-150
+                           flex items-center gap-1.5 select-none"
+                    [class.bg-indigo-100]="isPetSelected(pet.id)"
+                    [class.border-indigo-400]="isPetSelected(pet.id)"
+                    [class.text-indigo-700]="isPetSelected(pet.id)"
+                    [class.ring-2]="isPetSelected(pet.id)"
+                    [class.ring-indigo-200]="isPetSelected(pet.id)"
+                    [class.bg-gray-50]="!isPetSelected(pet.id)"
+                    [class.border-gray-200]="!isPetSelected(pet.id)"
+                    [class.text-gray-600]="!isPetSelected(pet.id)"
+                    [class.hover:bg-gray-100]="!isPetSelected(pet.id)">
+                    <span>{{ speciesEmoji(pet.species) }}</span>
+                    <span>{{ pet.name }}</span>
+                    @if (isPetSelected(pet.id)) {
+                      <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
+                      </svg>
+                    }
+                  </button>
+                }
+              </div>
+              @if (submitted() && selectedPetIds().length === 0) {
+                <p class="text-xs text-red-500 mt-1.5 text-start">{{ 'BOOKING.SELECT_AT_LEAST_ONE_PET' | translate }}</p>
+              }
+            }
           </div>
 
           <!-- Start Date -->
@@ -172,9 +224,16 @@ export class BookingModalComponent implements OnChanges, OnDestroy {
   private readonly bookingService = inject(BookingService);
   private readonly toast = inject(ToastService);
   private readonly translate = inject(TranslateService);
+  private readonly petService = inject(PetService);
   private readonly destroy$ = new Subject<void>();
 
   readonly submitting = signal(false);
+  readonly submitted = signal(false);
+  readonly pets = signal<Pet[]>([]);
+  readonly loadingPets = signal(false);
+  readonly selectedPetIds = signal<string[]>([]);
+
+  readonly speciesEmoji = petSpeciesEmoji;
 
   form: FormGroup = this.fb.group({
     serviceType: ['', Validators.required],
@@ -193,7 +252,9 @@ export class BookingModalComponent implements OnChanges, OnDestroy {
     const v = this.formValues();
     if (!v.serviceType || !v.startDate || !v.endDate || !this.data) return null;
 
-    const rate = this.data.serviceRates.find(r => r.serviceType === v.serviceType);
+    const rate = this.data.serviceRates.find(
+      r => normalizeServiceType(r.serviceType) === v.serviceType,
+    );
     if (!rate) return null;
 
     const start = new Date(v.startDate);
@@ -207,7 +268,9 @@ export class BookingModalComponent implements OnChanges, OnDestroy {
     const v = this.formValues();
     if (!v.serviceType || !v.startDate || !v.endDate || !this.data) return '';
 
-    const rate = this.data.serviceRates.find((r) => r.serviceType === v.serviceType);
+    const rate = this.data.serviceRates.find(
+      r => normalizeServiceType(r.serviceType) === v.serviceType,
+    );
     if (!rate) return '';
 
     const start = new Date(v.startDate);
@@ -215,7 +278,7 @@ export class BookingModalComponent implements OnChanges, OnDestroy {
     if (end <= start) return '';
 
     const tr = this.translate;
-    switch (rate.pricingUnit) {
+    switch (normalizePricingUnit(rate.pricingUnit)) {
       case 'PerHour': {
         const hours = Math.round(((end.getTime() - start.getTime()) / 3_600_000) * 10) / 10;
         return tr.instant('BOOKING.PRICE_BREAKDOWN', { hours, rate: rate.rate });
@@ -232,7 +295,12 @@ export class BookingModalComponent implements OnChanges, OnDestroy {
   });
 
   readonly canSubmit = computed(() => {
-    return this.estimatedTotal() !== null && this.estimatedTotal()! > 0 && !this.submitting();
+    return (
+      this.estimatedTotal() !== null &&
+      this.estimatedTotal()! > 0 &&
+      !this.submitting() &&
+      this.selectedPetIds().length > 0
+    );
   });
 
   constructor() {
@@ -248,6 +316,7 @@ export class BookingModalComponent implements OnChanges, OnDestroy {
   ngOnChanges(changes: SimpleChanges): void {
     if (changes['open'] && this.open) {
       this.resetForm();
+      this.loadPets();
     }
   }
 
@@ -260,18 +329,42 @@ export class BookingModalComponent implements OnChanges, OnDestroy {
     this.closed.emit();
   }
 
+  toNormalizedType(type: ServiceType | number | string): string {
+    return normalizeServiceType(type);
+  }
+
+  togglePet(petId: string): void {
+    const current = this.selectedPetIds();
+    if (current.includes(petId)) {
+      this.selectedPetIds.set(current.filter(id => id !== petId));
+    } else {
+      this.selectedPetIds.set([...current, petId]);
+    }
+  }
+
+  isPetSelected(petId: string): boolean {
+    return this.selectedPetIds().includes(petId);
+  }
+
   submit(): void {
+    this.submitted.set(true);
     if (!this.canSubmit() || !this.data) return;
 
     const v = this.form.value;
+    const matchedRate = this.data.serviceRates.find(
+      r => normalizeServiceType(r.serviceType) === v.serviceType,
+    );
+    if (!matchedRate) return;
+
     this.submitting.set(true);
 
     this.bookingService.create({
       providerId: this.data.providerId,
-      serviceType: v.serviceType as ServiceType,
+      serviceType: matchedRate.serviceType,
       startDate: new Date(v.startDate).toISOString(),
       endDate: new Date(v.endDate).toISOString(),
       notes: v.notes?.trim() || null,
+      petIds: this.selectedPetIds(),
     }).subscribe({
       next: () => {
         this.submitting.set(false);
@@ -283,27 +376,8 @@ export class BookingModalComponent implements OnChanges, OnDestroy {
     });
   }
 
-  serviceTypeI18nKey(type: ServiceType): string {
-    const map: Record<string, string> = {
-      DogWalking: 'WIZARD.SERVICE_DOG_WALKING_TITLE',
-      PetSitting: 'WIZARD.SERVICE_PET_SITTING_TITLE',
-      Boarding: 'WIZARD.SERVICE_BOARDING_TITLE',
-      DropInVisit: 'WIZARD.SERVICE_DROP_IN_TITLE',
-    };
-    return map[type] ?? type;
-  }
-
-  pricingUnitKey(unit: PricingUnit): string {
-    const map: Record<string, string> = {
-      PerHour: 'BOOKING.UNIT_HR',
-      PerNight: 'BOOKING.UNIT_NIGHT',
-      PerVisit: 'BOOKING.UNIT_VISIT',
-    };
-    return map[unit] ?? unit;
-  }
-
   private calculatePrice(rate: ServiceRateDto, start: Date, end: Date): number {
-    switch (rate.pricingUnit) {
+    switch (normalizePricingUnit(rate.pricingUnit)) {
       case 'PerNight': {
         const days = Math.floor((end.getTime() - start.getTime()) / 86_400_000);
         return rate.rate * Math.max(1, days);
@@ -331,7 +405,10 @@ export class BookingModalComponent implements OnChanges, OnDestroy {
       return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
     };
 
-    const defaultService = this.data?.serviceRates[0]?.serviceType ?? '';
+    const firstRate = this.data?.serviceRates[0];
+    const defaultService = firstRate
+      ? normalizeServiceType(firstRate.serviceType)
+      : '';
 
     this.form.reset({
       serviceType: defaultService,
@@ -339,6 +416,25 @@ export class BookingModalComponent implements OnChanges, OnDestroy {
       endDate: toLocal(endDefault),
       notes: '',
     });
+    this.selectedPetIds.set([]);
+    this.submitted.set(false);
     this.submitting.set(false);
+  }
+
+  private loadPets(): void {
+    this.loadingPets.set(true);
+    this.petService
+      .getAll()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: pets => {
+          this.pets.set(pets);
+          this.loadingPets.set(false);
+        },
+        error: () => {
+          this.pets.set([]);
+          this.loadingPets.set(false);
+        },
+      });
   }
 }

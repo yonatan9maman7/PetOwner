@@ -8,6 +8,7 @@ import { ToastService } from '../../services/toast.service';
 import { FavoriteService } from '../../services/favorite.service';
 import { petSpeciesEmoji, petSpeciesLabel } from '../../models/pet-species.model';
 import { BookingModalComponent, BookingModalInput } from '../../shared/booking-modal/booking-modal.component';
+import { ServiceTypePipe, PricingUnitPipe } from '../../shared/service-type.utils';
 
 const DAY_KEYS = [
   'SUNDAY',
@@ -22,7 +23,7 @@ const DAY_KEYS = [
 @Component({
   selector: 'app-provider-profile',
   standalone: true,
-  imports: [CommonModule, DatePipe, TranslatePipe, BookingModalComponent],
+  imports: [CommonModule, DatePipe, TranslatePipe, BookingModalComponent, ServiceTypePipe, PricingUnitPipe],
   template: `
     <div class="min-h-screen bg-gray-50" dir="auto">
       @if (loading()) {
@@ -111,11 +112,11 @@ const DAY_KEYS = [
               }
             </div>
             <div class="space-y-2">
-              @for (rate of profile()!.serviceRates; track rate.serviceType) {
+              @for (rate of profile()!.serviceRates; track $index) {
                 <div class="flex items-center justify-between gap-2 py-1.5">
-                  <span class="text-sm font-medium text-gray-800 text-start">{{ serviceTypeKey(rate.serviceType) | translate }}</span>
+                  <span class="text-sm font-medium text-gray-800 text-start">{{ rate.serviceType | serviceType | translate }}</span>
                   <span class="text-sm font-semibold text-indigo-700 shrink-0" dir="auto">
-                    ₪{{ rate.rate }}/{{ unitKey(rate.pricingUnit) | translate }}
+                    ₪{{ rate.rate }}/{{ rate.pricingUnit | pricingUnit | translate }}
                   </span>
                 </div>
               }

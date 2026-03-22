@@ -16,17 +16,20 @@ public class AuthController : ControllerBase
     private readonly IConfiguration _config;
     private readonly IEmailService _emailService;
     private readonly ITokenService _tokenService;
+    private readonly ILogger<AuthController> _logger;
 
     public AuthController(
         ApplicationDbContext db,
         IConfiguration config,
         IEmailService emailService,
-        ITokenService tokenService)
+        ITokenService tokenService,
+        ILogger<AuthController> logger)
     {
         _db = db;
         _config = config;
         _emailService = emailService;
         _tokenService = tokenService;
+        _logger = logger;
     }
 
     [HttpPost("register")]
@@ -92,23 +95,23 @@ public class AuthController : ControllerBase
 
             var encodedToken = Uri.EscapeDataString(resetToken);
             var encodedEmail = Uri.EscapeDataString(emailNorm);
-            var baseUrl = _config["FrontendBaseUrl"]?.TrimEnd('/');
+            var baseUrl = (_config["FrontendBaseUrl"] ?? "http://localhost:4200").TrimEnd('/');
             var resetLink = $"{baseUrl}/reset-password?token={encodedToken}&email={encodedEmail}";
 
-            var body = $@"
-<div dir='ltr' style='font-family: Arial, sans-serif; color: #333; text-align: left; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eaeaea; border-radius: 10px;'>
-    <h2 style='color: #4F46E5;'>Reset Your Password - PetOwner</h2>
-    <p>Hello,</p>
-    <p>We received a request to reset the password for your account.</p>
-    <p>Click the button below to choose a new password:</p>
-    <div style='margin: 30px 0;'>
-        <a href='{resetLink}' style='background-color: #4F46E5; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; font-weight: bold; display: inline-block;'>Reset Password</a>
-    </div>
-    <p style='font-size: 12px; color: #888;'>If you didn't request a password reset, you can safely ignore this email.</p>
-    <p>Best regards,<br/>The PetOwner Team</p>
-</div>";
+            _logger.LogInformation(
+                "Password reset requested for {Email}. Dev/test reset link: {ResetLink}",
+                emailNorm,
+                resetLink);
 
-            await _emailService.SendEmailAsync(emailNorm, "Reset Your Password - PetOwner", body);
+            const string subject = "איפוס סיסמה למערכת";
+            var body =
+                $"<div dir='rtl' style='text-align: right; font-family: sans-serif;'><h2>שלום,</h2>" +
+                "<p>קיבלנו בקשה לאיפוס הסיסמה שלך.</p>" +
+                "<p>לחיצה על הקישור הבא תוביל אותך למסך איפוס הסיסמה:</p>" +
+                $"<p><a href='{resetLink}'>לחץ כאן לאיפוס הסיסמה</a></p>" +
+                "<p>אם לא ביקשת לאפס את הסיסמה, התעלם מהודעה זו.</p></div>";
+
+            await _emailService.SendEmailAsync(emailNorm, subject, body);
         }
 
         return Ok(new { message = "If the email exists in our system, a reset link has been sent." });
