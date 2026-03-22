@@ -10,6 +10,10 @@ public class Post
     public int CommentCount { get; set; }
     public DateTime CreatedAt { get; set; }
 
+    public double? Latitude { get; set; }
+    public double? Longitude { get; set; }
+    public string? City { get; set; }
+
     public User User { get; set; } = null!;
     public ICollection<PostLike> Likes { get; set; } = new List<PostLike>();
     public ICollection<PostComment> Comments { get; set; } = new List<PostComment>();

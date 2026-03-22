@@ -18,4 +18,5 @@ public class Booking
 
     public User Owner { get; set; } = null!;
     public ProviderProfile ProviderProfile { get; set; } = null!;
+    public Review? Review { get; set; }
 }

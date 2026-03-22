@@ -2,8 +2,10 @@ import { Injectable, inject, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import * as signalR from '@microsoft/signalr';
+import { TranslateService } from '@ngx-translate/core';
 import { API_BASE_URL } from '../api-base.token';
 import { AuthService } from './auth.service';
+import { ToastService } from './toast.service';
 
 export interface AppNotification {
   id: string;
@@ -20,6 +22,8 @@ export class NotificationService {
   private readonly http = inject(HttpClient);
   private readonly auth = inject(AuthService);
   private readonly apiBaseUrl = inject(API_BASE_URL);
+  private readonly toast = inject(ToastService);
+  private readonly translate = inject(TranslateService);
   private connection: signalR.HubConnection | null = null;
 
   private notificationsHubUrl(): string {
@@ -40,10 +44,11 @@ export class NotificationService {
       .withAutomaticReconnect()
       .build();
 
-    this.connection.on('NotificationReceived', (notification: AppNotification) => {
+    this.connection.on('ReceiveNotification', (notification: AppNotification) => {
       this.notifications.update(list => [notification, ...list]);
       this.unreadCount.update(c => c + 1);
       this.newNotification.set(notification);
+      this.toast.show(notification.title || this.translate.instant('NOTIFICATIONS.NEW'), 'info');
     });
 
     this.connection.start().catch(() => {});
@@ -66,7 +71,7 @@ export class NotificationService {
 
   markAsRead(id: string): Observable<void> {
     return new Observable(sub => {
-      this.http.post<void>(`/api/notifications/${id}/read`, {}).subscribe({
+      this.http.put<void>(`/api/notifications/${id}/read`, {}).subscribe({
         next: () => {
           this.notifications.update(list =>
             list.map(n => n.id === id ? { ...n, isRead: true } : n)

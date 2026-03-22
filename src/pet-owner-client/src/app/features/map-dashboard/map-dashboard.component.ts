@@ -2,6 +2,7 @@ import {
   Component,
   OnInit,
   OnDestroy,
+  AfterViewInit,
   signal,
   computed,
   inject,
@@ -10,7 +11,6 @@ import {
   ElementRef,
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import * as L from 'leaflet';
 import { MapService, MapSearchFilters } from '../../services/map.service';
@@ -18,12 +18,11 @@ import { ProviderService } from '../../services/provider.service';
 import { AuthService } from '../../services/auth.service';
 import { AdminService } from '../../services/admin.service';
 import { ToastService } from '../../services/toast.service';
-import { PetService, Pet } from '../../services/pet.service';
-import { petSpeciesEmoji, petSpeciesLabel } from '../../models/pet-species.model';
-import { RequestService } from '../../services/request.service';
 import { ReviewService, ProviderReview } from '../../services/review.service';
 import { MapPin } from '../../models/map-pin.model';
-import { TranslatePipe } from '@ngx-translate/core';
+import { TranslatePipe, TranslateService } from '@ngx-translate/core';
+import { FavoriteService } from '../../services/favorite.service';
+import { BookingModalComponent, BookingModalInput } from '../../shared/booking-modal/booking-modal.component';
 
 const FLORENTIN_LAT = 32.0563;
 const FLORENTIN_LNG = 34.7668;
@@ -32,32 +31,31 @@ const DEFAULT_ZOOM = 15;
 @Component({
   selector: 'app-map-dashboard',
   standalone: true,
-  imports: [CommonModule, FormsModule, TranslatePipe],
+  imports: [CommonModule, TranslatePipe, BookingModalComponent],
   templateUrl: './map-dashboard.component.html',
   styleUrl: './map-dashboard.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class MapDashboardComponent implements OnInit, OnDestroy {
+export class MapDashboardComponent implements OnInit, OnDestroy, AfterViewInit {
   @ViewChild('chipsContainer') chipsContainer!: ElementRef<HTMLDivElement>;
+  @ViewChild('mapHost') mapHost!: ElementRef<HTMLElement>;
 
   private readonly mapService = inject(MapService);
   readonly providerService = inject(ProviderService);
   private readonly auth = inject(AuthService);
   private readonly toast = inject(ToastService);
-  private readonly petService = inject(PetService);
-  private readonly requestService = inject(RequestService);
   private readonly reviewService = inject(ReviewService);
   private readonly adminService = inject(AdminService);
   private readonly router = inject(Router);
-
-  readonly petSpeciesEmoji = petSpeciesEmoji;
-  readonly petSpeciesLabel = petSpeciesLabel;
+  readonly favoriteService = inject(FavoriteService);
+  private readonly translate = inject(TranslateService);
 
   readonly isLoggedIn = computed(() => this.auth.isLoggedIn());
   readonly isAdmin = computed(() => this.auth.userRole() === 'Admin');
 
   private map!: L.Map;
   private markersLayer = L.layerGroup();
+  private mapResizeObserver?: ResizeObserver;
   private userLat: number | null = null;
   private userLng: number | null = null;
 
@@ -72,19 +70,9 @@ export class MapDashboardComponent implements OnInit, OnDestroy {
   isAvailable = signal(false);
   togglingAvailability = signal(false);
 
-  isRequestModalOpen = signal(false);
-  pets = signal<Pet[]>([]);
-  selectedPetId = signal<string | null>(null);
-  loadingPets = signal(false);
-  sendingRequest = signal(false);
-
-  bookingDate = signal('');
-  bookingStartTime = signal('09:00');
-  bookingEndTime = signal('11:00');
-  bookingNotes = signal('');
-  shareMedicalRecords = signal(false);
-
-  providerSlots = signal<{ dayOfWeek: number; startTime: string; endTime: string }[]>([]);
+  isBookingModalOpen = signal(false);
+  bookingModalData = signal<BookingModalInput | null>(null);
+  bookingModalLoading = signal(false);
 
   providerReviews = signal<ProviderReview[]>([]);
   loadingReviews = signal(false);
@@ -125,59 +113,6 @@ export class MapDashboardComponent implements OnInit, OnDestroy {
     return count;
   });
 
-  estimatedPrice = computed(() => {
-    const pin = this.selectedPin();
-    const start = this.bookingStartTime();
-    const end = this.bookingEndTime();
-    if (!pin || !start || !end) return null;
-
-    const [sh, sm] = start.split(':').map(Number);
-    const [eh, em] = end.split(':').map(Number);
-    const hours = (eh * 60 + em - sh * 60 - sm) / 60;
-    if (hours <= 0) return null;
-
-    const rate = pin.minRate;
-
-    return {
-      hours: Math.round(hours * 10) / 10,
-      rate,
-      total: Math.round(rate * hours * 100) / 100,
-    };
-  });
-
-  canBook = computed(() => {
-    return !!this.selectedPetId()
-      && !!this.bookingDate()
-      && !!this.bookingStartTime()
-      && !!this.bookingEndTime()
-      && this.estimatedPrice() !== null
-      && !this.sendingRequest();
-  });
-
-  isOutsideWorkingHours = computed(() => {
-    const date = this.bookingDate();
-    const startTime = this.bookingStartTime();
-    const endTime = this.bookingEndTime();
-    const slots = this.providerSlots();
-    if (!date || !startTime || !endTime || slots.length === 0) return false;
-
-    const [y, m, d] = date.split('-').map(Number);
-    const dayOfWeek = new Date(y, m - 1, d).getDay();
-    const startMin = this.timeToMinutes(startTime);
-    const endMin = this.timeToMinutes(endTime);
-
-    return !slots.some(s =>
-      s.dayOfWeek === dayOfWeek
-      && this.timeToMinutes(s.startTime) <= startMin
-      && this.timeToMinutes(s.endTime) >= endMin
-    );
-  });
-
-  private timeToMinutes(t: string): number {
-    const [h, m] = t.split(':').map(Number);
-    return h * 60 + m;
-  }
-
   ngOnInit(): void {
     this.initMap();
     this.locateUser();
@@ -187,7 +122,20 @@ export class MapDashboardComponent implements OnInit, OnDestroy {
     });
   }
 
+  ngAfterViewInit(): void {
+    const host = this.mapHost?.nativeElement;
+    if (host && this.map) {
+      this.mapResizeObserver = new ResizeObserver(() => {
+        this.map?.invalidateSize({ animate: false });
+      });
+      this.mapResizeObserver.observe(host);
+    }
+    queueMicrotask(() => this.map?.invalidateSize({ animate: false }));
+  }
+
   ngOnDestroy(): void {
+    this.mapResizeObserver?.disconnect();
+    this.mapResizeObserver = undefined;
     this.map?.remove();
   }
 
@@ -213,82 +161,42 @@ export class MapDashboardComponent implements OnInit, OnDestroy {
     });
   }
 
-  openRequestModal(): void {
+  openBookingModal(): void {
     const pin = this.selectedPin();
     if (!pin) return;
 
     if (!this.auth.isLoggedIn()) {
-      this.toast.error('You must be logged in to request a service.');
+      this.toast.error(this.translate.instant('BOOKING.LOGIN_REQUIRED'));
       return;
     }
 
-    const tomorrow = new Date();
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    this.bookingDate.set(tomorrow.toISOString().split('T')[0]);
-    this.bookingStartTime.set('09:00');
-    this.bookingEndTime.set('11:00');
-    this.bookingNotes.set('');
-
-    this.loadingPets.set(true);
-    this.providerSlots.set([]);
-    this.isRequestModalOpen.set(true);
-
-    this.petService.getAll().subscribe({
-      next: (pets) => {
-        this.pets.set(pets);
-        if (pets.length === 1) {
-          this.selectedPetId.set(pets[0].id);
-        }
-        this.loadingPets.set(false);
-      },
-      error: () => {
-        this.loadingPets.set(false);
-        this.toast.error('Failed to load your pets.');
-      },
-    });
+    this.bookingModalLoading.set(true);
 
     this.mapService.getProviderProfile(pin.providerId).subscribe({
-      next: (profile) => this.providerSlots.set(profile.availabilitySlots),
-    });
-  }
-
-  closeRequestModal(): void {
-    this.isRequestModalOpen.set(false);
-    this.selectedPetId.set(null);
-    this.shareMedicalRecords.set(false);
-  }
-
-  sendRequest(): void {
-    const pin = this.selectedPin();
-    const petId = this.selectedPetId();
-    const date = this.bookingDate();
-    const start = this.bookingStartTime();
-    const end = this.bookingEndTime();
-    if (!pin || !petId || !date || !start || !end) return;
-
-    this.sendingRequest.set(true);
-
-    const scheduledStart = `${date}T${start}:00`;
-    const scheduledEnd = `${date}T${end}:00`;
-
-    this.requestService.create({
-      providerId: pin.providerId,
-      petId,
-      scheduledStart,
-      scheduledEnd,
-      notes: this.bookingNotes().trim() || null,
-      shareMedicalRecords: this.shareMedicalRecords(),
-    }).subscribe({
-      next: () => {
-        this.sendingRequest.set(false);
-        this.closeRequestModal();
-        this.closeSheet();
-        this.toast.success('Request sent successfully! Waiting for the provider\'s approval.');
+      next: (profile) => {
+        this.bookingModalData.set({
+          providerId: profile.providerId,
+          providerName: profile.name,
+          serviceRates: profile.serviceRates,
+        });
+        this.bookingModalLoading.set(false);
+        this.isBookingModalOpen.set(true);
       },
       error: () => {
-        this.sendingRequest.set(false);
+        this.bookingModalLoading.set(false);
+        this.toast.error(this.translate.instant('PROVIDER_PROFILE.NOT_FOUND'));
       },
     });
+  }
+
+  closeBookingModal(): void {
+    this.isBookingModalOpen.set(false);
+  }
+
+  onBookingSuccess(): void {
+    this.isBookingModalOpen.set(false);
+    this.closeSheet();
+    this.toast.success(this.translate.instant('BOOKING.SUCCESS'));
   }
 
   private checkProviderStatus(): void {
@@ -325,6 +233,9 @@ export class MapDashboardComponent implements OnInit, OnDestroy {
 
     L.control.zoom({ position: 'bottomright' }).addTo(this.map);
     this.markersLayer.addTo(this.map);
+
+    // Tile layer + controls size to the container; defer until layout/padding are applied.
+    setTimeout(() => this.map.invalidateSize({ animate: false }), 0);
   }
 
   private locateUser(): void {
@@ -400,12 +311,22 @@ export class MapDashboardComponent implements OnInit, OnDestroy {
     this.filterMinRating.set(val ? parseFloat(val) : null);
   }
 
+  setMinRatingAndApply(val: number | null): void {
+    this.filterMinRating.set(val);
+    this.loadPins();
+  }
+
   setMaxRate(val: string): void {
     this.filterMaxRate.set(val ? parseFloat(val) : null);
   }
 
   setRadiusKm(val: string): void {
     this.filterRadiusKm.set(val ? parseFloat(val) : null);
+  }
+
+  toggleFavorite(providerId: string): void {
+    if (!this.auth.isLoggedIn()) return;
+    this.favoriteService.toggle(providerId).subscribe();
   }
 
   viewProviderProfile(providerId: string): void {

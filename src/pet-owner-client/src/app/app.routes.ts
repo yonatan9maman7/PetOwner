@@ -127,6 +127,14 @@ export const routes: Routes = [
       ),
   },
   {
+    path: 'favorites',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./features/favorites/favorites.component').then(
+        (m) => m.FavoritesComponent
+      ),
+  },
+  {
     path: 'provider-dashboard',
     canActivate: [authGuard],
     loadComponent: () =>

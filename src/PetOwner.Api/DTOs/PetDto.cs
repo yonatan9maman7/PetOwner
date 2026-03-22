@@ -12,7 +12,12 @@ public record PetDto(
     string? Allergies,
     string? MedicalConditions,
     string? Notes,
-    bool IsNeutered
+    bool IsNeutered,
+    string? MedicalNotes,
+    string? FeedingSchedule,
+    string? MicrochipNumber,
+    string? VetName,
+    string? VetPhone
 );
 
 public record CreatePetRequest(
@@ -24,7 +29,12 @@ public record CreatePetRequest(
     string? Allergies,
     string? MedicalConditions,
     string? Notes,
-    bool IsNeutered = false
+    bool IsNeutered = false,
+    string? MedicalNotes = null,
+    string? FeedingSchedule = null,
+    string? MicrochipNumber = null,
+    string? VetName = null,
+    string? VetPhone = null
 );
 
 public record UpdatePetRequest(
@@ -36,5 +46,10 @@ public record UpdatePetRequest(
     string? Allergies,
     string? MedicalConditions,
     string? Notes,
-    bool IsNeutered = false
+    bool IsNeutered = false,
+    string? MedicalNotes = null,
+    string? FeedingSchedule = null,
+    string? MicrochipNumber = null,
+    string? VetName = null,
+    string? VetPhone = null
 );

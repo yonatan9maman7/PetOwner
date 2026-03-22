@@ -14,6 +14,11 @@ export interface Pet {
   allergies?: string;
   medicalConditions?: string;
   isNeutered?: boolean;
+  medicalNotes?: string;
+  feedingSchedule?: string;
+  microchipNumber?: string;
+  vetName?: string;
+  vetPhone?: string;
 }
 
 export interface CreatePetPayload {
@@ -26,6 +31,11 @@ export interface CreatePetPayload {
   allergies?: string;
   medicalConditions?: string;
   isNeutered?: boolean;
+  medicalNotes?: string;
+  feedingSchedule?: string;
+  microchipNumber?: string;
+  vetName?: string;
+  vetPhone?: string;
 }
 
 export interface UpdatePetPayload {
@@ -38,6 +48,11 @@ export interface UpdatePetPayload {
   allergies?: string;
   medicalConditions?: string;
   isNeutered?: boolean;
+  medicalNotes?: string;
+  feedingSchedule?: string;
+  microchipNumber?: string;
+  vetName?: string;
+  vetPhone?: string;
 }
 
 @Injectable({ providedIn: 'root' })

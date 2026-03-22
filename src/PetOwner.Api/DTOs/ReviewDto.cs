@@ -8,11 +8,19 @@ public record CreateReviewDto(
     int? ReliabilityRating = null
 );
 
+public record CreateBookingReviewDto(
+    Guid BookingId,
+    int Rating,
+    string Comment
+);
+
 public record ReviewDto(
     Guid Id,
-    Guid ServiceRequestId,
+    Guid? ServiceRequestId,
+    Guid? BookingId,
     Guid ReviewerId,
     string ReviewerName,
+    string? ReviewerAvatar,
     Guid RevieweeId,
     int Rating,
     string Comment,

@@ -64,7 +64,7 @@ export interface EarningsTransaction {
   capturedAt: string | null;
 }
 
-export interface StripeConnectStatus {
+export interface GrowConnectStatus {
   isConnected: boolean;
   accountId: string | null;
 }
@@ -198,8 +198,8 @@ export class ProviderService {
     return this.http.get<EarningsTransaction[]>(`${this.baseUrl}/me/earnings/transactions`);
   }
 
-  getStripeConnectStatus(): Observable<StripeConnectStatus> {
-    return this.http.get<StripeConnectStatus>(`${this.baseUrl}/me/stripe-connect`);
+  getGrowConnectStatus(): Observable<GrowConnectStatus> {
+    return this.http.get<GrowConnectStatus>(`${this.baseUrl}/me/grow-connect`);
   }
 
   getStats(): Observable<ProviderDashboardStats> {

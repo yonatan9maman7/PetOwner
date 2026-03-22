@@ -12,6 +12,7 @@ public class User
     public DateTime CreatedAt { get; set; }
     public string? ResetPasswordToken { get; set; }
     public DateTime? ResetPasswordTokenExpiry { get; set; }
+    public bool IsActive { get; set; } = true;
 
     public ProviderProfile? ProviderProfile { get; set; }
     public Location? Location { get; set; }
@@ -23,4 +24,5 @@ public class User
     public ICollection<Post> Posts { get; set; } = [];
     public ICollection<Notification> Notifications { get; set; } = [];
     public ICollection<Booking> Bookings { get; set; } = [];
+    public ICollection<GroupPost> GroupPosts { get; set; } = [];
 }

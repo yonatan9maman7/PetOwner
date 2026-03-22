@@ -695,7 +695,7 @@ export class RequestsComponent implements OnInit {
 
     this.submittingReview.set(true);
 
-    this.reviewService.create({
+    this.reviewService.createForServiceRequest({
       requestId: req.id,
       rating: this.reviewRating(),
       comment: this.reviewCommentValue.trim(),

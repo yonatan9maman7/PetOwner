@@ -1,8 +1,10 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using PetOwner.Api.DTOs;
 using PetOwner.Api.Services;
 using PetOwner.Data;
+using PetOwner.Data.Models;
 
 namespace PetOwner.Api.Controllers;
 
@@ -13,11 +15,93 @@ public class AdminController : ControllerBase
 {
     private readonly ApplicationDbContext _db;
     private readonly DatabaseSeeder _seeder;
+    private const decimal PlatformFeePercent = 0.10m;
 
     public AdminController(ApplicationDbContext db, DatabaseSeeder seeder)
     {
         _db = db;
         _seeder = seeder;
+    }
+
+    [HttpGet("stats")]
+    public async Task<IActionResult> GetStats()
+    {
+        var totalUsers = await _db.Users.CountAsync();
+        var totalProviders = await _db.ProviderProfiles
+            .CountAsync(p => p.Status == "Approved");
+        var totalBookings = await _db.Bookings.CountAsync();
+
+        var revenueBookings = await _db.Bookings
+            .Where(b => b.Status == BookingStatus.Completed ||
+                        b.PaymentStatus == PaymentStatus.Paid)
+            .SumAsync(b => b.TotalPrice);
+
+        return Ok(new AdminStatsDto
+        {
+            TotalUsers = totalUsers,
+            TotalProviders = totalProviders,
+            TotalBookings = totalBookings,
+            TotalPlatformRevenue = revenueBookings * PlatformFeePercent
+        });
+    }
+
+    [HttpGet("users")]
+    public async Task<IActionResult> GetUsers()
+    {
+        var users = await _db.Users
+            .Include(u => u.ProviderProfile)
+            .OrderByDescending(u => u.CreatedAt)
+            .Select(u => new AdminUserDto
+            {
+                Id = u.Id,
+                Name = u.Name,
+                Email = u.Email,
+                Phone = u.Phone,
+                Role = u.Role,
+                CreatedAt = u.CreatedAt,
+                IsActive = u.IsActive,
+                ProviderStatus = u.ProviderProfile != null ? u.ProviderProfile.Status : null
+            })
+            .ToListAsync();
+
+        return Ok(users);
+    }
+
+    [HttpPut("users/{id:guid}/toggle-status")]
+    public async Task<IActionResult> ToggleUserStatus(Guid id)
+    {
+        var user = await _db.Users.FindAsync(id);
+        if (user is null)
+            return NotFound(new { message = "User not found." });
+
+        user.IsActive = !user.IsActive;
+        await _db.SaveChangesAsync();
+
+        return Ok(new { message = user.IsActive ? "User unblocked." : "User blocked.", isActive = user.IsActive });
+    }
+
+    [HttpGet("bookings")]
+    public async Task<IActionResult> GetBookings()
+    {
+        var bookings = await _db.Bookings
+            .Include(b => b.Owner)
+            .Include(b => b.ProviderProfile)
+                .ThenInclude(p => p.User)
+            .OrderByDescending(b => b.CreatedAt)
+            .Select(b => new AdminBookingDto
+            {
+                Id = b.Id,
+                OwnerName = b.Owner.Name,
+                ProviderName = b.ProviderProfile.User.Name,
+                Service = b.Service.ToString(),
+                Status = b.Status.ToString(),
+                TotalPrice = b.TotalPrice,
+                StartDate = b.StartDate,
+                CreatedAt = b.CreatedAt
+            })
+            .ToListAsync();
+
+        return Ok(bookings);
     }
 
     [HttpGet("pending")]
@@ -100,8 +184,13 @@ public class AdminController : ControllerBase
     [HttpPost("seed-dummy-data")]
     public async Task<IActionResult> SeedDummyData()
     {
-        var count = await _seeder.SeedProvidersAsync();
-        return Ok(new { message = $"Successfully seeded {count} dummy providers." });
+        var result = await _seeder.SeedFullDemoEcosystemAsync();
+        return Ok(new
+        {
+            message = $"Demo ecosystem created: {result.Providers} providers, {result.Owners} owners, " +
+                      $"{result.Pets} pets, {result.Bookings} bookings, {result.Reviews} reviews, " +
+                      $"{result.GroupPosts} community posts, {result.SocialPosts} social posts."
+        });
     }
 
     [HttpPost("seed-bogus-pets")]

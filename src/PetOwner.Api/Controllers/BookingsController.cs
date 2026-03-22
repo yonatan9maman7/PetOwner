@@ -17,11 +17,16 @@ public class BookingsController : ControllerBase
 {
     private readonly ApplicationDbContext _db;
     private readonly IGrowPaymentService _growPayment;
+    private readonly INotificationService _notifications;
 
-    public BookingsController(ApplicationDbContext db, IGrowPaymentService growPayment)
+    public BookingsController(
+        ApplicationDbContext db,
+        IGrowPaymentService growPayment,
+        INotificationService notifications)
     {
         _db = db;
         _growPayment = growPayment;
+        _notifications = notifications;
     }
 
     [HttpPost]
@@ -71,6 +76,13 @@ public class BookingsController : ControllerBase
         _db.Bookings.Add(booking);
         await _db.SaveChangesAsync();
 
+        await _notifications.CreateAsync(
+            provider.UserId,
+            "BookingCreated",
+            "New Booking Request",
+            $"You have a new request from {owner?.Name ?? "a pet owner"}.",
+            booking.Id);
+
         return CreatedAtAction(nameof(GetById), new { id = booking.Id }, ToDto(booking, provider.User.Name, owner?.Name ?? "", serviceRate.Unit.ToString()));
     }
 
@@ -83,6 +95,7 @@ public class BookingsController : ControllerBase
             .Include(b => b.Owner)
             .Include(b => b.ProviderProfile).ThenInclude(p => p.User)
             .Include(b => b.ProviderProfile).ThenInclude(p => p.ServiceRates)
+            .Include(b => b.Review)
             .FirstOrDefaultAsync(b => b.Id == id);
 
         if (booking is null)
@@ -94,7 +107,8 @@ public class BookingsController : ControllerBase
         var unit = booking.ProviderProfile.ServiceRates
             .FirstOrDefault(r => r.Service == booking.Service)?.Unit.ToString() ?? "";
 
-        return Ok(ToDto(booking, booking.ProviderProfile.User.Name, booking.Owner.Name, unit));
+        return Ok(ToDto(booking, booking.ProviderProfile.User.Name, booking.Owner.Name, unit,
+            booking.ProviderProfile.User.Phone, booking.Owner.Phone));
     }
 
     [HttpGet("mine")]
@@ -106,6 +120,7 @@ public class BookingsController : ControllerBase
             .Include(b => b.Owner)
             .Include(b => b.ProviderProfile).ThenInclude(p => p.User)
             .Include(b => b.ProviderProfile).ThenInclude(p => p.ServiceRates)
+            .Include(b => b.Review)
             .Where(b => b.OwnerId == userId || b.ProviderProfileId == userId)
             .OrderByDescending(b => b.CreatedAt)
             .ToListAsync();
@@ -115,7 +130,8 @@ public class BookingsController : ControllerBase
             var unit = b.ProviderProfile.ServiceRates
                 .FirstOrDefault(r => r.Service == b.Service)?.Unit.ToString() ?? "";
 
-            return ToDto(b, b.ProviderProfile.User.Name, b.Owner.Name, unit);
+            return ToDto(b, b.ProviderProfile.User.Name, b.Owner.Name, unit,
+                b.ProviderProfile.User.Phone, b.Owner.Phone);
         });
 
         return Ok(dtos);
@@ -126,7 +142,10 @@ public class BookingsController : ControllerBase
     {
         var userId = GetUserId();
 
-        var booking = await _db.Bookings.FindAsync(id);
+        var booking = await _db.Bookings
+            .Include(b => b.ProviderProfile).ThenInclude(p => p.User)
+            .FirstOrDefaultAsync(b => b.Id == id);
+
         if (booking is null)
             return NotFound(new { message = "Booking not found." });
 
@@ -139,6 +158,14 @@ public class BookingsController : ControllerBase
         booking.Status = BookingStatus.Confirmed;
         booking.PaymentUrl = await _growPayment.GeneratePaymentLinkAsync(booking);
         await _db.SaveChangesAsync();
+
+        var providerName = booking.ProviderProfile.User.Name;
+        await _notifications.CreateAsync(
+            booking.OwnerId,
+            "BookingConfirmed",
+            "Booking Confirmed",
+            $"Your booking with {providerName} was approved!",
+            booking.Id);
 
         return NoContent();
     }
@@ -164,7 +191,8 @@ public class BookingsController : ControllerBase
         return NoContent();
     }
 
-    private static BookingDto ToDto(Booking b, string providerName, string ownerName, string unit)
+    private static BookingDto ToDto(Booking b, string providerName, string ownerName, string unit,
+        string? providerPhone = null, string? ownerPhone = null)
     {
         return new BookingDto(
             b.Id, b.OwnerId, b.ProviderProfileId,
@@ -172,7 +200,9 @@ public class BookingsController : ControllerBase
             b.Service.ToString(), b.StartDate, b.EndDate,
             b.TotalPrice, unit, b.Status.ToString(),
             b.PaymentStatus.ToString(), b.PaymentUrl,
-            b.CreatedAt, b.Notes
+            b.CreatedAt, b.Notes,
+            providerPhone, ownerPhone,
+            b.Review is not null
         );
     }
 

@@ -124,8 +124,22 @@ const RECORD_TYPES = ['Vaccination', 'Condition', 'Medication', 'VetVisit'] as c
                       </div>
                     }
 
-                    <!-- Health Records & Triage History Toggles -->
-                    <div class="mt-3 flex items-center gap-4">
+                    <!-- Medical Card / Health Records / Triage History Toggles -->
+                    <div class="mt-3 flex items-center gap-4 flex-wrap">
+                      <button
+                        type="button"
+                        (click)="toggleMedicalCard(pet)"
+                        class="flex items-center gap-1.5 text-sm font-medium transition-colors duration-150"
+                        [class]="medicalCardPetId() === pet.id ? 'text-teal-600' : 'text-slate-400 hover:text-teal-500'"
+                      >
+                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                          <path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+                        </svg>
+                        {{ 'PETS.MEDICAL_CARD_TITLE' | translate }}
+                        <svg class="w-3.5 h-3.5 transition-transform duration-200" [class.rotate-180]="medicalCardPetId() === pet.id" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                          <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
+                        </svg>
+                      </button>
                       <button
                         type="button"
                         (click)="toggleHealthRecords(pet)"
@@ -156,6 +170,109 @@ const RECORD_TYPES = ['Vaccination', 'Condition', 'Medication', 'VetVisit'] as c
                       </button>
                     </div>
                   </div>
+
+                  <!-- ─── Expanded Medical Card Panel ─── -->
+                  @if (medicalCardPetId() === pet.id) {
+                    <div class="border-t border-gray-100 bg-gradient-to-br from-teal-50/60 to-cyan-50/40 p-5">
+                      @if (hasMedicalInfo(pet)) {
+                        <div class="space-y-4">
+                          <div class="flex items-center gap-2 mb-1">
+                            <div class="w-8 h-8 rounded-lg bg-teal-100 flex items-center justify-center">
+                              <svg class="w-4.5 h-4.5 text-teal-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                              </svg>
+                            </div>
+                            <div>
+                              <h4 class="text-sm font-semibold text-slate-900">{{ 'PETS.MEDICAL_CARD_TITLE' | translate }}</h4>
+                              <p class="text-[11px] text-slate-500">{{ 'PETS.MEDICAL_CARD_SUBTITLE' | translate }}</p>
+                            </div>
+                          </div>
+
+                          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            @if (pet.medicalNotes) {
+                              <div class="sm:col-span-2 bg-white rounded-xl border border-gray-100 p-3.5 shadow-sm">
+                                <div class="flex items-center gap-2 mb-1.5">
+                                  <svg class="w-4 h-4 text-rose-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                  </svg>
+                                  <span class="text-xs font-semibold text-slate-700">{{ 'PETS.MEDICAL_NOTES' | translate }}</span>
+                                </div>
+                                <p class="text-sm text-slate-600 leading-relaxed whitespace-pre-wrap" dir="auto">{{ pet.medicalNotes }}</p>
+                              </div>
+                            }
+                            @if (pet.feedingSchedule) {
+                              <div class="sm:col-span-2 bg-white rounded-xl border border-gray-100 p-3.5 shadow-sm">
+                                <div class="flex items-center gap-2 mb-1.5">
+                                  <svg class="w-4 h-4 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                  </svg>
+                                  <span class="text-xs font-semibold text-slate-700">{{ 'PETS.FEEDING_SCHEDULE' | translate }}</span>
+                                </div>
+                                <p class="text-sm text-slate-600 leading-relaxed whitespace-pre-wrap" dir="auto">{{ pet.feedingSchedule }}</p>
+                              </div>
+                            }
+                            @if (pet.microchipNumber) {
+                              <div class="bg-white rounded-xl border border-gray-100 p-3.5 shadow-sm">
+                                <div class="flex items-center gap-2 mb-1.5">
+                                  <svg class="w-4 h-4 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+                                  </svg>
+                                  <span class="text-xs font-semibold text-slate-700">{{ 'PETS.MICROCHIP' | translate }}</span>
+                                </div>
+                                <p class="text-sm text-slate-800 font-mono tracking-wide" dir="auto">{{ pet.microchipNumber }}</p>
+                              </div>
+                            }
+                            @if (pet.isNeutered) {
+                              <div class="bg-white rounded-xl border border-gray-100 p-3.5 shadow-sm">
+                                <div class="flex items-center gap-2">
+                                  <svg class="w-4 h-4 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+                                  </svg>
+                                  <span class="text-sm font-medium text-slate-700">{{ 'PETS.SPAYED' | translate }}</span>
+                                </div>
+                              </div>
+                            }
+                            @if (pet.vetName || pet.vetPhone) {
+                              <div class="sm:col-span-2 bg-white rounded-xl border border-gray-100 p-3.5 shadow-sm">
+                                <div class="flex items-center gap-2 mb-1.5">
+                                  <svg class="w-4 h-4 text-purple-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                                  </svg>
+                                  <span class="text-xs font-semibold text-slate-700">{{ 'PETS.VET_DETAILS' | translate }}</span>
+                                </div>
+                                <div class="flex items-center gap-4 text-sm text-slate-700">
+                                  @if (pet.vetName) {
+                                    <span dir="auto">{{ pet.vetName }}</span>
+                                  }
+                                  @if (pet.vetPhone) {
+                                    <a [href]="'tel:' + pet.vetPhone" class="inline-flex items-center gap-1 text-teal-600 hover:text-teal-700 font-medium">
+                                      <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                                      </svg>
+                                      {{ pet.vetPhone }}
+                                    </a>
+                                  }
+                                </div>
+                              </div>
+                            }
+                          </div>
+                        </div>
+                      } @else {
+                        <div class="text-center py-6">
+                          <div class="w-12 h-12 rounded-full bg-teal-100 flex items-center justify-center text-xl mx-auto mb-2">
+                            <svg class="w-6 h-6 text-teal-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                              <path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                            </svg>
+                          </div>
+                          <p class="text-sm text-slate-500 mb-1">{{ 'PETS.NO_MEDICAL_INFO' | translate }}</p>
+                          <button type="button" (click)="editPet(pet); scrollToAddPetForm()"
+                                  class="mt-2 text-sm font-medium text-teal-600 hover:text-teal-700 transition-colors">
+                            {{ 'PROFILE.EDIT_PET' | translate }}
+                          </button>
+                        </div>
+                      }
+                    </div>
+                  }
 
                   <!-- ─── Expanded Health Records Panel ─── -->
                   @if (expandedPetId() === pet.id) {
@@ -398,12 +515,13 @@ const RECORD_TYPES = ['Vaccination', 'Condition', 'Medication', 'VetVisit'] as c
               <p class="mt-2 max-w-sm text-sm text-gray-500 leading-relaxed">
                 {{ 'PROFILE.NO_PETS_DESCRIPTION' | translate }}
               </p>
-              <a
-                href="#add-pet-form"
+              <button
+                type="button"
+                (click)="scrollToAddPetForm()"
                 class="mt-6 inline-flex items-center justify-center rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 focus-visible:ring-offset-2"
               >
                 {{ 'PROFILE.ADD_PET' | translate }}
-              </a>
+              </button>
             </div>
           }
 
@@ -549,6 +667,92 @@ const RECORD_TYPES = ['Vaccination', 'Condition', 'Medication', 'VetVisit'] as c
                 </div>
               </div>
 
+              <!-- ─── Care & Medical Details (Collapsible) ─── -->
+              <div class="rounded-xl border border-teal-200/60 bg-gradient-to-r from-teal-50/40 to-cyan-50/30 overflow-hidden">
+                <button
+                  type="button"
+                  (click)="showMedicalSection.set(!showMedicalSection())"
+                  class="w-full flex items-center justify-between px-4 py-3.5 text-start hover:bg-teal-50/60 transition-colors duration-150"
+                >
+                  <div class="flex items-center gap-2.5">
+                    <div class="w-8 h-8 rounded-lg bg-teal-100 flex items-center justify-center flex-shrink-0">
+                      <svg class="w-4 h-4 text-teal-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                      </svg>
+                    </div>
+                    <span class="text-sm font-semibold text-slate-800" dir="auto">{{ 'PETS.MEDICAL_INFO' | translate }}</span>
+                  </div>
+                  <svg class="w-4 h-4 text-slate-400 transition-transform duration-200" [class.rotate-180]="showMedicalSection()" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+
+                @if (showMedicalSection()) {
+                  <div class="px-4 pb-4 space-y-4 border-t border-teal-100/80">
+                    <div class="pt-3">
+                      <label for="pet-medical-notes" class="block text-start text-sm font-medium text-slate-700 mb-1"><span dir="auto">{{ 'PETS.MEDICAL_NOTES' | translate }}</span></label>
+                      <textarea
+                        id="pet-medical-notes"
+                        rows="2"
+                        formControlName="medicalNotes"
+                        dir="auto"
+                        [attr.placeholder]="'PETS.PLACEHOLDER_MEDICAL_NOTES' | translate"
+                        class="w-full text-start placeholder:text-start rounded-xl border border-gray-200 px-4 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:border-teal-400 focus:ring-2 focus:ring-teal-100 outline-none transition resize-none"
+                      ></textarea>
+                    </div>
+
+                    <div>
+                      <label for="pet-feeding" class="block text-start text-sm font-medium text-slate-700 mb-1"><span dir="auto">{{ 'PETS.FEEDING_SCHEDULE' | translate }}</span></label>
+                      <textarea
+                        id="pet-feeding"
+                        rows="2"
+                        formControlName="feedingSchedule"
+                        dir="auto"
+                        [attr.placeholder]="'PETS.PLACEHOLDER_FEEDING' | translate"
+                        class="w-full text-start placeholder:text-start rounded-xl border border-gray-200 px-4 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:border-teal-400 focus:ring-2 focus:ring-teal-100 outline-none transition resize-none"
+                      ></textarea>
+                    </div>
+
+                    <div>
+                      <label for="pet-microchip" class="block text-start text-sm font-medium text-slate-700 mb-1"><span dir="auto">{{ 'PETS.MICROCHIP' | translate }}</span></label>
+                      <input
+                        id="pet-microchip"
+                        type="text"
+                        formControlName="microchipNumber"
+                        dir="auto"
+                        [attr.placeholder]="'PETS.PLACEHOLDER_MICROCHIP' | translate"
+                        class="w-full text-start placeholder:text-start rounded-xl border border-gray-200 px-4 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:border-teal-400 focus:ring-2 focus:ring-teal-100 outline-none transition"
+                      />
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-4">
+                      <div>
+                        <label for="pet-vet-name" class="block text-start text-sm font-medium text-slate-700 mb-1"><span dir="auto">{{ 'PETS.VET_NAME' | translate }}</span></label>
+                        <input
+                          id="pet-vet-name"
+                          type="text"
+                          formControlName="vetName"
+                          dir="auto"
+                          [attr.placeholder]="'PETS.PLACEHOLDER_VET_NAME' | translate"
+                          class="w-full text-start placeholder:text-start rounded-xl border border-gray-200 px-4 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:border-teal-400 focus:ring-2 focus:ring-teal-100 outline-none transition"
+                        />
+                      </div>
+                      <div>
+                        <label for="pet-vet-phone" class="block text-start text-sm font-medium text-slate-700 mb-1"><span dir="auto">{{ 'PETS.VET_PHONE' | translate }}</span></label>
+                        <input
+                          id="pet-vet-phone"
+                          type="tel"
+                          formControlName="vetPhone"
+                          dir="auto"
+                          [attr.placeholder]="'PETS.PLACEHOLDER_VET_PHONE' | translate"
+                          class="w-full text-start placeholder:text-start rounded-xl border border-gray-200 px-4 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:border-teal-400 focus:ring-2 focus:ring-teal-100 outline-none transition"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                }
+              </div>
+
               <div class="flex gap-2">
                 <button
                   type="submit"
@@ -630,9 +834,13 @@ export class MyPetsComponent implements OnInit {
 
   readonly editingPetId = signal<string | null>(null);
 
+  readonly medicalCardPetId = signal<string | null>(null);
+
   readonly triagePetId = signal<string | null>(null);
   readonly triageHistory = signal<TeletriageHistory[]>([]);
   readonly triageLoading = signal(false);
+
+  readonly showMedicalSection = signal(false);
 
   readonly petForm = this.fb.group({
     name: ['', Validators.required],
@@ -643,6 +851,11 @@ export class MyPetsComponent implements OnInit {
     isNeutered: [false],
     notes: [''],
     medicalConditions: [''],
+    medicalNotes: [''],
+    feedingSchedule: [''],
+    microchipNumber: [''],
+    vetName: [''],
+    vetPhone: [''],
   });
 
   readonly recordForm = this.fb.group({
@@ -671,6 +884,10 @@ export class MyPetsComponent implements OnInit {
     });
   }
 
+  scrollToAddPetForm(): void {
+    document.getElementById('add-pet-form')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
   // ── Pet CRUD ──
 
   onSubmit(): void {
@@ -688,6 +905,11 @@ export class MyPetsComponent implements OnInit {
       allergies: this.allergiesCommaSeparated(),
       medicalConditions: v.medicalConditions?.trim() || undefined,
       isNeutered: !!v.isNeutered,
+      medicalNotes: v.medicalNotes?.trim() || undefined,
+      feedingSchedule: v.feedingSchedule?.trim() || undefined,
+      microchipNumber: v.microchipNumber?.trim() || undefined,
+      vetName: v.vetName?.trim() || undefined,
+      vetPhone: v.vetPhone?.trim() || undefined,
     };
 
     const editId = this.editingPetId();
@@ -722,7 +944,15 @@ export class MyPetsComponent implements OnInit {
       isNeutered: pet.isNeutered ?? false,
       notes: pet.notes ?? '',
       medicalConditions: pet.medicalConditions ?? '',
+      medicalNotes: pet.medicalNotes ?? '',
+      feedingSchedule: pet.feedingSchedule ?? '',
+      microchipNumber: pet.microchipNumber ?? '',
+      vetName: pet.vetName ?? '',
+      vetPhone: pet.vetPhone ?? '',
     });
+    if (pet.medicalNotes || pet.feedingSchedule || pet.microchipNumber || pet.vetName || pet.vetPhone) {
+      this.showMedicalSection.set(true);
+    }
   }
 
   cancelPetEdit(): void {
@@ -740,6 +970,9 @@ export class MyPetsComponent implements OnInit {
           this.expandedPetId.set(null);
           this.records.set([]);
         }
+        if (this.medicalCardPetId() === pet.id) {
+          this.medicalCardPetId.set(null);
+        }
         if (this.triagePetId() === pet.id) {
           this.triagePetId.set(null);
           this.triageHistory.set([]);
@@ -754,6 +987,26 @@ export class MyPetsComponent implements OnInit {
     });
   }
 
+  // ── Medical Card ──
+
+  toggleMedicalCard(pet: Pet): void {
+    if (this.medicalCardPetId() === pet.id) {
+      this.medicalCardPetId.set(null);
+      return;
+    }
+    this.expandedPetId.set(null);
+    this.records.set([]);
+    this.showRecordForm.set(false);
+    this.editingRecordId.set(null);
+    this.triagePetId.set(null);
+    this.triageHistory.set([]);
+    this.medicalCardPetId.set(pet.id);
+  }
+
+  hasMedicalInfo(pet: Pet): boolean {
+    return !!(pet.medicalNotes || pet.feedingSchedule || pet.microchipNumber || pet.vetName || pet.vetPhone || pet.isNeutered);
+  }
+
   // ── Medical Records ──
 
   toggleHealthRecords(pet: Pet): void {
@@ -764,6 +1017,7 @@ export class MyPetsComponent implements OnInit {
       this.editingRecordId.set(null);
       return;
     }
+    this.medicalCardPetId.set(null);
     this.triagePetId.set(null);
     this.triageHistory.set([]);
     this.expandedPetId.set(pet.id);
@@ -868,6 +1122,7 @@ export class MyPetsComponent implements OnInit {
       this.triageHistory.set([]);
       return;
     }
+    this.medicalCardPetId.set(null);
     this.expandedPetId.set(null);
     this.records.set([]);
     this.showRecordForm.set(false);
@@ -957,8 +1212,14 @@ export class MyPetsComponent implements OnInit {
       isNeutered: false,
       notes: '',
       medicalConditions: '',
+      medicalNotes: '',
+      feedingSchedule: '',
+      microchipNumber: '',
+      vetName: '',
+      vetPhone: '',
     });
     this.resetAllergiesToNone();
+    this.showMedicalSection.set(false);
   }
 
   triageSeverityDotClass(severity: string): string {

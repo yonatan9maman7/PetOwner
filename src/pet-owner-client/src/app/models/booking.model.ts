@@ -24,4 +24,7 @@ export interface BookingDto {
   paymentUrl: string | null;
   createdAt: string;
   notes: string | null;
+  providerPhone: string | null;
+  ownerPhone: string | null;
+  hasReview: boolean;
 }

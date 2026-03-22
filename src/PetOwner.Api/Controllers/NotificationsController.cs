@@ -30,7 +30,7 @@ public class NotificationsController : ControllerBase
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
             .Select(n => new NotificationDto(
-                n.Id, n.Type, n.Title, n.Body, n.ReferenceId, n.IsRead, n.CreatedAt))
+                n.Id, n.Type, n.Title, n.Message, n.RelatedEntityId, n.IsRead, n.CreatedAt))
             .ToListAsync();
 
         return Ok(notifications);
@@ -45,7 +45,7 @@ public class NotificationsController : ControllerBase
         return Ok(new { count });
     }
 
-    [HttpPost("{id:guid}/read")]
+    [HttpPut("{id:guid}/read")]
     public async Task<IActionResult> MarkAsRead(Guid id)
     {
         var userId = GetUserId();

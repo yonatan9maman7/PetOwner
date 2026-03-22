@@ -72,8 +72,10 @@ public class MapController : ControllerBase
                     .Select(r => new ReviewDto(
                         r.Id,
                         r.ServiceRequestId,
+                        r.BookingId,
                         r.ReviewerId,
                         r.Reviewer.Name,
+                        r.Reviewer.ProviderProfile != null ? r.Reviewer.ProviderProfile.ProfileImageUrl : null,
                         r.RevieweeId,
                         r.Rating,
                         r.Comment,

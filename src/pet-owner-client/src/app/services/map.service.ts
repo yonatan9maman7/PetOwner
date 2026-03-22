@@ -18,9 +18,11 @@ export interface ProviderPublicProfile {
   availabilitySlots: { dayOfWeek: number; startTime: string; endTime: string }[];
   recentReviews: {
     id: string;
-    serviceRequestId: string;
+    serviceRequestId: string | null;
+    bookingId: string | null;
     reviewerId: string;
     reviewerName: string;
+    reviewerAvatar: string | null;
     revieweeId: string;
     rating: number;
     comment: string;
@@ -84,5 +86,9 @@ export class MapService {
 
   getUserMiniProfile(userId: string): Observable<UserMiniProfile> {
     return this.http.get<UserMiniProfile>(`/api/users/${userId}/mini-profile`);
+  }
+
+  getProviderContact(providerId: string): Observable<{ phone: string }> {
+    return this.http.get<{ phone: string }>(`/api/providers/${providerId}/contact`);
   }
 }

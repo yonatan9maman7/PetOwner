@@ -6,21 +6,22 @@ import {
   inject,
   ChangeDetectionStrategy,
 } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { CommonModule, DatePipe } from '@angular/common';
 import { RouterLink } from '@angular/router';
-import { TranslatePipe } from '@ngx-translate/core';
+import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { AuthService } from '../../services/auth.service';
 import { BookingService } from '../../services/booking.service';
 import { ProviderService } from '../../services/provider.service';
 import { ToastService } from '../../services/toast.service';
 import { BookingDto } from '../../models/booking.model';
+import { ReviewModalComponent, ReviewModalInput } from './review-modal.component';
 
 type Tab = 'owner' | 'provider';
 
 @Component({
   selector: 'app-my-bookings',
   standalone: true,
-  imports: [CommonModule, RouterLink, TranslatePipe],
+  imports: [CommonModule, RouterLink, TranslatePipe, ReviewModalComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="min-h-screen bg-gray-50 pb-24">
@@ -171,6 +172,21 @@ type Tab = 'owner' | 'provider';
               </button>
             }
 
+            <!-- WhatsApp contact for active bookings -->
+            @if (b.status === 'Pending' || b.status === 'Confirmed') {
+              <button
+                (click)="openWhatsApp(b)"
+                class="mt-2 w-full flex items-center justify-center gap-1.5
+                       bg-[#25D366] hover:bg-[#1fb855] text-white text-sm font-semibold
+                       rounded-xl py-2.5 transition-colors">
+                <svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/>
+                  <path d="M12 0C5.373 0 0 5.373 0 12c0 2.625.846 5.059 2.284 7.034L.789 23.492a.5.5 0 00.611.611l4.458-1.495A11.96 11.96 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-2.319 0-4.477-.67-6.309-1.826l-.452-.277-2.644.886.886-2.644-.277-.452A9.96 9.96 0 012 12C2 6.477 6.477 2 12 2s10 4.477 10 10-4.477 10-10 10z"/>
+                </svg>
+                {{ 'BOOKINGS_DASHBOARD.WHATSAPP' | translate }}
+              </button>
+            }
+
             <!-- Provider actions on Pending -->
             @if (b.status === 'Pending' && activeTab() === 'provider') {
               <div class="flex gap-2 mt-3">
@@ -201,10 +217,38 @@ type Tab = 'owner' | 'provider';
                 {{ 'BOOKINGS_DASHBOARD.CANCEL' | translate }}
               </button>
             }
+
+            <!-- Leave a Review -->
+            @if ((b.status === 'Completed' || b.paymentStatus === 'Paid') && !b.hasReview && activeTab() === 'owner') {
+              <button
+                (click)="openReviewModal(b)"
+                class="mt-2 w-full flex items-center justify-center gap-2
+                       bg-amber-50 hover:bg-amber-100 text-amber-700
+                       text-sm font-semibold rounded-xl py-2.5 transition-colors border border-amber-200">
+                <span class="text-amber-500">&#9733;</span>
+                {{ 'BOOKINGS_DASHBOARD.LEAVE_REVIEW' | translate }}
+              </button>
+            }
+            @if (b.hasReview && (b.status === 'Completed' || b.paymentStatus === 'Paid')) {
+              <div class="mt-2 flex items-center justify-center gap-1.5 text-xs text-emerald-600 font-medium px-0.5">
+                <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
+                  <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
+                </svg>
+                {{ 'BOOKINGS_DASHBOARD.REVIEWED' | translate }}
+              </div>
+            }
           </div>
         </div>
       </ng-template>
     </div>
+
+    <!-- Review Modal -->
+    <app-review-modal
+      [open]="isReviewModalOpen()"
+      [data]="reviewModalData()"
+      (closed)="closeReviewModal()"
+      (reviewed)="onReviewSuccess()">
+    </app-review-modal>
   `,
 })
 export class MyBookingsComponent implements OnInit {
@@ -212,11 +256,14 @@ export class MyBookingsComponent implements OnInit {
   private readonly bookingService = inject(BookingService);
   private readonly providerService = inject(ProviderService);
   private readonly toast = inject(ToastService);
+  private readonly translate = inject(TranslateService);
 
   readonly bookings = signal<BookingDto[]>([]);
   readonly loading = signal(false);
   readonly actionLoading = signal<string | null>(null);
   readonly activeTab = signal<Tab>('owner');
+  readonly isReviewModalOpen = signal(false);
+  readonly reviewModalData = signal<ReviewModalInput | null>(null);
 
   private readonly userId = computed(() => this.auth.userId());
 
@@ -307,6 +354,57 @@ export class MyBookingsComponent implements OnInit {
         this.actionLoading.set(null);
       },
     });
+  }
+
+  openReviewModal(b: BookingDto): void {
+    this.reviewModalData.set({
+      bookingId: b.id,
+      providerName: b.providerName,
+    });
+    this.isReviewModalOpen.set(true);
+  }
+
+  closeReviewModal(): void {
+    this.isReviewModalOpen.set(false);
+  }
+
+  onReviewSuccess(): void {
+    this.isReviewModalOpen.set(false);
+    this.toast.success(this.translate.instant('REVIEWS.SUCCESS'));
+    this.loadBookings();
+  }
+
+  openWhatsApp(b: BookingDto): void {
+    const isProviderTab = this.activeTab() === 'provider';
+    const phone = isProviderTab ? b.ownerPhone : b.providerPhone;
+    const name = isProviderTab ? b.ownerName : b.providerName;
+
+    if (!phone) return;
+
+    const formatted = this.formatIsraeliPhone(phone);
+    const datePipe = new DatePipe('en-US');
+    const dateStr = datePipe.transform(b.startDate, 'EEE, MMM d') ?? b.startDate;
+    const msg = this.translate.instant('BOOKINGS_DASHBOARD.WHATSAPP_MSG', {
+      name,
+      service: b.service,
+      date: dateStr,
+    });
+    window.open(
+      `https://wa.me/${formatted}?text=${encodeURIComponent(msg)}`,
+      '_blank',
+      'noopener',
+    );
+  }
+
+  private formatIsraeliPhone(phone: string): string {
+    let digits = phone.replace(/\D/g, '');
+    if (digits.startsWith('0')) {
+      digits = '972' + digits.substring(1);
+    }
+    if (!digits.startsWith('972')) {
+      digits = '972' + digits;
+    }
+    return digits;
   }
 
   private loadBookings(): void {

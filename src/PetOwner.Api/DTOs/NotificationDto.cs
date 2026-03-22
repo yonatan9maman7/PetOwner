@@ -4,8 +4,8 @@ public record NotificationDto(
     Guid Id,
     string Type,
     string Title,
-    string Body,
-    string? ReferenceId,
+    string Message,
+    Guid? RelatedEntityId,
     bool IsRead,
     DateTime CreatedAt
 );

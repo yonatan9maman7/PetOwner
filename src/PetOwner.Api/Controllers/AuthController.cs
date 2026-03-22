@@ -68,6 +68,9 @@ public class AuthController : ControllerBase
         if (user is null || !BCrypt.Net.BCrypt.Verify(dto.Password, user.PasswordHash))
             return Unauthorized(new { message = "Invalid email or password." });
 
+        if (!user.IsActive)
+            return Unauthorized(new { message = "Your account has been suspended. Please contact support." });
+
         var token = _tokenService.GenerateAccessToken(user);
         return Ok(new { token, userId = user.Id });
     }

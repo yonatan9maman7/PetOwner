@@ -13,6 +13,11 @@ public class Pet
     public string? MedicalConditions { get; set; }
     public bool IsNeutered { get; set; }
     public string? Notes { get; set; }
+    public string? MedicalNotes { get; set; }
+    public string? FeedingSchedule { get; set; }
+    public string? MicrochipNumber { get; set; }
+    public string? VetName { get; set; }
+    public string? VetPhone { get; set; }
 
     public User User { get; set; } = null!;
     public ICollection<MedicalRecord> MedicalRecords { get; set; } = new List<MedicalRecord>();

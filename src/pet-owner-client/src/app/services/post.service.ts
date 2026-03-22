@@ -1,5 +1,5 @@
 import { Injectable, inject } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
 
 export interface Post {
@@ -14,6 +14,7 @@ export interface Post {
   createdAt: string;
   authorRole: string;
   authorIsApprovedProvider: boolean;
+  communityGroupId: string | null;
 }
 
 export interface PostComment {
@@ -29,16 +30,42 @@ export interface LikeResult {
   likeCount: number;
 }
 
+export interface GeoFilter {
+  lat: number;
+  lng: number;
+  radiusKm: number;
+}
+
 @Injectable({ providedIn: 'root' })
 export class PostService {
   private readonly http = inject(HttpClient);
 
-  getFeed(page = 1): Observable<Post[]> {
-    return this.http.get<Post[]>(`/api/posts/feed?page=${page}`);
+  getFeed(page = 1, groupId?: string | null, geo?: GeoFilter): Observable<Post[]> {
+    let params = new HttpParams().set('page', page);
+    if (groupId) params = params.set('groupId', groupId);
+    if (geo) {
+      params = params
+        .set('lat', geo.lat)
+        .set('lng', geo.lng)
+        .set('radiusKm', geo.radiusKm);
+    }
+    return this.http.get<Post[]>('/api/posts/feed', { params });
   }
 
-  create(content: string, imageUrl?: string): Observable<Post> {
-    return this.http.post<Post>('/api/posts', { content, imageUrl: imageUrl || null });
+  create(
+    content: string,
+    imageUrl?: string,
+    groupId?: string | null,
+    location?: { lat: number; lng: number; city?: string },
+  ): Observable<Post> {
+    return this.http.post<Post>('/api/posts', {
+      content,
+      imageUrl: imageUrl || null,
+      communityGroupId: groupId || null,
+      latitude: location?.lat ?? null,
+      longitude: location?.lng ?? null,
+      city: location?.city ?? null,
+    });
   }
 
   delete(id: string): Observable<void> {

@@ -17,13 +17,29 @@ public class PostsController : ControllerBase
     public PostsController(ApplicationDbContext db) => _db = db;
 
     [HttpGet("feed")]
-    public async Task<IActionResult> GetFeed([FromQuery] int page = 1, [FromQuery] int pageSize = 20)
+    public async Task<IActionResult> GetFeed(
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 20,
+        [FromQuery] double? lat = null,
+        [FromQuery] double? lng = null,
+        [FromQuery] double? radiusKm = null)
     {
         var userId = GetUserId();
         pageSize = Math.Clamp(pageSize, 1, 50);
 
-        var posts = await _db.Posts
-            .AsNoTracking()
+        var query = _db.Posts.AsNoTracking().AsQueryable();
+
+        if (lat.HasValue && lng.HasValue && radiusKm.HasValue)
+        {
+            var latDiff = radiusKm.Value / 111.0;
+            var lngDiff = radiusKm.Value / (111.0 * Math.Cos(lat.Value * Math.PI / 180.0));
+            query = query.Where(p =>
+                p.Latitude != null && p.Longitude != null &&
+                p.Latitude >= lat.Value - latDiff && p.Latitude <= lat.Value + latDiff &&
+                p.Longitude >= lng.Value - lngDiff && p.Longitude <= lng.Value + lngDiff);
+        }
+
+        var posts = await query
             .OrderByDescending(p => p.CreatedAt)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
@@ -52,6 +68,9 @@ public class PostsController : ControllerBase
             UserId = userId,
             Content = dto.Content.Trim(),
             ImageUrl = dto.ImageUrl?.Trim(),
+            Latitude = dto.Latitude,
+            Longitude = dto.Longitude,
+            City = dto.City?.Trim(),
         };
 
         _db.Posts.Add(post);

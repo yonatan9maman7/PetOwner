@@ -28,7 +28,7 @@ public class PetsController : ControllerBase
         var pets = await _db.Pets
             .AsNoTracking()
             .Where(p => p.UserId == userId)
-            .Select(p => new PetDto(p.Id, p.Name, p.Species, p.Breed, p.Age, p.Weight, p.Allergies, p.MedicalConditions, p.Notes, p.IsNeutered))
+            .Select(p => new PetDto(p.Id, p.Name, p.Species, p.Breed, p.Age, p.Weight, p.Allergies, p.MedicalConditions, p.Notes, p.IsNeutered, p.MedicalNotes, p.FeedingSchedule, p.MicrochipNumber, p.VetName, p.VetPhone))
             .ToListAsync();
 
         return Ok(pets);
@@ -51,12 +51,17 @@ public class PetsController : ControllerBase
             MedicalConditions = request.MedicalConditions,
             Notes = request.Notes,
             IsNeutered = request.IsNeutered,
+            MedicalNotes = request.MedicalNotes,
+            FeedingSchedule = request.FeedingSchedule,
+            MicrochipNumber = request.MicrochipNumber,
+            VetName = request.VetName,
+            VetPhone = request.VetPhone,
         };
 
         _db.Pets.Add(pet);
         await _db.SaveChangesAsync();
 
-        var dto = new PetDto(pet.Id, pet.Name, pet.Species, pet.Breed, pet.Age, pet.Weight, pet.Allergies, pet.MedicalConditions, pet.Notes, pet.IsNeutered);
+        var dto = new PetDto(pet.Id, pet.Name, pet.Species, pet.Breed, pet.Age, pet.Weight, pet.Allergies, pet.MedicalConditions, pet.Notes, pet.IsNeutered, pet.MedicalNotes, pet.FeedingSchedule, pet.MicrochipNumber, pet.VetName, pet.VetPhone);
         return CreatedAtAction(nameof(GetMyPets), dto);
     }
 
@@ -80,10 +85,15 @@ public class PetsController : ControllerBase
         pet.MedicalConditions = request.MedicalConditions;
         pet.Notes = request.Notes;
         pet.IsNeutered = request.IsNeutered;
+        pet.MedicalNotes = request.MedicalNotes;
+        pet.FeedingSchedule = request.FeedingSchedule;
+        pet.MicrochipNumber = request.MicrochipNumber;
+        pet.VetName = request.VetName;
+        pet.VetPhone = request.VetPhone;
 
         await _db.SaveChangesAsync();
 
-        var dto = new PetDto(pet.Id, pet.Name, pet.Species, pet.Breed, pet.Age, pet.Weight, pet.Allergies, pet.MedicalConditions, pet.Notes, pet.IsNeutered);
+        var dto = new PetDto(pet.Id, pet.Name, pet.Species, pet.Breed, pet.Age, pet.Weight, pet.Allergies, pet.MedicalConditions, pet.Notes, pet.IsNeutered, pet.MedicalNotes, pet.FeedingSchedule, pet.MicrochipNumber, pet.VetName, pet.VetPhone);
         return Ok(dto);
     }
 

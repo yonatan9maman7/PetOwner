@@ -29,7 +29,7 @@ public class DatabaseSeeder
         "Certified pet first-aid trained and deeply passionate about canine wellbeing."
     ];
 
-    // Florentin, Tel Aviv bounding box
+    // Florentin, Tel Aviv bounding box (used by SeedProvidersAsync)
     private const double MinLatitude = 32.0540;
     private const double MaxLatitude = 32.0600;
     private const double MinLongitude = 34.7640;
@@ -45,10 +45,314 @@ public class DatabaseSeeder
         (ServiceType.DropInVisit, "Drop-in Visit", PricingUnit.PerVisit, 30, 80),
     ];
 
+    private static readonly string[] IsraeliCities =
+        ["Tel Aviv", "Ramat Gan", "Herzliya", "Givatayim", "Petah Tikva", "Rishon LeZion", "Netanya"];
+
+    private static readonly string[] DogBreeds =
+    [
+        "Golden Retriever", "Labrador Retriever", "French Bulldog", "German Shepherd",
+        "Poodle", "Beagle", "Rottweiler", "Cocker Spaniel", "Shih Tzu",
+        "Cavalier King Charles", "Bichon Frise", "Israeli Canaan Dog", "Mixed Breed",
+    ];
+
+    private static readonly string[] CatBreeds =
+    [
+        "Persian", "Siamese", "Maine Coon", "Ragdoll", "British Shorthair",
+        "Russian Blue", "Scottish Fold", "Mixed Breed",
+    ];
+
+    private static readonly string[] PetNames =
+    [
+        "Luna", "Charlie", "Max", "Bella", "Leo", "Milo", "Coco", "Simba",
+        "Rocky", "Lucky", "Daisy", "Oliver", "Lola", "Shadow", "Rex", "Buddy",
+        "Nala", "Ginger", "Pixel", "Mitz", "Shoko", "Lulu", "Teddy", "Oscar",
+    ];
+
     public DatabaseSeeder(ApplicationDbContext db, ILogger<DatabaseSeeder> logger)
     {
         _db = db;
         _logger = logger;
+    }
+
+    public async Task<(int Providers, int Owners, int Pets, int Bookings, int Reviews, int GroupPosts, int SocialPosts)>
+        SeedFullDemoEcosystemAsync()
+    {
+        var faker = new Faker("he");
+        var fakerEn = new Faker("en");
+        var serviceIds = await EnsureServicesExistAsync();
+        var passwordHash = BCrypt.Net.BCrypt.HashPassword(SeedPassword);
+        var allServiceTypes = Enum.GetValues<ServiceType>();
+
+        // Central Israel bounding box (Tel Aviv / Ramat Gan / Herzliya area)
+        const double centralMinLat = 32.0400, centralMaxLat = 32.1700;
+        const double centralMinLng = 34.7600, centralMaxLng = 34.8200;
+
+        var phoneSalt = (int)(DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() % 100_000);
+        var phoneIdx = 0;
+        string NextPhone()
+        {
+            var idx = phoneIdx++;
+            return $"05{2 + idx % 8}{phoneSalt:D5}{idx:D2}";
+        }
+
+        int ServiceIdFor(ServiceType type) => type switch
+        {
+            ServiceType.DogWalking => serviceIds[0],
+            ServiceType.PetSitting => serviceIds[1],
+            ServiceType.Boarding => serviceIds[2],
+            ServiceType.DropInVisit => serviceIds[3],
+            _ => serviceIds[0],
+        };
+
+        // ===== 1. CREATE 10 PROVIDERS =====
+        const int providerCount = 10;
+        var providerUsers = new User[providerCount];
+
+        for (var i = 0; i < providerCount; i++)
+        {
+            var id = Guid.NewGuid();
+            var seed = Guid.NewGuid().ToString("N")[..8];
+
+            var assignedServices = faker.Random.Shuffle(allServiceTypes)
+                .Take(faker.Random.Int(1, allServiceTypes.Length))
+                .ToArray();
+
+            var providerServices = assignedServices
+                .Select(st => new ProviderService { ProviderId = id, ServiceId = ServiceIdFor(st) })
+                .ToList();
+
+            var serviceRates = assignedServices
+                .Select(st =>
+                {
+                    var rateDef = ServiceRateDefinitions.First(d => d.Type == st);
+                    return new ProviderServiceRate
+                    {
+                        ProviderProfileId = id,
+                        Service = st,
+                        Rate = fakerEn.Finance.Amount(rateDef.MinRate, rateDef.MaxRate, 0),
+                        Unit = rateDef.Unit,
+                    };
+                })
+                .ToList();
+
+            providerUsers[i] = new User
+            {
+                Id = id,
+                Name = faker.Name.FullName(),
+                Email = $"{fakerEn.Internet.UserName()}.{seed}@demo.petowner.co.il",
+                Phone = NextPhone(),
+                Role = "Provider",
+                PasswordHash = passwordHash,
+                CreatedAt = DateTime.UtcNow.AddDays(-faker.Random.Int(30, 90)),
+                IsActive = true,
+                ProviderProfile = new ProviderProfile
+                {
+                    UserId = id,
+                    Bio = fakerEn.Lorem.Paragraph(),
+                    ProfileImageUrl = $"https://api.dicebear.com/9.x/avataaars/svg?seed={seed}",
+                    Status = "Approved",
+                    IsAvailableNow = faker.Random.Bool(0.8f),
+                    City = faker.PickRandom(IsraeliCities),
+                    Street = faker.Address.StreetName(),
+                    BuildingNumber = faker.Random.Int(1, 120).ToString(),
+                    ApartmentNumber = faker.Random.Bool(0.2f) ? faker.Random.Int(1, 20).ToString() : null,
+                    ReferenceName = faker.Name.FullName(),
+                    ReferenceContact = $"05{faker.Random.Int(20000000, 59999999)}",
+                    ProviderServices = providerServices,
+                    ServiceRates = serviceRates,
+                },
+                Location = new Location
+                {
+                    UserId = id,
+                    GeoLocation = new Point(
+                        faker.Random.Double(centralMinLng, centralMaxLng),
+                        faker.Random.Double(centralMinLat, centralMaxLat))
+                    { SRID = 4326 },
+                },
+            };
+        }
+
+        _db.Users.AddRange(providerUsers);
+
+        // ===== 2. CREATE 15 OWNERS WITH PETS =====
+        const int ownerCount = 15;
+        var ownerUsers = new User[ownerCount];
+        var totalPets = 0;
+
+        for (var i = 0; i < ownerCount; i++)
+        {
+            var id = Guid.NewGuid();
+            var seed = Guid.NewGuid().ToString("N")[..8];
+            var numPets = faker.Random.Int(1, 3);
+
+            var pets = Enumerable.Range(0, numPets).Select(_ =>
+            {
+                var species = faker.PickRandom(PetSpecies.Dog, PetSpecies.Cat);
+                return new Pet
+                {
+                    UserId = id,
+                    Name = faker.PickRandom(PetNames),
+                    Species = species,
+                    Breed = species == PetSpecies.Dog
+                        ? faker.PickRandom(DogBreeds)
+                        : faker.PickRandom(CatBreeds),
+                    Age = faker.Random.Int(1, 14),
+                    Weight = Math.Round(faker.Random.Double(2, 45), 1),
+                    IsNeutered = faker.Random.Bool(0.6f),
+                    MedicalNotes = faker.Random.Bool(0.2f) ? fakerEn.Lorem.Sentence() : null,
+                    Notes = faker.Random.Bool(0.3f) ? fakerEn.Lorem.Sentence() : null,
+                };
+            }).ToList();
+
+            totalPets += pets.Count;
+
+            ownerUsers[i] = new User
+            {
+                Id = id,
+                Name = faker.Name.FullName(),
+                Email = $"{fakerEn.Internet.UserName()}.{seed}@demo.petowner.co.il",
+                Phone = NextPhone(),
+                Role = "Owner",
+                PasswordHash = passwordHash,
+                CreatedAt = DateTime.UtcNow.AddDays(-faker.Random.Int(15, 120)),
+                IsActive = true,
+                Pets = pets,
+            };
+        }
+
+        _db.Users.AddRange(ownerUsers);
+
+        // ===== 3. CREATE COMPLETED BOOKINGS =====
+        var bookings = new List<Booking>();
+        foreach (var owner in ownerUsers)
+        {
+            var numBookings = faker.Random.Int(1, 2);
+            for (var b = 0; b < numBookings; b++)
+            {
+                var provider = faker.PickRandom(providerUsers);
+                var serviceType = faker.PickRandom<ServiceType>();
+                var daysAgo = faker.Random.Int(5, 45);
+
+                bookings.Add(new Booking
+                {
+                    Id = Guid.NewGuid(),
+                    OwnerId = owner.Id,
+                    ProviderProfileId = provider.Id,
+                    Service = serviceType,
+                    StartDate = DateTime.UtcNow.AddDays(-daysAgo),
+                    EndDate = DateTime.UtcNow.AddDays(-daysAgo + (serviceType == ServiceType.Boarding ? 3 : 1)),
+                    TotalPrice = fakerEn.Finance.Amount(80, 250, 0),
+                    Status = BookingStatus.Completed,
+                    PaymentStatus = PaymentStatus.Paid,
+                    CreatedAt = DateTime.UtcNow.AddDays(-daysAgo - 2),
+                });
+            }
+        }
+
+        _db.Bookings.AddRange(bookings);
+
+        // ===== 4. CREATE REVIEWS FOR EACH BOOKING =====
+        var reviews = new List<Review>();
+        foreach (var bk in bookings)
+        {
+            reviews.Add(new Review
+            {
+                BookingId = bk.Id,
+                ReviewerId = bk.OwnerId,
+                RevieweeId = bk.ProviderProfileId,
+                Rating = faker.Random.Int(4, 5),
+                Comment = fakerEn.Lorem.Sentence(),
+                CommunicationRating = faker.Random.Int(4, 5),
+                ReliabilityRating = faker.Random.Int(4, 5),
+                IsVerified = true,
+                CreatedAt = bk.StartDate.AddDays(1),
+            });
+        }
+
+        _db.Reviews.AddRange(reviews);
+
+        // ===== 5. UPDATE PROVIDER RATING AGGREGATES =====
+        foreach (var pu in providerUsers)
+        {
+            var providerReviews = reviews.Where(r => r.RevieweeId == pu.Id).ToList();
+            if (providerReviews.Count <= 0) continue;
+            pu.ProviderProfile!.ReviewCount = providerReviews.Count;
+            pu.ProviderProfile.AverageRating =
+                (decimal)Math.Round(providerReviews.Average(r => r.Rating), 2);
+        }
+
+        // ===== 6. CREATE COMMUNITY GROUPS & POSTS =====
+        var groupCity1 = faker.PickRandom(IsraeliCities);
+        var group1 = new CommunityGroup
+        {
+            Id = Guid.NewGuid(),
+            Name = $"{groupCity1} Pet Owners",
+            Description = fakerEn.Lorem.Paragraph(),
+            TargetCountry = "Israel",
+            IsActive = true,
+            CreatedAt = DateTime.UtcNow.AddDays(-faker.Random.Int(30, 90)),
+        };
+
+        var groupCity2 = faker.PickRandom(IsraeliCities);
+        var group2 = new CommunityGroup
+        {
+            Id = Guid.NewGuid(),
+            Name = $"{groupCity2} Dog Walkers",
+            Description = fakerEn.Lorem.Paragraph(),
+            TargetCountry = "Israel",
+            TargetCity = groupCity2,
+            IsActive = true,
+            CreatedAt = DateTime.UtcNow.AddDays(-faker.Random.Int(20, 60)),
+        };
+
+        _db.CommunityGroups.AddRange(group1, group2);
+
+        var allUserIds = providerUsers.Select(u => u.Id)
+            .Concat(ownerUsers.Select(u => u.Id)).ToArray();
+
+        const int groupPostCount = 12;
+        var groupPosts = new List<GroupPost>();
+        for (var i = 0; i < groupPostCount; i++)
+        {
+            var targetGroup = faker.PickRandom(group1, group2);
+            groupPosts.Add(new GroupPost
+            {
+                GroupId = targetGroup.Id,
+                AuthorId = faker.PickRandom(allUserIds),
+                Content = fakerEn.Lorem.Sentence(),
+                Country = "Israel",
+                City = targetGroup.TargetCity,
+                CreatedAt = DateTime.UtcNow.AddDays(-faker.Random.Int(1, 30)).AddHours(-faker.Random.Int(1, 12)),
+            });
+        }
+
+        _db.GroupPosts.AddRange(groupPosts);
+
+        // ===== 7. CREATE SOCIAL FEED POSTS =====
+        const int socialPostCount = 10;
+        var socialPosts = new List<Post>();
+        for (var i = 0; i < socialPostCount; i++)
+        {
+            socialPosts.Add(new Post
+            {
+                UserId = faker.PickRandom(ownerUsers).Id,
+                Content = fakerEn.Lorem.Sentence(),
+                City = faker.PickRandom(IsraeliCities),
+                CreatedAt = DateTime.UtcNow.AddDays(-faker.Random.Int(1, 20)).AddHours(-faker.Random.Int(1, 12)),
+            });
+        }
+
+        _db.Posts.AddRange(socialPosts);
+
+        await _db.SaveChangesAsync();
+
+        _logger.LogInformation(
+            "Demo ecosystem seeded: {P} providers, {O} owners, {Pets} pets, {B} bookings, {R} reviews, {GP} group posts, {SP} social posts",
+            providerUsers.Length, ownerUsers.Length, totalPets,
+            bookings.Count, reviews.Count, groupPosts.Count, socialPosts.Count);
+
+        return (providerUsers.Length, ownerUsers.Length, totalPets,
+            bookings.Count, reviews.Count, groupPosts.Count, socialPosts.Count);
     }
 
     public async Task<int> SeedProvidersAsync()
@@ -175,9 +479,6 @@ public class DatabaseSeeder
         return $"05{faker.Random.Int(0, 9)}{900_0000 + index:D7}";
     }
 
-    /// <summary>
-    /// Creates demo pets for non-provider, non-admin users that have no pets yet (e.g. after manual owner registration).
-    /// </summary>
     public async Task<int> SeedBogusPetsForUsersWithoutPetsAsync(int maxUsers = 15, int petsPerUser = 1)
     {
         var faker = new Faker("en");

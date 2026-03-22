@@ -1,6 +1,12 @@
 namespace PetOwner.Api.DTOs;
 
-public record CreatePostDto(string Content, string? ImageUrl);
+public record CreatePostDto(
+    string Content,
+    string? ImageUrl,
+    double? Latitude = null,
+    double? Longitude = null,
+    string? City = null
+);
 
 public record PostDto(
     Guid Id,

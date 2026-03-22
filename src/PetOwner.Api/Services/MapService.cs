@@ -62,8 +62,17 @@ public class MapService : IMapService
 
         if (filter.MaxRate.HasValue)
         {
-            query = query.Where(l => l.User!.ProviderProfile!.ServiceRates
-                .Any(r => r.Rate <= filter.MaxRate.Value));
+            if (parsedServiceType.HasValue)
+            {
+                var svc = parsedServiceType.Value;
+                query = query.Where(l => l.User!.ProviderProfile!.ServiceRates
+                    .Any(r => r.Service == svc && r.Rate <= filter.MaxRate.Value));
+            }
+            else
+            {
+                query = query.Where(l => l.User!.ProviderProfile!.ServiceRates
+                    .Any(r => r.Rate <= filter.MaxRate.Value));
+            }
         }
 
         if (filter.RadiusKm.HasValue && filter.Latitude.HasValue && filter.Longitude.HasValue)

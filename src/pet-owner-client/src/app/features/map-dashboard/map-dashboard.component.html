@@ -1,8 +1,10 @@
-<!-- Full-screen Leaflet map -->
-<div id="map" class="absolute inset-0 z-0"></div>
+<div class="flex flex-col h-full min-h-0 w-full max-w-full overflow-hidden bg-gray-50">
+  <!-- Map fills space between app chrome (bottom nav padding on main); overlays sit above tiles. -->
+  <div #mapHost class="flex-1 min-h-0 relative overflow-hidden">
+    <div id="map" class="absolute inset-0 z-0"></div>
 
-<!-- ─── Top Overlay Zone ─── -->
-<div class="absolute top-4 inset-x-0 z-[400] flex flex-col items-center pointer-events-none" dir="auto">
+    <!-- ─── Top Overlay Zone ─── -->
+    <div class="absolute top-4 inset-x-0 z-[400] flex flex-col items-center pointer-events-none" dir="auto">
 
   <!-- Pending Approval Banner -->
   @if (isPendingProvider()) {
@@ -108,92 +110,171 @@
     </div>
   }
 
-  <!-- Expanded Filter Panel -->
+  <!-- ─── Advanced Filter Panel ─── -->
   @if (showFilterPanel()) {
     <div class="pointer-events-auto mt-2 w-[90%] md:w-[600px]
-                bg-white/95 backdrop-blur-md rounded-2xl shadow-xl border border-gray-100 p-4 space-y-3">
-      <div>
-        <label class="text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-1 block text-start">{{ 'DASHBOARD.FILTER_AVAILABLE_ON' | translate }}</label>
-        <div class="flex gap-2">
-          <input type="date" dir="auto" [value]="filterDate()" (input)="filterDate.set($any($event.target).value)" class="filter-input flex-1 text-start" />
-          <input type="time" dir="auto" [value]="filterTime()" (input)="filterTime.set($any($event.target).value)" class="filter-input flex-1 text-start" />
-        </div>
-      </div>
+                bg-white/[0.97] backdrop-blur-xl rounded-2xl shadow-2xl
+                border border-white/60 ring-1 ring-black/[0.04]
+                overflow-hidden animate-[filterSlideIn_0.25s_ease-out]" dir="auto">
 
-      <div>
-        <label class="text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-1 block text-start">{{ 'DASHBOARD.FILTER_SERVICE_TYPE' | translate }}</label>
-        <div class="flex flex-wrap gap-1.5">
-          <button
-            (click)="filterServiceType.set(''); selectedCategory.set('')"
-            class="px-2.5 py-1 rounded-full text-xs font-medium transition-colors"
-            [class]="!filterServiceType() ? 'bg-violet-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'">
-            {{ 'DASHBOARD.FILTER_ALL' | translate }}
-          </button>
-          @for (svc of serviceTypes(); track svc) {
-            <button
-              (click)="filterServiceType.set(svc)"
-              class="px-2.5 py-1 rounded-full text-xs font-medium transition-colors"
-              [class]="filterServiceType() === svc ? 'bg-violet-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'">
-              {{ svc }}
-            </button>
-          }
+      <!-- Header -->
+      <div class="flex items-center justify-between px-4 pt-4 pb-2">
+        <div class="flex items-center gap-2">
+          <div class="w-7 h-7 rounded-lg bg-gradient-to-br from-violet-500 to-indigo-600
+                      flex items-center justify-center shadow-sm">
+            <svg class="w-3.5 h-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+            </svg>
+          </div>
+          <h3 class="text-sm font-bold text-gray-900 text-start">{{ 'FILTERS.TITLE' | translate }}</h3>
         </div>
-      </div>
-
-      <div class="grid grid-cols-3 gap-2">
-        <div>
-          <label class="text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-1 block text-start">{{ 'DASHBOARD.FILTER_MIN_RATING' | translate }}</label>
-          <select
-            dir="auto"
-            [value]="filterMinRating() ?? ''"
-            (change)="setMinRating($any($event.target).value)"
-            class="filter-input w-full text-xs text-start">
-            <option value="">{{ 'DASHBOARD.FILTER_ANY' | translate }}</option>
-            <option value="3">3+</option>
-            <option value="3.5">3.5+</option>
-            <option value="4">4+</option>
-            <option value="4.5">4.5+</option>
-          </select>
-        </div>
-        <div>
-          <label class="text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-1 block text-start">{{ 'DASHBOARD.FILTER_MAX_RATE' | translate }}</label>
-          <input type="number" dir="auto" [attr.placeholder]="'DASHBOARD.FILTER_RATE_PLACEHOLDER' | translate" min="0" step="10"
-            [value]="filterMaxRate() ?? ''"
-            (input)="setMaxRate($any($event.target).value)"
-            class="filter-input w-full text-xs text-start placeholder:text-start" />
-        </div>
-        <div>
-          <label class="text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-1 block text-start">{{ 'DASHBOARD.FILTER_DISTANCE' | translate }}</label>
-          <select
-            dir="auto"
-            [value]="filterRadiusKm() ?? ''"
-            (change)="setRadiusKm($any($event.target).value)"
-            class="filter-input w-full text-xs text-start">
-            <option value="">{{ 'DASHBOARD.FILTER_ANY' | translate }}</option>
-            <option value="1">{{ 'DASHBOARD.DISTANCE_KM' | translate: { km: 1 } }}</option>
-            <option value="3">{{ 'DASHBOARD.DISTANCE_KM' | translate: { km: 3 } }}</option>
-            <option value="5">{{ 'DASHBOARD.DISTANCE_KM' | translate: { km: 5 } }}</option>
-            <option value="10">{{ 'DASHBOARD.DISTANCE_KM' | translate: { km: 10 } }}</option>
-            <option value="25">{{ 'DASHBOARD.DISTANCE_KM' | translate: { km: 25 } }}</option>
-          </select>
-        </div>
-      </div>
-
-      <div class="flex gap-2">
-        <button
-          (click)="applyFilter()"
-          [disabled]="isLoadingPins()"
-          class="flex-1 filter-btn filter-btn-search py-2.5">
-          {{ 'DASHBOARD.FILTER_APPLY' | translate }}
-        </button>
         @if (isFilterActive()) {
-          <button type="button" (click)="clearFilter()" class="filter-btn filter-btn-clear py-2.5 px-4">
-            {{ 'DASHBOARD.FILTER_CLEAR' | translate }}
+          <button type="button" (click)="clearFilter()"
+            class="text-xs font-semibold text-violet-600 hover:text-violet-800 transition-colors
+                   flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-violet-50">
+            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+            {{ 'FILTERS.CLEAR_ALL' | translate }}
           </button>
         }
       </div>
+
+      <div class="px-4 pb-4 space-y-3.5">
+        <!-- Service Type Chips -->
+        <div>
+          <label class="text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-1.5 block text-start">
+            {{ 'FILTERS.SERVICE' | translate }}
+          </label>
+          <div class="flex flex-wrap gap-1.5">
+            <button
+              (click)="filterServiceType.set(''); selectedCategory.set(''); applyFilter()"
+              class="filter-chip"
+              [class]="!filterServiceType() ? 'filter-chip-active' : 'filter-chip-idle'">
+              {{ 'FILTERS.ALL_SERVICES' | translate }}
+            </button>
+            @for (svc of serviceTypes(); track svc) {
+              <button
+                (click)="filterServiceType.set(svc); selectedCategory.set(svc); applyFilter()"
+                class="filter-chip"
+                [class]="filterServiceType() === svc ? 'filter-chip-active' : 'filter-chip-idle'">
+                {{ svc }}
+              </button>
+            }
+          </div>
+        </div>
+
+        <!-- Rating Stars -->
+        <div>
+          <label class="text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-1.5 block text-start">
+            {{ 'FILTERS.MIN_RATING' | translate }}
+          </label>
+          <div class="flex items-center gap-1">
+            <button type="button" (click)="setMinRatingAndApply(null)"
+              class="px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all duration-150"
+              [class]="filterMinRating() === null
+                ? 'bg-violet-100 text-violet-700 ring-1 ring-violet-300'
+                : 'bg-gray-50 text-gray-500 hover:bg-gray-100'">
+              {{ 'FILTERS.ANY_RATING' | translate }}
+            </button>
+            @for (star of [1,2,3,4,5]; track star) {
+              <button type="button" (click)="setMinRatingAndApply(star)"
+                class="group flex items-center gap-0.5 px-2 py-1.5 rounded-lg transition-all duration-150"
+                [class]="filterMinRating() === star
+                  ? 'bg-amber-50 ring-1 ring-amber-300'
+                  : 'hover:bg-gray-50'">
+                @for (s of [1,2,3,4,5]; track s) {
+                  <span class="text-sm transition-transform duration-150"
+                    [class]="s <= star
+                      ? 'text-amber-400'
+                      : 'text-gray-200 group-hover:text-gray-300'">&#9733;</span>
+                }
+                <span class="text-[10px] font-bold ms-0.5"
+                  [class]="filterMinRating() === star ? 'text-amber-600' : 'text-gray-400'">+</span>
+              </button>
+            }
+          </div>
+        </div>
+
+        <!-- Price & Distance Row -->
+        <div class="grid grid-cols-2 gap-3">
+          <!-- Max Price -->
+          <div>
+            <label class="text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-1.5 block text-start">
+              {{ 'FILTERS.MAX_PRICE' | translate }}
+            </label>
+            <div class="relative">
+              <span class="absolute start-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs font-semibold pointer-events-none">₪</span>
+              <input type="number" dir="auto" min="0" step="10"
+                [attr.placeholder]="'FILTERS.ANY_PRICE' | translate"
+                [value]="filterMaxRate() ?? ''"
+                (input)="setMaxRate($any($event.target).value)"
+                (change)="applyFilter()"
+                class="filter-input w-full ps-7 text-xs text-start placeholder:text-start" />
+            </div>
+          </div>
+
+          <!-- Distance -->
+          <div>
+            <label class="text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-1.5 block text-start">
+              {{ 'FILTERS.DISTANCE' | translate }}
+            </label>
+            <select
+              dir="auto"
+              [value]="filterRadiusKm() ?? ''"
+              (change)="setRadiusKm($any($event.target).value); applyFilter()"
+              class="filter-input w-full text-xs text-start">
+              <option value="">{{ 'DASHBOARD.FILTER_ANY' | translate }}</option>
+              <option value="1">{{ 'DASHBOARD.DISTANCE_KM' | translate: { km: 1 } }}</option>
+              <option value="3">{{ 'DASHBOARD.DISTANCE_KM' | translate: { km: 3 } }}</option>
+              <option value="5">{{ 'DASHBOARD.DISTANCE_KM' | translate: { km: 5 } }}</option>
+              <option value="10">{{ 'DASHBOARD.DISTANCE_KM' | translate: { km: 10 } }}</option>
+              <option value="25">{{ 'DASHBOARD.DISTANCE_KM' | translate: { km: 25 } }}</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Date & Time -->
+        <div>
+          <label class="text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-1.5 block text-start">
+            {{ 'FILTERS.AVAILABLE_ON' | translate }}
+          </label>
+          <div class="flex gap-2">
+            <input type="date" dir="auto" [value]="filterDate()" (input)="filterDate.set($any($event.target).value)"
+              (change)="applyFilter()" class="filter-input flex-1 text-start" />
+            <input type="time" dir="auto" [value]="filterTime()" (input)="filterTime.set($any($event.target).value)"
+              (change)="applyFilter()" class="filter-input flex-1 text-start" />
+          </div>
+        </div>
+
+        <!-- Results Count / Apply Bar -->
+        <div class="flex items-center justify-between pt-1">
+          <span class="text-xs font-medium text-gray-400">
+            @if (providers().length > 0) {
+              {{ 'FILTERS.RESULTS_COUNT' | translate: { count: providers().length } }}
+            } @else if (!isLoadingPins() && isFilterActive()) {
+              {{ 'FILTERS.NO_RESULTS' | translate }}
+            }
+          </span>
+          <button
+            (click)="applyFilter()"
+            [disabled]="isLoadingPins()"
+            class="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold
+                   bg-gradient-to-r from-violet-600 to-indigo-600 text-white shadow-md
+                   hover:shadow-lg hover:from-violet-700 hover:to-indigo-700
+                   active:scale-[0.97] transition-all duration-150
+                   disabled:opacity-50 disabled:cursor-not-allowed">
+            @if (isLoadingPins()) {
+              <div class="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+            }
+            {{ 'FILTERS.APPLY' | translate }}
+          </button>
+        </div>
+      </div>
     </div>
   }
+    </div>
+  </div>
 </div>
 
 <!-- ─── Bottom Sheet (Selected Pin Details) ─── -->
@@ -229,7 +310,7 @@
               🐾
             }
           </div>
-          <div class="min-w-0 text-start">
+          <div class="min-w-0 flex-1 text-start">
             <h2 class="text-lg font-bold text-gray-900 truncate">{{ pin.name }}</h2>
             <p class="text-sm text-violet-600 font-medium">{{ pin.services }}</p>
             @if (pin.reviewCount > 0) {
@@ -244,6 +325,22 @@
               </div>
             }
           </div>
+          @if (isLoggedIn()) {
+            <button
+              type="button"
+              (click)="toggleFavorite(pin.providerId)"
+              class="shrink-0 p-1.5 rounded-full transition-all duration-200 hover:scale-110 active:scale-95">
+              @if (favoriteService.isFavorited(pin.providerId)) {
+                <svg class="w-6 h-6 text-red-500" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M11.645 20.91l-.007-.003-.022-.012a15.247 15.247 0 01-.383-.218 25.18 25.18 0 01-4.244-3.17C4.688 15.36 2.25 12.174 2.25 8.25 2.25 5.322 4.714 3 7.688 3A5.5 5.5 0 0112 5.052 5.5 5.5 0 0116.313 3c2.973 0 5.437 2.322 5.437 5.25 0 3.925-2.438 7.111-4.739 9.256a25.175 25.175 0 01-4.244 3.17 15.247 15.247 0 01-.383.219l-.022.012-.007.004-.003.001a.752.752 0 01-.704 0l-.003-.001z" />
+                </svg>
+              } @else {
+                <svg class="w-6 h-6 text-gray-300 hover:text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12z" />
+                </svg>
+              }
+            </button>
+          }
         </div>
 
         <!-- Info Card -->
@@ -345,14 +442,20 @@
         <div class="flex gap-2">
           @if (isLoggedIn()) {
             <button
-              (click)="openRequestModal()"
+              (click)="openBookingModal()"
+              [disabled]="bookingModalLoading()"
               class="flex-1 flex items-center justify-center gap-2
                      bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800
+                     disabled:opacity-50 disabled:cursor-wait
                      text-white font-semibold rounded-xl py-3.5 px-4
                      transition-colors duration-150 text-sm">
-              <svg class="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-              </svg>
+              @if (bookingModalLoading()) {
+                <div class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin shrink-0"></div>
+              } @else {
+                <svg class="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+              }
               {{ 'BOOKING.BOOK_NOW' | translate }}
             </button>
           } @else {
@@ -394,180 +497,10 @@
   </div>
 </div>
 
-<!-- ─── Booking Modal ─── -->
-<div
-  class="fixed inset-0 z-[2000] flex items-end sm:items-center justify-center transition-opacity duration-200"
-  [class.pointer-events-none]="!isRequestModalOpen()"
-  [class.opacity-0]="!isRequestModalOpen()">
-
-  <div class="absolute inset-0 bg-black/40 backdrop-blur-[2px]" (click)="closeRequestModal()"></div>
-
-  <div class="relative bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full sm:w-[calc(100%-2rem)] sm:max-w-md p-6 z-10
-              max-h-[90vh] overflow-y-auto transition-all duration-200"
-       [class.translate-y-full]="!isRequestModalOpen()"
-       [class.translate-y-0]="isRequestModalOpen()"
-       dir="auto">
-
-    <h3 class="text-lg font-bold text-gray-900 mb-1 text-start">{{ 'BOOKING.TITLE' | translate }}</h3>
-    @if (selectedPin(); as pin) {
-      <p class="text-sm text-gray-500 mb-4 text-start">
-        {{ 'BOOKING.WITH_NAME' | translate: { name: pin.name } }}
-      </p>
-    }
-
-    @if (loadingPets()) {
-      <div class="flex items-center justify-center py-8 gap-2 text-sm text-gray-500">
-        <div class="w-4 h-4 border-2 border-violet-500 border-t-transparent rounded-full animate-spin shrink-0"></div>
-        <span>{{ 'BOOKING.LOADING_PETS' | translate }}</span>
-      </div>
-    } @else if (pets().length === 0) {
-      <div class="text-center py-6">
-        <p class="text-gray-500 text-sm mb-3">{{ 'BOOKING.NO_PETS_YET' | translate }}</p>
-        <a href="/my-pets" class="text-indigo-600 font-medium text-sm hover:underline">{{ 'BOOKING.ADD_PET_FIRST' | translate }}</a>
-      </div>
-    } @else {
-      <!-- Pet Selector -->
-      <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2 text-start">{{ 'BOOKING.YOUR_PET' | translate }}</label>
-      <div class="space-y-2 mb-4 max-h-36 overflow-y-auto">
-        @for (pet of pets(); track pet.id) {
-          <label
-            class="flex items-center gap-3 p-2.5 rounded-xl border-2 cursor-pointer transition-all duration-150"
-            [class]="selectedPetId() === pet.id
-              ? 'border-indigo-500 bg-indigo-50'
-              : 'border-gray-200 hover:border-gray-300 bg-white'">
-            <input
-              type="radio"
-              name="pet"
-              [value]="pet.id"
-              [checked]="selectedPetId() === pet.id"
-              (change)="selectedPetId.set(pet.id)"
-              class="sr-only" />
-            <span class="text-lg">{{ petSpeciesEmoji(pet.species) }}</span>
-            <div class="min-w-0 flex-1 text-start">
-              <p class="font-medium text-gray-900 text-sm truncate">{{ pet.name }}</p>
-              <p class="text-xs text-gray-500">{{ petSpeciesLabel(pet.species) }} · {{ pet.age }}{{ 'DASHBOARD.YEARS_SHORT' | translate }}</p>
-            </div>
-            @if (selectedPetId() === pet.id) {
-              <svg class="w-5 h-5 text-indigo-600 shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
-              </svg>
-            }
-          </label>
-        }
-      </div>
-
-      <!-- Date & Time -->
-      <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2 text-start">{{ 'BOOKING.WHEN' | translate }}</label>
-      <div class="space-y-3 mb-4">
-        <input
-          type="date"
-          dir="auto"
-          [value]="bookingDate()"
-          (input)="bookingDate.set($any($event.target).value)"
-          class="w-full rounded-xl border-2 border-gray-200 px-4 py-2.5 text-sm text-start text-gray-900
-                 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 outline-none transition" />
-        <div class="grid grid-cols-2 gap-3">
-          <div>
-            <label class="block text-xs text-gray-500 mb-1 text-start">{{ 'BOOKING.TIME_START' | translate }}</label>
-            <input
-              type="time"
-              dir="auto"
-              [value]="bookingStartTime()"
-              (input)="bookingStartTime.set($any($event.target).value)"
-              class="w-full rounded-xl border-2 border-gray-200 px-4 py-2.5 text-sm text-start text-gray-900
-                     focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 outline-none transition" />
-          </div>
-          <div>
-            <label class="block text-xs text-gray-500 mb-1 text-start">{{ 'BOOKING.TIME_END' | translate }}</label>
-            <input
-              type="time"
-              dir="auto"
-              [value]="bookingEndTime()"
-              (input)="bookingEndTime.set($any($event.target).value)"
-              class="w-full rounded-xl border-2 border-gray-200 px-4 py-2.5 text-sm text-start text-gray-900
-                     focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 outline-none transition" />
-          </div>
-        </div>
-      </div>
-
-      <!-- Notes -->
-      <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2 text-start">{{ 'BOOKING.NOTES' | translate }}</label>
-      <textarea
-        rows="2"
-        dir="auto"
-        [value]="bookingNotes()"
-        (input)="bookingNotes.set($any($event.target).value)"
-        [attr.placeholder]="'BOOKING.NOTES_PLACEHOLDER' | translate"
-        class="w-full rounded-xl border-2 border-gray-200 px-4 py-2.5 text-sm text-start placeholder:text-start text-gray-900 placeholder-gray-400
-               focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 outline-none transition resize-none mb-4">
-      </textarea>
-
-      <!-- Share Medical Records -->
-      <label class="flex items-center gap-3 bg-blue-50 rounded-xl px-4 py-3 mb-4 cursor-pointer select-none">
-        <input
-          type="checkbox"
-          [checked]="shareMedicalRecords()"
-          (change)="shareMedicalRecords.set($any($event.target).checked)"
-          class="w-4 h-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" />
-        <div class="min-w-0 flex-1 text-start">
-          <span class="text-sm font-medium text-gray-800">{{ 'BOOKING.SHARE_HEALTH' | translate }}</span>
-          <p class="text-xs text-gray-500 mt-0.5">{{ 'BOOKING.SHARE_HEALTH_HINT' | translate }}</p>
-        </div>
-        <svg class="w-5 h-5 text-blue-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-        </svg>
-      </label>
-
-      <!-- Outside Working Hours Warning -->
-      @if (isOutsideWorkingHours()) {
-        <div class="bg-yellow-50 border-s-4 border-yellow-400 p-4 mb-4 rounded-e-xl">
-          <p class="text-sm text-yellow-700 text-start">
-            ⚠️ <strong>{{ 'BOOKING.OUTSIDE_HOURS_NOTE_PREFIX' | translate }}</strong>
-            {{ 'BOOKING.OUTSIDE_HOURS_WARNING' | translate }}
-          </p>
-        </div>
-      }
-
-      <!-- Price Preview -->
-      @if (estimatedPrice(); as price) {
-        <div class="bg-indigo-50 rounded-xl p-3.5 mb-4 flex items-center justify-between gap-3">
-          <div class="text-sm text-gray-600 text-start min-w-0" dir="auto">
-            {{ 'BOOKING.PRICE_BREAKDOWN' | translate: { hours: price.hours, rate: price.rate } }}
-          </div>
-          <div class="text-lg font-bold text-indigo-700 shrink-0" dir="auto">
-            ₪{{ price.total }}
-          </div>
-        </div>
-      }
-
-      <!-- Actions -->
-      <div class="flex gap-3">
-        <button
-          (click)="sendRequest()"
-          [disabled]="!canBook()"
-          class="flex-1 flex items-center justify-center gap-2
-                 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800
-                 disabled:opacity-50 disabled:cursor-not-allowed
-                 text-white font-semibold rounded-xl py-3 px-4
-                 transition-colors duration-150 text-sm">
-          @if (sendingRequest()) {
-            <div class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin shrink-0"></div>
-            {{ 'BOOKING.SENDING' | translate }}
-          } @else {
-            <svg class="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-            </svg>
-            {{ 'BOOKING.SEND_REQUEST' | translate }}
-          }
-        </button>
-        <button
-          type="button"
-          (click)="closeRequestModal()"
-          class="bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold rounded-xl py-3 px-5
-                 transition-colors duration-150 text-sm">
-          {{ 'BOOKING.CANCEL' | translate }}
-        </button>
-      </div>
-    }
-  </div>
-</div>
+<!-- ─── Unified Booking Modal ─── -->
+<app-booking-modal
+  [open]="isBookingModalOpen()"
+  [data]="bookingModalData()"
+  (closed)="closeBookingModal()"
+  (booked)="onBookingSuccess()">
+</app-booking-modal>

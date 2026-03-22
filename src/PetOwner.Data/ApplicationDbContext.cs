@@ -29,6 +29,11 @@ public class ApplicationDbContext : DbContext
     public DbSet<Notification> Notifications => Set<Notification>();
     public DbSet<ProviderServiceRate> ProviderServiceRates => Set<ProviderServiceRate>();
     public DbSet<Booking> Bookings => Set<Booking>();
+    public DbSet<CommunityGroup> CommunityGroups => Set<CommunityGroup>();
+    public DbSet<GroupPost> GroupPosts => Set<GroupPost>();
+    public DbSet<GroupPostLike> GroupPostLikes => Set<GroupPostLike>();
+    public DbSet<GroupPostComment> GroupPostComments => Set<GroupPostComment>();
+    public DbSet<FavoriteProvider> FavoriteProviders => Set<FavoriteProvider>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -52,6 +57,9 @@ public class ApplicationDbContext : DbContext
         ConfigureConversation(modelBuilder);
         ConfigureNotification(modelBuilder);
         ConfigureBooking(modelBuilder);
+        ConfigureCommunityGroup(modelBuilder);
+        ConfigureGroupPost(modelBuilder);
+        ConfigureFavoriteProvider(modelBuilder);
     }
 
     private static void ConfigureUser(ModelBuilder modelBuilder)
@@ -96,6 +104,9 @@ public class ApplicationDbContext : DbContext
                 .HasMaxLength(200);
 
             entity.Property(u => u.ResetPasswordTokenExpiry);
+
+            entity.Property(u => u.IsActive)
+                .HasDefaultValue(true);
         });
     }
 
@@ -261,6 +272,21 @@ public class ApplicationDbContext : DbContext
             entity.Property(p => p.Notes)
                 .HasMaxLength(500);
 
+            entity.Property(p => p.MedicalNotes)
+                .HasMaxLength(2000);
+
+            entity.Property(p => p.FeedingSchedule)
+                .HasMaxLength(1000);
+
+            entity.Property(p => p.MicrochipNumber)
+                .HasMaxLength(50);
+
+            entity.Property(p => p.VetName)
+                .HasMaxLength(200);
+
+            entity.Property(p => p.VetPhone)
+                .HasMaxLength(30);
+
             entity.HasOne(p => p.User)
                 .WithMany(u => u.Pets)
                 .HasForeignKey(p => p.UserId)
@@ -329,7 +355,12 @@ public class ApplicationDbContext : DbContext
                 .HasDefaultValueSql("NEWSEQUENTIALID()");
 
             entity.HasIndex(r => r.ServiceRequestId)
-                .IsUnique();
+                .IsUnique()
+                .HasFilter("[ServiceRequestId] IS NOT NULL");
+
+            entity.HasIndex(r => r.BookingId)
+                .IsUnique()
+                .HasFilter("[BookingId] IS NOT NULL");
 
             entity.Property(r => r.Rating)
                 .IsRequired();
@@ -349,6 +380,11 @@ public class ApplicationDbContext : DbContext
             entity.HasOne(r => r.ServiceRequest)
                 .WithOne(sr => sr.Review)
                 .HasForeignKey<Review>(r => r.ServiceRequestId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(r => r.Booking)
+                .WithOne(b => b.Review)
+                .HasForeignKey<Review>(r => r.BookingId)
                 .OnDelete(DeleteBehavior.Cascade);
 
             entity.HasOne(r => r.Reviewer)
@@ -569,10 +605,13 @@ public class ApplicationDbContext : DbContext
             entity.Property(p => p.CommentCount).HasDefaultValue(0);
             entity.Property(p => p.CreatedAt).HasDefaultValueSql("GETUTCDATE()");
 
+            entity.Property(p => p.City).HasMaxLength(100);
+
             entity.HasOne(p => p.User)
                 .WithMany(u => u.Posts)
                 .HasForeignKey(p => p.UserId)
                 .OnDelete(DeleteBehavior.Cascade);
+
         });
 
         modelBuilder.Entity<PostLike>(entity =>
@@ -662,8 +701,7 @@ public class ApplicationDbContext : DbContext
             entity.Property(n => n.Id).HasDefaultValueSql("NEWSEQUENTIALID()");
             entity.Property(n => n.Type).IsRequired().HasMaxLength(50);
             entity.Property(n => n.Title).IsRequired().HasMaxLength(200);
-            entity.Property(n => n.Body).IsRequired().HasMaxLength(1000);
-            entity.Property(n => n.ReferenceId).HasMaxLength(200);
+            entity.Property(n => n.Message).IsRequired().HasMaxLength(1000);
             entity.Property(n => n.IsRead).HasDefaultValue(false);
             entity.Property(n => n.CreatedAt).HasDefaultValueSql("GETUTCDATE()");
 
@@ -729,6 +767,143 @@ public class ApplicationDbContext : DbContext
             entity.HasOne(b => b.ProviderProfile)
                 .WithMany()
                 .HasForeignKey(b => b.ProviderProfileId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+    }
+
+    private static void ConfigureCommunityGroup(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<CommunityGroup>(entity =>
+        {
+            entity.HasKey(g => g.Id);
+
+            entity.Property(g => g.Id)
+                .HasDefaultValueSql("NEWSEQUENTIALID()");
+
+            entity.Property(g => g.Name)
+                .IsRequired()
+                .HasMaxLength(200);
+
+            entity.Property(g => g.Description)
+                .HasMaxLength(2000);
+
+            entity.Property(g => g.Icon)
+                .HasMaxLength(500);
+
+            entity.Property(g => g.IsActive)
+                .HasDefaultValue(true);
+
+            entity.Property(g => g.CreatedAt)
+                .HasDefaultValueSql("GETUTCDATE()");
+
+            entity.Property(g => g.TargetCountry)
+                .HasMaxLength(100);
+
+            entity.Property(g => g.TargetCity)
+                .HasMaxLength(100);
+
+            entity.HasIndex(g => new { g.TargetCountry, g.TargetCity });
+        });
+    }
+
+    private static void ConfigureGroupPost(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<GroupPost>(entity =>
+        {
+            entity.HasKey(p => p.Id);
+
+            entity.Property(p => p.Id)
+                .HasDefaultValueSql("NEWSEQUENTIALID()");
+
+            entity.Property(p => p.Content)
+                .IsRequired()
+                .HasMaxLength(4000);
+
+            entity.Property(p => p.CreatedAt)
+                .HasDefaultValueSql("GETUTCDATE()");
+
+            entity.Property(p => p.City)
+                .HasMaxLength(100);
+
+            entity.Property(p => p.Country)
+                .HasMaxLength(100);
+
+            entity.HasIndex(p => new { p.GroupId, p.CreatedAt });
+
+            entity.HasOne(p => p.Group)
+                .WithMany(g => g.Posts)
+                .HasForeignKey(p => p.GroupId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(p => p.Author)
+                .WithMany(u => u.GroupPosts)
+                .HasForeignKey(p => p.AuthorId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<GroupPostLike>(entity =>
+        {
+            entity.HasKey(l => l.Id);
+            entity.Property(l => l.Id).HasDefaultValueSql("NEWSEQUENTIALID()");
+            entity.Property(l => l.CreatedAt).HasDefaultValueSql("GETUTCDATE()");
+
+            entity.HasIndex(l => new { l.PostId, l.UserId }).IsUnique();
+
+            entity.HasOne(l => l.Post)
+                .WithMany(p => p.Likes)
+                .HasForeignKey(l => l.PostId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(l => l.User)
+                .WithMany()
+                .HasForeignKey(l => l.UserId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<GroupPostComment>(entity =>
+        {
+            entity.HasKey(c => c.Id);
+            entity.Property(c => c.Id).HasDefaultValueSql("NEWSEQUENTIALID()");
+            entity.Property(c => c.Content).IsRequired().HasMaxLength(1000);
+            entity.Property(c => c.CreatedAt).HasDefaultValueSql("GETUTCDATE()");
+
+            entity.HasIndex(c => new { c.PostId, c.CreatedAt });
+
+            entity.HasOne(c => c.Post)
+                .WithMany(p => p.Comments)
+                .HasForeignKey(c => c.PostId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(c => c.Author)
+                .WithMany()
+                .HasForeignKey(c => c.AuthorId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+    }
+
+    private static void ConfigureFavoriteProvider(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<FavoriteProvider>(entity =>
+        {
+            entity.HasKey(f => f.Id);
+
+            entity.Property(f => f.Id)
+                .HasDefaultValueSql("NEWSEQUENTIALID()");
+
+            entity.Property(f => f.CreatedAt)
+                .HasDefaultValueSql("GETUTCDATE()");
+
+            entity.HasIndex(f => new { f.UserId, f.ProviderProfileId })
+                .IsUnique();
+
+            entity.HasOne(f => f.User)
+                .WithMany()
+                .HasForeignKey(f => f.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(f => f.ProviderProfile)
+                .WithMany()
+                .HasForeignKey(f => f.ProviderProfileId)
                 .OnDelete(DeleteBehavior.Restrict);
         });
     }

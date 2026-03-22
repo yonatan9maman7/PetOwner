@@ -1,6 +1,6 @@
 import { Component, computed, inject, signal, effect } from '@angular/core';
 import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
-import { CommonModule, DatePipe } from '@angular/common';
+import { CommonModule } from '@angular/common';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { map } from 'rxjs';
 import { TranslatePipe } from '@ngx-translate/core';
@@ -8,7 +8,9 @@ import { AuthService } from './services/auth.service';
 import { ProviderService } from './services/provider.service';
 import { NotificationService, AppNotification } from './services/notification.service';
 import { LanguageService } from './services/language.service';
+import { FavoriteService } from './services/favorite.service';
 import { ToastContainerComponent } from './shared/toast-container.component';
+import { TimeAgoPipe } from './shared/time-ago.pipe';
 
 @Component({
   selector: 'app-root',
@@ -18,9 +20,9 @@ import { ToastContainerComponent } from './shared/toast-container.component';
     RouterLink,
     RouterLinkActive,
     CommonModule,
-    DatePipe,
     ToastContainerComponent,
     TranslatePipe,
+    TimeAgoPipe,
   ],
   templateUrl: './app.component.html',
   styleUrl: './app.component.scss',
@@ -31,6 +33,7 @@ export class AppComponent {
   readonly providerService = inject(ProviderService);
   readonly notificationService = inject(NotificationService);
   readonly language = inject(LanguageService);
+  private readonly favoriteService = inject(FavoriteService);
 
   showNotificationPanel = signal(false);
   isProfileMenuOpen = signal(false);
@@ -48,6 +51,12 @@ export class AppComponent {
   showNav = computed(() => {
     const u = this.url();
     return !u.startsWith('/login');
+  });
+
+  /** Map home uses a non-scrolling flex layout so the Leaflet pane matches the visible area (nav padding included). */
+  readonly isMapHome = computed(() => {
+    const path = this.url().split('?')[0] || '/';
+    return path === '/' || path === '';
   });
 
   readonly isLoggedIn = computed(() => this.auth.isLoggedIn());
@@ -70,28 +79,35 @@ export class AppComponent {
 
   readonly currentMode = signal<'Owner' | 'Provider'>('Owner');
 
-  private readonly resetModeOnLogout = effect(() => {
-    if (!this.isLoggedIn()) {
-      this.currentMode.set('Owner');
-    }
-  });
+  private readonly resetModeOnLogout = effect(
+    () => {
+      if (!this.isLoggedIn()) {
+        this.currentMode.set('Owner');
+      }
+    },
+    { allowSignalWrites: true },
+  );
 
-  private loggedInEffect = effect(() => {
-    this.auth.token();
-    if (this.auth.isLoggedIn()) {
-      this.notificationService.stopConnection();
-      this.notificationService.startConnection();
-      this.notificationService.loadUnreadCount();
-      this.notificationService.loadNotifications().subscribe({
-        next: (list) => this.notificationService.notifications.set(list),
-      });
+  private loggedInEffect = effect(
+    () => {
+      this.auth.token();
+      if (this.auth.isLoggedIn()) {
+        this.notificationService.stopConnection();
+        this.notificationService.startConnection();
+        this.notificationService.loadUnreadCount();
+        this.notificationService.loadNotifications().subscribe({
+          next: (list) => this.notificationService.notifications.set(list),
+        });
 
-      this.providerService.getMe().subscribe();
-    } else {
-      this.notificationService.stopConnection();
-      this.providerService.providerStatus.set(null);
-    }
-  });
+        this.providerService.getMe().subscribe();
+        this.favoriteService.loadFavoriteIds();
+      } else {
+        this.notificationService.stopConnection();
+        this.providerService.providerStatus.set(null);
+      }
+    },
+    { allowSignalWrites: true },
+  );
 
   toggleMode(): void {
     if (!this.canSwitchToProvider()) return;
@@ -117,6 +133,10 @@ export class AppComponent {
         next: (list) => this.notificationService.notifications.set(list),
       });
     }
+  }
+
+  closeNotifications(): void {
+    this.showNotificationPanel.set(false);
   }
 
   markRead(n: AppNotification): void {

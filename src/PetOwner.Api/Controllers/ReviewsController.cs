@@ -21,7 +21,52 @@ public class ReviewsController : ControllerBase
     }
 
     [HttpPost]
-    public async Task<IActionResult> CreateReview([FromBody] CreateReviewDto request)
+    public async Task<IActionResult> CreateReview([FromBody] CreateBookingReviewDto request)
+    {
+        var userId = GetUserId();
+
+        if (request.Rating is < 1 or > 5)
+            return BadRequest(new { message = "Rating must be between 1 and 5." });
+
+        var booking = await _db.Bookings
+            .AsNoTracking()
+            .FirstOrDefaultAsync(b => b.Id == request.BookingId);
+
+        if (booking is null)
+            return NotFound(new { message = "Booking not found." });
+
+        if (booking.OwnerId != userId)
+            return Forbid();
+
+        if (booking.Status != BookingStatus.Completed && booking.PaymentStatus != PaymentStatus.Paid)
+            return BadRequest(new { message = "Can only review a completed or paid booking." });
+
+        var existingReview = await _db.Reviews
+            .AnyAsync(r => r.BookingId == request.BookingId);
+
+        if (existingReview)
+            return Conflict(new { message = "A review already exists for this booking." });
+
+        var review = new Review
+        {
+            BookingId = request.BookingId,
+            ReviewerId = userId,
+            RevieweeId = booking.ProviderProfileId,
+            Rating = request.Rating,
+            Comment = request.Comment,
+            IsVerified = true,
+        };
+
+        _db.Reviews.Add(review);
+        await _db.SaveChangesAsync();
+
+        await RecalculateProviderRating(booking.ProviderProfileId);
+
+        return CreatedAtAction(nameof(GetProviderReviews), new { providerId = booking.ProviderProfileId }, new { review.Id });
+    }
+
+    [HttpPost("service-request")]
+    public async Task<IActionResult> CreateServiceRequestReview([FromBody] CreateReviewDto request)
     {
         var userId = GetUserId();
 
@@ -91,8 +136,10 @@ public class ReviewsController : ControllerBase
             .Select(r => new ReviewDto(
                 r.Id,
                 r.ServiceRequestId,
+                r.BookingId,
                 r.ReviewerId,
                 r.Reviewer.Name,
+                r.Reviewer.ProviderProfile != null ? r.Reviewer.ProviderProfile.ProfileImageUrl : null,
                 r.RevieweeId,
                 r.Rating,
                 r.Comment,

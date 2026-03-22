@@ -16,15 +16,17 @@ public class NotificationService : INotificationService
         _hub = hub;
     }
 
-    public async Task CreateAsync(Guid userId, string type, string title, string body, string? referenceId = null)
+    public async Task CreateAsync(Guid userId, string type, string title, string message, Guid? relatedEntityId = null)
     {
         var notification = new Notification
         {
+            Id = Guid.NewGuid(),
             UserId = userId,
             Type = type,
             Title = title,
-            Body = body,
-            ReferenceId = referenceId,
+            Message = message,
+            RelatedEntityId = relatedEntityId,
+            CreatedAt = DateTime.UtcNow,
         };
 
         _db.Notifications.Add(notification);
@@ -35,8 +37,8 @@ public class NotificationService : INotificationService
             notification.Id,
             notification.Type,
             notification.Title,
-            notification.Body,
-            notification.ReferenceId,
+            notification.Message,
+            notification.RelatedEntityId,
             notification.IsRead,
             notification.CreatedAt,
         });

@@ -121,7 +121,7 @@ public class RequestsController : ControllerBase
 
         _ = _notifications.CreateAsync(
             request.ProviderId, "NewRequest", "New Booking Request",
-            $"You have a new booking request.", serviceRequest.Id.ToString());
+            $"You have a new booking request.", serviceRequest.Id);
 
         return CreatedAtAction(nameof(GetMyRequests), new { id = serviceRequest.Id }, new { serviceRequest.Id });
     }
@@ -195,7 +195,7 @@ public class RequestsController : ControllerBase
         serviceRequest.Status = "Completed";
         var completedRecipient = serviceRequest.PetOwnerId == userId ? serviceRequest.ProviderId : serviceRequest.PetOwnerId;
         _ = _notifications.CreateAsync(completedRecipient, "RequestCompleted", "Booking Completed",
-            "A booking has been marked as completed.", serviceRequest.Id.ToString());
+            "A booking has been marked as completed.", serviceRequest.Id);
 
         if (serviceRequest.Payment is { Status: "Authorized" })
         {
@@ -238,7 +238,7 @@ public class RequestsController : ControllerBase
         serviceRequest.CancellationReason = request.Reason?.Trim();
         var cancelRecipient = serviceRequest.PetOwnerId == userId ? serviceRequest.ProviderId : serviceRequest.PetOwnerId;
         _ = _notifications.CreateAsync(cancelRecipient, "RequestCancelled", "Booking Cancelled",
-            "A booking has been cancelled.", serviceRequest.Id.ToString());
+            "A booking has been cancelled.", serviceRequest.Id);
 
         decimal? refundAmount = null;
         string? refundPolicy = null;
@@ -349,7 +349,7 @@ public class RequestsController : ControllerBase
             _ => $"Booking {newStatus}"
         };
         _ = _notifications.CreateAsync(recipientId, $"Request{newStatus}", title,
-            $"Your booking has been {newStatus.ToLower()}.", serviceRequest.Id.ToString());
+            $"Your booking has been {newStatus.ToLower()}.", serviceRequest.Id);
 
         return Ok(new { serviceRequest.Id, serviceRequest.Status });
     }

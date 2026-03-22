@@ -25,5 +25,8 @@ public record BookingDto(
     string PaymentStatus,
     string? PaymentUrl,
     DateTime CreatedAt,
-    string? Notes
+    string? Notes,
+    string? ProviderPhone,
+    string? OwnerPhone,
+    bool HasReview
 );

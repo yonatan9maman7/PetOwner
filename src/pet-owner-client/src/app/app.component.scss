@@ -3,3 +3,19 @@
   width: 100%;
   height: 100%;
 }
+
+/* Slim main scrollbar; hide WebKit arrow buttons (often confused with inputs in RTL). */
+:host main {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(100, 116, 139, 0.4) transparent;
+}
+
+:host main::-webkit-scrollbar {
+  width: 8px;
+}
+
+:host main::-webkit-scrollbar-button {
+  display: none;
+  width: 0;
+  height: 0;
+}
