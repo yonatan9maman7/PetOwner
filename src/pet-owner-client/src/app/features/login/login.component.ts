@@ -233,7 +233,7 @@ export class LoginComponent {
     const { email, phone, password, name } = this.form.getRawValue();
 
     const request$ = this.isRegister()
-      ? this.auth.register({ email, phone, password, name })
+      ? this.auth.register({ email, phone, password, name, languagePreference: this.languageService.currentLang() })
       : this.auth.login(email, password);
 
     request$.subscribe({

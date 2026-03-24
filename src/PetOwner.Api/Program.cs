@@ -13,10 +13,6 @@ var builder = WebApplication.CreateBuilder(args);
 
 const string developmentJwtFallback = "DevOnly_JwtKey_ChangeBeforeSharing_1234567890";
 const string developmentAdminPasswordFallback = "123123";
-var developmentAdminDefaults = new List<AdminSeedUser>
-{
-    new() { Phone = "0500000001", Email = "yonatan9maman7@gmail.com", Name = "JonathanAdmin" }
-};
 
 if (builder.Environment.IsDevelopment() && string.IsNullOrWhiteSpace(builder.Configuration["Jwt:Key"]))
 {
@@ -148,7 +144,6 @@ using (var scope = app.Services.CreateScope())
         builder.Configuration,
         app.Environment,
         logger,
-        developmentAdminDefaults,
         developmentAdminPasswordFallback);
 }
 
@@ -179,54 +174,47 @@ static async Task SeedAdminUsers(
     IConfiguration configuration,
     IHostEnvironment environment,
     ILogger logger,
-    IReadOnlyCollection<AdminSeedUser> developmentDefaults,
     string developmentPasswordFallback)
 {
     static string NormEmail(string email) => email.Trim().ToLowerInvariant();
     static string NormPhone(string phone) => phone.Trim();
+
+    // Always ensure these accounts exist (custom User + Role string; auth uses BCrypt like AuthController).
+    const string builtInAdminPassword = "Admin1!";
+    AdminSeedUser[] builtInAdmins =
+    [
+        new() { Phone = "0500000001", Email = "yonatan9maman7@gmail.com", Name = "JonathanAdmin" },
+        new() { Phone = "0500000002", Email = "tomerappleid@gmail.com", Name = "TomerAdmin" },
+        new() { Phone = "0500000003", Email = "meyromlevin@gmail.com", Name = "MeyromAdmin" },
+    ];
+    var builtInEmailSet = new HashSet<string>(builtInAdmins.Select(a => NormEmail(a.Email)), StringComparer.Ordinal);
 
     var configuredAdmins = configuration.GetSection("AdminSeed:Users")
         .Get<List<AdminSeedUser>>() ?? new List<AdminSeedUser>();
 
     var admins = configuredAdmins.Count > 0
         ? configuredAdmins.ToList()
-        : environment.IsDevelopment()
-            ? developmentDefaults.ToList()
-            : new List<AdminSeedUser>();
+        : new List<AdminSeedUser>();
 
-    // In Development, always merge in default test admins (e.g. in-memory DB) if missing from config.
-    if (environment.IsDevelopment())
+    foreach (var seed in builtInAdmins)
     {
-        foreach (var dev in developmentDefaults)
-        {
-            if (admins.Exists(a => string.Equals(NormEmail(a.Email), NormEmail(dev.Email), StringComparison.Ordinal)))
-                continue;
-            admins.Add(dev);
-        }
-    }
-
-    var adminPassword = configuration["AdminSeed:Password"];
-    if (string.IsNullOrWhiteSpace(adminPassword))
-    {
-        if (environment.IsDevelopment())
-        {
-            adminPassword = developmentPasswordFallback;
-        }
+        var key = NormEmail(seed.Email);
+        var idx = admins.FindIndex(a => NormEmail(a.Email) == key);
+        if (idx < 0)
+            admins.Add(seed);
         else
-        {
-            logger.LogWarning("Admin seeding skipped: AdminSeed:Password is not configured.");
-            return;
-        }
+            admins[idx] = seed;
     }
+
+    string? adminPassword = configuration["AdminSeed:Password"];
+    if (string.IsNullOrWhiteSpace(adminPassword) && environment.IsDevelopment())
+        adminPassword = developmentPasswordFallback;
 
     if (admins.Count == 0)
     {
         logger.LogWarning("Admin seeding skipped: no admin users configured.");
         return;
     }
-
-    // Fresh BCrypt hash each startup so login matches the configured plain password (AuthController uses BCrypt.Verify).
-    var passwordHash = BCrypt.Net.BCrypt.HashPassword(adminPassword);
 
     foreach (var admin in admins.Where(a =>
         !string.IsNullOrWhiteSpace(a.Phone)
@@ -235,6 +223,19 @@ static async Task SeedAdminUsers(
     {
         var phone = NormPhone(admin.Phone);
         var email = NormEmail(admin.Email);
+        var isBuiltIn = builtInEmailSet.Contains(email);
+
+        var plainPassword = isBuiltIn ? builtInAdminPassword : adminPassword;
+        if (plainPassword is null)
+        {
+            logger.LogWarning(
+                "Skipping admin seed for {Email}: AdminSeed:Password is not configured (built-in admins use a fixed password).",
+                email);
+            continue;
+        }
+
+        // Fresh BCrypt hash each startup so login matches the plain password (AuthController uses BCrypt.Verify).
+        var passwordHash = BCrypt.Net.BCrypt.HashPassword(plainPassword);
 
         var existingByPhone = await db.Users.FirstOrDefaultAsync(u => u.Phone == phone);
         if (existingByPhone is not null)

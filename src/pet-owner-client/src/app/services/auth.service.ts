@@ -75,7 +75,7 @@ export class AuthService {
     );
   }
 
-  register(payload: { email: string; phone: string; name: string; password: string; role?: string }) {
+  register(payload: { email: string; phone: string; name: string; password: string; role?: string; languagePreference?: string }) {
     return this.http.post<AuthResponse>('/api/auth/register', payload).pipe(
       tap((res) => this.setToken(res.token)),
     );

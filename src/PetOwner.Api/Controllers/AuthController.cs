@@ -58,6 +58,18 @@ public class AuthController : ControllerBase
         _db.Users.Add(user);
         await _db.SaveChangesAsync();
 
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await _emailService.SendWelcomeEmailAsync(user.Email, user.Name, dto.LanguagePreference);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to send welcome email to {Email}", user.Email);
+            }
+        });
+
         var token = _tokenService.GenerateAccessToken(user);
         return Ok(new { token, userId = user.Id });
     }
