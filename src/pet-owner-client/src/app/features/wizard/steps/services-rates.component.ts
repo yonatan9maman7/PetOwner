@@ -6,7 +6,12 @@ import {
   ServiceType,
   PricingUnit,
   SERVICE_CARDS,
+  ServiceCardConfig,
 } from '../wizard.model';
+
+const PROVIDER_CARDS: ServiceCardConfig[] = SERVICE_CARDS.filter(c => c.type !== 'Insurance');
+
+const TRAINING_PRICING_UNITS: PricingUnit[] = ['PerSession', 'PerPackage'];
 
 @Component({
   selector: 'app-step-services-rates',
@@ -45,6 +50,21 @@ import {
 
             @if (isSelected(card.type)) {
               <div class="mt-4 pt-3 border-t border-slate-200/70" (click)="$event.stopPropagation()">
+                @if (card.type === 'Training') {
+                  <label class="mb-1.5 block text-start text-xs font-medium text-indigo-700">
+                    {{ 'WIZARD.PRICING_UNIT_LABEL' | translate }}
+                  </label>
+                  <select
+                    dir="auto"
+                    class="mb-3 w-full text-start rounded-xl border-2 border-indigo-200 bg-white px-4 py-2 text-sm text-slate-900
+                           outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
+                    [value]="pricingUnitFor(card.type)"
+                    (change)="updatePricingUnit(card.type, $any($event.target).value)">
+                    @for (unit of trainingPricingUnits; track unit) {
+                      <option [value]="unit">{{ pricingUnitLabelKey(unit) | translate }}</option>
+                    }
+                  </select>
+                }
                 <label class="mb-1.5 block text-start text-xs font-medium text-indigo-700">
                   {{ serviceRateKey(card.type) | translate }} (ILS)
                 </label>
@@ -57,7 +77,7 @@ import {
                          placeholder-slate-400 outline-none transition
                          focus:border-primary focus:ring-2 focus:ring-primary/20"
                   [value]="rateFor(card.type)"
-                  (input)="updateRate(card.type, $any($event.target).value, card.pricingUnit)"
+                  (input)="updateRate(card.type, $any($event.target).value)"
                   [attr.placeholder]="'WIZARD.RATE_PLACEHOLDER' | translate"
                 />
               </div>
@@ -71,7 +91,8 @@ import {
 export class ServicesRatesComponent implements OnInit {
   private readonly store = inject(WizardStore);
 
-  readonly cards = SERVICE_CARDS;
+  readonly cards = PROVIDER_CARDS;
+  readonly trainingPricingUnits = TRAINING_PRICING_UNITS;
   readonly selected = signal<ServiceRateDto[]>([]);
 
   /** Exposes a form-like interface so the parent wizard can check validity. */
@@ -83,44 +104,58 @@ export class ServicesRatesComponent implements OnInit {
     };
   }
 
-  private readonly icons: Record<ServiceType, string> = {
+  private readonly icons: Partial<Record<ServiceType, string>> = {
     DogWalking: '🐕',
     PetSitting: '🏠',
     Boarding: '🛏️',
     DropInVisit: '👋',
+    Training: '🦮',
   };
 
-  private readonly titleKeys: Record<ServiceType, string> = {
+  private readonly titleKeys: Partial<Record<ServiceType, string>> = {
     DogWalking: 'WIZARD.SERVICE_DOG_WALKING_TITLE',
     PetSitting: 'WIZARD.SERVICE_PET_SITTING_TITLE',
     Boarding: 'WIZARD.SERVICE_BOARDING_TITLE',
     DropInVisit: 'WIZARD.SERVICE_DROP_IN_TITLE',
+    Training: 'WIZARD.SERVICE_TRAINING_TITLE',
   };
 
-  private readonly descKeys: Record<ServiceType, string> = {
+  private readonly descKeys: Partial<Record<ServiceType, string>> = {
     DogWalking: 'WIZARD.SERVICE_DOG_WALKING_DESC',
     PetSitting: 'WIZARD.SERVICE_PET_SITTING_DESC',
     Boarding: 'WIZARD.SERVICE_BOARDING_DESC',
     DropInVisit: 'WIZARD.SERVICE_DROP_IN_DESC',
+    Training: 'WIZARD.SERVICE_TRAINING_DESC',
   };
 
-  private readonly rateKeys: Record<ServiceType, string> = {
-    DogWalking: 'WIZARD.RATE_PER_HOUR',
-    PetSitting: 'WIZARD.RATE_PER_HOUR',
-    Boarding: 'WIZARD.RATE_PER_NIGHT',
-    DropInVisit: 'WIZARD.RATE_PER_VISIT',
+  private readonly rateKeysByUnit: Record<string, string> = {
+    PerHour: 'WIZARD.RATE_PER_HOUR',
+    PerNight: 'WIZARD.RATE_PER_NIGHT',
+    PerVisit: 'WIZARD.RATE_PER_VISIT',
+    PerSession: 'WIZARD.RATE_PER_SESSION',
+    PerPackage: 'WIZARD.RATE_PER_PACKAGE',
+  };
+
+  private readonly pricingUnitLabelKeys: Record<string, string> = {
+    PerSession: 'WIZARD.UNIT_PER_SESSION',
+    PerPackage: 'WIZARD.UNIT_PER_PACKAGE',
   };
 
   serviceTitleKey(type: ServiceType): string {
-    return this.titleKeys[type];
+    return this.titleKeys[type] ?? type;
   }
 
   serviceDescKey(type: ServiceType): string {
-    return this.descKeys[type];
+    return this.descKeys[type] ?? type;
   }
 
   serviceRateKey(type: ServiceType): string {
-    return this.rateKeys[type];
+    const unit = this.pricingUnitFor(type);
+    return this.rateKeysByUnit[unit] ?? 'WIZARD.RATE_PER_HOUR';
+  }
+
+  pricingUnitLabelKey(unit: PricingUnit): string {
+    return this.pricingUnitLabelKeys[unit] ?? unit;
   }
 
   ngOnInit(): void {
@@ -136,6 +171,12 @@ export class ServicesRatesComponent implements OnInit {
 
   rateFor(type: ServiceType): number | null {
     return this.selected().find((r) => r.serviceType === type)?.rate ?? null;
+  }
+
+  pricingUnitFor(type: ServiceType): PricingUnit {
+    return this.selected().find((r) => r.serviceType === type)?.pricingUnit
+      ?? this.cards.find(c => c.type === type)?.pricingUnit
+      ?? 'PerHour';
   }
 
   iconFor(type: ServiceType): string {
@@ -155,11 +196,20 @@ export class ServicesRatesComponent implements OnInit {
     this.sync();
   }
 
-  updateRate(type: ServiceType, value: string, unit: PricingUnit): void {
+  updateRate(type: ServiceType, value: string): void {
     const rate = parseFloat(value) || 0;
     this.selected.update((list) =>
       list.map((r) =>
-        r.serviceType === type ? { ...r, rate, pricingUnit: unit } : r,
+        r.serviceType === type ? { ...r, rate } : r,
+      ),
+    );
+    this.sync();
+  }
+
+  updatePricingUnit(type: ServiceType, unit: PricingUnit): void {
+    this.selected.update((list) =>
+      list.map((r) =>
+        r.serviceType === type ? { ...r, pricingUnit: unit } : r,
       ),
     );
     this.sync();

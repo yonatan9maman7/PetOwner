@@ -4,5 +4,7 @@ public enum PricingUnit
 {
     PerHour,
     PerNight,
-    PerVisit
+    PerVisit,
+    PerSession,
+    PerPackage
 }

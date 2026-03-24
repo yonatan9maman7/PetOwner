@@ -188,13 +188,23 @@ export interface BookingModalInput {
               (click)="submit()"
               [disabled]="!canSubmit()"
               class="flex-1 flex items-center justify-center gap-2
-                     bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800
                      disabled:opacity-50 disabled:cursor-not-allowed
                      text-white font-semibold rounded-xl py-3 px-4
-                     transition-colors duration-150 text-sm">
+                     transition-colors duration-150 text-sm"
+              [class.bg-indigo-600]="!isTrainingSelected()"
+              [class.hover:bg-indigo-700]="!isTrainingSelected()"
+              [class.active:bg-indigo-800]="!isTrainingSelected()"
+              [class.bg-amber-600]="isTrainingSelected()"
+              [class.hover:bg-amber-700]="isTrainingSelected()"
+              [class.active:bg-amber-800]="isTrainingSelected()">
               @if (submitting()) {
                 <div class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                {{ 'BOOKING.SUBMITTING' | translate }}
+                {{ (isTrainingSelected() ? 'BOOKING.CONSULTATION_SUBMITTING' : 'BOOKING.SUBMITTING') | translate }}
+              } @else if (isTrainingSelected()) {
+                <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                </svg>
+                {{ 'BOOKING.REQUEST_CONSULTATION' | translate }}
               } @else {
                 <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                   <path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
@@ -209,6 +219,11 @@ export interface BookingModalInput {
               {{ 'BOOKING.CANCEL' | translate }}
             </button>
           </div>
+          @if (isTrainingSelected()) {
+            <p class="mt-2 text-xs text-amber-700 bg-amber-50 rounded-lg px-3 py-2 text-start" dir="auto">
+              {{ 'BOOKING.TRAINING_INFO' | translate }}
+            </p>
+          }
         </div>
       </div>
     </div>
@@ -299,6 +314,12 @@ export class BookingModalComponent implements OnChanges, OnDestroy {
       case 'PerVisit':
         base = tr.instant('BOOKING.PRICE_VISIT_BREAKDOWN', { rate: rate.rate });
         break;
+      case 'PerSession':
+        base = tr.instant('BOOKING.PRICE_SESSION_BREAKDOWN', { rate: rate.rate });
+        break;
+      case 'PerPackage':
+        base = tr.instant('BOOKING.PRICE_PACKAGE_BREAKDOWN', { rate: rate.rate });
+        break;
       default:
         return '';
     }
@@ -308,6 +329,10 @@ export class BookingModalComponent implements OnChanges, OnDestroy {
     }
 
     return base;
+  });
+
+  readonly isTrainingSelected = computed(() => {
+    return this.formValues().serviceType === 'Training';
   });
 
   readonly canSubmit = computed(() => {
@@ -403,6 +428,10 @@ export class BookingModalComponent implements OnChanges, OnDestroy {
         return Math.round(rate.rate * hours * 100) / 100;
       }
       case 'PerVisit':
+        return rate.rate;
+      case 'PerSession':
+        return rate.rate;
+      case 'PerPackage':
         return rate.rate;
       default:
         return 0;

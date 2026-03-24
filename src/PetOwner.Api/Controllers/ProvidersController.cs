@@ -44,7 +44,10 @@ public class ProvidersController : ControllerBase
         if (existingProfile)
             return Conflict(new { message = "Provider profile already exists." });
 
-        var user = await _db.Users.FirstAsync(u => u.Id == userId);
+        var user = await _db.Users.FirstOrDefaultAsync(u => u.Id == userId);
+        if (user is null)
+            return NotFound(new { message = "User not found or invalid token." });
+
         user.Role = "Provider";
 
         var profile = new ProviderProfile

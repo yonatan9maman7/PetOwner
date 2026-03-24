@@ -9,6 +9,7 @@ import {
   ServiceType,
   PricingUnit,
   SERVICE_CARDS,
+  ServiceCardConfig,
   SERVICE_TYPE_INT,
   PRICING_UNIT_INT,
 } from '../wizard/wizard.model';
@@ -20,30 +21,51 @@ import {
 } from '../../shared/provider-location-block/provider-location-draft.model';
 import { ScheduleManagerComponent } from './schedule-manager.component';
 
+const PROVIDER_CARDS: ServiceCardConfig[] = SERVICE_CARDS.filter(c => c.type !== 'Insurance');
+
+const TRAINING_PRICING_UNITS: PricingUnit[] = ['PerSession', 'PerPackage'];
+
 const SERVICE_CARD_I18N: Record<
-  ServiceType,
-  { titleKey: string; descKey: string; rateKey: string }
+  string,
+  { titleKey: string; descKey: string }
 > = {
   DogWalking: {
     titleKey: 'WIZARD.SERVICE_DOG_WALKING_TITLE',
     descKey: 'WIZARD.SERVICE_DOG_WALKING_DESC',
-    rateKey: 'WIZARD.RATE_PER_HOUR',
   },
   PetSitting: {
     titleKey: 'WIZARD.SERVICE_PET_SITTING_TITLE',
     descKey: 'WIZARD.SERVICE_PET_SITTING_DESC',
-    rateKey: 'WIZARD.RATE_PER_HOUR',
   },
   Boarding: {
     titleKey: 'WIZARD.SERVICE_BOARDING_TITLE',
     descKey: 'WIZARD.SERVICE_BOARDING_DESC',
-    rateKey: 'WIZARD.RATE_PER_NIGHT',
   },
   DropInVisit: {
     titleKey: 'WIZARD.SERVICE_DROP_IN_TITLE',
     descKey: 'WIZARD.SERVICE_DROP_IN_DESC',
-    rateKey: 'WIZARD.RATE_PER_VISIT',
   },
+  Training: {
+    titleKey: 'WIZARD.SERVICE_TRAINING_TITLE',
+    descKey: 'WIZARD.SERVICE_TRAINING_DESC',
+  },
+  Insurance: {
+    titleKey: 'WIZARD.SERVICE_INSURANCE_TITLE',
+    descKey: 'WIZARD.SERVICE_INSURANCE_DESC',
+  },
+};
+
+const RATE_KEY_BY_UNIT: Record<string, string> = {
+  PerHour: 'WIZARD.RATE_PER_HOUR',
+  PerNight: 'WIZARD.RATE_PER_NIGHT',
+  PerVisit: 'WIZARD.RATE_PER_VISIT',
+  PerSession: 'WIZARD.RATE_PER_SESSION',
+  PerPackage: 'WIZARD.RATE_PER_PACKAGE',
+};
+
+const PRICING_UNIT_LABEL_KEY: Record<string, string> = {
+  PerSession: 'WIZARD.UNIT_PER_SESSION',
+  PerPackage: 'WIZARD.UNIT_PER_PACKAGE',
 };
 
 @Component({
@@ -120,14 +142,26 @@ const SERVICE_CARD_I18N: Record<
                 <p class="mt-0.5 text-start text-xs text-slate-500" dir="auto">{{ serviceCardKeys(card.type).descKey | translate }}</p>
                 @if (isServiceSelected(card.type)) {
                   <div class="mt-2" (click)="$event.stopPropagation()">
-                    <label class="block text-start text-xs font-medium text-slate-600" dir="auto">{{ serviceCardKeys(card.type).rateKey | translate }} (ILS)</label>
+                    @if (card.type === 'Training') {
+                      <label class="block text-start text-xs font-medium text-slate-600 mb-1" dir="auto">{{ 'WIZARD.PRICING_UNIT_LABEL' | translate }}</label>
+                      <select
+                        dir="auto"
+                        class="mb-2 w-full text-start rounded-lg border border-slate-300 px-3 py-1.5 text-sm"
+                        [value]="getServicePricingUnit(card.type)"
+                        (change)="setServicePricingUnit(card.type, $any($event.target).value)">
+                        @for (unit of trainingPricingUnits; track unit) {
+                          <option [value]="unit">{{ pricingUnitLabelKey(unit) | translate }}</option>
+                        }
+                      </select>
+                    }
+                    <label class="block text-start text-xs font-medium text-slate-600" dir="auto">{{ serviceRateKey(card.type) | translate }} (ILS)</label>
                     <input
                       type="number"
                       min="1"
                       dir="auto"
                       class="mt-1 w-full text-start placeholder:text-start rounded-lg border border-slate-300 px-3 py-1.5 text-sm"
                       [value]="getServiceRate(card.type)"
-                      (input)="setServiceRate(card.type, $any($event.target).value, card.pricingUnit)"
+                      (input)="setServiceRate(card.type, $any($event.target).value)"
                       [attr.placeholder]="'WIZARD.RATE_PLACEHOLDER' | translate"
                     />
                   </div>
@@ -215,7 +249,8 @@ export class EditProfileComponent implements OnInit {
   private readonly router = inject(Router);
   private readonly translate = inject(TranslateService);
 
-  readonly serviceCards = SERVICE_CARDS;
+  readonly serviceCards = PROVIDER_CARDS;
+  readonly trainingPricingUnits = TRAINING_PRICING_UNITS;
 
   readonly loading = signal(true);
   readonly error = signal('');
@@ -321,14 +356,35 @@ export class EditProfileComponent implements OnInit {
     }
   }
 
-  serviceCardKeys(type: ServiceType): { titleKey: string; descKey: string; rateKey: string } {
-    return SERVICE_CARD_I18N[type];
+  serviceCardKeys(type: ServiceType): { titleKey: string; descKey: string } {
+    return SERVICE_CARD_I18N[type] ?? { titleKey: type, descKey: type };
   }
 
-  setServiceRate(type: ServiceType, value: string, unit: PricingUnit): void {
+  serviceRateKey(type: ServiceType): string {
+    const unit = this.getServicePricingUnit(type);
+    return RATE_KEY_BY_UNIT[unit] ?? 'WIZARD.RATE_PER_HOUR';
+  }
+
+  pricingUnitLabelKey(unit: PricingUnit): string {
+    return PRICING_UNIT_LABEL_KEY[unit] ?? unit;
+  }
+
+  getServicePricingUnit(type: ServiceType): PricingUnit {
+    return this.selectedServiceRates().find(r => r.serviceType === type)?.pricingUnit
+      ?? this.serviceCards.find(c => c.type === type)?.pricingUnit
+      ?? 'PerHour';
+  }
+
+  setServiceRate(type: ServiceType, value: string): void {
     const rate = parseFloat(value) || 0;
     this.selectedServiceRates.update(list =>
-      list.map(r => r.serviceType === type ? { ...r, rate, pricingUnit: unit } : r),
+      list.map(r => r.serviceType === type ? { ...r, rate } : r),
+    );
+  }
+
+  setServicePricingUnit(type: ServiceType, unit: PricingUnit): void {
+    this.selectedServiceRates.update(list =>
+      list.map(r => r.serviceType === type ? { ...r, pricingUnit: unit } : r),
     );
   }
 

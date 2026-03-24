@@ -295,6 +295,8 @@ static async Task EnsureSeededAdminsHaveProviderProfilesAsync(
         ("Pet Sitter", ServiceType.PetSitting, PricingUnit.PerHour, 90m),
         ("Boarding", ServiceType.Boarding, PricingUnit.PerNight, 150m),
         ("Drop-in Visit", ServiceType.DropInVisit, PricingUnit.PerVisit, 55m),
+        ("Pet Trainer", ServiceType.Training, PricingUnit.PerSession, 200m),
+        ("Pet Insurance", ServiceType.Insurance, PricingUnit.PerPackage, 350m),
     };
 
     foreach (var name in definitions.Select(d => d.Name).Distinct())

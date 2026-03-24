@@ -213,6 +213,8 @@ public class BookingsController : ControllerBase
             PricingUnit.PerNight => rate.Rate * Math.Max(1, (end.Date - start.Date).Days),
             PricingUnit.PerHour => rate.Rate * (decimal)Math.Max(0, (end - start).TotalHours),
             PricingUnit.PerVisit => rate.Rate,
+            PricingUnit.PerSession => rate.Rate,
+            PricingUnit.PerPackage => rate.Rate,
             _ => 0m,
         };
     }

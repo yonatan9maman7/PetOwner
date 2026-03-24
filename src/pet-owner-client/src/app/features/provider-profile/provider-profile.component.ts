@@ -312,6 +312,8 @@ export class ProviderProfileComponent implements OnInit {
       PetSitting: 'WIZARD.SERVICE_PET_SITTING_TITLE',
       Boarding: 'WIZARD.SERVICE_BOARDING_TITLE',
       DropInVisit: 'WIZARD.SERVICE_DROP_IN_TITLE',
+      Training: 'WIZARD.SERVICE_TRAINING_TITLE',
+      Insurance: 'WIZARD.SERVICE_INSURANCE_TITLE',
     };
     return map[type] ?? type;
   }
@@ -321,6 +323,8 @@ export class ProviderProfileComponent implements OnInit {
       PerHour: 'BOOKING.UNIT_HR',
       PerNight: 'BOOKING.UNIT_NIGHT',
       PerVisit: 'BOOKING.UNIT_VISIT',
+      PerSession: 'BOOKING.UNIT_SESSION',
+      PerPackage: 'BOOKING.UNIT_PACKAGE',
     };
     return map[unit] ?? unit;
   }

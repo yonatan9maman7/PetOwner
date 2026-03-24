@@ -92,6 +92,8 @@ export class MapDashboardComponent implements OnInit, OnDestroy, AfterViewInit {
     { labelKey: 'MAP.FILTER_WALKERS', icon: '🚶', value: 'Dog Walker' },
     { labelKey: 'MAP.FILTER_PROVIDERS', icon: '🏠', value: 'Pet Sitter' },
     { labelKey: 'MAP.FILTER_BOARDING', icon: '🛏️', value: 'Boarding' },
+    { labelKey: 'MAP.FILTER_TRAINERS', icon: '🦮', value: 'Training' },
+    { labelKey: 'MAP.FILTER_INSURANCE', icon: '🛡️', value: 'Insurance' },
     { labelKey: 'MAP.FILTER_VETS', icon: '🩺', value: 'Vet' },
     { labelKey: 'MAP.FILTER_GROOMERS', icon: '✂️', value: 'Groomer' },
     { labelKey: 'MAP.FILTER_SHOPS', icon: '🛒', value: 'Shop' },

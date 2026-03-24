@@ -5,5 +5,7 @@ public enum ServiceType
     DogWalking,
     PetSitting,
     Boarding,
-    DropInVisit
+    DropInVisit,
+    Training,
+    Insurance
 }

@@ -35,7 +35,7 @@ public class DatabaseSeeder
     private const double MinLongitude = 34.7640;
     private const double MaxLongitude = 34.7750;
 
-    private static readonly string[] ServiceDefinitions = ["Dog Walker", "Pet Sitter", "Boarding", "Drop-in Visit"];
+    private static readonly string[] ServiceDefinitions = ["Dog Walker", "Pet Sitter", "Boarding", "Drop-in Visit", "Pet Trainer", "Pet Insurance"];
 
     private static readonly (ServiceType Type, string Name, PricingUnit Unit, decimal MinRate, decimal MaxRate)[] ServiceRateDefinitions =
     [
@@ -43,6 +43,8 @@ public class DatabaseSeeder
         (ServiceType.PetSitting, "Pet Sitter", PricingUnit.PerHour, 50, 150),
         (ServiceType.Boarding, "Boarding", PricingUnit.PerNight, 80, 250),
         (ServiceType.DropInVisit, "Drop-in Visit", PricingUnit.PerVisit, 30, 80),
+        (ServiceType.Training, "Pet Trainer", PricingUnit.PerSession, 100, 300),
+        (ServiceType.Insurance, "Pet Insurance", PricingUnit.PerPackage, 150, 500),
     ];
 
     private static readonly string[] IsraeliCities =
@@ -101,6 +103,8 @@ public class DatabaseSeeder
             ServiceType.PetSitting => serviceIds[1],
             ServiceType.Boarding => serviceIds[2],
             ServiceType.DropInVisit => serviceIds[3],
+            ServiceType.Training => serviceIds[4],
+            ServiceType.Insurance => serviceIds[5],
             _ => serviceIds[0],
         };
 

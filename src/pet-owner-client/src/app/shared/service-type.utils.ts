@@ -6,12 +6,16 @@ const SERVICE_TYPE_FROM_INDEX: Record<number, ServiceType> = {
   1: 'PetSitting',
   2: 'Boarding',
   3: 'DropInVisit',
+  4: 'Training',
+  5: 'Insurance',
 };
 
 const PRICING_UNIT_FROM_INDEX: Record<number, PricingUnit> = {
   0: 'PerHour',
   1: 'PerNight',
   2: 'PerVisit',
+  3: 'PerSession',
+  4: 'PerPackage',
 };
 
 const SERVICE_TYPE_I18N: Record<ServiceType, string> = {
@@ -19,12 +23,16 @@ const SERVICE_TYPE_I18N: Record<ServiceType, string> = {
   PetSitting: 'WIZARD.SERVICE_PET_SITTING_TITLE',
   Boarding: 'WIZARD.SERVICE_BOARDING_TITLE',
   DropInVisit: 'WIZARD.SERVICE_DROP_IN_TITLE',
+  Training: 'WIZARD.SERVICE_TRAINING_TITLE',
+  Insurance: 'WIZARD.SERVICE_INSURANCE_TITLE',
 };
 
 const PRICING_UNIT_I18N: Record<PricingUnit, string> = {
   PerHour: 'BOOKING.UNIT_HR',
   PerNight: 'BOOKING.UNIT_NIGHT',
   PerVisit: 'BOOKING.UNIT_VISIT',
+  PerSession: 'BOOKING.UNIT_SESSION',
+  PerPackage: 'BOOKING.UNIT_PACKAGE',
 };
 
 export function normalizeServiceType(value: ServiceType | number | string): ServiceType {
