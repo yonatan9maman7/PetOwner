@@ -12,6 +12,7 @@ import {
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import * as L from 'leaflet';
+import { OSM_TILE_URL, OSM_TILE_OPTIONS } from '../../shared/leaflet-defaults';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { WizardStore } from './wizard.store';
 import { AddressAutocompleteComponent } from '../../shared/address-autocomplete.component';
@@ -166,10 +167,7 @@ export class WizardLocationPanelComponent implements OnDestroy {
       zoomControl: true,
     });
 
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-      attribution: '&copy; <a href="https://carto.com/">CARTO</a>',
-      maxZoom: 19,
-    }).addTo(this.map);
+    L.tileLayer(OSM_TILE_URL, OSM_TILE_OPTIONS).addTo(this.map);
 
     this.pinLayer.addTo(this.map);
     window.addEventListener('resize', this.onWinResize);

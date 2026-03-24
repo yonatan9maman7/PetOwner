@@ -9,23 +9,24 @@ export interface CreateBookingPayload {
   petIds?: string[];
 }
 
+/** Shapes returned by GET /api/bookings/mine (full DTO or minimal projections). */
 export interface BookingDto {
   id: string;
-  ownerId: string;
-  providerProfileId: string;
+  ownerId?: string;
+  providerProfileId?: string;
   providerName: string;
-  ownerName: string;
+  ownerName?: string;
   service: string;
   startDate: string;
   endDate: string;
   totalPrice: number;
-  pricingUnit: string;
+  pricingUnit?: string;
   status: string;
-  paymentStatus: string;
-  paymentUrl: string | null;
-  createdAt: string;
-  notes: string | null;
-  providerPhone: string | null;
-  ownerPhone: string | null;
-  hasReview: boolean;
+  paymentStatus?: string;
+  paymentUrl?: string | null;
+  createdAt?: string;
+  notes?: string | null;
+  providerPhone?: string | null;
+  ownerPhone?: string | null;
+  hasReview?: boolean;
 }

@@ -652,7 +652,10 @@
     "WHATSAPP": "WhatsApp",
     "WHATSAPP_MSG": "Hi {{name}}, regarding our booking for {{service}} on {{date}}...",
     "LEAVE_REVIEW": "Leave a Review",
-    "REVIEWED": "Review submitted"
+    "REVIEWED": "Review submitted",
+    "CARD_START": "Start",
+    "CARD_END": "End",
+    "CARD_TOTAL": "Total"
   },
   "NOTIFICATIONS": {
     "TITLE": "Notifications",

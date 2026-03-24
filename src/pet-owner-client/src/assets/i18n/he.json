@@ -652,7 +652,10 @@
     "WHATSAPP": "וואטסאפ",
     "WHATSAPP_MSG": "היי {{name}}, בנוגע להזמנה שלנו ל{{service}} בתאריך {{date}}...",
     "LEAVE_REVIEW": "השאר ביקורת",
-    "REVIEWED": "הביקורת נשלחה"
+    "REVIEWED": "הביקורת נשלחה",
+    "CARD_START": "התחלה",
+    "CARD_END": "סיום",
+    "CARD_TOTAL": "סה\"כ"
   },
   "NOTIFICATIONS": {
     "TITLE": "התראות",

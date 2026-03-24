@@ -13,6 +13,7 @@ import {
 import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
 import * as L from 'leaflet';
+import { OSM_TILE_URL, OSM_TILE_OPTIONS } from '../../shared/leaflet-defaults';
 import { MapService, MapSearchFilters } from '../../services/map.service';
 import { ProviderService } from '../../services/provider.service';
 import { AuthService } from '../../services/auth.service';
@@ -228,10 +229,7 @@ export class MapDashboardComponent implements OnInit, OnDestroy, AfterViewInit {
       zoomControl: false,
     });
 
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-      attribution: '&copy; <a href="https://carto.com/">CARTO</a>',
-      maxZoom: 19,
-    }).addTo(this.map);
+    L.tileLayer(OSM_TILE_URL, OSM_TILE_OPTIONS).addTo(this.map);
 
     L.control.zoom({ position: 'bottomright' }).addTo(this.map);
     this.markersLayer.addTo(this.map);

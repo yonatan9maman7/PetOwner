@@ -237,26 +237,42 @@ static async Task SeedAdminUsers(
         // Fresh BCrypt hash each startup so login matches the plain password (AuthController uses BCrypt.Verify).
         var passwordHash = BCrypt.Net.BCrypt.HashPassword(plainPassword);
 
-        var existingByPhone = await db.Users.FirstOrDefaultAsync(u => u.Phone == phone);
-        if (existingByPhone is not null)
+        // Built-in admins: match by email first so we never repoint another user's row that only shares the seed phone.
+        User? existing = null;
+        var matchedBy = "";
+        if (isBuiltIn)
         {
-            existingByPhone.Email = email;
-            existingByPhone.Name = admin.Name.Trim();
-            existingByPhone.Role = "Admin";
-            existingByPhone.PasswordHash = passwordHash;
-            logger.LogInformation("Admin user updated (matched by phone {Phone})", phone);
-            continue;
+            existing = await db.Users.FirstOrDefaultAsync(u => u.Email.ToLower() == email);
+            if (existing is not null)
+                matchedBy = "email";
+            else
+            {
+                existing = await db.Users.FirstOrDefaultAsync(u => u.Phone == phone);
+                if (existing is not null)
+                    matchedBy = "phone";
+            }
+        }
+        else
+        {
+            existing = await db.Users.FirstOrDefaultAsync(u => u.Phone == phone);
+            if (existing is not null)
+                matchedBy = "phone";
+            else
+            {
+                existing = await db.Users.FirstOrDefaultAsync(u => u.Email.ToLower() == email);
+                if (existing is not null)
+                    matchedBy = "email";
+            }
         }
 
-        var existingByEmail = await db.Users.FirstOrDefaultAsync(u => u.Email.ToLower() == email);
-        if (existingByEmail is not null)
+        if (existing is not null)
         {
-            existingByEmail.Email = email;
-            existingByEmail.Phone = phone;
-            existingByEmail.Name = admin.Name.Trim();
-            existingByEmail.Role = "Admin";
-            existingByEmail.PasswordHash = passwordHash;
-            logger.LogInformation("Admin user updated (matched by email {Email})", email);
+            existing.Email = email;
+            existing.Phone = phone;
+            existing.Name = admin.Name.Trim();
+            existing.Role = "Admin";
+            existing.PasswordHash = passwordHash;
+            logger.LogInformation("Admin user updated ({Email}, matched by {Match})", email, matchedBy);
             continue;
         }
 

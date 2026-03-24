@@ -117,32 +117,48 @@ type Tab = 'owner' | 'provider';
 
       <!-- Card Template -->
       <ng-template #bookingCard let-b>
-        <div class="mx-4 mb-3 bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-          <div class="p-4">
+        <div
+          class="mx-4 mb-4 bg-white rounded-2xl border border-gray-200/80 shadow-md shadow-gray-200/50 overflow-hidden ring-1 ring-black/[0.03] transition-shadow hover:shadow-lg hover:shadow-gray-200/60">
+          <div class="h-1 w-full" [class]="statusAccentBar(b.status)" aria-hidden="true"></div>
+          <div class="p-4 sm:p-5">
             <!-- Top row: ID + status -->
-            <div class="flex items-center justify-between mb-2">
-              <span class="text-[11px] font-mono text-gray-400 tracking-wide">#{{ b.id.slice(0, 8).toUpperCase() }}</span>
-              <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium"
+            <div class="flex items-start justify-between gap-3 mb-3">
+              <span class="text-[11px] font-mono text-gray-400 tracking-wide shrink-0">#{{ bookingShortId(b.id) }}</span>
+              <span class="inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold shrink-0"
                     [class]="statusClass(b.status)">
                 {{ statusLabel(b.status) | translate }}
               </span>
             </div>
 
             <!-- Provider / Owner name + translated service -->
-            <div class="mb-2">
-              <p class="font-semibold text-gray-900 text-sm truncate" dir="auto">
+            <div class="mb-4">
+              <p class="font-bold text-gray-900 text-base leading-snug truncate" dir="auto">
                 {{ activeTab() === 'provider' ? b.ownerName : b.providerName }}
               </p>
-              <p class="text-xs text-gray-500 mt-0.5" dir="auto">
-                {{ b.service | serviceType | translate }} · {{ b.createdAt | date:'mediumDate' }}
+              <p class="text-sm text-gray-500 mt-1" dir="auto">
+                <span class="font-medium text-gray-600">{{ b.service | serviceType | translate }}</span>
+                @if (b.createdAt) {
+                  <span class="text-gray-400"> · {{ b.createdAt | date:'mediumDate' }}</span>
+                }
               </p>
             </div>
 
             <!-- Date range + price -->
-            <div class="flex items-center gap-3 bg-gray-50 rounded-xl px-3 py-2 mb-2 text-xs text-gray-600">
-              <span>📅 {{ b.startDate | date:'EEE, MMM d' }}</span>
-              <span>→ {{ b.endDate | date:'EEE, MMM d' }}</span>
-              <span class="ms-auto font-semibold text-indigo-700">₪{{ b.totalPrice | number:'1.0-0' }}</span>
+            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-xl bg-gradient-to-br from-gray-50 to-slate-50/80 border border-gray-100 px-4 py-3 mb-2">
+              <div class="flex flex-col gap-1 text-sm text-gray-700 min-w-0">
+                <div class="flex items-center gap-2">
+                  <span class="text-gray-400 text-xs font-medium uppercase tracking-wide">{{ 'BOOKINGS_DASHBOARD.CARD_START' | translate }}</span>
+                  <span class="font-medium truncate">{{ b.startDate | date:'EEE, MMM d, y · HH:mm' }}</span>
+                </div>
+                <div class="flex items-center gap-2">
+                  <span class="text-gray-400 text-xs font-medium uppercase tracking-wide">{{ 'BOOKINGS_DASHBOARD.CARD_END' | translate }}</span>
+                  <span class="font-medium truncate">{{ b.endDate | date:'EEE, MMM d, y · HH:mm' }}</span>
+                </div>
+              </div>
+              <div class="flex items-baseline gap-1 sm:flex-col sm:items-end sm:text-end border-t sm:border-t-0 border-gray-200/80 pt-2 sm:pt-0">
+                <span class="text-xs text-gray-500 font-medium">{{ 'BOOKINGS_DASHBOARD.CARD_TOTAL' | translate }}</span>
+                <span class="text-lg font-bold text-indigo-700 tabular-nums">₪{{ b.totalPrice | number:'1.2-2' }}</span>
+              </div>
             </div>
 
             @if (b.notes) {
@@ -150,21 +166,21 @@ type Tab = 'owner' | 'provider';
             }
 
             <!-- Payment badge / Pay Now -->
-            @if (b.paymentStatus === 'Paid') {
+            @if (b.paymentStatus != null && b.paymentStatus === 'Paid') {
               <div class="flex items-center gap-1.5 text-xs text-emerald-600 font-medium mb-2 px-0.5">
                 <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
                   <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
                 </svg>
                 {{ 'BOOKINGS_DASHBOARD.PAID' | translate }}
               </div>
-            } @else if (b.paymentStatus === 'Failed') {
+            } @else if (b.paymentStatus != null && b.paymentStatus === 'Failed') {
               <div class="flex items-center gap-1.5 text-xs text-red-500 font-medium mb-2 px-0.5">
                 <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
                   <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
                 </svg>
                 {{ 'BOOKINGS_DASHBOARD.PAYMENT_FAILED' | translate }}
               </div>
-            } @else if (b.status === 'Confirmed' && b.paymentStatus === 'Pending' && activeTab() === 'owner' && b.paymentUrl) {
+            } @else if (b.status === 'Confirmed' && b.paymentStatus === 'Pending' && activeTab() === 'owner' && b.paymentUrl != null && b.paymentUrl !== '') {
               <button
                 (click)="payNow(b.paymentUrl)"
                 class="mt-1 mb-2 w-full flex items-center justify-center gap-2 bg-violet-600 hover:bg-violet-700
@@ -223,7 +239,7 @@ type Tab = 'owner' | 'provider';
             }
 
             <!-- Leave a Review -->
-            @if ((b.status === 'Completed' || b.paymentStatus === 'Paid') && !b.hasReview && activeTab() === 'owner') {
+            @if ((b.status === 'Completed' || b.paymentStatus === 'Paid') && b.hasReview !== true && activeTab() === 'owner') {
               <button
                 (click)="openReviewModal(b)"
                 class="mt-2 w-full flex items-center justify-center gap-2
@@ -233,7 +249,7 @@ type Tab = 'owner' | 'provider';
                 {{ 'BOOKINGS_DASHBOARD.LEAVE_REVIEW' | translate }}
               </button>
             }
-            @if (b.hasReview && (b.status === 'Completed' || b.paymentStatus === 'Paid')) {
+            @if (b.hasReview === true && (b.status === 'Completed' || b.paymentStatus === 'Paid')) {
               <div class="mt-2 flex items-center justify-center gap-1.5 text-xs text-emerald-600 font-medium px-0.5">
                 <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
                   <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
@@ -277,16 +293,32 @@ export class MyBookingsComponent implements OnInit {
 
   readonly showTabs = computed(() => {
     if (!this.isProvider()) return false;
-    return this.bookings().some(b => b.providerProfileId === this.userId());
+    const uid = this.userId();
+    if (!uid) return false;
+    return this.bookings().some(b => this.sameGuid(b.providerProfileId, uid));
   });
 
-  readonly ownerBookings = computed(() =>
-    this.bookings().filter(b => b.ownerId === this.userId()),
-  );
+  /**
+   * /mine is already scoped to the current user. JWT `sub` and JSON Guids may differ by case;
+   * some responses omit owner/provider ids — then show all rows on the owner tab.
+   */
+  readonly ownerBookings = computed(() => {
+    const uid = this.userId();
+    const all = this.bookings();
+    if (!uid) return [];
+    const anyOwnerId = all.some(b => !!b.ownerId);
+    if (!anyOwnerId) return all;
+    return all.filter(b => this.sameGuid(b.ownerId, uid));
+  });
 
-  readonly providerBookings = computed(() =>
-    this.bookings().filter(b => b.providerProfileId === this.userId()),
-  );
+  readonly providerBookings = computed(() => {
+    const uid = this.userId();
+    const all = this.bookings();
+    if (!uid) return [];
+    const anyProviderId = all.some(b => !!b.providerProfileId);
+    if (!anyProviderId) return [];
+    return all.filter(b => this.sameGuid(b.providerProfileId, uid));
+  });
 
   readonly visibleBookings = computed(() =>
     this.activeTab() === 'provider' ? this.providerBookings() : this.ownerBookings(),
@@ -308,13 +340,34 @@ export class MyBookingsComponent implements OnInit {
     this.loadBookings();
   }
 
+  /** Compares identity Guids from JWT and API regardless of casing. */
+  private sameGuid(a: string | null | undefined, b: string | null | undefined): boolean {
+    if (a == null || b == null) return false;
+    return a.trim().toLowerCase() === b.trim().toLowerCase();
+  }
+
+  bookingShortId(id: string | undefined): string {
+    if (!id) return '—';
+    return id.slice(0, 8).toUpperCase();
+  }
+
+  statusAccentBar(status: string): string {
+    switch (status) {
+      case 'Pending':   return 'bg-amber-400';
+      case 'Confirmed': return 'bg-emerald-500';
+      case 'Completed': return 'bg-indigo-500';
+      case 'Cancelled': return 'bg-gray-300';
+      default:          return 'bg-gray-400';
+    }
+  }
+
   statusClass(status: string): string {
     switch (status) {
-      case 'Pending':   return 'bg-amber-50 text-amber-700';
-      case 'Confirmed': return 'bg-emerald-50 text-emerald-700';
-      case 'Completed': return 'bg-indigo-50 text-indigo-700';
-      case 'Cancelled': return 'bg-gray-100 text-gray-500';
-      default:          return 'bg-gray-50 text-gray-600';
+      case 'Pending':   return 'bg-amber-50 text-amber-800 ring-1 ring-amber-200/80';
+      case 'Confirmed': return 'bg-emerald-50 text-emerald-800 ring-1 ring-emerald-200/80';
+      case 'Completed': return 'bg-indigo-50 text-indigo-800 ring-1 ring-indigo-200/80';
+      case 'Cancelled': return 'bg-gray-100 text-gray-600 ring-1 ring-gray-200/80';
+      default:          return 'bg-gray-50 text-gray-600 ring-1 ring-gray-200/60';
     }
   }
 
@@ -363,7 +416,7 @@ export class MyBookingsComponent implements OnInit {
   openReviewModal(b: BookingDto): void {
     this.reviewModalData.set({
       bookingId: b.id,
-      providerName: b.providerName,
+      providerName: b.providerName ?? '',
     });
     this.isReviewModalOpen.set(true);
   }
