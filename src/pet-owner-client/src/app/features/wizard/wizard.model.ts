@@ -1,6 +1,19 @@
 export type ServiceType = 'DogWalking' | 'PetSitting' | 'Boarding' | 'DropInVisit';
 export type PricingUnit = 'PerHour' | 'PerNight' | 'PerVisit';
 
+export const SERVICE_TYPE_INT: Record<ServiceType, number> = {
+  DogWalking: 0,
+  PetSitting: 1,
+  Boarding: 2,
+  DropInVisit: 3,
+};
+
+export const PRICING_UNIT_INT: Record<PricingUnit, number> = {
+  PerHour: 0,
+  PerNight: 1,
+  PerVisit: 2,
+};
+
 export interface ServiceRateDto {
   serviceType: ServiceType;
   rate: number;
@@ -72,8 +85,14 @@ export interface OnboardingPayload {
   verification: TrustVerification;
 }
 
+export interface ServiceRateApiDto {
+  serviceType: number;
+  rate: number;
+  pricingUnit: number;
+}
+
 export interface OnboardingApiPayload {
-  selectedServices: ServiceRateDto[];
+  selectedServices: ServiceRateApiDto[];
   bio: string;
   latitude: number | null;
   longitude: number | null;

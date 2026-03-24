@@ -452,12 +452,12 @@ interface ChatMessage {
 
               <input type="file" accept="image/*" (change)="onFileSelected($event)" class="hidden" #fileInput />
 
-              <form (ngSubmit)="submitSymptoms()" class="flex items-end gap-2">
+              <form (ngSubmit)="submitSymptoms()" class="flex flex-row items-end gap-2 p-3">
                 <button
                   type="button"
                   (click)="fileInput.click()"
                   [disabled]="assessing()"
-                  class="flex-shrink-0 w-10 h-10 rounded-xl border border-gray-300 text-slate-500 flex items-center justify-center hover:border-indigo-400 hover:text-indigo-600 hover:bg-indigo-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                  class="shrink-0 flex items-center justify-center w-10 h-10 rounded-xl border border-gray-300 text-slate-500 hover:border-indigo-400 hover:text-indigo-600 hover:bg-indigo-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
                   [attr.title]="'TRIAGE.ATTACH_PHOTO' | translate"
                 >
                   <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75">
@@ -465,32 +465,36 @@ interface ChatMessage {
                     <path stroke-linecap="round" stroke-linejoin="round" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
                   </svg>
                 </button>
-                <div class="flex-1 relative">
-                  <textarea
-                    [(ngModel)]="symptomInput"
-                    name="symptoms"
-                    dir="auto"
-                    [attr.placeholder]="'TRIAGE.DESCRIBE_ISSUE' | translate"
-                    rows="1"
-                    class="w-full resize-none rounded-xl border border-gray-300 px-4 py-3 pe-12 text-sm text-start placeholder:text-start text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-shadow"
-                    [disabled]="assessing()"
-                    (keydown.enter)="onEnterKey($event)"
-                    (input)="autoResize($event)"
-                    #textareaEl
-                  ></textarea>
-                </div>
+                <textarea
+                  [(ngModel)]="symptomInput"
+                  name="symptoms"
+                  dir="auto"
+                  [attr.placeholder]="'TRIAGE.DESCRIBE_ISSUE' | translate"
+                  rows="1"
+                  class="flex-1 min-w-0 resize-none m-0 rounded-xl border border-gray-300 px-4 py-3 pe-12 text-sm text-start placeholder:text-start text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-shadow"
+                  [disabled]="assessing()"
+                  (keydown.enter)="onEnterKey($event)"
+                  (input)="autoResize($event)"
+                  #textareaEl
+                ></textarea>
                 <button
                   type="submit"
                   [disabled]="assessing() || !symptomInput().trim()"
                   [attr.title]="'TRIAGE.CHECK_SYMPTOMS' | translate"
                   [attr.aria-label]="'TRIAGE.CHECK_SYMPTOMS' | translate"
-                  class="flex-shrink-0 w-10 h-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                  class="shrink-0 flex items-center justify-center w-10 h-10 rounded-xl bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                 >
                   <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M12 19V5m0 0l-7 7m7-7l7 7" />
                   </svg>
                 </button>
               </form>
+              <p
+                class="text-[10px] md:text-xs text-gray-400 text-center leading-tight mt-2 px-4"
+                dir="auto"
+              >
+                {{ 'TRIAGE.TRIAGE_DISCLAIMER' | translate }}
+              </p>
             </div>
           </div>
         }

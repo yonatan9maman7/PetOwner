@@ -5,11 +5,11 @@ import { ToastService, Toast } from '../services/toast.service';
   selector: 'app-toast-container',
   standalone: true,
   template: `
-    <div class="fixed top-4 left-1/2 -translate-x-1/2 z-[9999] flex flex-col items-center gap-2 pointer-events-none w-full max-w-sm px-4">
+    <div class="fixed top-4 inset-x-0 z-[9999] flex flex-col items-center gap-2 pointer-events-none px-4 max-w-full min-w-0">
       @for (toast of toastService.toasts(); track toast.id) {
         <div
           role="alert"
-          class="pointer-events-auto w-full rounded-xl px-4 py-3 shadow-lg backdrop-blur-sm
+          class="pointer-events-auto w-full max-w-sm min-w-0 rounded-xl px-4 py-3 shadow-lg backdrop-blur-sm
                  flex items-start gap-3 text-sm font-medium
                  transition-all duration-300 ease-out"
           [class]="toastClasses(toast)"
@@ -18,7 +18,7 @@ import { ToastService, Toast } from '../services/toast.service';
           [class.animate-[slideDown_0.3s_ease-out]]="!toast.dismissing"
         >
           <span class="text-base leading-none mt-0.5">{{ icon(toast.type) }}</span>
-          <span class="flex-1 leading-snug">{{ toast.message }}</span>
+          <span class="min-w-0 flex-1 break-words text-start leading-snug">{{ toast.message }}</span>
           <button
             (click)="toastService.dismiss(toast.id)"
             class="shrink-0 opacity-60 hover:opacity-100 transition-opacity text-current ml-1"

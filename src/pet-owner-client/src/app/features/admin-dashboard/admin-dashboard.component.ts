@@ -17,8 +17,8 @@ type Tab = 'overview' | 'users' | 'bookings' | 'providers';
   standalone: true,
   imports: [DatePipe, DecimalPipe, CurrencyPipe, TranslatePipe],
   template: `
-    <div class="min-h-screen bg-gray-50 p-4 md:p-10" dir="auto">
-      <div class="max-w-6xl mx-auto">
+    <div class="min-h-screen w-full max-w-full overflow-x-hidden bg-gray-50 p-4 md:p-10" dir="auto">
+      <div class="max-w-6xl mx-auto min-w-0">
 
         <!-- Header -->
         <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">

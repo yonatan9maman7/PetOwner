@@ -7,6 +7,8 @@ import {
   MagicBio,
   OnboardingApiPayload,
   OnboardingPayload,
+  PRICING_UNIT_INT,
+  SERVICE_TYPE_INT,
   ServiceRateDto,
   StructuredAddress,
   TrustVerification,
@@ -154,7 +156,11 @@ export class WizardStore {
     const a = snap.structuredAddress;
 
     const payload: OnboardingApiPayload = {
-      selectedServices: snap.selectedServices,
+      selectedServices: snap.selectedServices.map(s => ({
+        serviceType: SERVICE_TYPE_INT[s.serviceType],
+        rate: Number(s.rate),
+        pricingUnit: PRICING_UNIT_INT[s.pricingUnit],
+      })),
       bio: snap.bio.generatedBio || snap.bio.userNotes,
       latitude: snap.latitude,
       longitude: snap.longitude,

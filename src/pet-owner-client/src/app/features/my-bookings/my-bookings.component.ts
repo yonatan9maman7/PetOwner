@@ -15,13 +15,14 @@ import { ProviderService } from '../../services/provider.service';
 import { ToastService } from '../../services/toast.service';
 import { BookingDto } from '../../models/booking.model';
 import { ReviewModalComponent, ReviewModalInput } from './review-modal.component';
+import { ServiceTypePipe } from '../../shared/service-type.utils';
 
 type Tab = 'owner' | 'provider';
 
 @Component({
   selector: 'app-my-bookings',
   standalone: true,
-  imports: [CommonModule, RouterLink, TranslatePipe, ReviewModalComponent],
+  imports: [CommonModule, RouterLink, TranslatePipe, ServiceTypePipe, ReviewModalComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="min-h-screen bg-gray-50 pb-24">
@@ -118,20 +119,23 @@ type Tab = 'owner' | 'provider';
       <ng-template #bookingCard let-b>
         <div class="mx-4 mb-3 bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
           <div class="p-4">
-            <!-- Top row: name + status -->
-            <div class="flex items-start justify-between mb-2">
-              <div class="min-w-0 flex-1">
-                <p class="font-semibold text-gray-900 text-sm truncate" dir="auto">
-                  {{ activeTab() === 'provider' ? b.ownerName : b.providerName }}
-                </p>
-                <p class="text-xs text-gray-500 mt-0.5">
-                  {{ b.service }} · {{ b.createdAt | date:'mediumDate' }}
-                </p>
-              </div>
-              <span class="shrink-0 ms-3 inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium"
+            <!-- Top row: ID + status -->
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-[11px] font-mono text-gray-400 tracking-wide">#{{ b.id.slice(0, 8).toUpperCase() }}</span>
+              <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium"
                     [class]="statusClass(b.status)">
                 {{ statusLabel(b.status) | translate }}
               </span>
+            </div>
+
+            <!-- Provider / Owner name + translated service -->
+            <div class="mb-2">
+              <p class="font-semibold text-gray-900 text-sm truncate" dir="auto">
+                {{ activeTab() === 'provider' ? b.ownerName : b.providerName }}
+              </p>
+              <p class="text-xs text-gray-500 mt-0.5" dir="auto">
+                {{ b.service | serviceType | translate }} · {{ b.createdAt | date:'mediumDate' }}
+              </p>
             </div>
 
             <!-- Date range + price -->

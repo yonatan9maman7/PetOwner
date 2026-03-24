@@ -1,7 +1,7 @@
 <app-toast-container />
 
-<div class="flex h-[100dvh] w-full min-h-0 flex-col overflow-hidden">
-  <main class="relative flex min-h-0 flex-1 flex-col transition-colors duration-300"
+<div class="flex h-[100dvh] w-full min-h-0 max-w-full flex-col overflow-x-hidden overflow-y-hidden">
+  <main class="relative flex min-h-0 min-w-0 max-w-full flex-1 flex-col transition-colors duration-300"
         [class.overflow-y-auto]="!isMapHome()"
         [class.overflow-hidden]="isMapHome()"
         [class.bg-slate-50]="currentMode() === 'Provider'"
@@ -13,7 +13,7 @@
   <!-- Bottom Navigation Bar (flow layout — not fixed)               -->
   <!-- ============================================================ -->
   @if (showNav()) {
-    <nav class="shrink-0 z-50 w-full border-t shadow-[0_-2px_10px_rgba(0,0,0,0.06)] transition-colors duration-300"
+    <nav class="shrink-0 z-50 w-full max-w-full overflow-x-hidden border-t shadow-[0_-2px_10px_rgba(0,0,0,0.06)] transition-colors duration-300"
          [ngClass]="currentMode() === 'Provider' ? 'bg-slate-50 border-slate-300' : 'bg-white border-gray-200'">
       <div class="flex h-16 max-w-lg items-center justify-around mx-auto px-2">
 

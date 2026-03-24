@@ -9,6 +9,8 @@ import {
   ServiceType,
   PricingUnit,
   SERVICE_CARDS,
+  SERVICE_TYPE_INT,
+  PRICING_UNIT_INT,
 } from '../wizard/wizard.model';
 import { ToastService } from '../../services/toast.service';
 import { ProviderLocationBlockComponent } from '../../shared/provider-location-block/provider-location-block.component';
@@ -378,7 +380,11 @@ export class EditProfileComponent implements OnInit {
 
     const payload: UpdateProfilePayload = {
       bio: this.bio,
-      selectedServices: this.selectedServiceRates(),
+      selectedServices: this.selectedServiceRates().map(s => ({
+        serviceType: SERVICE_TYPE_INT[s.serviceType],
+        rate: Number(s.rate),
+        pricingUnit: PRICING_UNIT_INT[s.pricingUnit],
+      })),
       city: loc.city.trim(),
       street: loc.street.trim(),
       buildingNumber: loc.buildingNumber.trim(),

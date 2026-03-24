@@ -1,7 +1,9 @@
 :host {
   display: block;
   width: 100%;
+  max-width: 100%;
   height: 100%;
+  overflow-x: hidden;
 }
 
 /* Slim main scrollbar; hide WebKit arrow buttons (often confused with inputs in RTL). */

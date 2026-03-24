@@ -261,7 +261,10 @@ export class BookingModalComponent implements OnChanges, OnDestroy {
     const end = new Date(v.endDate);
     if (end <= start) return null;
 
-    return this.calculatePrice(rate, start, end);
+    const petCount = this.selectedPetIds().length;
+    if (petCount === 0) return null;
+
+    return this.calculatePrice(rate, start, end) * petCount;
   });
 
   readonly priceBreakdown = computed(() => {
@@ -277,21 +280,34 @@ export class BookingModalComponent implements OnChanges, OnDestroy {
     const end = new Date(v.endDate);
     if (end <= start) return '';
 
+    const petCount = this.selectedPetIds().length;
+    if (petCount === 0) return '';
+
     const tr = this.translate;
+    let base = '';
     switch (normalizePricingUnit(rate.pricingUnit)) {
       case 'PerHour': {
         const hours = Math.round(((end.getTime() - start.getTime()) / 3_600_000) * 10) / 10;
-        return tr.instant('BOOKING.PRICE_BREAKDOWN', { hours, rate: rate.rate });
+        base = tr.instant('BOOKING.PRICE_BREAKDOWN', { hours, rate: rate.rate });
+        break;
       }
       case 'PerNight': {
         const nights = Math.max(1, Math.floor((end.getTime() - start.getTime()) / 86_400_000));
-        return tr.instant('BOOKING.PRICE_NIGHT_BREAKDOWN', { nights, rate: rate.rate });
+        base = tr.instant('BOOKING.PRICE_NIGHT_BREAKDOWN', { nights, rate: rate.rate });
+        break;
       }
       case 'PerVisit':
-        return tr.instant('BOOKING.PRICE_VISIT_BREAKDOWN', { rate: rate.rate });
+        base = tr.instant('BOOKING.PRICE_VISIT_BREAKDOWN', { rate: rate.rate });
+        break;
       default:
         return '';
     }
+
+    if (petCount > 1) {
+      base += ` × ${petCount} ${tr.instant('BOOKING.PETS_LABEL')}`;
+    }
+
+    return base;
   });
 
   readonly canSubmit = computed(() => {

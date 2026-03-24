@@ -1,7 +1,7 @@
-import { Component, inject, OnInit, signal } from '@angular/core';
+import { Component, computed, inject, OnInit, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { DatePipe } from '@angular/common';
-import { TranslatePipe } from '@ngx-translate/core';
+import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { Pet, PetService } from '../../services/pet.service';
 import { MedicalRecord, MedicalRecordService } from '../../services/medical-record.service';
 import { TeletriageService, TeletriageHistory } from '../../services/teletriage.service';
@@ -13,33 +13,8 @@ import {
   petSpeciesEmoji,
   petSpeciesIconBgClass,
 } from '../../models/pet-species.model';
+import { BREED_I18N_MAP, getBreedOptionsForSpecies } from './breed.constants';
 
-const DOG_BREED_OPTIONS = [
-  'Mixed / Mutt',
-  'Golden Retriever',
-  'Labrador',
-  'German Shepherd',
-  'French Bulldog',
-  'Poodle',
-  'Beagle',
-  'Bulldog',
-  'Canaan Dog',
-  'Other',
-] as const;
-
-const CAT_BREED_OPTIONS = [
-  'Mixed',
-  'Persian',
-  'Siamese',
-  'British Shorthair',
-  'Maine Coon',
-  'Sphynx',
-  'Tricolor / Calico',
-  'Ginger',
-  'Other',
-] as const;
-
-const ALLERGY_OPTIONS = ['None', 'Chicken', 'Beef', 'Grains', 'Fleas', 'Other'] as const;
 const RECORD_TYPES = ['Vaccination', 'Condition', 'Medication', 'VetVisit'] as const;
 
 @Component({
@@ -47,13 +22,12 @@ const RECORD_TYPES = ['Vaccination', 'Condition', 'Medication', 'VetVisit'] as c
   standalone: true,
   imports: [ReactiveFormsModule, DatePipe, TranslatePipe],
   template: `
-    <div class="min-h-screen bg-gradient-to-b from-indigo-50 to-white px-4 py-8">
-      <div class="max-w-2xl mx-auto">
+    <div class="min-h-screen w-full max-w-full overflow-x-hidden bg-gradient-to-b from-indigo-50 to-white px-4 py-8">
+      <div class="max-w-2xl mx-auto min-w-0">
 
         <!-- Header -->
         <div class="text-center mb-8">
           <h1 class="text-3xl font-bold text-slate-900">{{ 'PROFILE.MY_PETS' | translate }}</h1>
-          <p class="mt-1 text-sm text-slate-500">{{ 'PROFILE.MY_PETS_SUBTITLE' | translate }}</p>
         </div>
 
         <!-- Loading State -->
@@ -588,19 +562,45 @@ const RECORD_TYPES = ['Vaccination', 'Condition', 'Medication', 'VetVisit'] as c
 
               <div [class]="'grid gap-4 ' + (currentBreedOptions().length > 0 ? 'grid-cols-3' : 'grid-cols-2')">
                 @if (currentBreedOptions().length > 0) {
-                  <div>
+                  <div class="relative">
                     <label for="pet-breed" class="block text-start text-sm font-medium text-slate-700 mb-1"><span dir="auto">{{ 'PETS.BREED' | translate }}</span> <span class="text-red-500">*</span></label>
-                    <select
-                      id="pet-breed"
-                      formControlName="breed"
-                      dir="auto"
-                      class="w-full text-start rounded-xl border border-gray-200 px-4 py-2.5 text-sm text-slate-900 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 outline-none transition bg-white"
-                    >
-                      <option value="" disabled>{{ 'PETS.SELECT_BREED' | translate }}</option>
-                      @for (b of currentBreedOptions(); track b) {
-                        <option [value]="b">{{ breedI18nKey(b) | translate }}</option>
+                    <div class="relative">
+                      <input
+                        id="pet-breed"
+                        type="text"
+                        autocomplete="off"
+                        dir="auto"
+                        [value]="breedSearchText()"
+                        (input)="onBreedInput($event)"
+                        (focus)="breedDropdownOpen.set(true)"
+                        (blur)="onBreedBlur()"
+                        [attr.placeholder]="'PETS.SEARCH_BREED' | translate"
+                        class="w-full text-start placeholder:text-start rounded-xl border border-gray-200 px-4 py-2.5 pe-10 text-sm text-slate-900 placeholder-slate-400 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 outline-none transition bg-white"
+                      />
+                      <svg class="absolute top-1/2 -translate-y-1/2 end-3 w-4 h-4 text-slate-400 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                      </svg>
+                    </div>
+                    @if (breedDropdownOpen()) {
+                      @if (filteredBreeds().length > 0) {
+                        <div class="absolute z-20 mt-1 w-full bg-white rounded-xl shadow-lg border border-gray-200 max-h-48 overflow-y-auto">
+                          @for (b of filteredBreeds(); track b) {
+                            <button
+                              type="button"
+                              (mousedown)="selectBreed(b)"
+                              [class]="'w-full text-start px-4 py-2.5 text-sm transition-colors duration-100 first:rounded-t-xl last:rounded-b-xl ' + (petForm.get('breed')?.value === b ? 'bg-indigo-50 text-indigo-700 font-medium' : 'text-slate-700 hover:bg-indigo-50 hover:text-indigo-700')"
+                              dir="auto"
+                            >
+                              {{ breedI18nKey(b) | translate }}
+                            </button>
+                          }
+                        </div>
+                      } @else if (breedSearchText().trim()) {
+                        <div class="absolute z-20 mt-1 w-full bg-white rounded-xl shadow-lg border border-gray-200 px-4 py-3 text-sm text-slate-400 text-center" dir="auto">
+                          {{ 'PETS.NO_BREED_MATCH' | translate }}
+                        </div>
                       }
-                    </select>
+                    }
                   </div>
                 }
 
@@ -676,45 +676,51 @@ const RECORD_TYPES = ['Vaccination', 'Condition', 'Medication', 'VetVisit'] as c
                 ></textarea>
               </div>
 
-              <div class="grid grid-cols-2 gap-4">
-                <div class="sm:col-span-2">
-                  <span class="block text-start text-sm font-medium text-slate-700 mb-2" dir="auto">{{ 'PETS.ALLERGIES' | translate }}</span>
+              <div class="space-y-4">
+                <div>
+                  <span class="block text-start text-sm font-medium text-slate-700 mb-1" dir="auto">{{ 'PETS.ALLERGIES' | translate }}</span>
                   <p class="text-xs text-start text-slate-500 mb-2" dir="auto">{{ 'PETS.ALLERGIES_HELP' | translate }}</p>
-                  <div class="flex flex-wrap gap-2">
-                    @for (a of allergyOptions; track a) {
-                      <button
-                        type="button"
-                        (click)="toggleAllergyChip(a)"
-                        [class]="allergyChipClass(a)"
-                      >
-                        {{ allergyLabelKey(a) | translate }}
-                      </button>
-                    }
+                  <div class="flex gap-2 mb-2">
+                    <button type="button" (click)="setAllergyMode('none')" [class]="modeChipClass(allergyMode() === 'none')">
+                      {{ 'PETS.ALLERGY_NONE' | translate }}
+                    </button>
+                    <button type="button" (click)="setAllergyMode('other')" [class]="modeChipClass(allergyMode() === 'other')">
+                      {{ 'PETS.ALLERGY_OTHER' | translate }}
+                    </button>
                   </div>
-                  @if (selectedAllergies().has('Other')) {
-                    <div class="mt-2">
-                      <label for="pet-specify-allergy" class="block text-start text-xs font-medium text-slate-600 mb-1"><span dir="auto">{{ 'PETS.SPECIFY_ALLERGY' | translate }}</span> <span class="text-red-500">*</span></label>
-                      <input
-                        id="pet-specify-allergy"
-                        type="text"
-                        formControlName="specifyAllergy"
-                        dir="auto"
-                        class="w-full text-start placeholder:text-start rounded-xl border border-gray-200 px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 outline-none transition"
-                      />
-                    </div>
+                  @if (allergyMode() === 'other') {
+                    <input
+                      id="pet-specify-allergy"
+                      type="text"
+                      formControlName="specifyAllergy"
+                      dir="auto"
+                      [attr.placeholder]="'PETS.SPECIFY_ALLERGY' | translate"
+                      class="w-full text-start placeholder:text-start rounded-xl border border-gray-200 px-4 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 outline-none transition"
+                    />
                   }
                 </div>
 
-                <div class="sm:col-span-2">
-                  <label for="pet-conditions" class="block text-start text-sm font-medium text-slate-700 mb-1"><span dir="auto">{{ 'PETS.MEDICAL_CONDITIONS' | translate }}</span></label>
-                  <input
-                    id="pet-conditions"
-                    type="text"
-                    formControlName="medicalConditions"
-                    dir="auto"
-                    [attr.placeholder]="'PETS.PLACEHOLDER_MEDICAL' | translate"
-                    class="w-full text-start placeholder:text-start rounded-xl border border-gray-200 px-4 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 outline-none transition"
-                  />
+                <div>
+                  <span class="block text-start text-sm font-medium text-slate-700 mb-1" dir="auto">{{ 'PETS.MEDICAL_CONDITIONS' | translate }}</span>
+                  <p class="text-xs text-start text-slate-500 mb-2" dir="auto">{{ 'PETS.MEDICAL_CONDITIONS_HELP' | translate }}</p>
+                  <div class="flex gap-2 mb-2">
+                    <button type="button" (click)="setConditionMode('none')" [class]="modeChipClass(conditionMode() === 'none')">
+                      {{ 'PETS.ALLERGY_NONE' | translate }}
+                    </button>
+                    <button type="button" (click)="setConditionMode('other')" [class]="modeChipClass(conditionMode() === 'other')">
+                      {{ 'PETS.ALLERGY_OTHER' | translate }}
+                    </button>
+                  </div>
+                  @if (conditionMode() === 'other') {
+                    <input
+                      id="pet-conditions"
+                      type="text"
+                      formControlName="medicalConditions"
+                      dir="auto"
+                      [attr.placeholder]="'PETS.PLACEHOLDER_MEDICAL' | translate"
+                      class="w-full text-start placeholder:text-start rounded-xl border border-gray-200 px-4 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 outline-none transition"
+                    />
+                  }
                 </div>
               </div>
 
@@ -834,32 +840,38 @@ export class MyPetsComponent implements OnInit {
   private readonly medicalRecordService = inject(MedicalRecordService);
   private readonly triageService = inject(TeletriageService);
   private readonly toast = inject(ToastService);
+  private readonly translate = inject(TranslateService);
   private readonly fb = inject(FormBuilder);
 
   readonly petSpeciesOptions = PET_SPECIES_OPTIONS;
-  readonly allergyOptions = ALLERGY_OPTIONS;
   readonly recordTypes = RECORD_TYPES;
 
   readonly currentBreedOptions = signal<readonly string[]>([]);
   readonly showSpecifyAnimal = signal(false);
   readonly showSpecifyBreed = signal(false);
+  readonly breedSearchText = signal('');
+  readonly breedDropdownOpen = signal(false);
   private hydrating = false;
+
+  readonly filteredBreeds = computed(() => {
+    const options = this.currentBreedOptions();
+    const search = this.breedSearchText().trim().toLowerCase();
+    if (!search) return [...options];
+    const currentVal = this.petForm.get('breed')?.value;
+    if (currentVal) {
+      const selectedText = this.translate.instant(BREED_I18N_MAP[currentVal] ?? currentVal).toLowerCase();
+      if (search === selectedText) return [...options];
+    }
+    return options.filter(b => {
+      const key = BREED_I18N_MAP[b] ?? b;
+      const translated = this.translate.instant(key).toLowerCase();
+      return translated.includes(search) || b.toLowerCase().includes(search);
+    });
+  });
 
   readonly speciesEmoji = petSpeciesEmoji;
   readonly speciesIconClass = petSpeciesIconBgClass;
 
-  private readonly allergyI18nKeys: Record<string, string> = {
-    None: 'PETS.ALLERGY_NONE',
-    Chicken: 'PETS.ALLERGY_CHICKEN',
-    Beef: 'PETS.ALLERGY_BEEF',
-    Grains: 'PETS.ALLERGY_GRAINS',
-    Fleas: 'PETS.ALLERGY_FLEAS',
-    Other: 'PETS.ALLERGY_OTHER',
-  };
-
-  allergyLabelKey(key: string): string {
-    return this.allergyI18nKeys[key] ?? key;
-  }
 
   speciesI18nKey(species: PetSpecies | number | string | null | undefined): string {
     const n = normalizePetSpecies(species);
@@ -874,30 +886,8 @@ export class MyPetsComponent implements OnInit {
     return map[n];
   }
 
-  private readonly breedI18nMap: Record<string, string> = {
-    'Mixed / Mutt': 'PETS.BREED_MIXED_MUTT',
-    'Golden Retriever': 'PETS.BREED_GOLDEN_RETRIEVER',
-    'Labrador': 'PETS.BREED_LABRADOR',
-    'Labrador Retriever': 'PETS.BREED_LABRADOR',
-    'German Shepherd': 'PETS.BREED_GERMAN_SHEPHERD',
-    'French Bulldog': 'PETS.BREED_FRENCH_BULLDOG',
-    'Poodle': 'PETS.BREED_POODLE',
-    'Beagle': 'PETS.BREED_BEAGLE',
-    'Bulldog': 'PETS.BREED_BULLDOG',
-    'Canaan Dog': 'PETS.BREED_CANAAN_DOG',
-    'Mixed': 'PETS.BREED_MIXED',
-    'Persian': 'PETS.BREED_PERSIAN',
-    'Siamese': 'PETS.BREED_SIAMESE',
-    'British Shorthair': 'PETS.BREED_BRITISH_SHORTHAIR',
-    'Maine Coon': 'PETS.BREED_MAINE_COON',
-    'Sphynx': 'PETS.BREED_SPHYNX',
-    'Tricolor / Calico': 'PETS.BREED_TRICOLOR',
-    'Ginger': 'PETS.BREED_GINGER',
-    'Other': 'PETS.BREED_OTHER',
-  };
-
   breedI18nKey(breed: string): string {
-    return this.breedI18nMap[breed] ?? breed;
+    return BREED_I18N_MAP[breed] ?? breed;
   }
 
   private readonly recordTypeI18nMap: Record<string, string> = {
@@ -912,14 +902,11 @@ export class MyPetsComponent implements OnInit {
   }
 
   private getBreedOptionsForSpecies(species: PetSpecies | null): readonly string[] {
-    switch (species) {
-      case PetSpecies.Dog: return DOG_BREED_OPTIONS;
-      case PetSpecies.Cat: return CAT_BREED_OPTIONS;
-      default: return [];
-    }
+    return getBreedOptionsForSpecies(species);
   }
 
-  readonly selectedAllergies = signal<Set<string>>(new Set(['None']));
+  readonly allergyMode = signal<'none' | 'other'>('none');
+  readonly conditionMode = signal<'none' | 'other'>('none');
 
   readonly pets = signal<Pet[]>([]);
   readonly loading = signal(true);
@@ -981,6 +968,8 @@ export class MyPetsComponent implements OnInit {
         this.petForm.get('breed')!.setValue('');
         this.petForm.get('specifyBreed')!.setValue('');
         this.petForm.get('specifyAnimalType')!.setValue('');
+        this.breedSearchText.set('');
+        this.breedDropdownOpen.set(false);
       }
 
       const breedCtrl = this.petForm.get('breed')!;
@@ -1030,6 +1019,35 @@ export class MyPetsComponent implements OnInit {
     document.getElementById('add-pet-form')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
+  // ── Breed Autocomplete ──
+
+  onBreedInput(event: Event): void {
+    const value = (event.target as HTMLInputElement).value;
+    this.breedSearchText.set(value);
+    this.breedDropdownOpen.set(true);
+    if (!value.trim()) {
+      this.petForm.get('breed')!.setValue('');
+    }
+  }
+
+  selectBreed(breed: string): void {
+    this.petForm.get('breed')!.setValue(breed);
+    this.breedSearchText.set(this.translate.instant(this.breedI18nKey(breed)));
+    this.breedDropdownOpen.set(false);
+  }
+
+  onBreedBlur(): void {
+    setTimeout(() => {
+      this.breedDropdownOpen.set(false);
+      const currentBreed = this.petForm.get('breed')?.value;
+      if (currentBreed) {
+        this.breedSearchText.set(this.translate.instant(this.breedI18nKey(currentBreed)));
+      } else if (this.breedSearchText().trim()) {
+        this.breedSearchText.set('');
+      }
+    }, 200);
+  }
+
   // ── Pet CRUD ──
 
   onSubmit(): void {
@@ -1048,8 +1066,8 @@ export class MyPetsComponent implements OnInit {
       notes: v.notes?.trim() || null,
       breed: finalBreed,
       weight: v.weight ?? undefined,
-      allergies: this.allergiesCommaSeparated(),
-      medicalConditions: v.medicalConditions?.trim() || undefined,
+      allergies: this.allergiesValue(),
+      medicalConditions: this.conditionMode() === 'other' ? (v.medicalConditions?.trim() || undefined) : undefined,
       isNeutered: !!v.isNeutered,
       medicalNotes: v.medicalNotes?.trim() || undefined,
       feedingSchedule: v.feedingSchedule?.trim() || undefined,
@@ -1065,7 +1083,9 @@ export class MyPetsComponent implements OnInit {
 
     request$.subscribe({
       next: () => {
-        this.toast.success(editId ? 'Pet updated!' : 'Pet added successfully!');
+        this.toast.success(
+          editId ? 'Pet updated!' : this.translate.instant('PETS.ADD_SUCCESS'),
+        );
         this.editingPetId.set(null);
         this.resetPetFormDefaults();
         this.refreshPets();
@@ -1081,7 +1101,8 @@ export class MyPetsComponent implements OnInit {
   editPet(pet: Pet): void {
     this.hydrating = true;
     this.editingPetId.set(pet.id);
-    this.hydrateAllergiesFromString(pet.allergies);
+    this.hydrateAllergyMode(pet.allergies);
+    this.hydrateConditionMode(pet.medicalConditions);
 
     this.petForm.patchValue({
       name: pet.name,
@@ -1101,12 +1122,15 @@ export class MyPetsComponent implements OnInit {
     const breedList = this.getBreedOptionsForSpecies(pet.species);
     if (pet.breed && (breedList as readonly string[]).includes(pet.breed)) {
       this.petForm.get('breed')!.setValue(pet.breed);
+      this.breedSearchText.set(this.translate.instant(this.breedI18nKey(pet.breed)));
       this.petForm.get('specifyBreed')!.setValue('');
     } else if (pet.breed) {
       this.petForm.get('breed')!.setValue('Other');
+      this.breedSearchText.set(this.translate.instant(this.breedI18nKey('Other')));
       this.petForm.get('specifyBreed')!.setValue(pet.breed);
     } else {
       this.petForm.get('breed')!.setValue('');
+      this.breedSearchText.set('');
       this.petForm.get('specifyBreed')!.setValue('');
     }
 
@@ -1309,79 +1333,59 @@ export class MyPetsComponent implements OnInit {
 
   // ── UI helpers ──
 
-  toggleAllergyChip(key: string): void {
-    this.selectedAllergies.update((prev) => {
-      const next = new Set(prev);
-      if (key === 'None') {
-        next.clear();
-        next.add('None');
-        return next;
-      }
-      next.delete('None');
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
-      if (next.size === 0) next.add('None');
-      return next;
-    });
-    const hasOther = this.selectedAllergies().has('Other');
+  setAllergyMode(mode: 'none' | 'other'): void {
+    this.allergyMode.set(mode);
     const ctrl = this.petForm.get('specifyAllergy')!;
-    if (hasOther) {
-      ctrl.setValidators(Validators.required);
-    } else {
-      ctrl.clearValidators();
+    if (mode === 'none') {
       ctrl.setValue('');
+      ctrl.clearValidators();
+    } else {
+      ctrl.setValidators(Validators.required);
     }
     ctrl.updateValueAndValidity();
   }
 
-  allergyChipClass(key: string): string {
-    const on = this.selectedAllergies().has(key);
-    const base =
-      'min-h-[2.25rem] rounded-full px-3.5 py-1.5 text-xs font-semibold tracking-wide transition-all duration-200 border';
-    if (on) {
-      return `${base} border-indigo-500 bg-indigo-600 text-white shadow-md shadow-indigo-500/25`;
-    }
-    return `${base} border-slate-200 bg-white text-slate-600 hover:border-indigo-200 hover:bg-indigo-50/60`;
-  }
-
-  private allergiesCommaSeparated(): string | undefined {
-    const set = this.selectedAllergies();
-    if (set.size === 0 || (set.size === 1 && set.has('None'))) return undefined;
-    const parts = [...set].filter(a => a !== 'None' && a !== 'Other');
-    if (set.has('Other')) {
-      const custom = this.petForm.get('specifyAllergy')?.value?.trim();
-      if (custom) parts.push(custom);
-    }
-    return parts.length > 0 ? parts.join(', ') : undefined;
-  }
-
-  private hydrateAllergiesFromString(s: string | null | undefined): void {
-    const known = new Set<string>(ALLERGY_OPTIONS.filter((x) => x !== 'None'));
-    if (!s?.trim()) {
-      this.selectedAllergies.set(new Set(['None']));
-      this.petForm.get('specifyAllergy')?.setValue('');
-      return;
-    }
-    const parts = s.split(',').map((x) => x.trim()).filter(Boolean);
-    const next = new Set<string>();
-    const customParts: string[] = [];
-    for (const p of parts) {
-      const match = [...known].find((k) => k.toLowerCase() === p.toLowerCase());
-      if (match) next.add(match);
-      else customParts.push(p);
-    }
-    if (customParts.length > 0) {
-      next.add('Other');
-      this.petForm.get('specifyAllergy')?.setValue(customParts.join(', '));
+  setConditionMode(mode: 'none' | 'other'): void {
+    this.conditionMode.set(mode);
+    const ctrl = this.petForm.get('medicalConditions')!;
+    if (mode === 'none') {
+      ctrl.setValue('');
+      ctrl.clearValidators();
     } else {
-      this.petForm.get('specifyAllergy')?.setValue('');
+      ctrl.setValidators(Validators.required);
     }
-    if (next.size === 0) next.add('None');
-    this.selectedAllergies.set(next);
+    ctrl.updateValueAndValidity();
   }
 
-  private resetAllergiesToNone(): void {
-    this.selectedAllergies.set(new Set(['None']));
+  modeChipClass(active: boolean): string {
+    const base = 'rounded-full px-4 py-2 text-sm font-medium transition-all duration-200 border cursor-pointer';
+    return active
+      ? `${base} border-indigo-500 bg-indigo-600 text-white shadow-sm`
+      : `${base} border-slate-200 bg-white text-slate-600 hover:border-indigo-200 hover:bg-indigo-50/60`;
+  }
+
+  private allergiesValue(): string | undefined {
+    if (this.allergyMode() === 'none') return undefined;
+    return this.petForm.get('specifyAllergy')?.value?.trim() || undefined;
+  }
+
+  private hydrateAllergyMode(s: string | null | undefined): void {
+    if (s?.trim()) {
+      this.allergyMode.set('other');
+      this.petForm.get('specifyAllergy')?.setValue(s);
+    } else {
+      this.allergyMode.set('none');
+      this.petForm.get('specifyAllergy')?.setValue('');
+    }
+  }
+
+  private hydrateConditionMode(s: string | null | undefined): void {
+    if (s?.trim()) {
+      this.conditionMode.set('other');
+    } else {
+      this.conditionMode.set('none');
+      this.petForm.get('medicalConditions')?.setValue('');
+    }
   }
 
   private resetPetFormDefaults(): void {
@@ -1403,11 +1407,14 @@ export class MyPetsComponent implements OnInit {
       vetName: '',
       vetPhone: '',
     });
-    this.resetAllergiesToNone();
+    this.allergyMode.set('none');
+    this.conditionMode.set('none');
     this.showMedicalSection.set(false);
     this.currentBreedOptions.set([]);
     this.showSpecifyAnimal.set(false);
     this.showSpecifyBreed.set(false);
+    this.breedSearchText.set('');
+    this.breedDropdownOpen.set(false);
   }
 
   triageSeverityDotClass(severity: string): string {
