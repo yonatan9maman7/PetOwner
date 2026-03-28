@@ -48,7 +48,7 @@ public class RequestsController : ControllerBase
         if (providerProfile.UserId == userId)
             return BadRequest(new { message = "You cannot create a request for yourself." });
 
-        if (providerProfile.Status != "Approved")
+        if (providerProfile.Status != ProviderStatus.Approved)
             return BadRequest(new { message = "This provider is not currently approved." });
 
         if (request.PetId.HasValue)

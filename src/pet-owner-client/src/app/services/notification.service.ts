@@ -12,7 +12,8 @@ export interface AppNotification {
   type: string;
   title: string;
   body: string;
-  referenceId: string | null;
+  message: string;
+  relatedEntityId: string | null;
   isRead: boolean;
   createdAt: string;
 }
@@ -34,6 +35,11 @@ export class NotificationService {
   readonly unreadCount = signal(0);
   readonly notifications = signal<AppNotification[]>([]);
   readonly newNotification = signal<AppNotification | null>(null);
+  readonly sosAlert = signal<AppNotification | null>(null);
+
+  dismissSosAlert(): void {
+    this.sosAlert.set(null);
+  }
 
   startConnection(): void {
     const token = this.auth.token();
@@ -48,6 +54,11 @@ export class NotificationService {
       this.notifications.update(list => [notification, ...list]);
       this.unreadCount.update(c => c + 1);
       this.newNotification.set(notification);
+
+      if (notification.type === 'sos') {
+        this.sosAlert.set(notification);
+      }
+
       this.toast.show(notification.title || this.translate.instant('NOTIFICATIONS.NEW'), 'info');
     });
 

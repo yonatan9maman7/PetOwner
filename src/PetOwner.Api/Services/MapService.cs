@@ -3,6 +3,7 @@ using NetTopologySuite.Geometries;
 using PetOwner.Api.DTOs;
 using PetOwner.Api.Infrastructure;
 using PetOwner.Data;
+using PetOwner.Data.Models;
 
 namespace PetOwner.Api.Services;
 
@@ -28,7 +29,7 @@ public class MapService : IMapService
                 l.GeoLocation != null &&
                 l.User != null &&
                 l.User.ProviderProfile != null &&
-                l.User.ProviderProfile.Status == "Approved" &&
+                l.User.ProviderProfile.Status == ProviderStatus.Approved &&
                 l.User.ProviderProfile.IsAvailableNow);
 
         if (filter.RequestedTime.HasValue)
@@ -114,6 +115,10 @@ public class MapService : IMapService
                 l.User.ProviderProfile.AverageRating,
                 l.User.ProviderProfile.ReviewCount,
                 l.User.ProviderProfile.AcceptsOffHoursRequests,
+                l.User.ProviderProfile.Type,
+                l.User.ProviderProfile.WhatsAppNumber,
+                l.User.ProviderProfile.WebsiteUrl,
+                l.User.ProviderProfile.IsEmergencyService,
             })
             .ToListAsync();
 
@@ -127,7 +132,11 @@ public class MapService : IMapService
             string.Join(", ", r.ServiceKinds.OrderBy(s => s).Select(ServiceTypeCatalog.ToDisplayName)),
             r.AverageRating,
             r.ReviewCount,
-            r.AcceptsOffHoursRequests))
+            r.AcceptsOffHoursRequests,
+            r.Type.ToString(),
+            r.WhatsAppNumber,
+            r.WebsiteUrl,
+            r.IsEmergencyService))
             .ToList();
     }
 }

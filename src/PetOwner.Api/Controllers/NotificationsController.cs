@@ -45,6 +45,7 @@ public class NotificationsController : ControllerBase
         return Ok(new { count });
     }
 
+    [HttpPatch("{id:guid}/read")]
     [HttpPut("{id:guid}/read")]
     public async Task<IActionResult> MarkAsRead(Guid id)
     {
@@ -64,9 +65,14 @@ public class NotificationsController : ControllerBase
     public async Task<IActionResult> MarkAllAsRead()
     {
         var userId = GetUserId();
-        await _db.Notifications
+        var unread = await _db.Notifications
             .Where(n => n.UserId == userId && !n.IsRead)
-            .ExecuteUpdateAsync(s => s.SetProperty(n => n.IsRead, true));
+            .ToListAsync();
+
+        foreach (var n in unread)
+            n.IsRead = true;
+
+        await _db.SaveChangesAsync();
         return Ok(new { message = "All marked as read." });
     }
 

@@ -19,6 +19,35 @@ export interface Pet {
   microchipNumber?: string;
   vetName?: string;
   vetPhone?: string;
+  imageUrl?: string;
+  isLost?: boolean;
+  lastSeenLocation?: string;
+  lastSeenLat?: number;
+  lastSeenLng?: number;
+  lostAt?: string;
+  contactPhone?: string;
+  communityPostId?: string;
+}
+
+export interface LostPet {
+  id: string;
+  name: string;
+  species: PetSpecies;
+  breed: string | null;
+  imageUrl: string | null;
+  lastSeenLocation: string;
+  lastSeenLat: number;
+  lastSeenLng: number;
+  lostAt: string | null;
+  contactPhone: string;
+  ownerName: string;
+}
+
+export interface ReportLostPayload {
+  lastSeenLocation: string;
+  lastSeenLat: number;
+  lastSeenLng: number;
+  contactPhone: string;
 }
 
 export interface CreatePetPayload {
@@ -74,5 +103,17 @@ export class PetService {
 
   delete(id: string): Observable<void> {
     return this.http.delete<void>(`${this.baseUrl}/${id}`);
+  }
+
+  reportLost(id: string, payload: ReportLostPayload): Observable<Pet> {
+    return this.http.post<Pet>(`${this.baseUrl}/${id}/report-lost`, payload);
+  }
+
+  markFound(id: string): Observable<Pet> {
+    return this.http.post<Pet>(`${this.baseUrl}/${id}/mark-found`, {});
+  }
+
+  getLostPets(): Observable<LostPet[]> {
+    return this.http.get<LostPet[]>(`${this.baseUrl}/lost`);
   }
 }

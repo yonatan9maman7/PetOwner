@@ -18,9 +18,21 @@ public class Pet
     public string? MicrochipNumber { get; set; }
     public string? VetName { get; set; }
     public string? VetPhone { get; set; }
+    public string? ImageUrl { get; set; }
+
+    // SOS / Lost Pet fields
+    public bool IsLost { get; set; }
+    public string? LastSeenLocation { get; set; }
+    public double? LastSeenLat { get; set; }
+    public double? LastSeenLng { get; set; }
+    public DateTime? LostAt { get; set; }
+    public string? ContactPhone { get; set; }
+    public Guid? CommunityPostId { get; set; }
 
     public User User { get; set; } = null!;
     public ICollection<MedicalRecord> MedicalRecords { get; set; } = new List<MedicalRecord>();
+    public ICollection<Vaccination> Vaccinations { get; set; } = new List<Vaccination>();
+    public ICollection<WeightLog> WeightLogs { get; set; } = new List<WeightLog>();
     public ICollection<TeletriageSession> TeletriageSessions { get; set; } = new List<TeletriageSession>();
     public ICollection<Activity> Activities { get; set; } = new List<Activity>();
 }

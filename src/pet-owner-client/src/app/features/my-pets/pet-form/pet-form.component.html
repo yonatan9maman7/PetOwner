@@ -1,0 +1,409 @@
+<!-- Toggle Button -->
+@if (!editingPet) {
+  <div class="text-center mb-6">
+    <button type="button" (click)="toggleForm()" class="toggle-btn group">
+      @if (isFormVisible) {
+        <svg class="w-5 h-5 transition-transform duration-300 rotate-45" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
+        </svg>
+      } @else {
+        <svg class="w-5 h-5 transition-transform duration-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
+        </svg>
+      }
+      <span>{{ 'PETS.ADD_NEW_FAMILY_MEMBER' | translate }}</span>
+    </button>
+  </div>
+}
+
+<!-- Collapsible Form Container -->
+<div class="form-container" [class.open]="isFormVisible || !!editingPet">
+  <div class="form-overflow-wrapper">
+    <div class="form-card">
+
+      <!-- Success Overlay -->
+      @if (showSuccess()) {
+        <div class="success-overlay">
+          <span class="success-emoji">🎉</span>
+          <p class="success-text">{{ 'PETS.ADD_SUCCESS' | translate }}</p>
+        </div>
+      }
+
+      <!-- Avatar Upload -->
+      <div class="avatar-section">
+        <div class="avatar-circle" (click)="fileInput.click()">
+          @if (avatarPreview()) {
+            <img [src]="avatarPreview()" alt="" />
+          } @else {
+            <svg class="camera-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M6.827 6.175A2.31 2.31 0 015.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 00-1.134-.175 2.31 2.31 0 01-1.64-1.055l-.822-1.316a2.192 2.192 0 00-1.736-1.039 48.774 48.774 0 00-5.232 0 2.192 2.192 0 00-1.736 1.039l-.821 1.316z" />
+              <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 12.75a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0zM18.75 10.5h.008v.008h-.008V10.5z" />
+            </svg>
+          }
+        </div>
+        <input #fileInput type="file" accept="image/*" (change)="onFileSelected($event)" class="hidden" />
+        <span class="avatar-hint">{{ 'PETS.UPLOAD_AVATAR' | translate }}</span>
+      </div>
+
+      <!-- Dynamic Title -->
+      <h2 class="form-title">
+        @if (editingPet) {
+          {{ 'PETS.EDIT_PET' | translate }}
+        } @else if (nameValue()) {
+          {{ 'PETS.TELL_US_ABOUT' | translate:{ name: nameValue() } }}
+        } @else {
+          {{ 'PETS.ADD_NEW_PET' | translate }}
+        }
+      </h2>
+
+      <!-- Form -->
+      <form [formGroup]="petForm" (ngSubmit)="onSubmit()">
+        <div class="form-grid">
+
+          <!-- Name -->
+          <div class="form-field">
+            <label for="pf-name" class="field-label">
+              <span dir="auto">{{ 'PETS.NAME' | translate }}</span>
+              <span class="required-mark">*</span>
+            </label>
+            <div class="input-wrapper">
+              <input id="pf-name" type="text" formControlName="name" dir="auto"
+                [attr.placeholder]="'PETS.PLACEHOLDER_NAME' | translate"
+                (blur)="onFieldBlur('name')"
+                [class.field-invalid]="petForm.get('name')?.invalid && petForm.get('name')?.touched"
+                [class.field-shake]="shakingField() === 'name'"
+              />
+              @if (petForm.get('name')?.valid && petForm.get('name')?.touched) {
+                <span class="valid-check">
+                  <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+                  </svg>
+                </span>
+              }
+            </div>
+          </div>
+
+          <!-- Age -->
+          <div class="form-field">
+            <label for="pf-age" class="field-label">
+              <span dir="auto">{{ 'PETS.AGE' | translate }}</span>
+              <span class="required-mark">*</span>
+            </label>
+            <div class="input-wrapper">
+              <input id="pf-age" type="number" min="0" max="100" formControlName="age" dir="auto"
+                [attr.placeholder]="'PETS.PLACEHOLDER_AGE' | translate"
+                (blur)="onFieldBlur('age')"
+                [class.field-invalid]="petForm.get('age')?.invalid && petForm.get('age')?.touched"
+                [class.field-shake]="shakingField() === 'age'"
+              />
+              @if (petForm.get('age')?.valid && petForm.get('age')?.touched) {
+                <span class="valid-check">
+                  <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+                  </svg>
+                </span>
+              }
+            </div>
+          </div>
+
+          <!-- Species Cards (full width) -->
+          <div class="form-field full-width">
+            <label class="field-label">
+              <span dir="auto">{{ 'PETS.SPECIES' | translate }}</span>
+              <span class="required-mark">*</span>
+            </label>
+            <div class="species-grid">
+              @for (card of speciesCards; track card.value) {
+                <button type="button" class="species-card"
+                  [class.selected]="petForm.get('species')?.value === card.value"
+                  (click)="selectSpecies(card.value)">
+                  <span class="species-emoji">{{ card.emoji }}</span>
+                  <span class="species-name">{{ card.labelKey | translate }}</span>
+                </button>
+              }
+            </div>
+          </div>
+
+          <!-- Specify Animal (conditional) -->
+          @if (showSpecifyAnimal()) {
+            <div class="form-field full-width">
+              <label for="pf-specify-animal" class="field-label">
+                <span dir="auto">{{ 'PETS.SPECIFY_ANIMAL' | translate }}</span>
+                <span class="required-mark">*</span>
+              </label>
+              <div class="input-wrapper">
+                <input id="pf-specify-animal" type="text" formControlName="specifyAnimalType" dir="auto"
+                  (blur)="onFieldBlur('specifyAnimalType')"
+                  [class.field-invalid]="petForm.get('specifyAnimalType')?.invalid && petForm.get('specifyAnimalType')?.touched"
+                  [class.field-shake]="shakingField() === 'specifyAnimalType'"
+                />
+                @if (petForm.get('specifyAnimalType')?.valid && petForm.get('specifyAnimalType')?.touched && petForm.get('specifyAnimalType')?.value) {
+                  <span class="valid-check">
+                    <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+                    </svg>
+                  </span>
+                }
+              </div>
+            </div>
+          }
+
+          <!-- Breed (if options exist) -->
+          @if (currentBreedOptions().length > 0) {
+            <div class="form-field">
+              <label for="pf-breed" class="field-label">
+                <span dir="auto">{{ 'PETS.BREED' | translate }}</span>
+                <span class="required-mark">*</span>
+              </label>
+              <div class="input-wrapper breed-wrapper">
+                <input id="pf-breed" type="text" autocomplete="off" dir="auto"
+                  [value]="breedSearchText()"
+                  (input)="onBreedInput($event)"
+                  (focus)="breedDropdownOpen.set(true)"
+                  (blur)="onBreedBlur()"
+                  [attr.placeholder]="'PETS.SEARCH_BREED' | translate"
+                  [class.field-invalid]="petForm.get('breed')?.invalid && petForm.get('breed')?.touched"
+                />
+                <span class="search-icon">
+                  <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
+                </span>
+
+                @if (breedDropdownOpen()) {
+                  @if (filteredBreeds().length > 0) {
+                    <div class="breed-dropdown">
+                      @for (b of filteredBreeds(); track b) {
+                        <button type="button" (mousedown)="selectBreed(b)"
+                          class="breed-option"
+                          [class.breed-option-selected]="petForm.get('breed')?.value === b"
+                          dir="auto">
+                          {{ breedI18nKey(b) | translate }}
+                        </button>
+                      }
+                    </div>
+                  } @else if (breedSearchText().trim()) {
+                    <div class="breed-dropdown breed-empty" dir="auto">
+                      {{ 'PETS.NO_BREED_MATCH' | translate }}
+                    </div>
+                  }
+                }
+              </div>
+            </div>
+          }
+
+          <!-- Weight -->
+          <div class="form-field">
+            <label for="pf-weight" class="field-label">
+              <span dir="auto">{{ 'PETS.WEIGHT' | translate }}</span>
+              <span class="required-mark">*</span>
+            </label>
+            <div class="input-wrapper">
+              <input id="pf-weight" type="number" min="0" step="0.1" formControlName="weight" dir="auto"
+                [attr.placeholder]="'PETS.PLACEHOLDER_WEIGHT' | translate"
+                (blur)="onFieldBlur('weight')"
+                [class.field-invalid]="petForm.get('weight')?.invalid && petForm.get('weight')?.touched"
+                [class.field-shake]="shakingField() === 'weight'"
+              />
+              @if (petForm.get('weight')?.valid && petForm.get('weight')?.touched) {
+                <span class="valid-check">
+                  <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+                  </svg>
+                </span>
+              }
+            </div>
+          </div>
+
+          <!-- Specify Breed (conditional) -->
+          @if (showSpecifyBreed()) {
+            <div class="form-field full-width">
+              <label for="pf-specify-breed" class="field-label">
+                <span dir="auto">{{ 'PETS.SPECIFY_BREED' | translate }}</span>
+                <span class="required-mark">*</span>
+              </label>
+              <div class="input-wrapper">
+                <input id="pf-specify-breed" type="text" formControlName="specifyBreed" dir="auto"
+                  (blur)="onFieldBlur('specifyBreed')"
+                  [class.field-invalid]="petForm.get('specifyBreed')?.invalid && petForm.get('specifyBreed')?.touched"
+                  [class.field-shake]="shakingField() === 'specifyBreed'"
+                />
+                @if (petForm.get('specifyBreed')?.valid && petForm.get('specifyBreed')?.touched && petForm.get('specifyBreed')?.value) {
+                  <span class="valid-check">
+                    <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+                    </svg>
+                  </span>
+                }
+              </div>
+            </div>
+          }
+
+          <!-- Neutered Toggle (full width) -->
+          <div class="form-field full-width">
+            <div class="neutered-card">
+              <div class="neutered-info">
+                <span class="neutered-label" dir="auto">{{ 'PETS.NEUTERED_QUESTION' | translate }}</span>
+                <p class="neutered-hint" dir="auto">{{ 'PETS.NEUTERED_HELP' | translate }}</p>
+              </div>
+              <label for="pf-neutered" class="toggle-switch">
+                <input id="pf-neutered" type="checkbox" formControlName="isNeutered" class="sr-only peer" />
+                <span class="toggle-track"></span>
+              </label>
+            </div>
+          </div>
+
+          <!-- Notes (full width) -->
+          <div class="form-field full-width">
+            <label for="pf-notes" class="field-label">
+              <span dir="auto">{{ 'PETS.NOTES' | translate }}</span>
+            </label>
+            <div class="input-wrapper">
+              <textarea id="pf-notes" rows="2" formControlName="notes" dir="auto"
+                [attr.placeholder]="'PETS.PLACEHOLDER_NOTES' | translate"
+              ></textarea>
+            </div>
+          </div>
+
+          <!-- Allergies (full width) -->
+          <div class="form-field full-width">
+            <span class="field-label" dir="auto">{{ 'PETS.ALLERGIES' | translate }}</span>
+            <p class="field-hint" dir="auto">{{ 'PETS.ALLERGIES_HELP' | translate }}</p>
+            <div class="chip-row">
+              <button type="button" (click)="setAllergyMode('none')" [class]="modeChipClass(allergyMode() === 'none')">
+                {{ 'PETS.ALLERGY_NONE' | translate }}
+              </button>
+              <button type="button" (click)="setAllergyMode('other')" [class]="modeChipClass(allergyMode() === 'other')">
+                {{ 'PETS.ALLERGY_OTHER' | translate }}
+              </button>
+            </div>
+            @if (allergyMode() === 'other') {
+              <div class="input-wrapper mt-2">
+                <input id="pf-specify-allergy" type="text" formControlName="specifyAllergy" dir="auto"
+                  [attr.placeholder]="'PETS.SPECIFY_ALLERGY' | translate"
+                  (blur)="onFieldBlur('specifyAllergy')"
+                  [class.field-invalid]="petForm.get('specifyAllergy')?.invalid && petForm.get('specifyAllergy')?.touched"
+                  [class.field-shake]="shakingField() === 'specifyAllergy'"
+                />
+                @if (petForm.get('specifyAllergy')?.valid && petForm.get('specifyAllergy')?.touched && petForm.get('specifyAllergy')?.value) {
+                  <span class="valid-check">
+                    <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+                    </svg>
+                  </span>
+                }
+              </div>
+            }
+          </div>
+
+          <!-- Medical Conditions (full width) -->
+          <div class="form-field full-width">
+            <span class="field-label" dir="auto">{{ 'PETS.MEDICAL_CONDITIONS' | translate }}</span>
+            <p class="field-hint" dir="auto">{{ 'PETS.MEDICAL_CONDITIONS_HELP' | translate }}</p>
+            <div class="chip-row">
+              <button type="button" (click)="setConditionMode('none')" [class]="modeChipClass(conditionMode() === 'none')">
+                {{ 'PETS.ALLERGY_NONE' | translate }}
+              </button>
+              <button type="button" (click)="setConditionMode('other')" [class]="modeChipClass(conditionMode() === 'other')">
+                {{ 'PETS.ALLERGY_OTHER' | translate }}
+              </button>
+            </div>
+            @if (conditionMode() === 'other') {
+              <div class="input-wrapper mt-2">
+                <input id="pf-conditions" type="text" formControlName="medicalConditions" dir="auto"
+                  [attr.placeholder]="'PETS.PLACEHOLDER_MEDICAL' | translate"
+                  (blur)="onFieldBlur('medicalConditions')"
+                  [class.field-invalid]="petForm.get('medicalConditions')?.invalid && petForm.get('medicalConditions')?.touched"
+                  [class.field-shake]="shakingField() === 'medicalConditions'"
+                />
+              </div>
+            }
+          </div>
+
+          <!-- Care & Medical Details (collapsible, full width) -->
+          <div class="form-field full-width">
+            <div class="medical-section">
+              <button type="button" (click)="showMedicalSection.set(!showMedicalSection())" class="medical-toggle">
+                <div class="medical-toggle-left">
+                  <div class="medical-icon-circle">
+                    <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                    </svg>
+                  </div>
+                  <span class="medical-toggle-label" dir="auto">{{ 'PETS.MEDICAL_INFO' | translate }}</span>
+                </div>
+                <svg class="chevron-icon" [class.rotate-180]="showMedicalSection()" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+
+              @if (showMedicalSection()) {
+                <div class="medical-body">
+                  <div class="input-wrapper">
+                    <label for="pf-medical-notes" class="field-label"><span dir="auto">{{ 'PETS.MEDICAL_NOTES' | translate }}</span></label>
+                    <textarea id="pf-medical-notes" rows="2" formControlName="medicalNotes" dir="auto"
+                      [attr.placeholder]="'PETS.PLACEHOLDER_MEDICAL_NOTES' | translate"
+                    ></textarea>
+                  </div>
+
+                  <div class="input-wrapper">
+                    <label for="pf-feeding" class="field-label"><span dir="auto">{{ 'PETS.FEEDING_SCHEDULE' | translate }}</span></label>
+                    <textarea id="pf-feeding" rows="2" formControlName="feedingSchedule" dir="auto"
+                      [attr.placeholder]="'PETS.PLACEHOLDER_FEEDING' | translate"
+                    ></textarea>
+                  </div>
+
+                  <div class="input-wrapper">
+                    <label for="pf-microchip" class="field-label"><span dir="auto">{{ 'PETS.MICROCHIP' | translate }}</span></label>
+                    <input id="pf-microchip" type="text" formControlName="microchipNumber" dir="auto"
+                      [attr.placeholder]="'PETS.PLACEHOLDER_MICROCHIP' | translate"
+                    />
+                  </div>
+
+                  <div class="medical-vet-grid">
+                    <div class="input-wrapper">
+                      <label for="pf-vet-name" class="field-label"><span dir="auto">{{ 'PETS.VET_NAME' | translate }}</span></label>
+                      <input id="pf-vet-name" type="text" formControlName="vetName" dir="auto"
+                        [attr.placeholder]="'PETS.PLACEHOLDER_VET_NAME' | translate"
+                      />
+                    </div>
+                    <div class="input-wrapper">
+                      <label for="pf-vet-phone" class="field-label"><span dir="auto">{{ 'PETS.VET_PHONE' | translate }}</span></label>
+                      <input id="pf-vet-phone" type="tel" formControlName="vetPhone" dir="auto"
+                        [attr.placeholder]="'PETS.PLACEHOLDER_VET_PHONE' | translate"
+                      />
+                    </div>
+                  </div>
+                </div>
+              }
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Form Actions -->
+        <div class="form-actions">
+          <button type="submit" class="submit-btn"
+            [disabled]="submitting() || petForm.invalid"
+            [class.btn-valid]="petForm.valid && !submitting()">
+            @if (submitting()) {
+              <svg class="spin-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+              </svg>
+              {{ 'PROFILE.SAVING' | translate }}
+            } @else {
+              {{ 'PETS.SAVE_PET' | translate }}
+            }
+          </button>
+          @if (editingPet) {
+            <button type="button" class="cancel-btn" (click)="cancelEdit()">
+              {{ 'PETS.CANCEL' | translate }}
+            </button>
+          }
+        </div>
+      </form>
+
+    </div>
+  </div>
+</div>

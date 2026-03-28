@@ -1,0 +1,266 @@
+<div class="apply-page" dir="auto">
+  <div class="apply-shell">
+    <div class="apply-card">
+      @if (showSuccessOverlay()) {
+        <div class="success-overlay" role="status" aria-live="polite">
+          <span class="success-emoji" aria-hidden="true">🏪</span>
+          <p class="success-text">{{ 'BUSINESS_APPLY.SUCCESS_TITLE' | translate }}</p>
+          <p class="success-sub">{{ 'BUSINESS_APPLY.SUCCESS_SUB' | translate }}</p>
+        </div>
+      }
+
+      <h1 class="apply-title">
+        @if (businessNameDisplay()) {
+          {{ 'BUSINESS_APPLY.TITLE_PERSONAL' | translate: { name: businessNameDisplay() } }}
+        } @else {
+          {{ 'BUSINESS_APPLY.TITLE_DEFAULT' | translate }}
+        }
+      </h1>
+      <p class="apply-subtitle">{{ 'BUSINESS_APPLY.SUBTITLE' | translate }}</p>
+
+      <div class="stepper-track" role="navigation" aria-label="Steps">
+        @for (n of [1, 2, 3]; track n) {
+          <button
+            type="button"
+            class="step-pill"
+            [class.step-pill--active]="step() === n"
+            [class.step-pill--done]="step() > n"
+            [disabled]="n > step()"
+            (click)="goToStep(n)"
+          >
+            <span class="step-pill__num">{{ n }}</span>
+            <span class="step-pill__label">
+              @switch (n) {
+                @case (1) { {{ 'BUSINESS_APPLY.STEP_1' | translate }} }
+                @case (2) { {{ 'BUSINESS_APPLY.STEP_2' | translate }} }
+                @case (3) { {{ 'BUSINESS_APPLY.STEP_3' | translate }} }
+              }
+            </span>
+          </button>
+        }
+      </div>
+
+      <form [formGroup]="form" class="apply-form" (ngSubmit)="onFormSubmit($event)">
+        @switch (step()) {
+          <!-- ── Step 1: Identity ── -->
+          @case (1) {
+            <div class="form-field">
+              <label for="ba-name" class="field-label">
+                <span>{{ 'BUSINESS_APPLY.BUSINESS_NAME' | translate }}</span>
+                <span class="required-mark">*</span>
+              </label>
+              <div class="input-wrapper">
+                <input
+                  id="ba-name"
+                  type="text"
+                  formControlName="businessName"
+                  dir="auto"
+                  [attr.placeholder]="'BUSINESS_APPLY.BUSINESS_NAME_PH' | translate"
+                  (blur)="onFieldBlur('businessName')"
+                  [class.field-invalid]="form.controls.businessName.invalid && form.controls.businessName.touched"
+                  [class.field-shake]="shakingField() === 'businessName'"
+                />
+                @if (form.controls.businessName.valid && form.controls.businessName.touched) {
+                  <span class="valid-check" aria-hidden="true">
+                    <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+                    </svg>
+                  </span>
+                }
+              </div>
+            </div>
+
+            <div class="logo-block">
+              <button type="button" class="logo-circle" (click)="logoInput.click()">
+                @if (logoPreview()) {
+                  <img [src]="logoPreview()!" alt="" />
+                } @else {
+                  <svg class="logo-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 21v-7.5a.75.75 0 01.75-.75h3a.75.75 0 01.75.75V21m-4.5 0H2.36m11.14 0H18m0 0h3.64m-1.39 0V9.349m-16.5 11.65V9.35m0 0a3.001 3.001 0 003.75-.615A2.993 2.993 0 009.75 9.75c.896 0 1.7-.393 2.25-1.016a2.993 2.993 0 002.25 1.016c.896 0 1.7-.393 2.25-1.016a3.001 3.001 0 003.75.614m-16.5 0a3.004 3.004 0 01-.621-4.72L4.318 3.44A1.5 1.5 0 015.378 3h13.243a1.5 1.5 0 011.06.44l1.19 1.189a3 3 0 01-.621 4.72" />
+                  </svg>
+                }
+              </button>
+              <input #logoInput type="file" accept="image/*" class="hidden" (change)="onLogoSelected($event)" />
+              <span class="logo-hint">{{ 'BUSINESS_APPLY.LOGO_HINT' | translate }}</span>
+            </div>
+
+            <div class="form-field full-width">
+              <span class="field-label">
+                {{ 'BUSINESS_APPLY.CATEGORY_LABEL' | translate }}
+                <span class="required-mark">*</span>
+              </span>
+              <div class="service-grid">
+                @for (card of cards; track card.id) {
+                  <button
+                    type="button"
+                    class="service-card"
+                    [class.service-card--selected]="form.controls.categoryId.value === card.id"
+                    (click)="selectCategory(card)"
+                  >
+                    <span class="service-card__emoji" aria-hidden="true">{{ card.emoji }}</span>
+                    <span class="service-card__title">{{ card.titleKey | translate }}</span>
+                    <span class="service-card__desc">{{ card.descKey | translate }}</span>
+                  </button>
+                }
+              </div>
+              @if (form.controls.categoryId.invalid && form.controls.categoryId.touched) {
+                <span class="field-error">{{ 'BUSINESS_APPLY.ERROR_CATEGORY' | translate }}</span>
+              }
+            </div>
+          }
+
+          <!-- ── Step 2: Location ── -->
+          @case (2) {
+            <div class="form-field full-width">
+              <label class="field-label">
+                {{ 'BUSINESS_APPLY.ADDRESS_LABEL' | translate }}
+                <span class="required-mark">*</span>
+              </label>
+              <p class="field-hint">{{ 'BUSINESS_APPLY.ADDRESS_HINT' | translate }}</p>
+              <div class="input-wrapper input-wrapper--autocomplete">
+                <app-address-autocomplete
+                  formControlName="addressLine"
+                  (suggestionSelected)="onAddressSuggestion($event)"
+                />
+              </div>
+            </div>
+
+            <div #mapHost class="map-host" role="application" [attr.aria-label]="'BUSINESS_APPLY.MAP_LABEL' | translate"></div>
+
+            @if (hasPin() && hasStructuredAddress()) {
+              <div class="address-summary">
+                <p class="address-summary__text">
+                  {{ form.controls.street.value }} {{ form.controls.buildingNumber.value }},
+                  {{ form.controls.city.value }}
+                </p>
+                <button type="button" class="linkish" (click)="toggleAddressDetails()">
+                  {{ 'BUSINESS_APPLY.EDIT_ADDRESS' | translate }}
+                </button>
+              </div>
+            }
+
+            @if (hasPin() && !hasStructuredAddress()) {
+              <p class="address-warn">{{ 'BUSINESS_APPLY.ADDRESS_INCOMPLETE' | translate }}</p>
+            }
+
+            @if (addressFieldsExpanded() || (hasPin() && !hasStructuredAddress())) {
+              <div class="address-grid">
+                <div class="form-field">
+                  <label for="ba-city" class="field-label">{{ 'BUSINESS_APPLY.CITY' | translate }}</label>
+                  <div class="input-wrapper">
+                    <input id="ba-city" type="text" formControlName="city" dir="auto"
+                      (blur)="onFieldBlur('city')"
+                      [class.field-invalid]="form.controls.city.invalid && form.controls.city.touched"
+                      [class.field-shake]="shakingField() === 'city'" />
+                  </div>
+                </div>
+                <div class="form-field">
+                  <label for="ba-street" class="field-label">{{ 'BUSINESS_APPLY.STREET' | translate }}</label>
+                  <div class="input-wrapper">
+                    <input id="ba-street" type="text" formControlName="street" dir="auto"
+                      (blur)="onFieldBlur('street')"
+                      [class.field-invalid]="form.controls.street.invalid && form.controls.street.touched"
+                      [class.field-shake]="shakingField() === 'street'" />
+                  </div>
+                </div>
+                <div class="form-field">
+                  <label for="ba-bn" class="field-label">{{ 'BUSINESS_APPLY.BUILDING' | translate }}</label>
+                  <div class="input-wrapper">
+                    <input id="ba-bn" type="text" formControlName="buildingNumber" dir="auto"
+                      (blur)="onFieldBlur('buildingNumber')"
+                      [class.field-invalid]="form.controls.buildingNumber.invalid && form.controls.buildingNumber.touched"
+                      [class.field-shake]="shakingField() === 'buildingNumber'" />
+                  </div>
+                </div>
+                <div class="form-field">
+                  <label for="ba-apt" class="field-label">{{ 'BUSINESS_APPLY.APT' | translate }}</label>
+                  <div class="input-wrapper">
+                    <input id="ba-apt" type="text" formControlName="apartmentNumber" dir="auto" />
+                  </div>
+                </div>
+              </div>
+            }
+          }
+
+          <!-- ── Step 3: Contact & Hours ── -->
+          @case (3) {
+            <div class="form-field">
+              <label for="ba-phone" class="field-label">
+                {{ 'BUSINESS_APPLY.PHONE' | translate }}
+                <span class="required-mark">*</span>
+              </label>
+              <div class="input-wrapper">
+                <input id="ba-phone" type="tel" formControlName="phone" dir="auto"
+                  [attr.placeholder]="'BUSINESS_APPLY.PHONE_PH' | translate"
+                  (blur)="onFieldBlur('phone')"
+                  [class.field-invalid]="form.controls.phone.invalid && form.controls.phone.touched"
+                  [class.field-shake]="shakingField() === 'phone'" />
+                @if (form.controls.phone.valid && form.controls.phone.touched) {
+                  <span class="valid-check" aria-hidden="true">
+                    <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+                    </svg>
+                  </span>
+                }
+              </div>
+            </div>
+
+            <div class="form-field">
+              <label for="ba-whatsapp" class="field-label">{{ 'BUSINESS_APPLY.WHATSAPP' | translate }}</label>
+              <div class="input-wrapper">
+                <input id="ba-whatsapp" type="tel" formControlName="whatsapp" dir="auto"
+                  [attr.placeholder]="'BUSINESS_APPLY.WHATSAPP_PH' | translate" />
+              </div>
+            </div>
+
+            <div class="form-field">
+              <label for="ba-website" class="field-label">{{ 'BUSINESS_APPLY.WEBSITE' | translate }}</label>
+              <div class="input-wrapper">
+                <input id="ba-website" type="url" formControlName="website" dir="auto"
+                  [attr.placeholder]="'BUSINESS_APPLY.WEBSITE_PH' | translate" />
+              </div>
+            </div>
+
+            <div class="form-field full-width">
+              <label for="ba-hours" class="field-label">{{ 'BUSINESS_APPLY.OPENING_HOURS' | translate }}</label>
+              <div class="input-wrapper input-wrapper--textarea">
+                <textarea id="ba-hours" rows="3" formControlName="openingHours" dir="auto"
+                  [attr.placeholder]="'BUSINESS_APPLY.OPENING_HOURS_PH' | translate"></textarea>
+              </div>
+            </div>
+          }
+        }
+
+        @if (errorMessage()) {
+          <div class="form-error-banner" role="alert">{{ errorMessage() }}</div>
+        }
+
+        <footer class="apply-footer">
+          @if (step() > 1) {
+            <button type="button" class="btn-back" (click)="goBack()">
+              {{ 'BUSINESS_APPLY.BACK' | translate }}
+            </button>
+          } @else {
+            <span></span>
+          }
+
+          @if (step() < totalSteps) {
+            <button type="button" class="btn-next" (click)="goNext()">
+              {{ 'BUSINESS_APPLY.NEXT' | translate }}
+            </button>
+          } @else {
+            <button type="submit" class="btn-submit"
+              [disabled]="submitting() || !allStepsValid()">
+              @if (submitting()) {
+                <span class="btn-submit__spinner" aria-hidden="true"></span>
+                {{ 'BUSINESS_APPLY.SUBMITTING' | translate }}
+              } @else {
+                {{ 'BUSINESS_APPLY.SUBMIT' | translate }}
+              }
+            </button>
+          }
+        </footer>
+      </form>
+    </div>
+  </div>
+</div>

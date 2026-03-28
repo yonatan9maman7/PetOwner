@@ -47,28 +47,10 @@ else
 
 builder.Services.AddCors(options =>
 {
-    var configuredOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins")
-        .Get<string[]>()?
-        .Where(origin => !string.IsNullOrWhiteSpace(origin))
-        .Select(origin => origin.Trim())
-        .Distinct(StringComparer.OrdinalIgnoreCase)
-        .ToArray()
-        ?? Array.Empty<string>();
-
-    var allowedOrigins = configuredOrigins.Length > 0
-        ? configuredOrigins
-        : builder.Environment.IsDevelopment()
-            ? new[] { "http://localhost:4200" }
-            : Array.Empty<string>();
-
-    if (allowedOrigins.Length == 0)
-        throw new InvalidOperationException("No CORS origins configured. Set Cors:AllowedOrigins.");
-
     options.AddDefaultPolicy(policy =>
-        policy.WithOrigins(allowedOrigins)
+        policy.AllowAnyOrigin()
               .AllowAnyMethod()
-              .AllowAnyHeader()
-              .AllowCredentials());
+              .AllowAnyHeader());
 });
 
 var jwtKey = builder.Configuration["Jwt:Key"];
@@ -112,6 +94,7 @@ builder.Services.AddSingleton<ITokenService, TokenService>();
 builder.Services.AddScoped<IMapService, MapService>();
 builder.Services.AddScoped<DatabaseSeeder>();
 builder.Services.AddHostedService<BookingExpirationService>();
+builder.Services.AddHostedService<VaccinationReminderService>();
 
 builder.Services.Configure<StripeSettings>(builder.Configuration.GetSection(StripeSettings.SectionName));
 builder.Services.AddScoped<IPaymentService, StripePaymentService>();
@@ -135,23 +118,22 @@ using (var scope = app.Services.CreateScope())
     var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
     if (app.Environment.IsDevelopment())
         db.Database.EnsureCreated();
-    else
-        db.Database.Migrate();
+    // Production/non-dev: migrations are applied manually (`dotnet ef database update`), not at startup.
 
-    var logger = scope.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger("AdminSeeding");
-    await SeedAdminUsers(
-        db,
-        builder.Configuration,
-        app.Environment,
-        logger,
-        developmentAdminPasswordFallback);
+    if (app.Environment.IsDevelopment())
+    {
+        var logger = scope.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger("AdminSeeding");
+        await SeedAdminUsers(
+            db,
+            builder.Configuration,
+            app.Environment,
+            logger,
+            developmentAdminPasswordFallback);
+    }
 }
 
-if (app.Environment.IsDevelopment())
-{
-    app.UseSwagger();
-    app.UseSwaggerUI();
-}
+app.UseSwagger();
+app.UseSwaggerUI();
 
 app.UseExceptionHandler();
 
@@ -164,6 +146,7 @@ app.UseStaticFiles();
 
 app.MapControllers();
 app.MapHub<NotificationHub>("/hubs/notifications");
+app.MapHub<ChatHub>("/hubs/chat");
 
 app.MapFallbackToFile("index.html");
 
@@ -354,7 +337,7 @@ static async Task EnsureSeededAdminsHaveProviderProfilesAsync(
         {
             UserId = userId,
             Bio = "Local development admin — provider profile for testing provider views.",
-            Status = "Approved",
+            Status = ProviderStatus.Approved,
             IsAvailableNow = false,
             City = "Tel Aviv",
             Street = "Dizengoff Street",

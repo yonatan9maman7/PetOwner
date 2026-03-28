@@ -6,14 +6,20 @@ import { HttpLoaderFactory } from './i18n/http-loader.factory';
 import { routes } from './app.routes';
 import { authInterceptor } from './interceptors/auth.interceptor';
 import { errorInterceptor } from './interceptors/error.interceptor';
+import { baseUrlInterceptor } from './interceptors/base-url.interceptor';
 import { API_BASE_URL } from './api-base.token';
+import { environment } from '../environments/environment';
+
+const apiOrigin = environment.apiUrl
+  ? environment.apiUrl.replace(/\/api\/?$/, '')
+  : '';
 
 export const appConfig: ApplicationConfig = {
   providers: [
-    { provide: API_BASE_URL, useValue: '' },
+    { provide: API_BASE_URL, useValue: apiOrigin },
     provideZoneChangeDetection({ eventCoalescing: true }),
     provideRouter(routes),
-    provideHttpClient(withFetch(), withInterceptors([authInterceptor, errorInterceptor])),
+    provideHttpClient(withFetch(), withInterceptors([authInterceptor, errorInterceptor, baseUrlInterceptor])),
     importProvidersFrom(
       TranslateModule.forRoot({
         loader: {

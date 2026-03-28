@@ -149,6 +149,7 @@ export class CommunityService {
       authorRole: '',
       authorIsApprovedProvider: false,
       communityGroupId: p.groupId,
+      category: null,
     };
   }
 

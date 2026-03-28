@@ -13,9 +13,14 @@ import {
 import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
 import * as L from 'leaflet';
-import { OSM_TILE_URL, OSM_TILE_OPTIONS } from '../../shared/leaflet-defaults';
+import {
+  applyMinimalMapAttribution,
+  CARTO_VOYAGER_TILE_OPTIONS,
+  CARTO_VOYAGER_TILE_URL,
+} from '../../shared/leaflet-defaults';
 import { MapService, MapSearchFilters } from '../../services/map.service';
 import { ProviderService } from '../../services/provider.service';
+import { PetService, LostPet } from '../../services/pet.service';
 import { AuthService } from '../../services/auth.service';
 import { AdminService } from '../../services/admin.service';
 import { ToastService } from '../../services/toast.service';
@@ -43,6 +48,7 @@ export class MapDashboardComponent implements OnInit, OnDestroy, AfterViewInit {
 
   private readonly mapService = inject(MapService);
   readonly providerService = inject(ProviderService);
+  private readonly petService = inject(PetService);
   private readonly auth = inject(AuthService);
   private readonly toast = inject(ToastService);
   private readonly reviewService = inject(ReviewService);
@@ -56,11 +62,15 @@ export class MapDashboardComponent implements OnInit, OnDestroy, AfterViewInit {
 
   private map!: L.Map;
   private markersLayer = L.layerGroup();
+  private lostPetsLayer = L.layerGroup();
   private mapResizeObserver?: ResizeObserver;
   private userLat: number | null = null;
   private userLng: number | null = null;
 
   providers = signal<MapPin[]>([]);
+  lostPets = signal<LostPet[]>([]);
+  selectedLostPet = signal<LostPet | null>(null);
+  isLostPetSheetOpen = signal(false);
   selectedPin = signal<MapPin | null>(null);
   isSheetOpen = signal(false);
   isLoadingPins = signal(false);
@@ -120,6 +130,7 @@ export class MapDashboardComponent implements OnInit, OnDestroy, AfterViewInit {
     this.initMap();
     this.locateUser();
     this.checkProviderStatus();
+    this.loadLostPets();
     this.mapService.getServiceTypes().subscribe({
       next: (types) => this.serviceTypes.set(types),
     });
@@ -228,11 +239,13 @@ export class MapDashboardComponent implements OnInit, OnDestroy, AfterViewInit {
       zoom: DEFAULT_ZOOM,
       zoomControl: false,
     });
+    applyMinimalMapAttribution(this.map);
 
-    L.tileLayer(OSM_TILE_URL, OSM_TILE_OPTIONS).addTo(this.map);
+    L.tileLayer(CARTO_VOYAGER_TILE_URL, CARTO_VOYAGER_TILE_OPTIONS).addTo(this.map);
 
     L.control.zoom({ position: 'bottomright' }).addTo(this.map);
     this.markersLayer.addTo(this.map);
+    this.lostPetsLayer.addTo(this.map);
 
     // Tile layer + controls size to the container; defer until layout/padding are applied.
     setTimeout(() => this.map.invalidateSize({ animate: false }), 0);
@@ -354,6 +367,44 @@ export class MapDashboardComponent implements OnInit, OnDestroy, AfterViewInit {
     });
   }
 
+  closeLostPetSheet(): void {
+    this.isLostPetSheetOpen.set(false);
+    this.selectedLostPet.set(null);
+  }
+
+  private loadLostPets(): void {
+    this.petService.getLostPets().subscribe({
+      next: (pets) => {
+        this.lostPets.set(pets);
+        this.renderLostPetMarkers(pets);
+      },
+    });
+  }
+
+  private renderLostPetMarkers(pets: LostPet[]): void {
+    this.lostPetsLayer.clearLayers();
+
+    pets.forEach((pet) => {
+      const imgHtml = pet.imageUrl
+        ? `<img src="${pet.imageUrl}" alt="${pet.name}" class="sos-marker-img" />`
+        : `<span class="sos-marker-emoji">🐾</span>`;
+
+      const icon = L.divIcon({
+        className: 'sos-marker',
+        html: `<div class="sos-marker-inner">${imgHtml}</div><div class="sos-pulse-ring"></div>`,
+        iconSize: [52, 52],
+        iconAnchor: [26, 26],
+      });
+
+      const marker = L.marker([pet.lastSeenLat, pet.lastSeenLng], { icon });
+      marker.on('click', () => {
+        this.selectedLostPet.set(pet);
+        this.isLostPetSheetOpen.set(true);
+      });
+      this.lostPetsLayer.addLayer(marker);
+    });
+  }
+
   private loadPins(): void {
     this.isLoadingPins.set(true);
 
@@ -398,19 +449,28 @@ export class MapDashboardComponent implements OnInit, OnDestroy, AfterViewInit {
     });
   }
 
+  private readonly pawIcon = L.divIcon({
+    className: 'paw-marker',
+    html: `<div class="paw-marker-inner">🐾</div>`,
+    iconSize: [40, 40],
+    iconAnchor: [20, 40],
+    popupAnchor: [0, -40],
+  });
+
+  private readonly storeIcon = L.divIcon({
+    className: 'store-marker',
+    html: `<div class="store-marker-inner">🏪</div>`,
+    iconSize: [40, 40],
+    iconAnchor: [20, 40],
+    popupAnchor: [0, -40],
+  });
+
   private renderMarkers(pins: MapPin[]): void {
     this.markersLayer.clearLayers();
 
-    const pawIcon = L.divIcon({
-      className: 'paw-marker',
-      html: `<div class="paw-marker-inner">🐾</div>`,
-      iconSize: [40, 40],
-      iconAnchor: [20, 40],
-      popupAnchor: [0, -40],
-    });
-
     pins.forEach((pin) => {
-      const marker = L.marker([pin.latitude, pin.longitude], { icon: pawIcon });
+      const icon = pin.providerType === 'Business' ? this.storeIcon : this.pawIcon;
+      const marker = L.marker([pin.latitude, pin.longitude], { icon });
 
       marker.on('click', () => {
         this.selectedPin.set(pin);

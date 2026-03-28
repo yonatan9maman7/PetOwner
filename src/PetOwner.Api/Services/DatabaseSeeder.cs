@@ -154,7 +154,7 @@ public class DatabaseSeeder
                     UserId = id,
                     Bio = fakerEn.Lorem.Paragraph(),
                     ProfileImageUrl = $"https://api.dicebear.com/9.x/avataaars/svg?seed={seed}",
-                    Status = "Approved",
+                    Status = ProviderStatus.Approved,
                     IsAvailableNow = faker.Random.Bool(0.8f),
                     City = faker.PickRandom(IsraeliCities),
                     Street = faker.Address.StreetName(),
@@ -388,7 +388,7 @@ public class DatabaseSeeder
                 {
                     UserId = userId,
                     Bio = faker.PickRandom(DogLoverBios),
-                    Status = "Approved",
+                    Status = ProviderStatus.Approved,
                     IsAvailableNow = isAvailable,
                     City = faker.Address.City(),
                     Street = faker.Address.StreetName(),
@@ -489,7 +489,6 @@ public class DatabaseSeeder
 
         var eligibleIds = await _db.Users
             .AsNoTracking()
-            .Where(u => u.Role != "Provider" && u.Role != "Admin")
             .Where(u => !_db.Pets.Any(p => p.UserId == u.Id))
             .OrderBy(u => u.CreatedAt)
             .Select(u => u.Id)

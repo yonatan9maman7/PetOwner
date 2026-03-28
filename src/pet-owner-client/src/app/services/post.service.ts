@@ -15,6 +15,7 @@ export interface Post {
   authorRole: string;
   authorIsApprovedProvider: boolean;
   communityGroupId: string | null;
+  category: string | null;
 }
 
 export interface PostComment {
@@ -40,9 +41,10 @@ export interface GeoFilter {
 export class PostService {
   private readonly http = inject(HttpClient);
 
-  getFeed(page = 1, groupId?: string | null, geo?: GeoFilter): Observable<Post[]> {
+  getFeed(page = 1, groupId?: string | null, geo?: GeoFilter, category?: string | null): Observable<Post[]> {
     let params = new HttpParams().set('page', page);
     if (groupId) params = params.set('groupId', groupId);
+    if (category) params = params.set('category', category);
     if (geo) {
       params = params
         .set('lat', geo.lat)

@@ -10,7 +10,11 @@ public record MapPinDto(
     string Services,
     decimal? AverageRating,
     int ReviewCount,
-    bool AcceptsOffHoursRequests);
+    bool AcceptsOffHoursRequests,
+    string ProviderType,
+    string? WhatsAppNumber,
+    string? WebsiteUrl,
+    bool IsEmergencyService);
 
 public record ProviderPublicProfileDto(
     Guid ProviderId,
@@ -24,7 +28,12 @@ public record ProviderPublicProfileDto(
     bool AcceptsOffHoursRequests,
     List<string> Services,
     List<PublicAvailabilitySlotDto> AvailabilitySlots,
-    List<ReviewDto> RecentReviews
+    List<ReviewDto> RecentReviews,
+    string ProviderType,
+    string? WhatsAppNumber,
+    string? WebsiteUrl,
+    string? OpeningHours,
+    bool IsEmergencyService
 );
 
 public record PublicAvailabilitySlotDto(int DayOfWeek, string StartTime, string EndTime);

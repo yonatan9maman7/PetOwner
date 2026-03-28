@@ -19,7 +19,8 @@ public record PostDto(
     bool LikedByMe,
     DateTime CreatedAt,
     string AuthorRole,
-    bool AuthorIsApprovedProvider
+    bool AuthorIsApprovedProvider,
+    string? Category = null
 );
 
 public record CreateCommentDto(string Content);

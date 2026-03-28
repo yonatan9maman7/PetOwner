@@ -7,6 +7,7 @@ import { TranslatePipe } from '@ngx-translate/core';
 import { AuthService } from './services/auth.service';
 import { ProviderService } from './services/provider.service';
 import { NotificationService, AppNotification } from './services/notification.service';
+import { ChatService } from './services/chat.service';
 import { LanguageService } from './services/language.service';
 import { FavoriteService } from './services/favorite.service';
 import { ToastContainerComponent } from './shared/toast-container.component';
@@ -32,6 +33,7 @@ export class AppComponent {
   readonly auth = inject(AuthService);
   readonly providerService = inject(ProviderService);
   readonly notificationService = inject(NotificationService);
+  readonly chatService = inject(ChatService);
   readonly language = inject(LanguageService);
   private readonly favoriteService = inject(FavoriteService);
 
@@ -99,10 +101,15 @@ export class AppComponent {
           next: (list) => this.notificationService.notifications.set(list),
         });
 
+        this.chatService.stopConnection();
+        this.chatService.startConnection();
+        this.chatService.loadConversations().subscribe();
+
         this.providerService.getMe().subscribe();
         this.favoriteService.loadFavoriteIds();
       } else {
         this.notificationService.stopConnection();
+        this.chatService.stopConnection();
         this.providerService.providerStatus.set(null);
       }
     },
@@ -143,7 +150,10 @@ export class AppComponent {
     if (!n.isRead) {
       this.notificationService.markAsRead(n.id).subscribe();
     }
-    if (n.referenceId) {
+    if (n.type === 'sos' && n.relatedEntityId) {
+      this.router.navigate(['/community'], { queryParams: { highlightPost: n.relatedEntityId } });
+      this.showNotificationPanel.set(false);
+    } else if (n.relatedEntityId) {
       this.router.navigate(['/requests']);
       this.showNotificationPanel.set(false);
     }
@@ -155,6 +165,7 @@ export class AppComponent {
 
   logout(): void {
     this.notificationService.stopConnection();
+    this.chatService.stopConnection();
     this.auth.logout();
   }
 }

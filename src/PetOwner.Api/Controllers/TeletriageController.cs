@@ -124,7 +124,7 @@ public class TeletriageController : ControllerBase
                 l.GeoLocation != null &&
                 l.User != null &&
                 l.User.ProviderProfile != null &&
-                l.User.ProviderProfile.Status == "Approved")
+                l.User.ProviderProfile.Status == ProviderStatus.Approved)
             .OrderBy(l => l.GeoLocation!.Distance(userPoint))
             .Take(Math.Min(maxResults, 10))
             .Select(l => new NearbyVetDto(

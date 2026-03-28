@@ -8,11 +8,13 @@ public class SmtpEmailService : IEmailService
 {
     private readonly EmailSettings _settings;
     private readonly ILogger<SmtpEmailService> _logger;
+    private readonly IWebHostEnvironment _env;
 
-    public SmtpEmailService(IOptions<EmailSettings> settings, ILogger<SmtpEmailService> logger)
+    public SmtpEmailService(IOptions<EmailSettings> settings, ILogger<SmtpEmailService> logger, IWebHostEnvironment env)
     {
         _settings = settings.Value;
         _logger = logger;
+        _env = env;
     }
 
     public async Task SendEmailAsync(string to, string subject, string body)
@@ -50,6 +52,12 @@ public class SmtpEmailService : IEmailService
         _logger.LogInformation(
             "Welcome email for {Email} (lang={Language}):\nSubject: {Subject}\nBody:\n{Body}",
             email, language, subject, body);
+
+        if (_env.IsDevelopment())
+        {
+            _logger.LogInformation("Development mode — skipping actual send of welcome email to {Email}", email);
+            return;
+        }
 
         await SendEmailAsync(email, subject, body);
     }

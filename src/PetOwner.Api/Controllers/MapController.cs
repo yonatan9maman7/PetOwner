@@ -5,6 +5,7 @@ using PetOwner.Api.DTOs;
 using PetOwner.Api.Infrastructure;
 using PetOwner.Api.Services;
 using PetOwner.Data;
+using PetOwner.Data.Models;
 
 namespace PetOwner.Api.Controllers;
 
@@ -47,7 +48,7 @@ public class MapController : ControllerBase
     {
         var provider = await _db.Users
             .AsNoTracking()
-            .Where(u => u.Id == providerId && u.ProviderProfile != null && u.ProviderProfile.Status == "Approved")
+            .Where(u => u.Id == providerId && u.ProviderProfile != null && u.ProviderProfile.Status == ProviderStatus.Approved)
             .Select(u => new ProviderPublicProfileDto(
                 u.Id,
                 u.Name,
@@ -84,7 +85,12 @@ public class MapController : ControllerBase
                         r.ReliabilityRating,
                         r.PhotoUrl,
                         r.CreatedAt))
-                    .ToList()))
+                    .ToList(),
+                u.ProviderProfile.Type.ToString(),
+                u.ProviderProfile.WhatsAppNumber,
+                u.ProviderProfile.WebsiteUrl,
+                u.ProviderProfile.OpeningHours,
+                u.ProviderProfile.IsEmergencyService))
             .FirstOrDefaultAsync();
 
         if (provider is null)
@@ -106,8 +112,8 @@ public class MapController : ControllerBase
                 u.ProviderProfile != null ? u.ProviderProfile.Bio : null,
                 u.Role,
                 u.CreatedAt,
-                u.ProviderProfile != null && u.ProviderProfile.Status == "Approved",
-                u.ProviderProfile != null && u.ProviderProfile.Status == "Approved"
+                u.ProviderProfile != null && u.ProviderProfile.Status == ProviderStatus.Approved,
+                u.ProviderProfile != null && u.ProviderProfile.Status == ProviderStatus.Approved
                     ? u.ProviderProfile.ProviderServices.Select(ps => ps.Service.Name).ToList()
                     : null,
                 u.ProviderProfile != null ? u.ProviderProfile.AverageRating : null,
@@ -127,7 +133,7 @@ public class MapController : ControllerBase
     {
         var phone = await _db.Users
             .AsNoTracking()
-            .Where(u => u.Id == providerId && u.ProviderProfile != null && u.ProviderProfile.Status == "Approved")
+            .Where(u => u.Id == providerId && u.ProviderProfile != null && u.ProviderProfile.Status == ProviderStatus.Approved)
             .Select(u => u.Phone)
             .FirstOrDefaultAsync();
 

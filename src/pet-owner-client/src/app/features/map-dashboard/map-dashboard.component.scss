@@ -55,6 +55,35 @@
   font-size: 0;
 }
 
+::ng-deep .store-marker {
+  background: transparent !important;
+  border: none !important;
+}
+
+::ng-deep .store-marker-inner {
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  background: white;
+  border-radius: 50% 50% 50% 0;
+  transform: rotate(-45deg);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+  border: 2px solid #10b981;
+  line-height: 1;
+
+  &::before {
+    content: '🏪';
+    display: block;
+    transform: rotate(45deg);
+    font-size: 20px;
+  }
+
+  font-size: 0;
+}
+
 .scrollbar-hide {
   -ms-overflow-style: none;
   scrollbar-width: none;
@@ -160,5 +189,69 @@
   to {
     opacity: 1;
     transform: translateY(0) scale(1);
+  }
+}
+
+// ── SOS / Lost Pet Markers ──
+
+::ng-deep .sos-marker {
+  background: transparent !important;
+  border: none !important;
+  position: relative;
+}
+
+::ng-deep .sos-marker-inner {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  overflow: hidden;
+  border: 3px solid #ef4444;
+  background: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  z-index: 2;
+  box-shadow: 0 2px 8px rgba(239, 68, 68, 0.4);
+}
+
+::ng-deep .sos-marker-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+::ng-deep .sos-marker-emoji {
+  font-size: 20px;
+  line-height: 1;
+}
+
+::ng-deep .sos-pulse-ring {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 52px;
+  height: 52px;
+  margin-top: -26px;
+  margin-left: -26px;
+  border-radius: 50%;
+  border: 3px solid #ef4444;
+  z-index: 1;
+  animation: sosPulseRing 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  pointer-events: none;
+}
+
+@keyframes sosPulseRing {
+  0% {
+    transform: scale(1);
+    opacity: 0.7;
+  }
+  70% {
+    transform: scale(1.8);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(1.8);
+    opacity: 0;
   }
 }

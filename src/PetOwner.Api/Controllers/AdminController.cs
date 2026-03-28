@@ -15,21 +15,35 @@ public class AdminController : ControllerBase
 {
     private readonly ApplicationDbContext _db;
     private readonly DatabaseSeeder _seeder;
+    private readonly INotificationService _notifications;
+    // private readonly IEmailService _emailService;
     private const decimal PlatformFeePercent = 0.10m;
 
-    public AdminController(ApplicationDbContext db, DatabaseSeeder seeder)
+    public AdminController(
+        ApplicationDbContext db,
+        DatabaseSeeder seeder,
+        INotificationService notifications
+        // IEmailService emailService
+    )
     {
         _db = db;
         _seeder = seeder;
+        _notifications = notifications;
+        // _emailService = emailService;
     }
 
     [HttpGet("stats")]
     public async Task<IActionResult> GetStats()
     {
         var totalUsers = await _db.Users.CountAsync();
+        var totalPets = await _db.Pets.CountAsync();
         var totalProviders = await _db.ProviderProfiles
-            .CountAsync(p => p.Status == "Approved");
+            .CountAsync(p => p.Status == ProviderStatus.Approved);
         var totalBookings = await _db.Bookings.CountAsync();
+        var activeSOSReports = await _db.Pets
+            .CountAsync(p => p.IsLost);
+        var pendingProviders = await _db.ProviderProfiles
+            .CountAsync(p => p.Status == ProviderStatus.Pending);
 
         var revenueBookings = await _db.Bookings
             .Where(b => b.Status == BookingStatus.Completed ||
@@ -39,8 +53,11 @@ public class AdminController : ControllerBase
         return Ok(new AdminStatsDto
         {
             TotalUsers = totalUsers,
+            TotalPets = totalPets,
             TotalProviders = totalProviders,
             TotalBookings = totalBookings,
+            ActiveSOSReports = activeSOSReports,
+            PendingProviders = pendingProviders,
             TotalPlatformRevenue = revenueBookings * PlatformFeePercent
         });
     }
@@ -60,11 +77,45 @@ public class AdminController : ControllerBase
                 Role = u.Role,
                 CreatedAt = u.CreatedAt,
                 IsActive = u.IsActive,
-                ProviderStatus = u.ProviderProfile != null ? u.ProviderProfile.Status : null
+                ProviderStatus = u.ProviderProfile != null
+                    ? (u.ProviderProfile.IsSuspended ? "Suspended" : u.ProviderProfile.Status.ToString())
+                    : null,
+                ProviderType = u.ProviderProfile != null
+                    ? u.ProviderProfile.Type.ToString()
+                    : null,
+                WhatsAppNumber = u.ProviderProfile != null
+                    ? u.ProviderProfile.WhatsAppNumber
+                    : null,
+                WebsiteUrl = u.ProviderProfile != null
+                    ? u.ProviderProfile.WebsiteUrl
+                    : null
             })
             .ToListAsync();
 
         return Ok(users);
+    }
+
+    [HttpPatch("users/{id:guid}/role")]
+    public async Task<IActionResult> UpdateUserRole(Guid id, [FromBody] UpdateRoleRequest request)
+    {
+        var allowedRoles = new[] { "Owner", "Provider", "Admin" };
+        if (!allowedRoles.Contains(request.Role))
+            return BadRequest(new { message = $"Invalid role. Allowed: {string.Join(", ", allowedRoles)}" });
+
+        var user = await _db.Users
+            .Include(u => u.ProviderProfile)
+            .FirstOrDefaultAsync(u => u.Id == id);
+
+        if (user is null)
+            return NotFound(new { message = "User not found." });
+
+        if (request.Role == "Provider" && user.ProviderProfile is null)
+            return BadRequest(new { message = "Cannot promote to Provider without a business profile." });
+
+        user.Role = request.Role;
+        await _db.SaveChangesAsync();
+
+        return Ok(new { message = $"User role updated to {request.Role}.", role = request.Role });
     }
 
     [HttpPut("users/{id:guid}/toggle-status")]
@@ -108,7 +159,7 @@ public class AdminController : ControllerBase
     public async Task<IActionResult> GetPendingProviders()
     {
         var pending = await _db.ProviderProfiles
-            .Where(p => p.Status == "Pending")
+            .Where(p => p.Status == ProviderStatus.Pending)
             .Include(p => p.User)
             .Include(p => p.ProviderServices)
                 .ThenInclude(ps => ps.Service)
@@ -118,6 +169,14 @@ public class AdminController : ControllerBase
                 p.UserId,
                 p.User.Name,
                 p.User.Phone,
+                ProviderType = p.Type.ToString(),
+                p.BusinessName,
+                p.PhoneNumber,
+                p.WhatsAppNumber,
+                p.WebsiteUrl,
+                p.OpeningHours,
+                p.IsEmergencyService,
+                p.Description,
                 p.Bio,
                 ServiceRates = p.ServiceRates.Select(r => new { r.Service, r.Rate, r.Unit }).ToList(),
                 p.ProfileImageUrl,
@@ -125,6 +184,8 @@ public class AdminController : ControllerBase
                 Address = p.Street + " " + p.BuildingNumber
                     + (p.ApartmentNumber != null ? ", Apt " + p.ApartmentNumber : "")
                     + ", " + p.City,
+                p.Latitude,
+                p.Longitude,
                 Services = p.ProviderServices.Select(ps => ps.Service.Name).ToList(),
                 p.ReferenceName,
                 p.ReferenceContact,
@@ -142,10 +203,10 @@ public class AdminController : ControllerBase
         if (profile is null)
             return NotFound(new { message = "Provider not found." });
 
-        if (profile.Status == "Approved")
+        if (profile.Status == ProviderStatus.Approved)
             return BadRequest(new { message = "Provider is already approved." });
 
-        profile.Status = "Approved";
+        profile.Status = ProviderStatus.Approved;
 
         var user = await _db.Users.FindAsync(providerId);
         if (user is not null)
@@ -169,16 +230,133 @@ public class AdminController : ControllerBase
         if (user.ProviderProfile is null)
             return BadRequest(new { message = "User is not a provider." });
 
-        if (user.ProviderProfile.Status == "Revoked")
+        if (user.ProviderProfile.Status == ProviderStatus.Revoked)
             return BadRequest(new { message = "Provider status is already revoked." });
 
-        user.ProviderProfile.Status = "Revoked";
+        user.ProviderProfile.Status = ProviderStatus.Revoked;
         user.ProviderProfile.IsAvailableNow = false;
         user.Role = "Owner";
 
         await _db.SaveChangesAsync();
 
         return Ok(new { message = "Sitter status revoked successfully." });
+    }
+
+    [HttpPost("providers/{id:guid}/suspend")]
+    public async Task<IActionResult> SuspendProvider(Guid id, [FromBody] SuspendProviderRequest? request)
+    {
+        var user = await _db.Users
+            .Include(u => u.ProviderProfile)
+            .FirstOrDefaultAsync(u => u.Id == id);
+
+        if (user is null)
+            return NotFound(new { message = "User not found." });
+
+        if (user.ProviderProfile is null)
+            return BadRequest(new { message = "User is not a provider." });
+
+        if (user.ProviderProfile.IsSuspended)
+            return BadRequest(new { message = "Provider is already suspended." });
+
+        user.ProviderProfile.IsSuspended = true;
+        user.ProviderProfile.SuspensionReason = request?.Reason;
+        user.ProviderProfile.IsAvailableNow = false;
+        user.Role = "Owner";
+
+        await _db.SaveChangesAsync();
+
+        await _notifications.CreateAsync(
+            user.Id,
+            "Admin",
+            "Account Suspended",
+            request?.Reason is not null
+                ? $"Your provider account has been suspended. Reason: {request.Reason}"
+                : "Your provider account has been suspended. Please contact support for details.");
+
+        // TODO: Enable email notification once email templates are finalized
+        // await _emailService.SendEmailAsync(
+        //     user.Email,
+        //     "Account Suspended",
+        //     $"Dear {user.Name}, your provider account on PetOwner has been suspended. " +
+        //     $"Reason: {request?.Reason ?? "Policy violation"}. " +
+        //     "If you believe this is an error, please contact our support team.");
+
+        return Ok(new { message = "Provider suspended successfully." });
+    }
+
+    [HttpPost("providers/{id:guid}/ban")]
+    public async Task<IActionResult> BanProvider(Guid id)
+    {
+        var user = await _db.Users
+            .Include(u => u.ProviderProfile)
+                .ThenInclude(p => p!.ServiceRates)
+            .Include(u => u.ProviderProfile)
+                .ThenInclude(p => p!.ProviderServices)
+            .Include(u => u.ProviderProfile)
+                .ThenInclude(p => p!.AvailabilitySlots)
+            .FirstOrDefaultAsync(u => u.Id == id);
+
+        if (user is null)
+            return NotFound(new { message = "User not found." });
+
+        if (user.ProviderProfile is null)
+            return BadRequest(new { message = "User is not a provider." });
+
+        _db.ProviderServiceRates.RemoveRange(user.ProviderProfile.ServiceRates);
+        _db.ProviderServices.RemoveRange(user.ProviderProfile.ProviderServices);
+        _db.AvailabilitySlots.RemoveRange(user.ProviderProfile.AvailabilitySlots);
+        _db.ProviderProfiles.Remove(user.ProviderProfile);
+
+        user.Role = "Owner";
+
+        await _db.SaveChangesAsync();
+
+        await _notifications.CreateAsync(
+            user.Id,
+            "Admin",
+            "Provider Account Banned",
+            "Your provider account has been permanently removed from the platform due to policy violations.");
+
+        // TODO: Enable email notification once email templates are finalized
+        // await _emailService.SendEmailAsync(
+        //     user.Email,
+        //     "Provider Account Banned",
+        //     $"Dear {user.Name}, your provider account on PetOwner has been permanently banned. " +
+        //     "Your provider profile and all associated data have been removed. " +
+        //     "If you believe this is an error, please contact our support team.");
+
+        return Ok(new { message = "Provider banned and profile deleted." });
+    }
+
+    [HttpPost("providers/{id:guid}/reactivate")]
+    public async Task<IActionResult> ReactivateProvider(Guid id)
+    {
+        var user = await _db.Users
+            .Include(u => u.ProviderProfile)
+            .FirstOrDefaultAsync(u => u.Id == id);
+
+        if (user is null)
+            return NotFound(new { message = "User not found." });
+
+        if (user.ProviderProfile is null)
+            return BadRequest(new { message = "User is not a provider." });
+
+        if (!user.ProviderProfile.IsSuspended)
+            return BadRequest(new { message = "Provider is not suspended." });
+
+        user.ProviderProfile.IsSuspended = false;
+        user.ProviderProfile.SuspensionReason = null;
+        user.Role = "Provider";
+
+        await _db.SaveChangesAsync();
+
+        await _notifications.CreateAsync(
+            user.Id,
+            "Admin",
+            "Account Reactivated",
+            "Your provider account has been reactivated. You can now accept bookings again.");
+
+        return Ok(new { message = "Provider reactivated successfully." });
     }
 
     [HttpPost("seed-dummy-data")]
@@ -198,5 +376,87 @@ public class AdminController : ControllerBase
     {
         var count = await _seeder.SeedBogusPetsForUsersWithoutPetsAsync();
         return Ok(new { message = count == 0 ? "No eligible users without pets." : $"Seeded {count} bogus pets.", count });
+    }
+
+    [HttpGet("pets")]
+    public async Task<IActionResult> GetPets()
+    {
+        var pets = await _db.Pets
+            .Include(p => p.User)
+            .OrderByDescending(p => p.Id)
+            .Select(p => new AdminPetDto
+            {
+                Id = p.Id,
+                Name = p.Name,
+                Breed = p.Breed,
+                Species = p.Species.ToString(),
+                Age = p.Age,
+                ImageUrl = p.ImageUrl,
+                OwnerName = p.User.Name,
+                OwnerEmail = p.User.Email,
+                OwnerId = p.UserId
+            })
+            .ToListAsync();
+
+        return Ok(pets);
+    }
+
+    [HttpDelete("pets/{id:guid}")]
+    public async Task<IActionResult> AdminDeletePet(Guid id)
+    {
+        var pet = await _db.Pets
+            .Include(p => p.MedicalRecords)
+            .Include(p => p.TeletriageSessions)
+            .Include(p => p.Activities)
+            .FirstOrDefaultAsync(p => p.Id == id);
+
+        if (pet is null)
+            return NotFound(new { message = "Pet not found." });
+
+        _db.MedicalRecords.RemoveRange(pet.MedicalRecords);
+        _db.TeletriageSessions.RemoveRange(pet.TeletriageSessions);
+        _db.Activities.RemoveRange(pet.Activities);
+        _db.Pets.Remove(pet);
+        await _db.SaveChangesAsync();
+
+        return Ok(new { message = $"Pet '{pet.Name}' deleted successfully." });
+    }
+
+    [HttpPost("providers/{id:guid}/approve")]
+    public async Task<IActionResult> ApproveProviderPost(Guid id)
+    {
+        var profile = await _db.ProviderProfiles.FindAsync(id);
+
+        if (profile is null)
+            return NotFound(new { message = "Provider not found." });
+
+        if (profile.Status == ProviderStatus.Approved)
+            return BadRequest(new { message = "Provider is already approved." });
+
+        profile.Status = ProviderStatus.Approved;
+
+        var user = await _db.Users.FindAsync(id);
+        if (user is not null)
+            user.Role = "Provider";
+
+        await _db.SaveChangesAsync();
+
+        return Ok(new { message = "Provider approved successfully." });
+    }
+
+    [HttpPost("clear-sos")]
+    public async Task<IActionResult> ClearAllSOSReports()
+    {
+        var sosReports = await _db.TeletriageSessions
+            .Where(t => t.IsEmergency)
+            .ToListAsync();
+
+        if (sosReports.Count == 0)
+            return Ok(new { message = "No active SOS reports to clear.", count = 0 });
+
+        _db.TeletriageSessions.RemoveRange(sosReports);
+        await _db.SaveChangesAsync();
+
+        return Ok(new { message = $"Cleared {sosReports.Count} SOS reports.", count = sosReports.Count });
     }
 }

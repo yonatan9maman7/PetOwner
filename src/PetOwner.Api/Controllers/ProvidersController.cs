@@ -19,17 +19,139 @@ public class ProvidersController : ControllerBase
     private readonly IBlobService _blobService;
     private readonly IGeminiAiService _aiService;
     private readonly ITokenService _tokenService;
+    private readonly INotificationService _notifications;
 
     public ProvidersController(
         ApplicationDbContext db,
         IBlobService blobService,
         IGeminiAiService aiService,
-        ITokenService tokenService)
+        ITokenService tokenService,
+        INotificationService notifications)
     {
         _db = db;
         _blobService = blobService;
         _aiService = aiService;
         _tokenService = tokenService;
+        _notifications = notifications;
+    }
+
+    [Authorize]
+    [HttpPost("apply")]
+    public async Task<IActionResult> Apply([FromBody] ProviderApplicationRequest request)
+    {
+        var userId = GetUserId();
+
+        if (request.Type == ProviderType.Business)
+        {
+            if (string.IsNullOrWhiteSpace(request.BusinessName))
+                return BadRequest(new { message = "BusinessName is required for Business providers." });
+            if (string.IsNullOrWhiteSpace(request.City) || string.IsNullOrWhiteSpace(request.Street) || string.IsNullOrWhiteSpace(request.BuildingNumber))
+                return BadRequest(new { message = "Full address (City, Street, BuildingNumber) is required for Business providers." });
+        }
+
+        var existingProfile = await _db.ProviderProfiles
+            .AnyAsync(p => p.UserId == userId);
+
+        if (existingProfile)
+            return BadRequest(new { message = "You already have a provider application on file." });
+
+        var user = await _db.Users.FirstOrDefaultAsync(u => u.Id == userId);
+        if (user is null)
+            return NotFound(new { message = "User not found or invalid token." });
+
+        var displayName = request.Type == ProviderType.Business
+            ? request.BusinessName!.Trim()
+            : user.Name;
+
+        var profile = new ProviderProfile
+        {
+            UserId = userId,
+            Type = request.Type,
+            BusinessName = request.Type == ProviderType.Business
+                ? request.BusinessName!.Trim()
+                : null,
+            ServiceType = request.ServiceType,
+            PhoneNumber = request.PhoneNumber.Trim(),
+            WhatsAppNumber = request.WhatsAppNumber?.Trim(),
+            WebsiteUrl = request.WebsiteUrl?.Trim(),
+            OpeningHours = request.OpeningHours?.Trim(),
+            IsEmergencyService = request.IsEmergencyService,
+            Description = request.Description.Trim(),
+            ProfileImageUrl = request.ImageUrl?.Trim(),
+            Status = ProviderStatus.Pending,
+            IsAvailableNow = false,
+            ReferenceName = request.ReferenceName?.Trim(),
+            ReferenceContact = request.ReferenceContact?.Trim(),
+            City = request.City.Trim(),
+            Street = request.Street.Trim(),
+            BuildingNumber = request.BuildingNumber.Trim(),
+            ApartmentNumber = string.IsNullOrWhiteSpace(request.ApartmentNumber)
+                ? null
+                : request.ApartmentNumber.Trim(),
+            Latitude = request.Latitude,
+            Longitude = request.Longitude,
+        };
+
+        _db.ProviderProfiles.Add(profile);
+
+        var location = new PetOwner.Data.Models.Location
+        {
+            UserId = userId,
+            GeoLocation = new Point(request.Longitude, request.Latitude) { SRID = 4326 },
+        };
+
+        _db.Locations.Add(location);
+
+        foreach (var svcRate in request.SelectedServices)
+        {
+            _db.ProviderServiceRates.Add(new ProviderServiceRate
+            {
+                ProviderProfileId = userId,
+                Service = svcRate.ServiceType,
+                Rate = svcRate.Rate,
+                Unit = svcRate.PricingUnit,
+            });
+
+            if (!ServiceTypeCatalog.TryGetDisplayName(svcRate.ServiceType, out var serviceName))
+                continue;
+
+            var service = await _db.Services
+                .FirstOrDefaultAsync(s => s.Name == serviceName);
+
+            if (service is null)
+            {
+                service = new Service { Name = serviceName, Category = "PetCare" };
+                _db.Services.Add(service);
+                await _db.SaveChangesAsync();
+            }
+
+            _db.ProviderServices.Add(new ProviderService
+            {
+                ProviderId = userId,
+                ServiceId = service.Id,
+            });
+        }
+
+        await _db.SaveChangesAsync();
+
+        var admins = await _db.Users
+            .Where(u => u.Role == "Admin")
+            .Select(u => u.Id)
+            .ToListAsync();
+
+        foreach (var adminId in admins)
+        {
+            await _notifications.CreateAsync(
+                adminId,
+                "ProviderApplication",
+                "New Provider Application",
+                $"{displayName} has submitted a provider application ({request.Type}). Review it in the admin panel.",
+                userId);
+        }
+
+        return Ok(new ProviderApplicationResponse(
+            "Application submitted successfully. You will be notified once reviewed.",
+            userId));
     }
 
     [Authorize]
@@ -54,7 +176,7 @@ public class ProvidersController : ControllerBase
         {
             UserId = userId,
             Bio = request.Bio,
-            Status = "Pending",
+            Status = ProviderStatus.Pending,
             IsAvailableNow = false,
             ReferenceName = request.ReferenceName.Trim(),
             ReferenceContact = request.ReferenceContact.Trim(),
@@ -335,6 +457,14 @@ public class ProvidersController : ControllerBase
         using var stream = file.OpenReadStream();
         var result = await _blobService.UploadAsync(stream, file.FileName, "profiles", generateThumbnail: true);
 
+        var userId = GetUserId();
+        var profile = await _db.ProviderProfiles.FirstOrDefaultAsync(p => p.UserId == userId);
+        if (profile is not null)
+        {
+            profile.ProfileImageUrl = result.Url;
+            await _db.SaveChangesAsync();
+        }
+
         return Ok(new { Url = result.Url, ThumbnailUrl = result.ThumbnailUrl });
     }
 
@@ -360,7 +490,7 @@ public class ProvidersController : ControllerBase
             .FirstOrDefaultAsync(l => l.UserId == userId);
 
         return Ok(new ProviderMeResponse(
-            profile.Status,
+            profile.Status.ToString(),
             profile.IsAvailableNow,
             profile.User.Name,
             profile.Bio,
@@ -376,7 +506,14 @@ public class ProvidersController : ControllerBase
             profile.ProfileImageUrl,
             profile.AverageRating,
             profile.ReviewCount,
-            profile.AcceptsOffHoursRequests
+            profile.AcceptsOffHoursRequests,
+            profile.IsSuspended,
+            profile.SuspensionReason,
+            profile.Type.ToString(),
+            profile.WhatsAppNumber,
+            profile.WebsiteUrl,
+            profile.OpeningHours,
+            profile.IsEmergencyService
         ));
     }
 
@@ -462,7 +599,7 @@ public class ProvidersController : ControllerBase
     {
         var userId = GetUserId();
         var profile = await _db.ProviderProfiles.AsNoTracking()
-            .FirstOrDefaultAsync(p => p.UserId == userId && p.Status == "Approved");
+            .FirstOrDefaultAsync(p => p.UserId == userId && p.Status == ProviderStatus.Approved);
         if (profile is null)
             return NotFound(new { message = "Provider profile not found." });
 

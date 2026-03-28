@@ -1,3 +1,5 @@
+export type ProviderType = 'Individual' | 'Business';
+
 export interface MapPin {
   providerId: string;
   name: string;
@@ -10,4 +12,7 @@ export interface MapPin {
   averageRating: number | null;
   reviewCount: number;
   acceptsOffHoursRequests: boolean;
+  providerType?: ProviderType;
+  whatsapp?: string;
+  website?: string;
 }

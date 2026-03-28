@@ -34,6 +34,8 @@ public class ApplicationDbContext : DbContext
     public DbSet<GroupPostLike> GroupPostLikes => Set<GroupPostLike>();
     public DbSet<GroupPostComment> GroupPostComments => Set<GroupPostComment>();
     public DbSet<FavoriteProvider> FavoriteProviders => Set<FavoriteProvider>();
+    public DbSet<Vaccination> Vaccinations => Set<Vaccination>();
+    public DbSet<WeightLog> WeightLogs => Set<WeightLog>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -60,6 +62,8 @@ public class ApplicationDbContext : DbContext
         ConfigureCommunityGroup(modelBuilder);
         ConfigureGroupPost(modelBuilder);
         ConfigureFavoriteProvider(modelBuilder);
+        ConfigureVaccination(modelBuilder);
+        ConfigureWeightLog(modelBuilder);
     }
 
     private static void ConfigureUser(ModelBuilder modelBuilder)
@@ -116,9 +120,44 @@ public class ApplicationDbContext : DbContext
         {
             entity.HasKey(p => p.UserId);
 
-            entity.Property(p => p.Status)
+            entity.Ignore(p => p.IsApproved);
+
+            entity.Property(p => p.Type)
+                .IsRequired()
+                .HasConversion<string>()
                 .HasMaxLength(20)
-                .HasDefaultValue("Pending");
+                .HasDefaultValue(ProviderType.Individual);
+
+            entity.Property(p => p.BusinessName)
+                .HasMaxLength(200);
+
+            entity.Property(p => p.ServiceType)
+                .HasConversion<string>()
+                .HasMaxLength(50);
+
+            entity.Property(p => p.PhoneNumber)
+                .HasMaxLength(20);
+
+            entity.Property(p => p.WhatsAppNumber)
+                .HasMaxLength(20);
+
+            entity.Property(p => p.WebsiteUrl)
+                .HasMaxLength(500);
+
+            entity.Property(p => p.OpeningHours)
+                .HasMaxLength(2000);
+
+            entity.Property(p => p.IsEmergencyService)
+                .HasDefaultValue(false);
+
+            entity.Property(p => p.Description)
+                .HasMaxLength(2000);
+
+            entity.Property(p => p.Status)
+                .IsRequired()
+                .HasConversion<string>()
+                .HasMaxLength(20)
+                .HasDefaultValue(ProviderStatus.Pending);
 
             entity.Property(p => p.IsAvailableNow)
                 .HasDefaultValue(false);
@@ -286,6 +325,17 @@ public class ApplicationDbContext : DbContext
 
             entity.Property(p => p.VetPhone)
                 .HasMaxLength(30);
+
+            entity.Property(p => p.IsLost)
+                .HasDefaultValue(false);
+
+            entity.Property(p => p.LastSeenLocation)
+                .HasMaxLength(500);
+
+            entity.Property(p => p.ContactPhone)
+                .HasMaxLength(30);
+
+            entity.Property(p => p.CommunityPostId);
 
             entity.HasOne(p => p.User)
                 .WithMany(u => u.Pets)
@@ -606,6 +656,7 @@ public class ApplicationDbContext : DbContext
             entity.Property(p => p.CreatedAt).HasDefaultValueSql("GETUTCDATE()");
 
             entity.Property(p => p.City).HasMaxLength(100);
+            entity.Property(p => p.Category).HasMaxLength(50);
 
             entity.HasOne(p => p.User)
                 .WithMany(u => u.Posts)
@@ -905,6 +956,66 @@ public class ApplicationDbContext : DbContext
                 .WithMany()
                 .HasForeignKey(f => f.ProviderProfileId)
                 .OnDelete(DeleteBehavior.Restrict);
+        });
+    }
+
+    private static void ConfigureVaccination(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<Vaccination>(entity =>
+        {
+            entity.HasKey(v => v.Id);
+
+            entity.Property(v => v.Id)
+                .HasDefaultValueSql("NEWSEQUENTIALID()");
+
+            entity.Property(v => v.VaccineName)
+                .IsRequired()
+                .HasConversion<string>()
+                .HasMaxLength(30);
+
+            entity.Property(v => v.DateAdministered)
+                .IsRequired();
+
+            entity.Property(v => v.Notes)
+                .HasMaxLength(1000);
+
+            entity.Property(v => v.CreatedAt)
+                .HasDefaultValueSql("GETUTCDATE()");
+
+            entity.HasIndex(v => new { v.PetId, v.VaccineName });
+
+            entity.HasOne(v => v.Pet)
+                .WithMany(p => p.Vaccinations)
+                .HasForeignKey(v => v.PetId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+    }
+
+    private static void ConfigureWeightLog(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<WeightLog>(entity =>
+        {
+            entity.HasKey(w => w.Id);
+
+            entity.Property(w => w.Id)
+                .HasDefaultValueSql("NEWSEQUENTIALID()");
+
+            entity.Property(w => w.Weight)
+                .HasColumnType("decimal(10,2)")
+                .IsRequired();
+
+            entity.Property(w => w.DateRecorded)
+                .IsRequired();
+
+            entity.Property(w => w.CreatedAt)
+                .HasDefaultValueSql("GETUTCDATE()");
+
+            entity.HasIndex(w => new { w.PetId, w.DateRecorded });
+
+            entity.HasOne(w => w.Pet)
+                .WithMany(p => p.WeightLogs)
+                .HasForeignKey(w => w.PetId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
     }
 }

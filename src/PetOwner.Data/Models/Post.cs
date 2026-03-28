@@ -13,6 +13,7 @@ public class Post
     public double? Latitude { get; set; }
     public double? Longitude { get; set; }
     public string? City { get; set; }
+    public string? Category { get; set; }
 
     public User User { get; set; } = null!;
     public ICollection<PostLike> Likes { get; set; } = new List<PostLike>();

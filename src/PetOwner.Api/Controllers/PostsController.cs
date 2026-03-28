@@ -22,12 +22,16 @@ public class PostsController : ControllerBase
         [FromQuery] int pageSize = 20,
         [FromQuery] double? lat = null,
         [FromQuery] double? lng = null,
-        [FromQuery] double? radiusKm = null)
+        [FromQuery] double? radiusKm = null,
+        [FromQuery] string? category = null)
     {
         var userId = GetUserId();
         pageSize = Math.Clamp(pageSize, 1, 50);
 
         var query = _db.Posts.AsNoTracking().AsQueryable();
+
+        if (!string.IsNullOrWhiteSpace(category))
+            query = query.Where(p => p.Category == category);
 
         if (lat.HasValue && lng.HasValue && radiusKm.HasValue)
         {
@@ -49,7 +53,8 @@ public class PostsController : ControllerBase
                 p.Likes.Any(l => l.UserId == userId),
                 p.CreatedAt,
                 p.User.Role,
-                p.User.ProviderProfile != null && p.User.ProviderProfile.Status == "Approved"))
+                p.User.ProviderProfile != null && p.User.ProviderProfile.Status == ProviderStatus.Approved,
+                p.Category))
             .ToListAsync();
 
         return Ok(posts);
@@ -83,7 +88,8 @@ public class PostsController : ControllerBase
                 p.Id, p.UserId, p.User.Name, p.Content, p.ImageUrl,
                 0, 0, false, p.CreatedAt,
                 p.User.Role,
-                p.User.ProviderProfile != null && p.User.ProviderProfile.Status == "Approved"))
+                p.User.ProviderProfile != null && p.User.ProviderProfile.Status == ProviderStatus.Approved,
+                p.Category))
             .FirstAsync();
 
         return CreatedAtAction(nameof(GetFeed), null, created);

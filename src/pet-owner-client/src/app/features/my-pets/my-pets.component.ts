@@ -1,10 +1,10 @@
-import { Component, computed, inject, OnInit, signal } from '@angular/core';
-import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
+import { Component, inject, OnInit, OnDestroy, signal, ViewChild } from '@angular/core';
 import { DatePipe } from '@angular/common';
+import { Router } from '@angular/router';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
-import { Pet, PetService } from '../../services/pet.service';
-import { MedicalRecord, MedicalRecordService } from '../../services/medical-record.service';
+import { Pet, PetService, ReportLostPayload } from '../../services/pet.service';
 import { TeletriageService, TeletriageHistory } from '../../services/teletriage.service';
+import { GeocodingService, AddressSuggestion } from '../../services/geocoding.service';
 import { ToastService } from '../../services/toast.service';
 import {
   PET_SPECIES_OPTIONS,
@@ -13,14 +13,15 @@ import {
   petSpeciesEmoji,
   petSpeciesIconBgClass,
 } from '../../models/pet-species.model';
-import { BREED_I18N_MAP, getBreedOptionsForSpecies } from './breed.constants';
-
-const RECORD_TYPES = ['Vaccination', 'Condition', 'Medication', 'VetVisit'] as const;
+import { BREED_I18N_MAP } from './breed.constants';
+import { PetFormComponent } from './pet-form/pet-form.component';
+import { PetHealthPassportComponent } from './pet-health-passport/pet-health-passport.component';
+import { Subject, debounceTime, distinctUntilChanged, switchMap } from 'rxjs';
 
 @Component({
   selector: 'app-my-pets',
   standalone: true,
-  imports: [ReactiveFormsModule, DatePipe, TranslatePipe],
+  imports: [DatePipe, TranslatePipe, PetFormComponent, PetHealthPassportComponent],
   template: `
     <div class="min-h-screen w-full max-w-full overflow-x-hidden bg-gradient-to-b from-indigo-50 to-white px-4 py-8">
       <div class="max-w-2xl mx-auto min-w-0">
@@ -109,7 +110,51 @@ const RECORD_TYPES = ['Vaccination', 'Condition', 'Medication', 'VetVisit'] as c
                       </div>
                     }
 
-                    <!-- Medical Card / Health Records / Triage History Toggles -->
+                    <!-- SOS Button -->
+                    <div class="mt-3">
+                      @if (pet.isLost) {
+                        <button
+                          type="button"
+                          (click)="markPetFound(pet)"
+                          [disabled]="sosSubmitting()"
+                          class="w-full flex items-center justify-center gap-2 rounded-xl py-2.5 px-4
+                                 bg-emerald-500 hover:bg-emerald-600 active:bg-emerald-700
+                                 text-white text-sm font-bold shadow-md
+                                 transition-all duration-150
+                                 disabled:opacity-50 disabled:cursor-not-allowed">
+                          <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+                          </svg>
+                          {{ 'SOS.MARK_FOUND' | translate }}
+                        </button>
+                      } @else if (sosCooldownRemaining()) {
+                        <button
+                          type="button"
+                          disabled
+                          class="w-full flex items-center justify-center gap-2 rounded-xl py-2.5 px-4
+                                 bg-gray-200 text-gray-500 text-sm font-bold cursor-not-allowed">
+                          <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                          {{ 'SOS.COOLDOWN' | translate: { time: sosCooldownRemaining() } }}
+                        </button>
+                      } @else {
+                        <button
+                          type="button"
+                          (click)="openSosDialog(pet)"
+                          class="w-full flex items-center justify-center gap-2 rounded-xl py-2.5 px-4
+                                 bg-red-500 hover:bg-red-600 active:bg-red-700
+                                 text-white text-sm font-bold shadow-lg
+                                 sos-pulse-btn transition-all duration-150">
+                          <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                          </svg>
+                          {{ 'SOS.REPORT_LOST' | translate }}
+                        </button>
+                      }
+                    </div>
+
+                    <!-- Medical Card / Health Passport / Triage History Toggles -->
                     <div class="mt-3 flex items-center gap-4 flex-wrap">
                       <button
                         type="button"
@@ -127,15 +172,15 @@ const RECORD_TYPES = ['Vaccination', 'Condition', 'Medication', 'VetVisit'] as c
                       </button>
                       <button
                         type="button"
-                        (click)="toggleHealthRecords(pet)"
+                        (click)="toggleHealthPassport(pet)"
                         class="flex items-center gap-1.5 text-sm font-medium transition-colors duration-150"
-                        [class]="expandedPetId() === pet.id ? 'text-indigo-600' : 'text-slate-400 hover:text-indigo-500'"
+                        [class]="healthPassportPetId() === pet.id ? 'text-purple-600' : 'text-slate-400 hover:text-purple-500'"
                       >
                         <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                          <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                          <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
                         </svg>
-                        {{ 'PETS.HEALTH_RECORDS' | translate }}
-                        <svg class="w-3.5 h-3.5 transition-transform duration-200" [class.rotate-180]="expandedPetId() === pet.id" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        {{ 'HEALTH.TAB_TITLE' | translate }}
+                        <svg class="w-3.5 h-3.5 transition-transform duration-200" [class.rotate-180]="healthPassportPetId() === pet.id" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                           <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
                         </svg>
                       </button>
@@ -259,165 +304,10 @@ const RECORD_TYPES = ['Vaccination', 'Condition', 'Medication', 'VetVisit'] as c
                     </div>
                   }
 
-                  <!-- ─── Expanded Health Records Panel ─── -->
-                  @if (expandedPetId() === pet.id) {
-                    <div class="border-t border-gray-100 bg-slate-50/70 p-5">
-
-                      @if (recordsLoading()) {
-                        <div class="flex items-center justify-center py-6 text-slate-400">
-                          <svg class="w-5 h-5 animate-spin mr-2" fill="none" viewBox="0 0 24 24">
-                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
-                          </svg>
-                          <span class="text-sm">{{ 'PETS.LOADING_RECORDS' | translate }}</span>
-                        </div>
-                      } @else {
-
-                        <!-- ─── Medical Timeline ─── -->
-                        @if (records().length > 0) {
-                          <div class="mb-4">
-                            <h4 class="text-[11px] font-semibold uppercase tracking-widest text-slate-400 mb-5">{{ 'PETS.MEDICAL_TIMELINE' | translate }}</h4>
-
-                            <div class="relative pl-9">
-                              <!-- Vertical line -->
-                              <div class="absolute left-[11px] top-1 bottom-1 w-px bg-gradient-to-b from-indigo-300 via-slate-200 to-transparent"></div>
-
-                              <div class="space-y-5">
-                                @for (rec of records(); track rec.id) {
-                                  <div class="relative group">
-                                    <!-- Timeline dot -->
-                                    <div class="absolute -left-9 top-3.5 z-10 flex items-center justify-center w-[22px] h-[22px] rounded-full ring-[3px] ring-slate-50 text-[11px] shadow-sm"
-                                         [class]="recordTypeClass(rec.type)">
-                                      {{ recordTypeIcon(rec.type) }}
-                                    </div>
-
-                                    <!-- Card -->
-                                    <div class="bg-white rounded-xl border border-gray-100 shadow-sm group-hover:shadow-md group-hover:border-indigo-100 transition-all duration-200 overflow-hidden">
-                                      <div class="h-0.5" [class]="recordTypeAccentClass(rec.type)"></div>
-
-                                      <div class="p-4">
-                                        <div class="flex items-start justify-between gap-2">
-                                          <div class="min-w-0 flex-1">
-                                            <div class="flex items-center gap-2 flex-wrap">
-                                              <h5 class="text-sm font-semibold text-slate-900">{{ rec.title }}</h5>
-                                              <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold tracking-wide"
-                                                    [class]="recordTypeBadgeClass(rec.type)">
-                                                {{ recordTypeI18nKey(rec.type) | translate }}
-                                              </span>
-                                            </div>
-
-                                            <p class="text-xs text-slate-400 mt-1 flex items-center gap-1">
-                                              <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                                <path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                                              </svg>
-                                              {{ rec.date | date:'mediumDate' }}
-                                            </p>
-
-                                            @if (rec.description) {
-                                              <p class="text-sm text-slate-600 mt-2 leading-relaxed">{{ rec.description }}</p>
-                                            }
-
-                                            @if (rec.documentUrl) {
-                                              <a [href]="rec.documentUrl" target="_blank" rel="noopener"
-                                                 class="inline-flex items-center gap-1.5 mt-2.5 px-3 py-1.5 rounded-lg bg-indigo-50 text-xs text-indigo-600 hover:bg-indigo-100 font-medium transition-colors">
-                                                <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                                  <path stroke-linecap="round" stroke-linejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101" />
-                                                  <path stroke-linecap="round" stroke-linejoin="round" d="M10.172 13.828a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.102 1.101" />
-                                                </svg>
-                                                {{ 'PETS.VIEW_DOCUMENT' | translate }}
-                                              </a>
-                                            }
-                                          </div>
-
-                                          <div class="flex items-center gap-0.5 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
-                                            <button type="button" (click)="editRecord(rec)"
-                                                    class="p-1.5 rounded-lg text-slate-300 hover:text-indigo-500 hover:bg-indigo-50 transition-colors">
-                                              <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                                <path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                                              </svg>
-                                            </button>
-                                            <button type="button" (click)="confirmDeleteRecord(rec)"
-                                                    class="p-1.5 rounded-lg text-slate-300 hover:text-red-500 hover:bg-red-50 transition-colors">
-                                              <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                                <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                              </svg>
-                                            </button>
-                                          </div>
-                                        </div>
-                                      </div>
-                                    </div>
-                                  </div>
-                                }
-                              </div>
-                            </div>
-                          </div>
-                        } @else if (!showRecordForm()) {
-                          <div class="text-center py-6">
-                            <div class="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center text-xl mx-auto mb-2">
-                              📋
-                            </div>
-                            <p class="text-sm text-slate-500 mb-1">{{ 'PETS.NO_HEALTH_RECORDS' | translate }}</p>
-                            <p class="text-xs text-slate-400">{{ 'PETS.NO_HEALTH_RECORDS_HINT' | translate }}</p>
-                          </div>
-                        }
-
-                        <!-- Add / Edit Record Form -->
-                        @if (showRecordForm()) {
-                          <div class="bg-white rounded-xl border border-indigo-100 p-4">
-                            <h4 class="text-sm font-semibold text-slate-900 mb-3">
-                              {{ (editingRecordId() ? 'PETS.EDIT_RECORD' : 'PETS.ADD_RECORD') | translate }}
-                            </h4>
-                            <form [formGroup]="recordForm" (ngSubmit)="submitRecord()" class="space-y-3">
-                              <div class="grid grid-cols-2 gap-3">
-                                <div>
-                                  <label class="block text-start text-xs font-medium text-slate-600 mb-1">{{ 'PETS.RECORD_TYPE' | translate }}</label>
-                                  <select formControlName="type" dir="auto"
-                                          class="w-full text-start rounded-lg border border-gray-200 px-3 py-2 text-sm text-slate-900 bg-white focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 outline-none transition">
-                                    @for (t of recordTypes; track t) {
-                                      <option [value]="t">{{ recordTypeI18nKey(t) | translate }}</option>
-                                    }
-                                  </select>
-                                </div>
-                                <div>
-                                  <label class="block text-start text-xs font-medium text-slate-600 mb-1">{{ 'PETS.RECORD_DATE' | translate }}</label>
-                                  <input type="date" formControlName="date" dir="auto"
-                                         class="w-full text-start rounded-lg border border-gray-200 px-3 py-2 text-sm text-slate-900 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 outline-none transition" />
-                                </div>
-                              </div>
-                              <div>
-                                <label class="block text-start text-xs font-medium text-slate-600 mb-1">{{ 'PETS.RECORD_TITLE' | translate }}</label>
-                                <input type="text" formControlName="title" dir="auto" placeholder="e.g., Rabies vaccine"
-                                       class="w-full text-start placeholder:text-start rounded-lg border border-gray-200 px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 outline-none transition" />
-                              </div>
-                              <div>
-                                <label class="block text-start text-xs font-medium text-slate-600 mb-1">{{ 'PETS.RECORD_DESCRIPTION' | translate }}</label>
-                                <textarea formControlName="description" rows="2" dir="auto" placeholder="Additional details..."
-                                          class="w-full text-start placeholder:text-start rounded-lg border border-gray-200 px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 outline-none transition resize-none"></textarea>
-                              </div>
-                              <div>
-                                <label class="block text-start text-xs font-medium text-slate-600 mb-1">{{ 'PETS.RECORD_DOCUMENT_URL' | translate }}</label>
-                                <input type="url" formControlName="documentUrl" dir="auto" placeholder="https://..."
-                                       class="w-full text-start placeholder:text-start rounded-lg border border-gray-200 px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 outline-none transition" />
-                              </div>
-                              <div class="flex gap-2">
-                                <button type="submit" [disabled]="recordSubmitting() || recordForm.invalid"
-                                        class="flex-1 rounded-lg bg-indigo-600 px-3 py-2 text-sm font-semibold text-white hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed transition">
-                                  {{ recordSubmitting() ? ('PETS.RECORD_SAVING' | translate) : ((editingRecordId() ? 'PETS.RECORD_UPDATE' : 'PETS.ADD_RECORD') | translate) }}
-                                </button>
-                                <button type="button" (click)="cancelRecordForm()"
-                                        class="rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 transition">
-                                  {{ 'PETS.CANCEL' | translate }}
-                                </button>
-                              </div>
-                            </form>
-                          </div>
-                        } @else {
-                          <button type="button" (click)="openAddRecordForm()"
-                                  class="w-full rounded-xl border-2 border-dashed border-gray-200 px-4 py-3 text-sm font-medium text-slate-400 hover:border-indigo-300 hover:text-indigo-500 transition-colors duration-150">
-                            {{ 'PETS.ADD_HEALTH_RECORD' | translate }}
-                          </button>
-                        }
-                      }
+                  <!-- ─── Expanded Health Passport Panel ─── -->
+                  @if (healthPassportPetId() === pet.id) {
+                    <div class="border-t border-gray-100 bg-gradient-to-br from-purple-50/60 to-indigo-50/40 p-5">
+                      <app-pet-health-passport [pet]="pet"></app-pet-health-passport>
                     </div>
                   }
 
@@ -500,374 +390,175 @@ const RECORD_TYPES = ['Vaccination', 'Condition', 'Medication', 'VetVisit'] as c
               <p class="mt-2 max-w-sm text-sm text-gray-500 leading-relaxed">
                 {{ 'PROFILE.NO_PETS_DESCRIPTION' | translate }}
               </p>
-              <button
-                type="button"
-                (click)="scrollToAddPetForm()"
-                class="mt-6 inline-flex items-center justify-center rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 focus-visible:ring-offset-2"
-              >
-                {{ 'PROFILE.ADD_PET' | translate }}
-              </button>
             </div>
           }
 
           <!-- ─── Add / Edit Pet Form ─── -->
-          <div id="add-pet-form" class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 scroll-mt-24">
-            <h2 class="text-lg font-semibold text-slate-900 mb-4">
-              {{ (editingPetId() ? 'PETS.EDIT_PET' : 'PETS.ADD_NEW_PET') | translate }}
-            </h2>
-
-            <form [formGroup]="petForm" (ngSubmit)="onSubmit()" class="space-y-4">
-
-              <div class="grid grid-cols-2 gap-4">
-                <div>
-                  <label for="pet-name" class="block text-start text-sm font-medium text-slate-700 mb-1"><span dir="auto">{{ 'PETS.NAME' | translate }}</span> <span class="text-red-500">*</span></label>
-                  <input
-                    id="pet-name"
-                    type="text"
-                    formControlName="name"
-                    dir="auto"
-                    [attr.placeholder]="'PETS.PLACEHOLDER_NAME' | translate"
-                    class="w-full text-start placeholder:text-start rounded-xl border border-gray-200 px-4 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 outline-none transition"
-                  />
-                </div>
-
-                <div>
-                  <label for="pet-species" class="block text-start text-sm font-medium text-slate-700 mb-1"><span dir="auto">{{ 'PETS.SPECIES' | translate }}</span> <span class="text-red-500">*</span></label>
-                  <select
-                    id="pet-species"
-                    formControlName="species"
-                    dir="auto"
-                    class="w-full text-start rounded-xl border border-gray-200 px-4 py-2.5 text-sm text-slate-900 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 outline-none transition bg-white"
-                  >
-                    <option [ngValue]="null" disabled>{{ 'PETS.SELECT_SPECIES' | translate }}</option>
-                    @for (opt of petSpeciesOptions; track opt.value) {
-                      <option [ngValue]="opt.value">{{ speciesI18nKey(opt.value) | translate }}</option>
-                    }
-                  </select>
-                </div>
-              </div>
-
-              @if (showSpecifyAnimal()) {
-                <div>
-                  <label for="pet-specify-animal" class="block text-start text-sm font-medium text-slate-700 mb-1"><span dir="auto">{{ 'PETS.SPECIFY_ANIMAL' | translate }}</span> <span class="text-red-500">*</span></label>
-                  <input
-                    id="pet-specify-animal"
-                    type="text"
-                    formControlName="specifyAnimalType"
-                    dir="auto"
-                    class="w-full text-start placeholder:text-start rounded-xl border border-gray-200 px-4 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 outline-none transition"
-                  />
-                </div>
-              }
-
-              <div [class]="'grid gap-4 ' + (currentBreedOptions().length > 0 ? 'grid-cols-3' : 'grid-cols-2')">
-                @if (currentBreedOptions().length > 0) {
-                  <div class="relative">
-                    <label for="pet-breed" class="block text-start text-sm font-medium text-slate-700 mb-1"><span dir="auto">{{ 'PETS.BREED' | translate }}</span> <span class="text-red-500">*</span></label>
-                    <div class="relative">
-                      <input
-                        id="pet-breed"
-                        type="text"
-                        autocomplete="off"
-                        dir="auto"
-                        [value]="breedSearchText()"
-                        (input)="onBreedInput($event)"
-                        (focus)="breedDropdownOpen.set(true)"
-                        (blur)="onBreedBlur()"
-                        [attr.placeholder]="'PETS.SEARCH_BREED' | translate"
-                        class="w-full text-start placeholder:text-start rounded-xl border border-gray-200 px-4 py-2.5 pe-10 text-sm text-slate-900 placeholder-slate-400 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 outline-none transition bg-white"
-                      />
-                      <svg class="absolute top-1/2 -translate-y-1/2 end-3 w-4 h-4 text-slate-400 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                      </svg>
-                    </div>
-                    @if (breedDropdownOpen()) {
-                      @if (filteredBreeds().length > 0) {
-                        <div class="absolute z-20 mt-1 w-full bg-white rounded-xl shadow-lg border border-gray-200 max-h-48 overflow-y-auto">
-                          @for (b of filteredBreeds(); track b) {
-                            <button
-                              type="button"
-                              (mousedown)="selectBreed(b)"
-                              [class]="'w-full text-start px-4 py-2.5 text-sm transition-colors duration-100 first:rounded-t-xl last:rounded-b-xl ' + (petForm.get('breed')?.value === b ? 'bg-indigo-50 text-indigo-700 font-medium' : 'text-slate-700 hover:bg-indigo-50 hover:text-indigo-700')"
-                              dir="auto"
-                            >
-                              {{ breedI18nKey(b) | translate }}
-                            </button>
-                          }
-                        </div>
-                      } @else if (breedSearchText().trim()) {
-                        <div class="absolute z-20 mt-1 w-full bg-white rounded-xl shadow-lg border border-gray-200 px-4 py-3 text-sm text-slate-400 text-center" dir="auto">
-                          {{ 'PETS.NO_BREED_MATCH' | translate }}
-                        </div>
-                      }
-                    }
-                  </div>
-                }
-
-                <div>
-                  <label for="pet-age" class="block text-start text-sm font-medium text-slate-700 mb-1"><span dir="auto">{{ 'PETS.AGE' | translate }}</span> <span class="text-red-500">*</span></label>
-                  <input
-                    id="pet-age"
-                    type="number"
-                    min="0"
-                    max="100"
-                    formControlName="age"
-                    dir="auto"
-                    [attr.placeholder]="'PETS.PLACEHOLDER_AGE' | translate"
-                    class="w-full text-start placeholder:text-start rounded-xl border border-gray-200 px-4 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 outline-none transition"
-                  />
-                </div>
-
-                <div>
-                  <label for="pet-weight" class="block text-start text-sm font-medium text-slate-700 mb-1"><span dir="auto">{{ 'PETS.WEIGHT' | translate }}</span> <span class="text-red-500">*</span></label>
-                  <input
-                    id="pet-weight"
-                    type="number"
-                    min="0"
-                    step="0.1"
-                    formControlName="weight"
-                    dir="auto"
-                    [attr.placeholder]="'PETS.PLACEHOLDER_WEIGHT' | translate"
-                    class="w-full text-start placeholder:text-start rounded-xl border border-gray-200 px-4 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 outline-none transition"
-                  />
-                </div>
-              </div>
-
-              @if (showSpecifyBreed()) {
-                <div>
-                  <label for="pet-specify-breed" class="block text-start text-sm font-medium text-slate-700 mb-1"><span dir="auto">{{ 'PETS.SPECIFY_BREED' | translate }}</span> <span class="text-red-500">*</span></label>
-                  <input
-                    id="pet-specify-breed"
-                    type="text"
-                    formControlName="specifyBreed"
-                    dir="auto"
-                    class="w-full text-start placeholder:text-start rounded-xl border border-gray-200 px-4 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 outline-none transition"
-                  />
-                </div>
-              }
-
-              <div class="flex items-center justify-between gap-4 rounded-xl border border-slate-200/80 bg-gradient-to-r from-slate-50 to-indigo-50/30 px-4 py-3.5 shadow-sm">
-                <div class="min-w-0 text-start">
-                  <span class="block text-sm font-semibold text-slate-800 tracking-tight" dir="auto">{{ 'PETS.NEUTERED_QUESTION' | translate }}</span>
-                  <p class="text-xs text-slate-500 mt-0.5" dir="auto">{{ 'PETS.NEUTERED_HELP' | translate }}</p>
-                </div>
-                <label for="pet-neutered" class="group inline-flex cursor-pointer flex-shrink-0 items-center rounded-full focus-within:outline-none focus-within:ring-2 focus-within:ring-indigo-300 focus-within:ring-offset-2">
-                  <input
-                    id="pet-neutered"
-                    type="checkbox"
-                    formControlName="isNeutered"
-                    class="peer sr-only"
-                  />
-                  <span
-                    class="relative h-7 w-12 shrink-0 rounded-full bg-slate-300/90 ring-1 ring-slate-200/80 transition-all duration-200 after:absolute after:top-[3px] after:block after:h-[22px] after:w-[22px] after:rounded-full after:bg-white after:shadow-md after:ring-1 after:ring-black/5 after:transition-transform after:duration-200 after:content-[''] after:[inset-inline-start:3px] peer-checked:bg-gradient-to-r peer-checked:from-indigo-600 peer-checked:to-violet-600 peer-checked:ring-indigo-500/30 ltr:peer-checked:after:translate-x-[1.35rem] rtl:peer-checked:after:-translate-x-[1.35rem]"
-                  ></span>
-                </label>
-              </div>
-
-              <div>
-                <label for="pet-notes" class="block text-start text-sm font-medium text-slate-700 mb-1"><span dir="auto">{{ 'PETS.NOTES' | translate }}</span></label>
-                <textarea
-                  id="pet-notes"
-                  rows="2"
-                  formControlName="notes"
-                  dir="auto"
-                  [attr.placeholder]="'PETS.PLACEHOLDER_NOTES' | translate"
-                  class="w-full text-start placeholder:text-start rounded-xl border border-gray-200 px-4 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 outline-none transition resize-none"
-                ></textarea>
-              </div>
-
-              <div class="space-y-4">
-                <div>
-                  <span class="block text-start text-sm font-medium text-slate-700 mb-1" dir="auto">{{ 'PETS.ALLERGIES' | translate }}</span>
-                  <p class="text-xs text-start text-slate-500 mb-2" dir="auto">{{ 'PETS.ALLERGIES_HELP' | translate }}</p>
-                  <div class="flex gap-2 mb-2">
-                    <button type="button" (click)="setAllergyMode('none')" [class]="modeChipClass(allergyMode() === 'none')">
-                      {{ 'PETS.ALLERGY_NONE' | translate }}
-                    </button>
-                    <button type="button" (click)="setAllergyMode('other')" [class]="modeChipClass(allergyMode() === 'other')">
-                      {{ 'PETS.ALLERGY_OTHER' | translate }}
-                    </button>
-                  </div>
-                  @if (allergyMode() === 'other') {
-                    <input
-                      id="pet-specify-allergy"
-                      type="text"
-                      formControlName="specifyAllergy"
-                      dir="auto"
-                      [attr.placeholder]="'PETS.SPECIFY_ALLERGY' | translate"
-                      class="w-full text-start placeholder:text-start rounded-xl border border-gray-200 px-4 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 outline-none transition"
-                    />
-                  }
-                </div>
-
-                <div>
-                  <span class="block text-start text-sm font-medium text-slate-700 mb-1" dir="auto">{{ 'PETS.MEDICAL_CONDITIONS' | translate }}</span>
-                  <p class="text-xs text-start text-slate-500 mb-2" dir="auto">{{ 'PETS.MEDICAL_CONDITIONS_HELP' | translate }}</p>
-                  <div class="flex gap-2 mb-2">
-                    <button type="button" (click)="setConditionMode('none')" [class]="modeChipClass(conditionMode() === 'none')">
-                      {{ 'PETS.ALLERGY_NONE' | translate }}
-                    </button>
-                    <button type="button" (click)="setConditionMode('other')" [class]="modeChipClass(conditionMode() === 'other')">
-                      {{ 'PETS.ALLERGY_OTHER' | translate }}
-                    </button>
-                  </div>
-                  @if (conditionMode() === 'other') {
-                    <input
-                      id="pet-conditions"
-                      type="text"
-                      formControlName="medicalConditions"
-                      dir="auto"
-                      [attr.placeholder]="'PETS.PLACEHOLDER_MEDICAL' | translate"
-                      class="w-full text-start placeholder:text-start rounded-xl border border-gray-200 px-4 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 outline-none transition"
-                    />
-                  }
-                </div>
-              </div>
-
-              <!-- ─── Care & Medical Details (Collapsible) ─── -->
-              <div class="rounded-xl border border-teal-200/60 bg-gradient-to-r from-teal-50/40 to-cyan-50/30 overflow-hidden">
-                <button
-                  type="button"
-                  (click)="showMedicalSection.set(!showMedicalSection())"
-                  class="w-full flex items-center justify-between px-4 py-3.5 text-start hover:bg-teal-50/60 transition-colors duration-150"
-                >
-                  <div class="flex items-center gap-2.5">
-                    <div class="w-8 h-8 rounded-lg bg-teal-100 flex items-center justify-center flex-shrink-0">
-                      <svg class="w-4 h-4 text-teal-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-                      </svg>
-                    </div>
-                    <span class="text-sm font-semibold text-slate-800" dir="auto">{{ 'PETS.MEDICAL_INFO' | translate }}</span>
-                  </div>
-                  <svg class="w-4 h-4 text-slate-400 transition-transform duration-200" [class.rotate-180]="showMedicalSection()" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
-                  </svg>
-                </button>
-
-                @if (showMedicalSection()) {
-                  <div class="px-4 pb-4 space-y-4 border-t border-teal-100/80">
-                    <div class="pt-3">
-                      <label for="pet-medical-notes" class="block text-start text-sm font-medium text-slate-700 mb-1"><span dir="auto">{{ 'PETS.MEDICAL_NOTES' | translate }}</span></label>
-                      <textarea
-                        id="pet-medical-notes"
-                        rows="2"
-                        formControlName="medicalNotes"
-                        dir="auto"
-                        [attr.placeholder]="'PETS.PLACEHOLDER_MEDICAL_NOTES' | translate"
-                        class="w-full text-start placeholder:text-start rounded-xl border border-gray-200 px-4 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:border-teal-400 focus:ring-2 focus:ring-teal-100 outline-none transition resize-none"
-                      ></textarea>
-                    </div>
-
-                    <div>
-                      <label for="pet-feeding" class="block text-start text-sm font-medium text-slate-700 mb-1"><span dir="auto">{{ 'PETS.FEEDING_SCHEDULE' | translate }}</span></label>
-                      <textarea
-                        id="pet-feeding"
-                        rows="2"
-                        formControlName="feedingSchedule"
-                        dir="auto"
-                        [attr.placeholder]="'PETS.PLACEHOLDER_FEEDING' | translate"
-                        class="w-full text-start placeholder:text-start rounded-xl border border-gray-200 px-4 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:border-teal-400 focus:ring-2 focus:ring-teal-100 outline-none transition resize-none"
-                      ></textarea>
-                    </div>
-
-                    <div>
-                      <label for="pet-microchip" class="block text-start text-sm font-medium text-slate-700 mb-1"><span dir="auto">{{ 'PETS.MICROCHIP' | translate }}</span></label>
-                      <input
-                        id="pet-microchip"
-                        type="text"
-                        formControlName="microchipNumber"
-                        dir="auto"
-                        [attr.placeholder]="'PETS.PLACEHOLDER_MICROCHIP' | translate"
-                        class="w-full text-start placeholder:text-start rounded-xl border border-gray-200 px-4 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:border-teal-400 focus:ring-2 focus:ring-teal-100 outline-none transition"
-                      />
-                    </div>
-
-                    <div class="grid grid-cols-2 gap-4">
-                      <div>
-                        <label for="pet-vet-name" class="block text-start text-sm font-medium text-slate-700 mb-1"><span dir="auto">{{ 'PETS.VET_NAME' | translate }}</span></label>
-                        <input
-                          id="pet-vet-name"
-                          type="text"
-                          formControlName="vetName"
-                          dir="auto"
-                          [attr.placeholder]="'PETS.PLACEHOLDER_VET_NAME' | translate"
-                          class="w-full text-start placeholder:text-start rounded-xl border border-gray-200 px-4 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:border-teal-400 focus:ring-2 focus:ring-teal-100 outline-none transition"
-                        />
-                      </div>
-                      <div>
-                        <label for="pet-vet-phone" class="block text-start text-sm font-medium text-slate-700 mb-1"><span dir="auto">{{ 'PETS.VET_PHONE' | translate }}</span></label>
-                        <input
-                          id="pet-vet-phone"
-                          type="tel"
-                          formControlName="vetPhone"
-                          dir="auto"
-                          [attr.placeholder]="'PETS.PLACEHOLDER_VET_PHONE' | translate"
-                          class="w-full text-start placeholder:text-start rounded-xl border border-gray-200 px-4 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:border-teal-400 focus:ring-2 focus:ring-teal-100 outline-none transition"
-                        />
-                      </div>
-                    </div>
-                  </div>
-                }
-              </div>
-
-              <div class="flex gap-2">
-                <button
-                  type="submit"
-                  [disabled]="submitting() || petForm.invalid"
-                  class="flex-1 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 focus:ring-2 focus:ring-indigo-300 disabled:opacity-50 disabled:cursor-not-allowed transition"
-                >
-                  {{ submitting() ? ('PROFILE.SAVING' | translate) : ('PETS.SAVE_PET' | translate) }}
-                </button>
-                @if (editingPetId()) {
-                  <button
-                    type="button"
-                    (click)="cancelPetEdit()"
-                    class="rounded-xl border border-gray-200 px-4 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50 transition"
-                  >
-                    {{ 'PETS.CANCEL' | translate }}
-                  </button>
-                }
-              </div>
-            </form>
-          </div>
+          <app-pet-form
+            [editingPet]="editingPetData()"
+            (petSaved)="onPetFormSaved()"
+            (editCancelled)="onEditCancelled()"
+          ></app-pet-form>
         }
       </div>
     </div>
+
+    <!-- ─── SOS Report Lost Dialog ─── -->
+    @if (sosPet()) {
+      <div class="fixed inset-0 z-[1000] flex items-center justify-center p-4">
+        <div class="absolute inset-0 bg-black/40 backdrop-blur-[2px]" (click)="closeSosDialog()"></div>
+        <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden
+                    animate-[sosSlideIn_0.25s_ease-out]" dir="auto">
+          <!-- Red Header -->
+          <div class="bg-gradient-to-r from-red-500 to-red-600 px-5 py-4 text-white">
+            <div class="flex items-center gap-2">
+              <span class="text-2xl">🆘</span>
+              <div>
+                <h2 class="text-lg font-bold">{{ 'SOS.DIALOG_TITLE' | translate }}</h2>
+                <p class="text-sm text-red-100">{{ 'SOS.DIALOG_SUBTITLE' | translate: { name: sosPet()!.name } }}</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="p-5 space-y-4">
+            <!-- Address Autocomplete -->
+            <div>
+              <label class="block text-start text-xs font-semibold text-slate-600 mb-1.5">
+                {{ 'SOS.LAST_SEEN_ADDRESS' | translate }}
+              </label>
+              <input
+                type="text"
+                dir="auto"
+                [attr.placeholder]="'SOS.ADDRESS_PLACEHOLDER' | translate"
+                [value]="sosAddressQuery()"
+                (input)="onSosAddressInput($any($event.target).value)"
+                class="w-full text-start placeholder:text-start rounded-xl border-2 border-gray-200 px-4 py-2.5 text-sm
+                       text-slate-900 placeholder-slate-400
+                       focus:border-red-400 focus:ring-2 focus:ring-red-100 outline-none transition" />
+              @if (sosSuggestions().length > 0) {
+                <ul class="mt-1 bg-white border border-gray-200 rounded-xl shadow-lg max-h-40 overflow-y-auto text-start">
+                  @for (s of sosSuggestions(); track s.displayName) {
+                    <li (click)="selectSosSuggestion(s)"
+                        class="px-4 py-2.5 text-sm text-slate-700 hover:bg-red-50 cursor-pointer
+                               transition-colors border-b border-gray-50 last:border-0">
+                      {{ s.displayName }}
+                    </li>
+                  }
+                </ul>
+              }
+            </div>
+
+            <!-- Emergency Phone -->
+            <div>
+              <label class="block text-start text-xs font-semibold text-slate-600 mb-1.5">
+                {{ 'SOS.EMERGENCY_PHONE' | translate }}
+              </label>
+              <input
+                type="tel"
+                dir="ltr"
+                [attr.placeholder]="'SOS.PHONE_PLACEHOLDER' | translate"
+                [value]="sosPhone()"
+                (input)="sosPhone.set($any($event.target).value)"
+                class="w-full text-start rounded-xl border-2 border-gray-200 px-4 py-2.5 text-sm
+                       text-slate-900 placeholder-slate-400
+                       focus:border-red-400 focus:ring-2 focus:ring-red-100 outline-none transition" />
+            </div>
+
+            <!-- Actions -->
+            <div class="flex gap-2 pt-1">
+              <button
+                type="button"
+                (click)="submitSos()"
+                [disabled]="sosSubmitting() || !sosSelectedAddress() || !sosPhone()"
+                class="flex-1 flex items-center justify-center gap-2 rounded-xl py-3 px-4
+                       bg-red-500 hover:bg-red-600 active:bg-red-700
+                       text-white text-sm font-bold shadow-lg
+                       transition-all duration-150
+                       disabled:opacity-40 disabled:cursor-not-allowed">
+                @if (sosSubmitting()) {
+                  <div class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                }
+                {{ 'SOS.SEND_ALERT' | translate }}
+              </button>
+              <button
+                type="button"
+                (click)="closeSosDialog()"
+                class="rounded-xl border border-gray-200 px-4 py-3 text-sm font-medium
+                       text-slate-600 hover:bg-slate-50 transition">
+                {{ 'PETS.CANCEL' | translate }}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    }
+
+    <!-- ─── SOS Success Dialog ─── -->
+    @if (sosSuccessPet(); as sp) {
+      <div class="fixed inset-0 z-[1000] flex items-center justify-center p-4">
+        <div class="absolute inset-0 bg-black/30 backdrop-blur-[2px]" (click)="dismissSosSuccess()"></div>
+        <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden
+                    animate-[sosSlideIn_0.3s_ease-out]">
+          <div class="bg-gradient-to-r from-emerald-500 to-emerald-600 p-6 text-center">
+            <div class="w-16 h-16 rounded-full bg-white/20 flex items-center justify-center mx-auto mb-3">
+              <svg class="w-8 h-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+              </svg>
+            </div>
+            <h3 class="text-lg font-bold text-white" dir="auto">{{ 'SOS.SUCCESS_TITLE' | translate }}</h3>
+            <p class="mt-1 text-sm text-white/90" dir="auto">{{ 'SOS.SUCCESS_MESSAGE' | translate: { name: sp.name } }}</p>
+          </div>
+          <div class="p-5 space-y-3">
+            @if (sp.communityPostId) {
+              <button
+                type="button"
+                (click)="goToSosPost()"
+                class="w-full flex items-center justify-center gap-2 rounded-xl py-3 px-4
+                       bg-sky-500 hover:bg-sky-600 text-white text-sm font-bold
+                       transition-all duration-150">
+                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                </svg>
+                {{ 'SOS.EDIT_POST' | translate }}
+              </button>
+            }
+            <button
+              type="button"
+              (click)="dismissSosSuccess()"
+              class="w-full rounded-xl border border-gray-200 py-3 px-4 text-sm font-medium
+                     text-slate-600 hover:bg-slate-50 transition">
+              {{ 'SOS.CLOSE' | translate }}
+            </button>
+          </div>
+        </div>
+      </div>
+    }
+
+    <style>
+      .sos-pulse-btn {
+        animation: sosPulse 2s ease-in-out infinite;
+      }
+      @@keyframes sosPulse {
+        0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.5); }
+        50% { box-shadow: 0 0 0 8px rgba(239, 68, 68, 0); }
+      }
+      @@keyframes sosSlideIn {
+        from { opacity: 0; transform: scale(0.95) translateY(10px); }
+        to { opacity: 1; transform: scale(1) translateY(0); }
+      }
+    </style>
   `,
 })
-export class MyPetsComponent implements OnInit {
+export class MyPetsComponent implements OnInit, OnDestroy {
   private readonly petService = inject(PetService);
-  private readonly medicalRecordService = inject(MedicalRecordService);
   private readonly triageService = inject(TeletriageService);
+  private readonly geocoding = inject(GeocodingService);
   private readonly toast = inject(ToastService);
   private readonly translate = inject(TranslateService);
-  private readonly fb = inject(FormBuilder);
+
+  @ViewChild(PetFormComponent) petFormComp?: PetFormComponent;
 
   readonly petSpeciesOptions = PET_SPECIES_OPTIONS;
-  readonly recordTypes = RECORD_TYPES;
-
-  readonly currentBreedOptions = signal<readonly string[]>([]);
-  readonly showSpecifyAnimal = signal(false);
-  readonly showSpecifyBreed = signal(false);
-  readonly breedSearchText = signal('');
-  readonly breedDropdownOpen = signal(false);
-  private hydrating = false;
-
-  readonly filteredBreeds = computed(() => {
-    const options = this.currentBreedOptions();
-    const search = this.breedSearchText().trim().toLowerCase();
-    if (!search) return [...options];
-    const currentVal = this.petForm.get('breed')?.value;
-    if (currentVal) {
-      const selectedText = this.translate.instant(BREED_I18N_MAP[currentVal] ?? currentVal).toLowerCase();
-      if (search === selectedText) return [...options];
-    }
-    return options.filter(b => {
-      const key = BREED_I18N_MAP[b] ?? b;
-      const translated = this.translate.instant(key).toLowerCase();
-      return translated.includes(search) || b.toLowerCase().includes(search);
-    });
-  });
 
   readonly speciesEmoji = petSpeciesEmoji;
   readonly speciesIconClass = petSpeciesIconBgClass;
@@ -890,115 +581,27 @@ export class MyPetsComponent implements OnInit {
     return BREED_I18N_MAP[breed] ?? breed;
   }
 
-  private readonly recordTypeI18nMap: Record<string, string> = {
-    'Vaccination': 'PETS.RECORD_TYPE_VACCINATION',
-    'Condition': 'PETS.RECORD_TYPE_CONDITION',
-    'Medication': 'PETS.RECORD_TYPE_MEDICATION',
-    'VetVisit': 'PETS.RECORD_TYPE_VET_VISIT',
-  };
-
-  recordTypeI18nKey(type: string): string {
-    return this.recordTypeI18nMap[type] ?? type;
-  }
-
-  private getBreedOptionsForSpecies(species: PetSpecies | null): readonly string[] {
-    return getBreedOptionsForSpecies(species);
-  }
-
-  readonly allergyMode = signal<'none' | 'other'>('none');
-  readonly conditionMode = signal<'none' | 'other'>('none');
-
   readonly pets = signal<Pet[]>([]);
   readonly loading = signal(true);
-  readonly submitting = signal(false);
 
-  readonly expandedPetId = signal<string | null>(null);
-  readonly records = signal<MedicalRecord[]>([]);
-  readonly recordsLoading = signal(false);
-  readonly showRecordForm = signal(false);
-  readonly recordSubmitting = signal(false);
-  readonly editingRecordId = signal<string | null>(null);
-
-  readonly editingPetId = signal<string | null>(null);
+  readonly editingPetData = signal<Pet | null>(null);
 
   readonly medicalCardPetId = signal<string | null>(null);
+  readonly healthPassportPetId = signal<string | null>(null);
 
   readonly triagePetId = signal<string | null>(null);
   readonly triageHistory = signal<TeletriageHistory[]>([]);
   readonly triageLoading = signal(false);
 
-  readonly showMedicalSection = signal(false);
-
-  readonly petForm = this.fb.group({
-    name: ['', Validators.required],
-    species: [null as PetSpecies | null, Validators.required],
-    breed: [''],
-    specifyAnimalType: [''],
-    specifyBreed: [''],
-    age: [null as number | null, [Validators.required, Validators.min(0), Validators.max(100)]],
-    weight: [null as number | null, [Validators.required, Validators.min(0)]],
-    isNeutered: [false],
-    notes: [''],
-    specifyAllergy: [''],
-    medicalConditions: [''],
-    medicalNotes: [''],
-    feedingSchedule: [''],
-    microchipNumber: [''],
-    vetName: [''],
-    vetPhone: [''],
-  });
-
-  readonly recordForm = this.fb.group({
-    type: ['Vaccination', Validators.required],
-    title: ['', Validators.required],
-    description: [''],
-    date: ['', Validators.required],
-    documentUrl: [''],
-  });
-
   ngOnInit(): void {
     this.loadPets();
+  }
 
-    this.petForm.get('species')!.valueChanges.subscribe(species => {
-      const opts = this.getBreedOptionsForSpecies(species);
-      this.currentBreedOptions.set(opts);
-      this.showSpecifyAnimal.set(species === PetSpecies.Other);
-
-      if (!this.hydrating) {
-        this.petForm.get('breed')!.setValue('');
-        this.petForm.get('specifyBreed')!.setValue('');
-        this.petForm.get('specifyAnimalType')!.setValue('');
-        this.breedSearchText.set('');
-        this.breedDropdownOpen.set(false);
-      }
-
-      const breedCtrl = this.petForm.get('breed')!;
-      if (opts.length > 0) {
-        breedCtrl.setValidators(Validators.required);
-      } else {
-        breedCtrl.clearValidators();
-      }
-      breedCtrl.updateValueAndValidity({ emitEvent: false });
-
-      const specifyAnimalCtrl = this.petForm.get('specifyAnimalType')!;
-      if (species === PetSpecies.Other) {
-        specifyAnimalCtrl.setValidators(Validators.required);
-      } else {
-        specifyAnimalCtrl.clearValidators();
-      }
-      specifyAnimalCtrl.updateValueAndValidity({ emitEvent: false });
-    });
-
-    this.petForm.get('breed')!.valueChanges.subscribe(breed => {
-      this.showSpecifyBreed.set(breed === 'Other');
-      const specifyBreedCtrl = this.petForm.get('specifyBreed')!;
-      if (breed === 'Other') {
-        specifyBreedCtrl.setValidators(Validators.required);
-      } else {
-        specifyBreedCtrl.clearValidators();
-      }
-      specifyBreedCtrl.updateValueAndValidity({ emitEvent: false });
-    });
+  ngOnDestroy(): void {
+    if (this.cooldownTimer) {
+      clearInterval(this.cooldownTimer);
+      this.cooldownTimer = null;
+    }
   }
 
   loadPets(): void {
@@ -1007,6 +610,7 @@ export class MyPetsComponent implements OnInit {
       next: (pets) => {
         this.pets.set(pets);
         this.loading.set(false);
+        this.startCooldownTimer();
       },
       error: () => {
         this.toast.error('Failed to load pets.');
@@ -1016,134 +620,28 @@ export class MyPetsComponent implements OnInit {
   }
 
   scrollToAddPetForm(): void {
-    document.getElementById('add-pet-form')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  }
-
-  // ── Breed Autocomplete ──
-
-  onBreedInput(event: Event): void {
-    const value = (event.target as HTMLInputElement).value;
-    this.breedSearchText.set(value);
-    this.breedDropdownOpen.set(true);
-    if (!value.trim()) {
-      this.petForm.get('breed')!.setValue('');
-    }
-  }
-
-  selectBreed(breed: string): void {
-    this.petForm.get('breed')!.setValue(breed);
-    this.breedSearchText.set(this.translate.instant(this.breedI18nKey(breed)));
-    this.breedDropdownOpen.set(false);
-  }
-
-  onBreedBlur(): void {
+    this.petFormComp?.openForm();
     setTimeout(() => {
-      this.breedDropdownOpen.set(false);
-      const currentBreed = this.petForm.get('breed')?.value;
-      if (currentBreed) {
-        this.breedSearchText.set(this.translate.instant(this.breedI18nKey(currentBreed)));
-      } else if (this.breedSearchText().trim()) {
-        this.breedSearchText.set('');
-      }
-    }, 200);
-  }
-
-  // ── Pet CRUD ──
-
-  onSubmit(): void {
-    if (this.submitting() || this.petForm.invalid) return;
-
-    this.submitting.set(true);
-    const v = this.petForm.getRawValue();
-    const rawBreed = v.breed?.trim();
-    const finalBreed = rawBreed === 'Other'
-      ? (v.specifyBreed?.trim() || undefined)
-      : (rawBreed || undefined);
-    const payload = {
-      name: v.name!.trim(),
-      species: v.species!,
-      age: v.age!,
-      notes: v.notes?.trim() || null,
-      breed: finalBreed,
-      weight: v.weight ?? undefined,
-      allergies: this.allergiesValue(),
-      medicalConditions: this.conditionMode() === 'other' ? (v.medicalConditions?.trim() || undefined) : undefined,
-      isNeutered: !!v.isNeutered,
-      medicalNotes: v.medicalNotes?.trim() || undefined,
-      feedingSchedule: v.feedingSchedule?.trim() || undefined,
-      microchipNumber: v.microchipNumber?.trim() || undefined,
-      vetName: v.vetName?.trim() || undefined,
-      vetPhone: v.vetPhone?.trim() || undefined,
-    };
-
-    const editId = this.editingPetId();
-    const request$ = editId
-      ? this.petService.update(editId, payload)
-      : this.petService.create(payload);
-
-    request$.subscribe({
-      next: () => {
-        this.toast.success(
-          editId ? 'Pet updated!' : this.translate.instant('PETS.ADD_SUCCESS'),
-        );
-        this.editingPetId.set(null);
-        this.resetPetFormDefaults();
-        this.refreshPets();
-        this.submitting.set(false);
-      },
-      error: () => {
-        this.toast.error(editId ? 'Failed to update pet.' : 'Failed to add pet. Please try again.');
-        this.submitting.set(false);
-      },
+      document.getElementById('add-pet-form')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     });
   }
+
+  // ── Pet Form Integration ──
 
   editPet(pet: Pet): void {
-    this.hydrating = true;
-    this.editingPetId.set(pet.id);
-    this.hydrateAllergyMode(pet.allergies);
-    this.hydrateConditionMode(pet.medicalConditions);
-
-    this.petForm.patchValue({
-      name: pet.name,
-      species: pet.species,
-      age: pet.age,
-      weight: pet.weight ?? null,
-      isNeutered: pet.isNeutered ?? false,
-      notes: pet.notes ?? '',
-      medicalConditions: pet.medicalConditions ?? '',
-      medicalNotes: pet.medicalNotes ?? '',
-      feedingSchedule: pet.feedingSchedule ?? '',
-      microchipNumber: pet.microchipNumber ?? '',
-      vetName: pet.vetName ?? '',
-      vetPhone: pet.vetPhone ?? '',
+    this.editingPetData.set(pet);
+    setTimeout(() => {
+      document.getElementById('add-pet-form')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     });
-
-    const breedList = this.getBreedOptionsForSpecies(pet.species);
-    if (pet.breed && (breedList as readonly string[]).includes(pet.breed)) {
-      this.petForm.get('breed')!.setValue(pet.breed);
-      this.breedSearchText.set(this.translate.instant(this.breedI18nKey(pet.breed)));
-      this.petForm.get('specifyBreed')!.setValue('');
-    } else if (pet.breed) {
-      this.petForm.get('breed')!.setValue('Other');
-      this.breedSearchText.set(this.translate.instant(this.breedI18nKey('Other')));
-      this.petForm.get('specifyBreed')!.setValue(pet.breed);
-    } else {
-      this.petForm.get('breed')!.setValue('');
-      this.breedSearchText.set('');
-      this.petForm.get('specifyBreed')!.setValue('');
-    }
-
-    this.hydrating = false;
-
-    if (pet.medicalNotes || pet.feedingSchedule || pet.microchipNumber || pet.vetName || pet.vetPhone) {
-      this.showMedicalSection.set(true);
-    }
   }
 
-  cancelPetEdit(): void {
-    this.editingPetId.set(null);
-    this.resetPetFormDefaults();
+  onPetFormSaved(): void {
+    this.editingPetData.set(null);
+    this.refreshPets();
+  }
+
+  onEditCancelled(): void {
+    this.editingPetData.set(null);
   }
 
   confirmDelete(pet: Pet): void {
@@ -1152,20 +650,18 @@ export class MyPetsComponent implements OnInit {
     this.petService.delete(pet.id).subscribe({
       next: () => {
         this.pets.update((list) => list.filter((p) => p.id !== pet.id));
-        if (this.expandedPetId() === pet.id) {
-          this.expandedPetId.set(null);
-          this.records.set([]);
-        }
         if (this.medicalCardPetId() === pet.id) {
           this.medicalCardPetId.set(null);
+        }
+        if (this.healthPassportPetId() === pet.id) {
+          this.healthPassportPetId.set(null);
         }
         if (this.triagePetId() === pet.id) {
           this.triagePetId.set(null);
           this.triageHistory.set([]);
         }
-        if (this.editingPetId() === pet.id) {
-          this.editingPetId.set(null);
-          this.resetPetFormDefaults();
+        if (this.editingPetData()?.id === pet.id) {
+          this.editingPetData.set(null);
         }
         this.toast.success(`${pet.name} removed.`);
       },
@@ -1180,124 +676,27 @@ export class MyPetsComponent implements OnInit {
       this.medicalCardPetId.set(null);
       return;
     }
-    this.expandedPetId.set(null);
-    this.records.set([]);
-    this.showRecordForm.set(false);
-    this.editingRecordId.set(null);
     this.triagePetId.set(null);
     this.triageHistory.set([]);
+    this.healthPassportPetId.set(null);
     this.medicalCardPetId.set(pet.id);
   }
 
-  hasMedicalInfo(pet: Pet): boolean {
-    return !!(pet.medicalNotes || pet.feedingSchedule || pet.microchipNumber || pet.vetName || pet.vetPhone || pet.isNeutered);
-  }
+  // ── Health Passport ──
 
-  // ── Medical Records ──
-
-  toggleHealthRecords(pet: Pet): void {
-    if (this.expandedPetId() === pet.id) {
-      this.expandedPetId.set(null);
-      this.records.set([]);
-      this.showRecordForm.set(false);
-      this.editingRecordId.set(null);
+  toggleHealthPassport(pet: Pet): void {
+    if (this.healthPassportPetId() === pet.id) {
+      this.healthPassportPetId.set(null);
       return;
     }
     this.medicalCardPetId.set(null);
     this.triagePetId.set(null);
     this.triageHistory.set([]);
-    this.expandedPetId.set(pet.id);
-    this.showRecordForm.set(false);
-    this.editingRecordId.set(null);
-    this.loadRecords(pet.id);
+    this.healthPassportPetId.set(pet.id);
   }
 
-  loadRecords(petId: string): void {
-    this.recordsLoading.set(true);
-    this.medicalRecordService.getAll(petId).subscribe({
-      next: (records) => {
-        records.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-        this.records.set(records);
-        this.recordsLoading.set(false);
-      },
-      error: () => {
-        this.toast.error('Failed to load health records.');
-        this.recordsLoading.set(false);
-      },
-    });
-  }
-
-  openAddRecordForm(): void {
-    this.editingRecordId.set(null);
-    this.recordForm.reset({ type: 'Vaccination', title: '', description: '', date: '', documentUrl: '' });
-    this.showRecordForm.set(true);
-  }
-
-  editRecord(rec: MedicalRecord): void {
-    this.editingRecordId.set(rec.id);
-    this.recordForm.patchValue({
-      type: rec.type,
-      title: rec.title,
-      description: rec.description ?? '',
-      date: rec.date.substring(0, 10),
-      documentUrl: rec.documentUrl ?? '',
-    });
-    this.showRecordForm.set(true);
-  }
-
-  cancelRecordForm(): void {
-    this.showRecordForm.set(false);
-    this.editingRecordId.set(null);
-    this.recordForm.reset({ type: 'Vaccination', title: '', description: '', date: '', documentUrl: '' });
-  }
-
-  submitRecord(): void {
-    const petId = this.expandedPetId();
-    if (!petId || this.recordSubmitting() || this.recordForm.invalid) return;
-
-    this.recordSubmitting.set(true);
-    const v = this.recordForm.getRawValue();
-    const payload = {
-      type: v.type!,
-      title: v.title!.trim(),
-      description: v.description?.trim() || null,
-      date: new Date(v.date!).toISOString(),
-      documentUrl: v.documentUrl?.trim() || null,
-    };
-
-    const editId = this.editingRecordId();
-    const request$ = editId
-      ? this.medicalRecordService.update(petId, editId, payload)
-      : this.medicalRecordService.create(petId, payload);
-
-    request$.subscribe({
-      next: () => {
-        this.toast.success(editId ? 'Record updated.' : 'Record added.');
-        this.showRecordForm.set(false);
-        this.editingRecordId.set(null);
-        this.recordForm.reset({ type: 'Vaccination', title: '', description: '', date: '', documentUrl: '' });
-        this.loadRecords(petId);
-        this.recordSubmitting.set(false);
-      },
-      error: () => {
-        this.toast.error('Failed to save record. Please try again.');
-        this.recordSubmitting.set(false);
-      },
-    });
-  }
-
-  confirmDeleteRecord(rec: MedicalRecord): void {
-    if (!confirm(`Delete "${rec.title}"?`)) return;
-    const petId = this.expandedPetId();
-    if (!petId) return;
-
-    this.medicalRecordService.delete(petId, rec.id).subscribe({
-      next: () => {
-        this.records.update((list) => list.filter((r) => r.id !== rec.id));
-        this.toast.success('Record deleted.');
-      },
-      error: () => this.toast.error('Failed to delete record.'),
-    });
+  hasMedicalInfo(pet: Pet): boolean {
+    return !!(pet.medicalNotes || pet.feedingSchedule || pet.microchipNumber || pet.vetName || pet.vetPhone || pet.isNeutered);
   }
 
   // ── Triage History ──
@@ -1309,10 +708,7 @@ export class MyPetsComponent implements OnInit {
       return;
     }
     this.medicalCardPetId.set(null);
-    this.expandedPetId.set(null);
-    this.records.set([]);
-    this.showRecordForm.set(false);
-    this.editingRecordId.set(null);
+    this.healthPassportPetId.set(null);
     this.triagePetId.set(pet.id);
     this.loadTriageHistory(pet.id);
   }
@@ -1331,91 +727,154 @@ export class MyPetsComponent implements OnInit {
     });
   }
 
-  // ── UI helpers ──
+  // ── SOS / Lost Pet ──
 
-  setAllergyMode(mode: 'none' | 'other'): void {
-    this.allergyMode.set(mode);
-    const ctrl = this.petForm.get('specifyAllergy')!;
-    if (mode === 'none') {
-      ctrl.setValue('');
-      ctrl.clearValidators();
-    } else {
-      ctrl.setValidators(Validators.required);
+  readonly sosPet = signal<Pet | null>(null);
+  readonly sosAddressQuery = signal('');
+  readonly sosSuggestions = signal<AddressSuggestion[]>([]);
+  readonly sosSelectedAddress = signal<AddressSuggestion | null>(null);
+  readonly sosPhone = signal('');
+  readonly sosSubmitting = signal(false);
+  readonly sosCooldownRemaining = signal<string | null>(null);
+  readonly sosSuccessPet = signal<Pet | null>(null);
+  private readonly router = inject(Router);
+  private cooldownTimer: ReturnType<typeof setInterval> | null = null;
+  private readonly sosSearch$ = new Subject<string>();
+
+  private initSosSearch(): void {
+    this.sosSearch$.pipe(
+      debounceTime(350),
+      distinctUntilChanged(),
+      switchMap(q => this.geocoding.search(q)),
+    ).subscribe(results => this.sosSuggestions.set(results));
+  }
+
+  private startCooldownTimer(): void {
+    if (this.cooldownTimer) clearInterval(this.cooldownTimer);
+    this.tickCooldown();
+    this.cooldownTimer = setInterval(() => this.tickCooldown(), 60_000);
+  }
+
+  private tickCooldown(): void {
+    const pets = this.pets();
+    const SOS_COOLDOWN_MS = 24 * 60 * 60 * 1000;
+    const now = Date.now();
+
+    let latestLostAt = 0;
+    for (const p of pets) {
+      if (p.lostAt) {
+        const t = new Date(p.lostAt).getTime();
+        if (t > latestLostAt) latestLostAt = t;
+      }
     }
-    ctrl.updateValueAndValidity();
-  }
 
-  setConditionMode(mode: 'none' | 'other'): void {
-    this.conditionMode.set(mode);
-    const ctrl = this.petForm.get('medicalConditions')!;
-    if (mode === 'none') {
-      ctrl.setValue('');
-      ctrl.clearValidators();
-    } else {
-      ctrl.setValidators(Validators.required);
+    if (!latestLostAt || now - latestLostAt >= SOS_COOLDOWN_MS) {
+      this.sosCooldownRemaining.set(null);
+      if (this.cooldownTimer) {
+        clearInterval(this.cooldownTimer);
+        this.cooldownTimer = null;
+      }
+      return;
     }
-    ctrl.updateValueAndValidity();
+
+    const remaining = SOS_COOLDOWN_MS - (now - latestLostAt);
+    const hours = Math.floor(remaining / 3_600_000);
+    const minutes = Math.ceil((remaining % 3_600_000) / 60_000);
+    this.sosCooldownRemaining.set(
+      hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`,
+    );
   }
 
-  modeChipClass(active: boolean): string {
-    const base = 'rounded-full px-4 py-2 text-sm font-medium transition-all duration-200 border cursor-pointer';
-    return active
-      ? `${base} border-indigo-500 bg-indigo-600 text-white shadow-sm`
-      : `${base} border-slate-200 bg-white text-slate-600 hover:border-indigo-200 hover:bg-indigo-50/60`;
+  openSosDialog(pet: Pet): void {
+    this.sosPet.set(pet);
+    this.sosAddressQuery.set('');
+    this.sosSuggestions.set([]);
+    this.sosSelectedAddress.set(null);
+    this.sosPhone.set('');
+    this.initSosSearch();
   }
 
-  private allergiesValue(): string | undefined {
-    if (this.allergyMode() === 'none') return undefined;
-    return this.petForm.get('specifyAllergy')?.value?.trim() || undefined;
+  closeSosDialog(): void {
+    this.sosPet.set(null);
   }
 
-  private hydrateAllergyMode(s: string | null | undefined): void {
-    if (s?.trim()) {
-      this.allergyMode.set('other');
-      this.petForm.get('specifyAllergy')?.setValue(s);
-    } else {
-      this.allergyMode.set('none');
-      this.petForm.get('specifyAllergy')?.setValue('');
-    }
+  onSosAddressInput(value: string): void {
+    this.sosAddressQuery.set(value);
+    this.sosSelectedAddress.set(null);
+    this.sosSearch$.next(value);
   }
 
-  private hydrateConditionMode(s: string | null | undefined): void {
-    if (s?.trim()) {
-      this.conditionMode.set('other');
-    } else {
-      this.conditionMode.set('none');
-      this.petForm.get('medicalConditions')?.setValue('');
-    }
+  selectSosSuggestion(s: AddressSuggestion): void {
+    this.sosAddressQuery.set(s.displayName);
+    this.sosSelectedAddress.set(s);
+    this.sosSuggestions.set([]);
   }
 
-  private resetPetFormDefaults(): void {
-    this.petForm.reset({
-      name: '',
-      species: null,
-      breed: '',
-      specifyAnimalType: '',
-      specifyBreed: '',
-      age: null,
-      weight: null,
-      isNeutered: false,
-      notes: '',
-      specifyAllergy: '',
-      medicalConditions: '',
-      medicalNotes: '',
-      feedingSchedule: '',
-      microchipNumber: '',
-      vetName: '',
-      vetPhone: '',
+  submitSos(): void {
+    const pet = this.sosPet();
+    const addr = this.sosSelectedAddress();
+    const phone = this.sosPhone().trim();
+    if (!pet || !addr || !phone) return;
+
+    this.sosSubmitting.set(true);
+    const payload: ReportLostPayload = {
+      lastSeenLocation: addr.displayName,
+      lastSeenLat: addr.lat,
+      lastSeenLng: addr.lon,
+      contactPhone: phone,
+    };
+
+    this.petService.reportLost(pet.id, payload).subscribe({
+      next: (updated) => {
+        this.pets.update(list => list.map(p => p.id === updated.id ? updated : p));
+        this.sosSubmitting.set(false);
+        this.closeSosDialog();
+        this.startCooldownTimer();
+        this.sosSuccessPet.set(updated);
+      },
+      error: (err) => {
+        this.sosSubmitting.set(false);
+        const body = err?.error;
+        if (body?.code === 'SOS_COOLDOWN') {
+          this.closeSosDialog();
+          this.startCooldownTimer();
+          this.toast.error(this.translate.instant('SOS.COOLDOWN_ERROR'));
+        } else {
+          this.toast.error(this.translate.instant('SOS.REPORT_FAILED'));
+        }
+      },
     });
-    this.allergyMode.set('none');
-    this.conditionMode.set('none');
-    this.showMedicalSection.set(false);
-    this.currentBreedOptions.set([]);
-    this.showSpecifyAnimal.set(false);
-    this.showSpecifyBreed.set(false);
-    this.breedSearchText.set('');
-    this.breedDropdownOpen.set(false);
   }
+
+  markPetFound(pet: Pet): void {
+    this.sosSubmitting.set(true);
+    this.petService.markFound(pet.id).subscribe({
+      next: (updated) => {
+        this.pets.update(list => list.map(p => p.id === updated.id ? updated : p));
+        this.sosSubmitting.set(false);
+        this.startCooldownTimer();
+        this.toast.success(this.translate.instant('SOS.FOUND_SUCCESS', { name: pet.name }));
+      },
+      error: () => {
+        this.sosSubmitting.set(false);
+        this.toast.error(this.translate.instant('SOS.FOUND_FAILED'));
+      },
+    });
+  }
+
+  goToSosPost(): void {
+    const pet = this.sosSuccessPet();
+    if (pet?.communityPostId) {
+      this.sosSuccessPet.set(null);
+      this.router.navigate(['/community'], { queryParams: { highlightPost: pet.communityPostId } });
+    }
+  }
+
+  dismissSosSuccess(): void {
+    this.sosSuccessPet.set(null);
+  }
+
+  // ── UI helpers ──
 
   triageSeverityDotClass(severity: string): string {
     switch (severity) {
@@ -1434,46 +893,6 @@ export class MyPetsComponent implements OnInit {
       case 'High': return 'bg-orange-100 text-orange-700';
       case 'Critical': return 'bg-red-100 text-red-700';
       default: return 'bg-gray-100 text-gray-700';
-    }
-  }
-
-  recordTypeIcon(type: string): string {
-    switch (type) {
-      case 'Vaccination': return '💉';
-      case 'Condition':   return '🩺';
-      case 'Medication':  return '💊';
-      case 'VetVisit':    return '🏥';
-      default:            return '📋';
-    }
-  }
-
-  recordTypeClass(type: string): string {
-    switch (type) {
-      case 'Vaccination': return 'bg-green-100';
-      case 'Condition':   return 'bg-orange-100';
-      case 'Medication':  return 'bg-blue-100';
-      case 'VetVisit':    return 'bg-purple-100';
-      default:            return 'bg-slate-100';
-    }
-  }
-
-  recordTypeAccentClass(type: string): string {
-    switch (type) {
-      case 'Vaccination': return 'bg-green-400';
-      case 'Condition':   return 'bg-orange-400';
-      case 'Medication':  return 'bg-blue-400';
-      case 'VetVisit':    return 'bg-purple-400';
-      default:            return 'bg-slate-300';
-    }
-  }
-
-  recordTypeBadgeClass(type: string): string {
-    switch (type) {
-      case 'Vaccination': return 'bg-green-100 text-green-700';
-      case 'Condition':   return 'bg-orange-100 text-orange-700';
-      case 'Medication':  return 'bg-blue-100 text-blue-700';
-      case 'VetVisit':    return 'bg-purple-100 text-purple-700';
-      default:            return 'bg-slate-100 text-slate-700';
     }
   }
 

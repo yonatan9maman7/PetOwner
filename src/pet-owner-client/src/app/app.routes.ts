@@ -47,6 +47,14 @@ export const routes: Routes = [
       ),
   },
   {
+    path: 'register-business',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./features/business-apply/business-apply.component').then(
+        (m) => m.BusinessApplyComponent
+      ),
+  },
+  {
     path: 'edit-profile',
     canActivate: [authGuard],
     loadComponent: () =>
@@ -147,6 +155,30 @@ export const routes: Routes = [
     loadComponent: () =>
       import('./features/provider-profile/provider-profile.component').then(
         (m) => m.ProviderProfileComponent
+      ),
+  },
+  {
+    path: 'chat',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./features/chat-inbox/chat-inbox.component').then(
+        (m) => m.ChatInboxComponent
+      ),
+  },
+  {
+    path: 'chat/:otherUserId',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./features/chat-room/chat-room.component').then(
+        (m) => m.ChatRoomComponent
+      ),
+  },
+  {
+    path: 'notifications',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./features/notifications-history/notifications-history.component').then(
+        (m) => m.NotificationsHistoryComponent
       ),
   },
   {

@@ -1,7 +1,7 @@
-import { Component, inject, OnInit, signal, computed, HostListener } from '@angular/core';
+import { Component, inject, OnInit, signal, computed, HostListener, AfterViewInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { DatePipe, DecimalPipe } from '@angular/common';
-import { Router } from '@angular/router';
+import { DatePipe, DecimalPipe, NgClass } from '@angular/common';
+import { Router, ActivatedRoute } from '@angular/router';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { Post, PostComment, PostService } from '../../services/post.service';
 import { AuthService } from '../../services/auth.service';
@@ -13,7 +13,7 @@ import { CommunityService, CommunityGroup } from '../../services/community.servi
 @Component({
   selector: 'app-social-feed',
   standalone: true,
-  imports: [FormsModule, DatePipe, DecimalPipe, TranslatePipe],
+  imports: [FormsModule, DatePipe, DecimalPipe, NgClass, TranslatePipe],
   template: `
     <div class="min-h-screen bg-gradient-to-b from-sky-50 to-white">
 
@@ -31,11 +31,23 @@ import { CommunityService, CommunityGroup } from '../../services/community.servi
                 <button
                   (click)="selectGroup(null)"
                   class="shrink-0 px-3 py-1.5 rounded-full text-sm font-medium transition-all whitespace-nowrap"
-                  [class]="selectedGroupId() === null
+                  [class]="selectedGroupId() === null && !categoryFilter()
                     ? 'bg-sky-600 text-white shadow-sm'
                     : 'bg-slate-100 text-slate-600 hover:bg-slate-200'"
                 >
                   {{ 'COMMUNITY.GLOBAL' | translate }}
+                </button>
+
+                <!-- Lost & Found pill -->
+                <button
+                  (click)="toggleLostAndFound()"
+                  class="shrink-0 px-3 py-1.5 rounded-full text-sm font-medium transition-all whitespace-nowrap"
+                  [class]="categoryFilter() === 'lost_and_found'
+                    ? 'bg-red-500 text-white shadow-sm'
+                    : 'bg-red-50 text-red-600 hover:bg-red-100 border border-red-200'"
+                >
+                  <span class="me-1">🆘</span>
+                  {{ 'COMMUNITY.LOST_AND_FOUND' | translate }}
                 </button>
 
                 @for (group of groups(); track group.id) {
@@ -166,7 +178,18 @@ import { CommunityService, CommunityGroup } from '../../services/community.servi
         } @else {
           <div class="space-y-4">
             @for (post of posts(); track post.id) {
-              <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+              <div class="bg-white rounded-2xl shadow-sm overflow-hidden"
+                   [ngClass]="post.category === 'lost_and_found'
+                     ? 'border-2 border-red-300 ring-1 ring-red-100'
+                     : 'border border-gray-100'"
+                   [id]="'post-' + post.id"
+                   [style.background-color]="highlightPostId() === post.id ? 'rgb(254 242 242 / 0.3)' : ''">
+                @if (post.category === 'lost_and_found') {
+                  <div class="bg-red-500 text-white px-4 py-1.5 flex items-center gap-2">
+                    <span class="text-sm leading-none">🆘</span>
+                    <span class="text-xs font-bold uppercase tracking-wide">{{ 'COMMUNITY.SOS_BADGE' | translate }}</span>
+                  </div>
+                }
                 <!-- Post Header -->
                 <div class="flex items-center gap-3 px-5 pt-4 pb-2">
                   <button
@@ -472,7 +495,7 @@ import { CommunityService, CommunityGroup } from '../../services/community.servi
     .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
   `,
 })
-export class SocialFeedComponent implements OnInit {
+export class SocialFeedComponent implements OnInit, AfterViewInit {
   private readonly postService = inject(PostService);
   private readonly communityService = inject(CommunityService);
   private readonly auth = inject(AuthService);
@@ -480,11 +503,14 @@ export class SocialFeedComponent implements OnInit {
   private readonly toast = inject(ToastService);
   private readonly mapService = inject(MapService);
   private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
   private readonly translate = inject(TranslateService);
 
   // Groups
   groups = signal<CommunityGroup[]>([]);
   selectedGroupId = signal<string | null>(null);
+  categoryFilter = signal<string | null>(null);
+  highlightPostId = signal<string | null>(null);
 
   selectedGroupName = computed(() => {
     const id = this.selectedGroupId();
@@ -536,7 +562,27 @@ export class SocialFeedComponent implements OnInit {
   ngOnInit(): void {
     this.currentUserId.set(this.auth.userId());
     this.loadGroups();
+
+    const hp = this.route.snapshot.queryParamMap.get('highlightPost');
+    if (hp) {
+      this.highlightPostId.set(hp);
+    }
+
     this.loadFeed();
+  }
+
+  ngAfterViewInit(): void {
+    const hp = this.highlightPostId();
+    if (hp) {
+      setTimeout(() => this.scrollToPost(hp), 600);
+    }
+  }
+
+  private scrollToPost(postId: string): void {
+    const el = document.getElementById('post-' + postId);
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
   }
 
   // --- Groups ---
@@ -550,6 +596,18 @@ export class SocialFeedComponent implements OnInit {
 
   selectGroup(groupId: string | null): void {
     this.selectedGroupId.set(groupId);
+    this.categoryFilter.set(null);
+    this.page = 1;
+    this.loadFeed();
+  }
+
+  toggleLostAndFound(): void {
+    if (this.categoryFilter() === 'lost_and_found') {
+      this.categoryFilter.set(null);
+    } else {
+      this.categoryFilter.set('lost_and_found');
+      this.selectedGroupId.set(null);
+    }
     this.page = 1;
     this.loadFeed();
   }
@@ -642,6 +700,7 @@ export class SocialFeedComponent implements OnInit {
     this.comments.set([]);
     const groupId = this.selectedGroupId();
     const geo = this.buildGeoFilter();
+    const category = this.categoryFilter();
 
     if (groupId) {
       this.communityService.getGroupPosts(groupId, geo).subscribe({
@@ -657,7 +716,7 @@ export class SocialFeedComponent implements OnInit {
         },
       });
     } else {
-      this.postService.getFeed(1, null, geo).subscribe({
+      this.postService.getFeed(1, null, geo, category).subscribe({
         next: (posts) => {
           this.posts.set(posts);
           this.hasMore.set(posts.length >= 20);
@@ -676,8 +735,9 @@ export class SocialFeedComponent implements OnInit {
     this.loadingMore.set(true);
     const groupId = this.selectedGroupId();
     const geo = this.buildGeoFilter();
+    const category = this.categoryFilter();
 
-    this.postService.getFeed(this.page + 1, groupId, geo).subscribe({
+    this.postService.getFeed(this.page + 1, groupId, geo, category).subscribe({
       next: (newPosts) => {
         this.posts.update((prev) => [...prev, ...newPosts]);
         this.hasMore.set(newPosts.length >= 20);

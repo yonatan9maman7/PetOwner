@@ -21,6 +21,8 @@ export interface ProviderProfile {
   averageRating: number | null;
   reviewCount: number;
   acceptsOffHoursRequests: boolean;
+  isSuspended: boolean;
+  suspensionReason: string | null;
 }
 
 export interface UpdateProfilePayload {
@@ -135,13 +137,21 @@ export class ProviderService {
   private readonly baseUrl = '/api/providers';
 
   readonly providerStatus = signal<ProviderStatus>(null);
+  readonly isSuspended = signal(false);
+  readonly suspensionReason = signal<string | null>(null);
 
   getMe(): Observable<ProviderProfile | null> {
     return this.http.get<ProviderProfile>(`${this.baseUrl}/me`).pipe(
-      tap((profile) => this.providerStatus.set(profile.status as ProviderStatus)),
+      tap((profile) => {
+        this.providerStatus.set(profile.status as ProviderStatus);
+        this.isSuspended.set(profile.isSuspended ?? false);
+        this.suspensionReason.set(profile.suspensionReason ?? null);
+      }),
       catchError((err: HttpErrorResponse) => {
         if (err.status === 404) {
           this.providerStatus.set('None');
+          this.isSuspended.set(false);
+          this.suspensionReason.set(null);
           return of(null);
         }
         throw err;

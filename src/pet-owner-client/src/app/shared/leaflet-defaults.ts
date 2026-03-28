@@ -1,4 +1,4 @@
-import { icon, Marker } from 'leaflet';
+import { icon, Map, Marker } from 'leaflet';
 
 const iconDefault = icon({
   iconRetinaUrl: 'assets/marker-icon-2x.png',
@@ -13,10 +13,17 @@ const iconDefault = icon({
 
 Marker.prototype.options.icon = iconDefault;
 
-export const OSM_TILE_URL = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
+/** CartoDB Voyager — clean, colorful base map (replaces default OSM tiles). */
+export const CARTO_VOYAGER_TILE_URL =
+  'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png';
 
-export const OSM_TILE_OPTIONS = {
-  maxZoom: 19,
+export const CARTO_VOYAGER_TILE_OPTIONS = {
   attribution:
-    '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+    '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+  maxZoom: 20,
 } as const;
+
+/** Clears Leaflet’s default attribution prefix (wordmark and flag); OSM/CARTO text stays on the layer. */
+export function applyMinimalMapAttribution(map: Map): void {
+  map.attributionControl.setPrefix('');
+}

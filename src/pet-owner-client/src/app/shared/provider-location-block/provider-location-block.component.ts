@@ -14,7 +14,11 @@ import {
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import * as L from 'leaflet';
-import { OSM_TILE_URL, OSM_TILE_OPTIONS } from '../leaflet-defaults';
+import {
+  applyMinimalMapAttribution,
+  CARTO_VOYAGER_TILE_OPTIONS,
+  CARTO_VOYAGER_TILE_URL,
+} from '../leaflet-defaults';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { AddressAutocompleteComponent } from '../address-autocomplete.component';
 import { AddressSuggestion, GeocodingService } from '../../services/geocoding.service';
@@ -203,8 +207,9 @@ export class ProviderLocationBlockComponent implements OnDestroy {
       zoom,
       zoomControl: true,
     });
+    applyMinimalMapAttribution(this.map);
 
-    L.tileLayer(OSM_TILE_URL, OSM_TILE_OPTIONS).addTo(this.map);
+    L.tileLayer(CARTO_VOYAGER_TILE_URL, CARTO_VOYAGER_TILE_OPTIONS).addTo(this.map);
 
     this.pinLayer.addTo(this.map);
     window.addEventListener('resize', this.onWinResize);

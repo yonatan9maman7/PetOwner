@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.SignalR;
+using Microsoft.EntityFrameworkCore;
 using PetOwner.Api.Hubs;
 using PetOwner.Data;
 using PetOwner.Data.Models;
@@ -42,5 +43,44 @@ public class NotificationService : INotificationService
             notification.IsRead,
             notification.CreatedAt,
         });
+    }
+
+    public async Task BroadcastAsync(string type, string title, string message, Guid? relatedEntityId = null)
+    {
+        var userIds = await _db.Users
+            .AsNoTracking()
+            .Select(u => u.Id)
+            .ToListAsync();
+
+        var now = DateTime.UtcNow;
+        var notifications = userIds.Select(uid => new Notification
+        {
+            Id = Guid.NewGuid(),
+            UserId = uid,
+            Type = type,
+            Title = title,
+            Message = message,
+            RelatedEntityId = relatedEntityId,
+            CreatedAt = now,
+        }).ToList();
+
+        _db.Notifications.AddRange(notifications);
+        await _db.SaveChangesAsync();
+
+        var payload = new { Type = type, Title = title, Message = message, RelatedEntityId = relatedEntityId, IsRead = false, CreatedAt = now };
+
+        foreach (var n in notifications)
+        {
+            await _hub.Clients.Group(n.UserId.ToString()).SendAsync("NotificationReceived", new
+            {
+                n.Id,
+                n.Type,
+                n.Title,
+                n.Message,
+                n.RelatedEntityId,
+                n.IsRead,
+                n.CreatedAt,
+            });
+        }
     }
 }
