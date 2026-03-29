@@ -14,6 +14,16 @@ import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
 import * as L from 'leaflet';
 import {
+  Subject,
+  of,
+  debounceTime,
+  switchMap,
+  takeUntil,
+  tap,
+  finalize,
+  catchError,
+} from 'rxjs';
+import {
   applyMinimalMapAttribution,
   CARTO_VOYAGER_TILE_OPTIONS,
   CARTO_VOYAGER_TILE_URL,
@@ -66,6 +76,11 @@ export class MapDashboardComponent implements OnInit, OnDestroy, AfterViewInit {
   private mapResizeObserver?: ResizeObserver;
   private userLat: number | null = null;
   private userLng: number | null = null;
+  private readonly destroy$ = new Subject<void>();
+  private readonly mapMove$ = new Subject<void>();
+  private readonly onMapMoveEnd = (): void => {
+    this.mapMove$.next();
+  };
 
   providers = signal<MapPin[]>([]);
   lostPets = signal<LostPet[]>([]);
@@ -148,6 +163,9 @@ export class MapDashboardComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
   ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
+    this.map?.off('moveend', this.onMapMoveEnd);
     this.mapResizeObserver?.disconnect();
     this.mapResizeObserver = undefined;
     this.map?.remove();
@@ -246,6 +264,21 @@ export class MapDashboardComponent implements OnInit, OnDestroy, AfterViewInit {
     L.control.zoom({ position: 'bottomright' }).addTo(this.map);
     this.markersLayer.addTo(this.map);
     this.lostPetsLayer.addTo(this.map);
+
+    this.map.on('moveend', this.onMapMoveEnd);
+    this.mapMove$
+      .pipe(
+        debounceTime(500),
+        takeUntil(this.destroy$),
+        tap(() => this.isLoadingPins.set(true)),
+        switchMap(() =>
+          this.fetchPins$().pipe(
+            finalize(() => this.isLoadingPins.set(false)),
+            catchError(() => of([] as MapPin[]))
+          )
+        )
+      )
+      .subscribe((pins) => this.applyPins(pins));
 
     // Tile layer + controls size to the container; defer until layout/padding are applied.
     setTimeout(() => this.map.invalidateSize({ animate: false }), 0);
@@ -407,7 +440,28 @@ export class MapDashboardComponent implements OnInit, OnDestroy, AfterViewInit {
 
   private loadPins(): void {
     this.isLoadingPins.set(true);
+    this.fetchPins$()
+      .pipe(
+        finalize(() => this.isLoadingPins.set(false)),
+        catchError(() => of([] as MapPin[]))
+      )
+      .subscribe((pins) => this.applyPins(pins));
+  }
 
+  private fetchPins$() {
+    return this.mapService.fetchPins(this.buildMapSearchFilters());
+  }
+
+  private applyPins(pins: MapPin[]): void {
+    this.providers.set(pins);
+    this.renderMarkers(pins);
+  }
+
+  /**
+   * Search anchor: user-chosen radius uses GPS; otherwise map center + radius covering the visible viewport
+   * (existing API requires radiusKm + lat + lng for spatial filtering).
+   */
+  private buildMapSearchFilters(): MapSearchFilters {
     const filters: MapSearchFilters = {};
     const date = this.filterDate();
     const time = this.filterTime();
@@ -415,23 +469,39 @@ export class MapDashboardComponent implements OnInit, OnDestroy, AfterViewInit {
     if (this.filterServiceType()) filters.serviceType = this.filterServiceType();
     if (this.filterMinRating() !== null) filters.minRating = this.filterMinRating()!;
     if (this.filterMaxRate() !== null) filters.maxRate = this.filterMaxRate()!;
+    if (this.searchQuery()) filters.searchTerm = this.searchQuery();
+
     if (this.filterRadiusKm() !== null && this.userLat !== null && this.userLng !== null) {
       filters.radiusKm = this.filterRadiusKm()!;
       filters.latitude = this.userLat;
       filters.longitude = this.userLng;
+    } else if (this.map) {
+      const center = this.map.getCenter();
+      filters.latitude = center.lat;
+      filters.longitude = center.lng;
+      filters.radiusKm = this.computeViewportRadiusKm(this.map);
     }
-    if (this.searchQuery()) filters.searchTerm = this.searchQuery();
 
-    this.mapService.fetchPins(filters).subscribe({
-      next: (pins) => {
-        this.providers.set(pins);
-        this.renderMarkers(pins);
-        this.isLoadingPins.set(false);
-      },
-      error: () => {
-        this.isLoadingPins.set(false);
-      },
-    });
+    return filters;
+  }
+
+  /** Half-diagonal of the map bounds in km, padded — keeps results aligned with what the user sees. */
+  private computeViewportRadiusKm(map: L.Map): number {
+    const center = map.getCenter();
+    const ne = map.getBounds().getNorthEast();
+    const km = this.haversineKm(center.lat, center.lng, ne.lat, ne.lng);
+    return Math.min(80, Math.max(1.2, km * 1.2));
+  }
+
+  private haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): number {
+    const R = 6371;
+    const toRad = (d: number) => (d * Math.PI) / 180;
+    const dLat = toRad(lat2 - lat1);
+    const dLng = toRad(lng2 - lng1);
+    const a =
+      Math.sin(dLat / 2) ** 2 +
+      Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
+    return R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
   }
 
   private loadProviderReviews(providerId: string): void {

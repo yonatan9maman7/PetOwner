@@ -214,6 +214,13 @@ public class AdminController : ControllerBase
 
         await _db.SaveChangesAsync();
 
+        await _notifications.CreateAsync(
+            profile.UserId,
+            "Admin",
+            "NOTIFICATIONS.PROVIDER_APPROVED_TITLE",
+            "NOTIFICATIONS.PROVIDER_APPROVED",
+            profile.UserId);
+
         return Ok(new { message = "Provider approved successfully." });
     }
 
@@ -268,10 +275,8 @@ public class AdminController : ControllerBase
         await _notifications.CreateAsync(
             user.Id,
             "Admin",
-            "Account Suspended",
-            request?.Reason is not null
-                ? $"Your provider account has been suspended. Reason: {request.Reason}"
-                : "Your provider account has been suspended. Please contact support for details.");
+            "NOTIFICATIONS.ACCOUNT_SUSPENDED_TITLE",
+            "NOTIFICATIONS.ACCOUNT_SUSPENDED");
 
         // TODO: Enable email notification once email templates are finalized
         // await _emailService.SendEmailAsync(
@@ -314,8 +319,8 @@ public class AdminController : ControllerBase
         await _notifications.CreateAsync(
             user.Id,
             "Admin",
-            "Provider Account Banned",
-            "Your provider account has been permanently removed from the platform due to policy violations.");
+            "NOTIFICATIONS.PROVIDER_BANNED_TITLE",
+            "NOTIFICATIONS.PROVIDER_BANNED");
 
         // TODO: Enable email notification once email templates are finalized
         // await _emailService.SendEmailAsync(
@@ -353,8 +358,8 @@ public class AdminController : ControllerBase
         await _notifications.CreateAsync(
             user.Id,
             "Admin",
-            "Account Reactivated",
-            "Your provider account has been reactivated. You can now accept bookings again.");
+            "NOTIFICATIONS.ACCOUNT_REACTIVATED_TITLE",
+            "NOTIFICATIONS.ACCOUNT_REACTIVATED");
 
         return Ok(new { message = "Provider reactivated successfully." });
     }
@@ -440,6 +445,13 @@ public class AdminController : ControllerBase
             user.Role = "Provider";
 
         await _db.SaveChangesAsync();
+
+        await _notifications.CreateAsync(
+            profile.UserId,
+            "Admin",
+            "NOTIFICATIONS.PROVIDER_APPROVED_TITLE",
+            "NOTIFICATIONS.PROVIDER_APPROVED",
+            profile.UserId);
 
         return Ok(new { message = "Provider approved successfully." });
     }

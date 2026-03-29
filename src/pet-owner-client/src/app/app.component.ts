@@ -1,4 +1,5 @@
 import { Component, computed, inject, signal, effect } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { toSignal } from '@angular/core/rxjs-interop';
@@ -33,6 +34,17 @@ export class AppComponent {
   readonly auth = inject(AuthService);
   readonly providerService = inject(ProviderService);
   readonly notificationService = inject(NotificationService);
+
+  constructor() {
+    this.notificationService.notificationReceived$
+      .pipe(takeUntilDestroyed())
+      .subscribe((n) => {
+        const blob = `${n.message ?? ''}${n.body ?? ''}${n.title ?? ''}`;
+        if (blob.includes('PROVIDER_APPROVED')) {
+          this.providerService.refreshStatus();
+        }
+      });
+  }
   readonly chatService = inject(ChatService);
   readonly language = inject(LanguageService);
   private readonly favoriteService = inject(FavoriteService);

@@ -802,7 +802,19 @@
     "HISTORY_TITLE": "Notification History",
     "HISTORY_SUBTITLE": "All your notifications in one place.",
     "LOADING": "Loading...",
-    "UNREAD": "New"
+    "UNREAD": "New",
+    "PROVIDER_APPROVED_TITLE": "Profile Approved",
+    "PROVIDER_APPROVED": "Your profile has been approved!",
+    "ACCOUNT_SUSPENDED_TITLE": "Account Suspended",
+    "ACCOUNT_SUSPENDED": "Your provider account has been suspended. Please contact support for details.",
+    "PROVIDER_BANNED_TITLE": "Provider Account Banned",
+    "PROVIDER_BANNED": "Your provider account has been permanently removed from the platform due to policy violations.",
+    "ACCOUNT_REACTIVATED_TITLE": "Account Reactivated",
+    "ACCOUNT_REACTIVATED": "Your provider account has been reactivated. You can now accept bookings again.",
+    "SOS_ALERT_TITLE": "⚠️ SOS Alert",
+    "SOS_ALERT": "⚠️ A pet has been reported lost! Click to help.",
+    "SOS_RESOLVED_TITLE": "✅ SOS Resolved",
+    "SOS_RESOLVED": "Great news! The pet has been found safe!"
   },
   "SUSPENSION": {
     "BANNER_TITLE": "Your provider account is suspended",

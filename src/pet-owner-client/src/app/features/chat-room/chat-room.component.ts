@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy, inject, signal, computed, effect, ViewChild, ElementRef, AfterViewChecked } from '@angular/core';
+import { Component, OnInit, OnDestroy, inject, signal, ViewChild, ElementRef, AfterViewChecked } from '@angular/core';
 import { CommonModule, DatePipe } from '@angular/common';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
@@ -11,11 +11,15 @@ import { AuthService } from '../../services/auth.service';
   standalone: true,
   imports: [CommonModule, FormsModule, RouterLink, TranslatePipe, DatePipe],
   template: `
-    <div class="flex flex-col h-[100dvh] bg-gray-100" dir="auto">
-      <!-- Top bar -->
-      <div class="shrink-0 bg-white border-b border-gray-200 shadow-sm px-4 py-3 flex items-center gap-3 z-10">
-        <button type="button" (click)="goBack()" class="p-1.5 -ms-1.5 hover:bg-gray-100 rounded-full transition-colors">
-          <svg class="w-5 h-5 text-gray-600 rtl:rotate-180" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+    <!-- fixed fullscreen overlay — breaks out of <main> scroll context entirely -->
+    <div class="fixed inset-0 z-[100] flex flex-col bg-gray-100">
+
+      <!-- ─── Top bar ─── -->
+      <div class="shrink-0 bg-white border-b border-gray-200 shadow-sm px-4 py-3 flex items-center gap-3">
+        <button type="button" (click)="goBack()"
+                class="p-1.5 -ms-1.5 hover:bg-gray-100 rounded-full transition-colors">
+          <svg class="w-5 h-5 text-gray-600 rtl:rotate-180" fill="none" viewBox="0 0 24 24"
+               stroke="currentColor" stroke-width="2">
             <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
           </svg>
         </button>
@@ -28,24 +32,29 @@ import { AuthService } from '../../services/auth.service';
           }
         </div>
         <div class="flex-1 min-w-0">
-          <p class="text-sm font-semibold text-gray-900 truncate">{{ otherName() }}</p>
+          <p class="text-sm font-semibold text-gray-900 truncate" dir="auto">{{ otherName() }}</p>
         </div>
       </div>
 
-      <!-- Messages area -->
-      <div #scrollContainer class="flex-1 overflow-y-auto px-4 py-4 space-y-1.5"
-           style="scroll-behavior: smooth; background: linear-gradient(135deg, #f3f0ff 0%, #eef2ff 50%, #f0fdf4 100%);">
+      <!-- ─── Messages area (flex-1 + min-h-0 = scrollable within remaining space) ─── -->
+      <div #scrollContainer
+           class="flex-1 min-h-0 overflow-y-auto px-4 py-4 space-y-1.5"
+           style="background: linear-gradient(135deg, #f3f0ff 0%, #eef2ff 50%, #f0fdf4 100%);">
+
         @if (loading()) {
           <div class="flex items-center justify-center h-full">
-            <div class="w-7 h-7 border-3 border-violet-500 border-t-transparent rounded-full animate-spin"></div>
+            <div class="w-7 h-7 border-[3px] border-violet-500 border-t-transparent rounded-full animate-spin"></div>
           </div>
         } @else {
           @if (messages().length === 0) {
             <div class="flex flex-col items-center justify-center h-full text-center px-6">
               <div class="w-14 h-14 bg-white/80 rounded-full flex items-center justify-center mb-3 shadow-sm">
-                <svg class="w-7 h-7 text-violet-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M8.625 12a.375.375 0 11-.75 0 .375.375 0 01.75 0zm4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" />
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M12 2.25c-5.385 0-9.75 4.365-9.75 9.75s4.365 9.75 9.75 9.75 9.75-4.365 9.75-9.75S17.385 2.25 12 2.25z" />
+                <svg class="w-7 h-7 text-violet-400" fill="none" viewBox="0 0 24 24"
+                     stroke="currentColor" stroke-width="1.5">
+                  <path stroke-linecap="round" stroke-linejoin="round"
+                        d="M8.625 12a.375.375 0 11-.75 0 .375.375 0 01.75 0zm4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" />
+                  <path stroke-linecap="round" stroke-linejoin="round"
+                        d="M12 2.25c-5.385 0-9.75 4.365-9.75 9.75s4.365 9.75 9.75 9.75 9.75-4.365 9.75-9.75S17.385 2.25 12 2.25z" />
                 </svg>
               </div>
               <p class="text-sm text-gray-500">{{ 'CHAT.START_CONVERSATION' | translate }}</p>
@@ -55,27 +64,31 @@ import { AuthService } from '../../services/auth.service';
               <!-- Date separator -->
               @if (i === 0 || !sameDay(messages()[i - 1].sentAt, msg.sentAt)) {
                 <div class="flex items-center justify-center my-3">
-                  <span class="bg-white/80 text-gray-500 text-[10px] font-medium px-3 py-1 rounded-full shadow-sm backdrop-blur-sm">
+                  <span class="bg-white/80 text-gray-500 text-[10px] font-medium px-3 py-1
+                               rounded-full shadow-sm backdrop-blur-sm">
                     {{ msg.sentAt | date:'mediumDate' }}
                   </span>
                 </div>
               }
-              <!-- Bubble -->
-              <div class="flex" [class]="msg.senderId === myId() ? 'justify-end' : 'justify-start'"
-                   style="animation: bubbleIn 0.2s ease-out">
+
+              <!-- Bubble row — ms-auto / me-auto are RTL-aware (logical) -->
+              <div class="flex" style="animation: bubbleIn 0.2s ease-out">
                 <div class="max-w-[80%] px-3.5 py-2 shadow-sm"
-                     [class]="msg.senderId === myId()
-                       ? 'bg-gradient-to-br from-violet-600 to-indigo-600 text-white rounded-2xl rounded-br-md'
-                       : 'bg-white text-gray-800 rounded-2xl rounded-bl-md'">
-                  <p class="text-sm leading-relaxed whitespace-pre-wrap break-words">{{ msg.content }}</p>
+                     [class]="isMine(msg)
+                       ? 'ms-auto bg-violet-600 text-white rounded-2xl ltr:rounded-br-md rtl:rounded-bl-md'
+                       : 'me-auto bg-gray-200 text-gray-900 rounded-2xl ltr:rounded-bl-md rtl:rounded-br-md'">
+
+                  <p class="text-sm leading-relaxed whitespace-pre-wrap break-words" dir="auto">{{ msg.content }}</p>
+
                   <div class="flex items-center gap-1 mt-0.5"
-                       [class]="msg.senderId === myId() ? 'justify-end' : 'justify-start'">
+                       [class]="isMine(msg) ? 'justify-end' : 'justify-start'">
                     <span class="text-[10px]"
-                          [class]="msg.senderId === myId() ? 'text-white/60' : 'text-gray-400'">
+                          [class]="isMine(msg) ? 'text-white/60' : 'text-gray-500'">
                       {{ msg.sentAt | date:'shortTime' }}
                     </span>
-                    @if (msg.senderId === myId()) {
-                      <svg class="w-3.5 h-3.5" [class]="msg.isRead ? 'text-sky-300' : 'text-white/50'"
+                    @if (isMine(msg)) {
+                      <svg class="w-3.5 h-3.5"
+                           [class]="msg.isRead ? 'text-sky-300' : 'text-white/50'"
                            fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" />
                       </svg>
@@ -88,10 +101,10 @@ import { AuthService } from '../../services/auth.service';
         }
       </div>
 
-      <!-- Input area -->
+      <!-- ─── Input area (always pinned at bottom) ─── -->
       <div class="shrink-0 bg-white border-t border-gray-200 px-3 py-2.5 safe-area-bottom">
         <div class="flex items-end gap-2 max-w-lg mx-auto">
-          <div class="flex-1 relative">
+          <div class="flex-1">
             <textarea
               #msgInput
               [(ngModel)]="newMessage"
@@ -102,6 +115,7 @@ import { AuthService } from '../../services/auth.service';
                      text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2
                      focus:ring-violet-500/40 focus:border-violet-400 transition-shadow
                      max-h-28 overflow-y-auto leading-snug"
+              dir="auto"
               (input)="autoResize($event)">
             </textarea>
           </div>
@@ -113,8 +127,10 @@ import { AuthService } from '../../services/auth.service';
                    hover:bg-violet-700 active:bg-violet-800 transition-all duration-150
                    disabled:bg-gray-300 disabled:shadow-none disabled:cursor-not-allowed
                    shrink-0 flex items-center justify-center">
-            <svg class="w-5 h-5 rtl:rotate-180" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5" />
+            <svg class="w-5 h-5 rtl:rotate-180" fill="none" viewBox="0 0 24 24"
+                 stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round"
+                    d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5" />
             </svg>
           </button>
         </div>
@@ -127,7 +143,6 @@ import { AuthService } from '../../services/auth.service';
       to   { opacity: 1; transform: translateY(0) scale(1); }
     }
     .safe-area-bottom { padding-bottom: max(0.625rem, env(safe-area-inset-bottom)); }
-    textarea { field-sizing: content; }
   `],
 })
 export class ChatRoomComponent implements OnInit, OnDestroy, AfterViewChecked {
@@ -150,8 +165,20 @@ export class ChatRoomComponent implements OnInit, OnDestroy, AfterViewChecked {
   private shouldScroll = true;
   private prevMessageCount = 0;
 
+  isMine(msg: ChatMessage): boolean {
+    return !!this.myId() && msg.senderId === this.myId();
+  }
+
   ngOnInit(): void {
     this.otherUserId = this.route.snapshot.paramMap.get('otherUserId') || '';
+    const myId = this.auth.userId();
+    if (
+      !this.otherUserId ||
+      (!!myId && this.otherUserId.toLowerCase() === myId.toLowerCase())
+    ) {
+      void this.router.navigate(['/chat']);
+      return;
+    }
 
     const nav = this.router.getCurrentNavigation()?.extras?.state
       ?? history.state;

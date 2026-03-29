@@ -9,10 +9,14 @@ export interface AuthResponse {
 }
 
 const ROLE_CLAIM_URI = 'http://schemas.microsoft.com/ws/2008/06/identity/claims/role';
+const NAMEID_CLAIM_URI = 'http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier';
+const NAME_CLAIM_URI = 'http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name';
 
 export interface JwtPayload {
-  sub: string;
-  name: string;
+  sub?: string;
+  nameid?: string;
+  name?: string;
+  unique_name?: string;
   exp: number;
   role?: string | string[];
   [key: string]: unknown;
@@ -39,12 +43,16 @@ export class AuthService {
     const payload = this.decoded();
     if (!payload || this.isExpired()) return null;
     const role = (payload.role ?? payload[ROLE_CLAIM_URI] ?? '') as string;
-    return { userId: payload.sub, role };
+    const userId = (payload.sub ?? payload.nameid ?? payload[NAMEID_CLAIM_URI] ?? '') as string;
+    return { userId, role };
   });
 
   readonly userId = computed(() => this.currentUser$()?.userId ?? null);
   readonly userRole = computed(() => this.currentUser$()?.role ?? null);
-  readonly userName = computed(() => this.decoded()?.name ?? null);
+  readonly userName = computed(() => {
+    const p = this.decoded();
+    return (p?.name ?? p?.unique_name ?? p?.[NAME_CLAIM_URI] ?? null) as string | null;
+  });
 
   readonly roles = computed<string[]>(() => {
     const payload = this.decoded();

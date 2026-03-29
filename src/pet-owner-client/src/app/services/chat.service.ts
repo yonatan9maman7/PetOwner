@@ -77,7 +77,21 @@ export class ChatService {
 
   sendMessage(recipientId: string, content: string): void {
     if (!this.connection || this.connection.state !== signalR.HubConnectionState.Connected) return;
-    this.connection.invoke('SendMessage', recipientId, content).catch(() => {});
+
+    const tempId = `temp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const optimistic: ChatMessage = {
+      id: tempId,
+      senderId: this.auth.userId() ?? '',
+      senderName: '',
+      content: content.trim(),
+      isRead: false,
+      sentAt: new Date().toISOString(),
+    };
+    this.activeMessages.update(msgs => [...msgs, optimistic]);
+
+    this.connection.invoke('SendMessage', recipientId, content).catch(() => {
+      this.activeMessages.update(msgs => msgs.filter(m => m.id !== tempId));
+    });
   }
 
   // ─── REST ───
@@ -150,6 +164,14 @@ export class ChatService {
     if (response.message.senderId === myId && this.activeOtherUserId()) {
       this.activeMessages.update(msgs => {
         if (msgs.some(m => m.id === response.message.id)) return msgs;
+        const tempIdx = msgs.findIndex(
+          m => m.id.startsWith('temp-') && m.content === response.message.content
+        );
+        if (tempIdx >= 0) {
+          const updated = [...msgs];
+          updated[tempIdx] = response.message;
+          return updated;
+        }
         return [...msgs, response.message];
       });
     }

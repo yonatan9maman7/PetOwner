@@ -188,8 +188,8 @@ public class PetsController : ControllerBase
 
         await _notifications.BroadcastAsync(
             "sos",
-            $"⚠️ SOS: {pet.Name} is lost!",
-            $"⚠️ SOS: {pet.Name} is lost near {request.LastSeenLocation}! Click to help.",
+            "NOTIFICATIONS.SOS_ALERT_TITLE",
+            "NOTIFICATIONS.SOS_ALERT",
             sosPost.Id);
 
         return Ok(MapToDto(pet));
@@ -215,8 +215,8 @@ public class PetsController : ControllerBase
 
         await _notifications.BroadcastAsync(
             "sos_resolved",
-            "✅ SOS Resolved",
-            $"Great news! {pet.Name} has been found safe!",
+            "NOTIFICATIONS.SOS_RESOLVED_TITLE",
+            "NOTIFICATIONS.SOS_RESOLVED",
             pet.Id);
 
         return Ok(MapToDto(pet));

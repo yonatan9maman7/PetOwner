@@ -90,7 +90,7 @@ public class ChatHub : Hub
         var senderName = await _db.Users
             .Where(u => u.Id == senderId)
             .Select(u => u.Name)
-            .FirstAsync();
+            .FirstOrDefaultAsync() ?? "Unknown";
 
         var payload = new ChatMessageDto(
             message.Id,

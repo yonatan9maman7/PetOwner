@@ -801,7 +801,19 @@
     "HISTORY_TITLE": "היסטוריית התראות",
     "HISTORY_SUBTITLE": "כל ההתראות שלך במקום אחד.",
     "LOADING": "טוען...",
-    "UNREAD": "חדש"
+    "UNREAD": "חדש",
+    "PROVIDER_APPROVED_TITLE": "הפרופיל אושר",
+    "PROVIDER_APPROVED": "הפרופיל שלך אושר בהצלחה!",
+    "ACCOUNT_SUSPENDED_TITLE": "החשבון הושעה",
+    "ACCOUNT_SUSPENDED": "חשבון הספק שלך הושעה. אנא פנה לתמיכה לפרטים נוספים.",
+    "PROVIDER_BANNED_TITLE": "חשבון הספק נחסם",
+    "PROVIDER_BANNED": "חשבון הספק שלך הוסר לצמיתות מהפלטפורמה עקב הפרת מדיניות.",
+    "ACCOUNT_REACTIVATED_TITLE": "החשבון הופעל מחדש",
+    "ACCOUNT_REACTIVATED": "חשבון הספק שלך הופעל מחדש. כעת תוכל לקבל הזמנות שוב.",
+    "SOS_ALERT_TITLE": "⚠️ התראת SOS",
+    "SOS_ALERT": "⚠️ חיית מחמד דווחה כאבודה! לחץ לעזרה.",
+    "SOS_RESOLVED_TITLE": "✅ SOS טופל",
+    "SOS_RESOLVED": "חדשות טובות! חיית המחמד נמצאה בשלום!"
   },
   "SUSPENSION": {
     "BANNER_TITLE": "חשבון נותן השירות שלך מושעה",

@@ -1,6 +1,6 @@
 import { Injectable, inject, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Observable } from 'rxjs';
+import { Observable, Subject } from 'rxjs';
 import * as signalR from '@microsoft/signalr';
 import { TranslateService } from '@ngx-translate/core';
 import { API_BASE_URL } from '../api-base.token';
@@ -26,6 +26,9 @@ export class NotificationService {
   private readonly toast = inject(ToastService);
   private readonly translate = inject(TranslateService);
   private connection: signalR.HubConnection | null = null;
+  private readonly notificationReceivedSubject = new Subject<AppNotification>();
+  /** Fires for each real-time payload from SignalR (after normalization). */
+  readonly notificationReceived$ = this.notificationReceivedSubject.asObservable();
 
   private notificationsHubUrl(): string {
     const base = this.apiBaseUrl.trim().replace(/\/$/, '');
@@ -50,16 +53,23 @@ export class NotificationService {
       .withAutomaticReconnect()
       .build();
 
-    this.connection.on('ReceiveNotification', (notification: AppNotification) => {
+    this.connection.on('NotificationReceived', (raw: AppNotification) => {
+      const notification: AppNotification = {
+        ...raw,
+        body: raw.body ?? raw.message ?? '',
+        message: raw.message ?? raw.body ?? '',
+      };
       this.notifications.update(list => [notification, ...list]);
       this.unreadCount.update(c => c + 1);
       this.newNotification.set(notification);
+      this.notificationReceivedSubject.next(notification);
 
       if (notification.type === 'sos') {
         this.sosAlert.set(notification);
       }
 
-      this.toast.show(notification.title || this.translate.instant('NOTIFICATIONS.NEW'), 'info');
+      const titleKey = notification.title?.trim() || 'NOTIFICATIONS.NEW';
+      this.toast.show(this.translate.instant(titleKey), 'info');
     });
 
     this.connection.start().catch(() => {});

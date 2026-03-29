@@ -57,7 +57,7 @@ import { TimeAgoPipe } from '../../shared/time-ago.pipe';
                     <div class="flex items-center gap-2 flex-wrap">
                       <p class="text-sm"
                          [class]="n.isRead ? 'font-normal text-gray-600' : 'font-semibold text-gray-900'">
-                        {{ n.title }}
+                        {{ n.title | translate }}
                       </p>
                       @if (!n.isRead) {
                         <span class="inline-block rounded-full bg-violet-100 px-2 py-0.5 text-[10px] font-bold text-violet-700 uppercase">
@@ -65,7 +65,7 @@ import { TimeAgoPipe } from '../../shared/time-ago.pipe';
                         </span>
                       }
                     </div>
-                    <p class="text-sm text-gray-500 mt-0.5">{{ n.body }}</p>
+                    <p class="text-sm text-gray-500 mt-0.5">{{ n.message | translate }}</p>
                     <div class="flex items-center gap-3 mt-1.5">
                       <span class="inline-block rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-medium text-gray-500">
                         {{ n.type }}

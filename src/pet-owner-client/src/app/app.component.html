@@ -260,8 +260,8 @@
                              [class]="n.isRead ? 'bg-transparent' : 'bg-violet-500'"></div>
                         <div class="min-w-0 flex-1">
                           <p class="text-sm truncate"
-                             [class]="n.isRead ? 'font-normal text-gray-600' : 'font-semibold text-gray-900'">{{ n.title }}</p>
-                          <p class="text-xs text-gray-500 mt-0.5">{{ n.body }}</p>
+                             [class]="n.isRead ? 'font-normal text-gray-600' : 'font-semibold text-gray-900'">{{ n.title | translate }}</p>
+                          <p class="text-xs text-gray-500 mt-0.5">{{ n.message | translate }}</p>
                           <p class="text-[10px] text-gray-400 mt-1">{{ n.createdAt | timeAgo }}</p>
                         </div>
                       </div>
@@ -457,8 +457,8 @@
                              [class]="n.isRead ? 'bg-transparent' : 'bg-violet-500'"></div>
                         <div class="min-w-0 flex-1">
                           <p class="text-sm truncate"
-                             [class]="n.isRead ? 'font-normal text-gray-600' : 'font-semibold text-gray-900'">{{ n.title }}</p>
-                          <p class="text-xs text-gray-500 mt-0.5">{{ n.body }}</p>
+                             [class]="n.isRead ? 'font-normal text-gray-600' : 'font-semibold text-gray-900'">{{ n.title | translate }}</p>
+                          <p class="text-xs text-gray-500 mt-0.5">{{ n.message | translate }}</p>
                           <p class="text-[10px] text-gray-400 mt-1">{{ n.createdAt | timeAgo }}</p>
                         </div>
                       </div>

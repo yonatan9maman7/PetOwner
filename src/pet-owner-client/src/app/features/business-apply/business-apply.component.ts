@@ -27,14 +27,40 @@ import {
 import { AddressAutocompleteComponent } from '../../shared/address-autocomplete.component';
 import { GeocodingService, AddressSuggestion } from '../../services/geocoding.service';
 import { AuthService } from '../../services/auth.service';
-import { ProviderService, ProviderOnboardingResponse } from '../../services/provider.service';
+import { ProviderService } from '../../services/provider.service';
 import { ToastService } from '../../services/toast.service';
 import {
-  OnboardingApiPayload,
   PRICING_UNIT_INT,
   SERVICE_TYPE_INT,
 } from '../wizard/wizard.model';
 import { BUSINESS_CATEGORY_CARDS, BusinessCategoryCard } from './business-apply.models';
+
+interface BusinessApplicationPayload {
+  type: number;
+  businessName: string;
+  serviceType: number;
+  city: string;
+  street: string;
+  buildingNumber: string;
+  apartmentNumber: string | null;
+  latitude: number;
+  longitude: number;
+  phoneNumber: string;
+  whatsAppNumber: string | null;
+  websiteUrl: string | null;
+  openingHours: string | null;
+  isEmergencyService: boolean;
+  description: string;
+  imageUrl: string | null;
+  selectedServices: { serviceType: number; rate: number; pricingUnit: number }[];
+  referenceName: string | null;
+  referenceContact: string | null;
+}
+
+interface BusinessApplicationResponse {
+  message: string;
+  applicationId: string;
+}
 
 const DEFAULT_LAT = 32.0563;
 const DEFAULT_LNG = 34.7668;
@@ -265,13 +291,23 @@ export class BusinessApplyComponent implements OnDestroy {
     const serviceType = CATEGORY_TO_SERVICE[card.id] ?? 'DropInVisit';
     const pricingUnit = CATEGORY_TO_PRICING[card.id] ?? 'PerVisit';
 
-    const bio = [
-      raw.openingHours ? `Opening hours: ${raw.openingHours}` : '',
-      raw.website ? `Website: ${raw.website}` : '',
-      raw.whatsapp ? `WhatsApp: ${raw.whatsapp}` : '',
-    ].filter(Boolean).join('\n');
-
-    const payload: OnboardingApiPayload = {
+    const payload: BusinessApplicationPayload = {
+      type: 1,
+      businessName: raw.businessName.trim(),
+      serviceType: SERVICE_TYPE_INT[serviceType],
+      city: raw.city.trim(),
+      street: raw.street.trim(),
+      buildingNumber: raw.buildingNumber.trim(),
+      apartmentNumber: raw.apartmentNumber.trim() || null,
+      latitude: this.lat()!,
+      longitude: this.lng()!,
+      phoneNumber: raw.phone.trim(),
+      whatsAppNumber: raw.whatsapp?.trim() || null,
+      websiteUrl: raw.website?.trim() || null,
+      openingHours: raw.openingHours?.trim() || null,
+      isEmergencyService: false,
+      description: raw.businessName.trim(),
+      imageUrl: null,
       selectedServices: [
         {
           serviceType: SERVICE_TYPE_INT[serviceType],
@@ -279,13 +315,6 @@ export class BusinessApplyComponent implements OnDestroy {
           pricingUnit: PRICING_UNIT_INT[pricingUnit],
         },
       ],
-      bio,
-      latitude: this.lat()!,
-      longitude: this.lng()!,
-      city: raw.city.trim(),
-      street: raw.street.trim(),
-      buildingNumber: raw.buildingNumber.trim(),
-      apartmentNumber: raw.apartmentNumber.trim() || null,
       referenceName: raw.businessName.trim(),
       referenceContact: raw.phone.trim(),
     };
@@ -293,12 +322,9 @@ export class BusinessApplyComponent implements OnDestroy {
     this.submitting.set(true);
 
     this.http
-      .post<ProviderOnboardingResponse>('/api/providers/onboarding', payload)
+      .post<BusinessApplicationResponse>('/api/providers/apply', payload)
       .pipe(
-        switchMap((res) => {
-          if (res.newAccessToken) {
-            this.auth.updateToken(res.newAccessToken);
-          }
+        switchMap(() => {
           if (!this.logoFile) return of(null);
           return this.providerService.uploadImage(this.logoFile).pipe(
             catchError(() => of(null)),
