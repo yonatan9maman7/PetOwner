@@ -33,7 +33,9 @@ public record ProviderPublicProfileDto(
     string? WhatsAppNumber,
     string? WebsiteUrl,
     string? OpeningHours,
-    bool IsEmergencyService
+    bool IsEmergencyService,
+    string? InstagramUrl,
+    string? FacebookUrl
 );
 
 public record PublicAvailabilitySlotDto(int DayOfWeek, string StartTime, string EndTime);

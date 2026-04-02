@@ -25,6 +25,8 @@ public class ProviderProfile
     public bool AcceptsOffHoursRequests { get; set; } = true;
     public string? ReferenceName { get; set; }
     public string? ReferenceContact { get; set; }
+    public string? InstagramUrl { get; set; }
+    public string? FacebookUrl { get; set; }
 
     public string City { get; set; } = null!;
     public string Street { get; set; } = null!;

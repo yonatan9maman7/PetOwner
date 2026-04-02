@@ -169,11 +169,12 @@ public class PetsController : ControllerBase
         pet.ContactPhone = request.ContactPhone;
 
         var imageSection = !string.IsNullOrEmpty(pet.ImageUrl) ? $"\n🖼️ Photo: {pet.ImageUrl}" : "";
+        var notesSection = !string.IsNullOrEmpty(request.Notes) ? $"\n📝 Identifying marks: {request.Notes}" : "";
         var sosPost = new Post
         {
             Id = Guid.NewGuid(),
             UserId = userId,
-            Content = $"🆘 SOS: {pet.Name} is lost!\n\n📍 Last seen: {request.LastSeenLocation}\n📞 Contact: {request.ContactPhone}{imageSection}\n\nPlease help us find {pet.Name}! If you see this pet, contact the owner immediately.",
+            Content = $"🆘 SOS: {pet.Name} is lost!\n\n📍 Last seen: {request.LastSeenLocation}\n📞 Contact: {request.ContactPhone}{imageSection}{notesSection}\n\nPlease help us find {pet.Name}! If you see this pet, contact the owner immediately.",
             ImageUrl = pet.ImageUrl,
             Latitude = request.LastSeenLat,
             Longitude = request.LastSeenLng,

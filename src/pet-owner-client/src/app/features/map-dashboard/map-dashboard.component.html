@@ -536,6 +536,21 @@
   </div>
 </div>
 
+<!-- ─── Floating SOS Button ─── -->
+@if (hasPets()) {
+  <button
+    type="button"
+    (click)="navigateToSos()"
+    class="fixed bottom-20 ltr:right-6 rtl:left-6 z-50
+           bg-red-600 text-white rounded-full w-16 h-16
+           flex items-center justify-center shadow-lg
+           hover:bg-red-700 active:scale-95 transition-all duration-150
+           animate-[sosPulse_2s_ease-in-out_infinite]"
+    [attr.aria-label]="'SOS.REPORT_LOST' | translate">
+    <span class="text-lg font-extrabold tracking-wide">SOS</span>
+  </button>
+}
+
 <!-- ─── Lost Pet Bottom Sheet ─── -->
 <div
   class="fixed inset-0 z-[1001] transition-opacity duration-300"

@@ -89,6 +89,39 @@ import { WizardLocationPanelComponent } from './wizard-location-panel.component'
 
             <app-step-magic-bio />
 
+            <fieldset class="step-form mt-4 border-0 p-0 m-0 min-w-0">
+              <legend class="field-label mb-2 text-start" dir="auto">{{ 'WIZARD.SOCIAL_LINKS_TITLE' | translate }}</legend>
+              <p class="mb-3 text-start text-xs text-slate-500" dir="auto">{{ 'WIZARD.SOCIAL_LINKS_SUBTITLE' | translate }}</p>
+              <div class="field mb-3">
+                <label class="field-label text-start block w-full" dir="auto" for="wizard-instagram">{{ 'WIZARD.INSTAGRAM_LABEL' | translate }}</label>
+                <input
+                  id="wizard-instagram"
+                  type="url"
+                  dir="ltr"
+                  [attr.placeholder]="'WIZARD.INSTAGRAM_PLACEHOLDER' | translate"
+                  class="w-full text-start placeholder:text-start px-4 py-3 text-base border-[1.5px] rounded-xl bg-white text-slate-900 outline-none transition-all
+                         border-slate-300 focus:border-indigo-500 focus:ring-[3px] focus:ring-indigo-500/15
+                         placeholder:text-slate-400"
+                  [ngModel]="store.instagramUrl()"
+                  (ngModelChange)="store.setInstagramUrl($event)"
+                />
+              </div>
+              <div class="field">
+                <label class="field-label text-start block w-full" dir="auto" for="wizard-facebook">{{ 'WIZARD.FACEBOOK_LABEL' | translate }}</label>
+                <input
+                  id="wizard-facebook"
+                  type="url"
+                  dir="ltr"
+                  [attr.placeholder]="'WIZARD.FACEBOOK_PLACEHOLDER' | translate"
+                  class="w-full text-start placeholder:text-start px-4 py-3 text-base border-[1.5px] rounded-xl bg-white text-slate-900 outline-none transition-all
+                         border-slate-300 focus:border-indigo-500 focus:ring-[3px] focus:ring-indigo-500/15
+                         placeholder:text-slate-400"
+                  [ngModel]="store.facebookUrl()"
+                  (ngModelChange)="store.setFacebookUrl($event)"
+                />
+              </div>
+            </fieldset>
+
             <!-- Location + map + address: single source in WizardLocationPanelComponent (no duplicate inputs here). -->
             <app-wizard-location-panel />
           }

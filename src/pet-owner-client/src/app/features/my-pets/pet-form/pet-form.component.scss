@@ -367,9 +367,11 @@
 /* ─── Neutered Toggle ─── */
 .neutered-card {
   display: flex;
+  flex-direction: row;
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
+  width: 100%;
   padding: 1rem 1.25rem;
   border-radius: 12px;
   border: 1px solid #e9ecf1;
@@ -379,6 +381,7 @@
 
 .neutered-info {
   min-width: 0;
+  flex: 1;
   text-align: start;
 }
 
@@ -415,12 +418,15 @@
       position: absolute;
       top: 3px;
       inset-inline-start: 3px;
+      inset-inline-end: auto;
       height: 22px;
       width: 22px;
       border-radius: 50%;
       background: #fff;
       box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
-      transition: transform 0.2s ease;
+      transition:
+        inset-inline-start 0.2s ease,
+        inset-inline-end 0.2s ease;
     }
   }
 
@@ -428,11 +434,8 @@
     background: linear-gradient(135deg, #7c3aed, #6d28d9);
 
     &::after {
-      transform: translateX(20px);
-
-      [dir='rtl'] & {
-        transform: translateX(-20px);
-      }
+      inset-inline-start: auto;
+      inset-inline-end: 3px;
     }
   }
 }

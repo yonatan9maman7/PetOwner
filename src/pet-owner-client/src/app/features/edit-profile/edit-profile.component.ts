@@ -229,6 +229,35 @@ const PRICING_UNIT_LABEL_KEY: Record<string, string> = {
           </div>
         </label>
 
+        <fieldset class="border-0 p-0 m-0 min-w-0 mt-4">
+          <legend class="field-label mb-1 text-start" dir="auto">{{ 'WIZARD.SOCIAL_LINKS_TITLE' | translate }}</legend>
+          <p class="mb-3 text-start text-xs text-slate-500" dir="auto">{{ 'WIZARD.SOCIAL_LINKS_SUBTITLE' | translate }}</p>
+          <div class="field mb-3">
+            <label class="field-label text-start block w-full" dir="auto" for="edit-instagram">{{ 'WIZARD.INSTAGRAM_LABEL' | translate }}</label>
+            <input
+              id="edit-instagram"
+              type="url"
+              dir="ltr"
+              class="text-start placeholder:text-start w-full"
+              [(ngModel)]="instagramUrl"
+              name="instagramUrl"
+              [attr.placeholder]="'WIZARD.INSTAGRAM_PLACEHOLDER' | translate"
+            />
+          </div>
+          <div class="field">
+            <label class="field-label text-start block w-full" dir="auto" for="edit-facebook">{{ 'WIZARD.FACEBOOK_LABEL' | translate }}</label>
+            <input
+              id="edit-facebook"
+              type="url"
+              dir="ltr"
+              class="text-start placeholder:text-start w-full"
+              [(ngModel)]="facebookUrl"
+              name="facebookUrl"
+              [attr.placeholder]="'WIZARD.FACEBOOK_PLACEHOLDER' | translate"
+            />
+          </div>
+        </fieldset>
+
         <button
           type="submit"
           class="btn btn-primary btn-submit"
@@ -291,6 +320,8 @@ export class EditProfileComponent implements OnInit {
 
   bio = '';
   aiNotes = '';
+  instagramUrl = '';
+  facebookUrl = '';
   readonly generatingBio = signal(false);
 
   ngOnInit(): void {
@@ -311,6 +342,8 @@ export class EditProfileComponent implements OnInit {
         this.userName.set(profile.userName ?? '');
         this.status.set(profile.status ?? '');
         this.bio = profile.bio ?? '';
+        this.instagramUrl = profile.instagramUrl ?? '';
+        this.facebookUrl = profile.facebookUrl ?? '';
         this.imagePreview.set(profile.profileImageUrl ?? null);
 
         this.selectedServiceRates.set(profile.serviceRates ?? []);
@@ -448,6 +481,8 @@ export class EditProfileComponent implements OnInit {
       latitude: loc.latitude,
       longitude: loc.longitude,
       acceptsOffHoursRequests: this.acceptsOffHoursRequests(),
+      instagramUrl: this.instagramUrl.trim() || null,
+      facebookUrl: this.facebookUrl.trim() || null,
     };
 
     const upload$: Observable<unknown> = this.selectedImageFile

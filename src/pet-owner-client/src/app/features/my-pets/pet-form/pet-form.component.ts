@@ -16,7 +16,7 @@ import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { Pet, PetService } from '../../../services/pet.service';
 import { PetSpecies } from '../../../models/pet-species.model';
-import { BREED_I18N_MAP, getBreedOptionsForSpecies } from '../breed.constants';
+import { BREED_I18N_MAP, BREED_OTHER_VALUE, getBreedOptionsForSpecies } from '../breed.constants';
 import { ToastService } from '../../../services/toast.service';
 import confetti from 'canvas-confetti';
 
@@ -60,6 +60,7 @@ export class PetFormComponent implements OnInit, OnChanges {
   readonly showSpecifyBreed = signal(false);
   readonly breedSearchText = signal('');
   readonly breedDropdownOpen = signal(false);
+  readonly specifyBreedPlaceholderKey = signal('');
   private hydrating = false;
 
   readonly filteredBreeds = computed(() => {
@@ -76,7 +77,11 @@ export class PetFormComponent implements OnInit, OnChanges {
     return options.filter((b) => {
       const key = BREED_I18N_MAP[b] ?? b;
       const translated = this.translate.instant(key).toLowerCase();
-      return translated.includes(search) || b.toLowerCase().includes(search);
+      return (
+        translated.includes(search) ||
+        b.toLowerCase().includes(search) ||
+        b.includes(this.breedSearchText().trim())
+      );
     });
   });
 
@@ -112,11 +117,15 @@ export class PetFormComponent implements OnInit, OnChanges {
       this.showSpecifyAnimal.set(species === PetSpecies.Other);
 
       if (!this.hydrating) {
-        this.petForm.get('breed')!.setValue('');
         this.petForm.get('specifyBreed')!.setValue('');
         this.petForm.get('specifyAnimalType')!.setValue('');
         this.breedSearchText.set('');
         this.breedDropdownOpen.set(false);
+        if (opts.length === 0 && species != null) {
+          this.petForm.get('breed')!.setValue(BREED_OTHER_VALUE);
+        } else {
+          this.petForm.get('breed')!.setValue('');
+        }
       }
 
       const breedCtrl = this.petForm.get('breed')!;
@@ -134,15 +143,30 @@ export class PetFormComponent implements OnInit, OnChanges {
         specifyAnimalCtrl.clearValidators();
       }
       specifyAnimalCtrl.updateValueAndValidity({ emitEvent: false });
+
+      if (species === PetSpecies.Bird) {
+        this.specifyBreedPlaceholderKey.set('PETS.SPECIFY_BREED_BIRD_PH');
+      } else if (species === PetSpecies.Rabbit) {
+        this.specifyBreedPlaceholderKey.set('PETS.SPECIFY_BREED_RABBIT_PH');
+      } else if (opts.length === 0 && species != null) {
+        this.specifyBreedPlaceholderKey.set('PETS.SPECIFY_BREED_OTHER_PH');
+      } else {
+        this.specifyBreedPlaceholderKey.set('');
+      }
     });
 
     this.petForm.get('breed')!.valueChanges.subscribe((breed) => {
-      this.showSpecifyBreed.set(breed === 'Other');
+      this.showSpecifyBreed.set(breed === BREED_OTHER_VALUE);
       const specifyBreedCtrl = this.petForm.get('specifyBreed')!;
-      if (breed === 'Other') {
-        specifyBreedCtrl.setValidators(Validators.required);
+      if (breed === BREED_OTHER_VALUE) {
+        if (this.currentBreedOptions().length > 0) {
+          specifyBreedCtrl.setValidators(Validators.required);
+        } else {
+          specifyBreedCtrl.clearValidators();
+        }
       } else {
         specifyBreedCtrl.clearValidators();
+        specifyBreedCtrl.setValue('');
       }
       specifyBreedCtrl.updateValueAndValidity({ emitEvent: false });
     });
@@ -276,7 +300,7 @@ export class PetFormComponent implements OnInit, OnChanges {
     const v = this.petForm.getRawValue();
     const rawBreed = v.breed?.trim();
     const finalBreed =
-      rawBreed === 'Other' ? v.specifyBreed?.trim() || undefined : rawBreed || undefined;
+      rawBreed === BREED_OTHER_VALUE ? v.specifyBreed?.trim() || undefined : rawBreed || undefined;
 
     const payload = {
       name: v.name!.trim(),
@@ -376,8 +400,8 @@ export class PetFormComponent implements OnInit, OnChanges {
       this.breedSearchText.set(this.translate.instant(this.breedI18nKey(pet.breed)));
       this.petForm.get('specifyBreed')!.setValue('');
     } else if (pet.breed) {
-      this.petForm.get('breed')!.setValue('Other');
-      this.breedSearchText.set(this.translate.instant(this.breedI18nKey('Other')));
+      this.petForm.get('breed')!.setValue(BREED_OTHER_VALUE);
+      this.breedSearchText.set(this.translate.instant(this.breedI18nKey(BREED_OTHER_VALUE)));
       this.petForm.get('specifyBreed')!.setValue(pet.breed);
     } else {
       this.petForm.get('breed')!.setValue('');
@@ -439,6 +463,7 @@ export class PetFormComponent implements OnInit, OnChanges {
     this.showSpecifyBreed.set(false);
     this.breedSearchText.set('');
     this.breedDropdownOpen.set(false);
+    this.specifyBreedPlaceholderKey.set('');
     this.avatarPreview.set(null);
     this.nameValue.set('');
   }

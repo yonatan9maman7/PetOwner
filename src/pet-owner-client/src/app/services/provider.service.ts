@@ -23,6 +23,8 @@ export interface ProviderProfile {
   acceptsOffHoursRequests: boolean;
   isSuspended: boolean;
   suspensionReason: string | null;
+  instagramUrl: string | null;
+  facebookUrl: string | null;
 }
 
 export interface UpdateProfilePayload {
@@ -35,6 +37,8 @@ export interface UpdateProfilePayload {
   latitude: number | null;
   longitude: number | null;
   acceptsOffHoursRequests?: boolean;
+  instagramUrl?: string | null;
+  facebookUrl?: string | null;
 }
 
 /** Response from POST /api/providers/onboarding */

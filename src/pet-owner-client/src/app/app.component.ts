@@ -166,7 +166,7 @@ export class AppComponent {
       this.router.navigate(['/community'], { queryParams: { highlightPost: n.relatedEntityId } });
       this.showNotificationPanel.set(false);
     } else if (n.relatedEntityId) {
-      this.router.navigate(['/requests']);
+      this.router.navigate(['/bookings']);
       this.showNotificationPanel.set(false);
     }
   }

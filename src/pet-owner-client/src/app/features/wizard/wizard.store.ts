@@ -36,6 +36,8 @@ export class WizardStore {
   private readonly submitting = signal(false);
   private readonly generatingBio = signal(false);
   private readonly verification_ = signal<TrustVerification>({ referenceName: '', referenceContact: '' });
+  private readonly instagramUrl_ = signal('');
+  private readonly facebookUrl_ = signal('');
 
   readonly step = this.currentStep.asReadonly();
   readonly isSubmitting = this.submitting.asReadonly();
@@ -61,6 +63,8 @@ export class WizardStore {
   readonly structuredAddress = this.structuredAddress_.asReadonly();
   readonly verification = this.verification_.asReadonly();
   readonly services = this.selectedServices.asReadonly();
+  readonly instagramUrl = this.instagramUrl_.asReadonly();
+  readonly facebookUrl = this.facebookUrl_.asReadonly();
 
   readonly hasStructuredAddress = computed(() => {
     const a = this.structuredAddress_();
@@ -137,6 +141,14 @@ export class WizardStore {
     this.verification_.update((prev) => ({ ...prev, ...value }));
   }
 
+  setInstagramUrl(value: string): void {
+    this.instagramUrl_.set(value);
+  }
+
+  setFacebookUrl(value: string): void {
+    this.facebookUrl_.set(value);
+  }
+
   generateBio(userNotes: string) {
     this.generatingBio.set(true);
     this.http
@@ -170,6 +182,8 @@ export class WizardStore {
       apartmentNumber: a.apartmentNumber.trim() || null,
       referenceName: snap.verification.referenceName.trim(),
       referenceContact: snap.verification.referenceContact.trim(),
+      instagramUrl: this.instagramUrl_().trim() || null,
+      facebookUrl: this.facebookUrl_().trim() || null,
     };
 
     return this.http.post<ProviderOnboardingResponse>('/api/providers/onboarding', payload).pipe(

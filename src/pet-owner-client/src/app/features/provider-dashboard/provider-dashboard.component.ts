@@ -119,7 +119,7 @@ import { ToastService } from '../../services/toast.service';
           <div class="bg-white rounded-2xl shadow-md p-5">
             <div class="flex items-center justify-between gap-2 mb-3">
               <h2 class="text-xs font-semibold text-gray-400 uppercase tracking-wider text-start">{{ 'DASHBOARD.UPCOMING_BOOKINGS' | translate }}</h2>
-              <a routerLink="/requests" class="text-xs text-violet-600 font-medium hover:underline shrink-0">{{ 'DASHBOARD.VIEW_ALL' | translate }}</a>
+              <a routerLink="/bookings" class="text-xs text-violet-600 font-medium hover:underline shrink-0">{{ 'DASHBOARD.VIEW_ALL' | translate }}</a>
             </div>
             @if (stats()!.upcomingBookings.length === 0) {
               <p class="text-sm text-gray-400 text-center py-4">{{ 'DASHBOARD.NO_UPCOMING_BOOKINGS' | translate }}</p>

@@ -172,7 +172,9 @@
     "SENDING_RESET": "Sending...",
     "SAVING_PASSWORD": "Saving...",
     "PASSWORDS_MISMATCH": "Passwords do not match",
-    "RESET_INVALID_TOKEN": "This link is invalid or has expired. Please request a new one."
+    "RESET_INVALID_TOKEN": "This link is invalid or has expired. Please request a new one.",
+    "SHOW_PASSWORD": "Show password",
+    "HIDE_PASSWORD": "Hide password"
   },
   "EARNINGS": {
     "TITLE": "Earnings",
@@ -303,6 +305,13 @@
     "SELECT_BREED": "Select breed...",
     "SPECIFY_ANIMAL": "Specify Animal Type",
     "SPECIFY_BREED": "Specify Breed",
+    "BREED_NAME_CUSTOM": "Breed name",
+    "BREED_QA_OTHER": "Other",
+    "BREED_QA_MIXED": "Mixed",
+    "BREED_QA_LABRADOR": "Labrador",
+    "BREED_QA_GOLDEN": "Golden Retriever",
+    "BREED_QA_STREET_CAT": "Street cat",
+    "BREED_QA_PERSIAN": "Persian",
     "SPECIFY_ALLERGY": "Specify Allergy",
     "HEALTH_RECORDS": "Health Records",
     "TRIAGE_HISTORY": "Triage History",
@@ -330,6 +339,7 @@
     "BREED_LABRADOR": "Labrador",
     "BREED_GERMAN_SHEPHERD": "German Shepherd",
     "BREED_FRENCH_BULLDOG": "French Bulldog",
+    "BREED_SIBERIAN_HUSKY": "Siberian Husky",
     "BREED_POODLE": "Poodle",
     "BREED_BEAGLE": "Beagle",
     "BREED_BULLDOG": "Bulldog",
@@ -356,7 +366,10 @@
     "RECORD_TYPE_VET_VISIT": "Vet Visit",
     "ADD_NEW_FAMILY_MEMBER": "Add New Family Member",
     "TELL_US_ABOUT": "Tell us about {{name}} 🐾",
-    "UPLOAD_AVATAR": "Upload Photo"
+    "UPLOAD_AVATAR": "Upload Photo",
+    "SPECIFY_BREED_BIRD_PH": "Type/Color (e.g., Gray Parrot)",
+    "SPECIFY_BREED_RABBIT_PH": "Type/Color (e.g., White Dwarf)",
+    "SPECIFY_BREED_OTHER_PH": "Breed or description (optional)"
   },
   "TRIAGE": {
     "SYMPTOM_CHECKER": "Symptom Checker",
@@ -402,6 +415,9 @@
     "SYMPTOM_PLACEHOLDER": "Describe the symptoms you've noticed...",
     "ERROR_ASSESSMENT": "Sorry, I was unable to complete the assessment. Please try again or consult a veterinarian directly."
   },
+  "POST": {
+    "EDITED": "edited"
+  },
   "COMMUNITY": {
     "FEED_TITLE": "Community Feed",
     "SUBTITLE": "Share moments with fellow pet lovers",
@@ -444,7 +460,12 @@
     "CREATING": "Creating...",
     "ERROR_CREATE_GROUP": "Failed to create group.",
     "LOST_AND_FOUND": "Lost & Found",
-    "SOS_BADGE": "SOS — Lost Pet"
+    "SOS_BADGE": "SOS — Lost Pet",
+    "EDIT": "Edit",
+    "SAVE": "Save",
+    "SAVING": "Saving...",
+    "CANCEL_EDIT": "Cancel",
+    "ERROR_EDIT_POST": "Failed to update post."
   },
   "WIZARD": {
     "STEP_OF": "Step {{current}} of {{total}}",
@@ -533,7 +554,13 @@
     "ERROR_SUBMIT_FAILED": "Submission failed. Please try again.",
     "GEO_NOT_SUPPORTED": "Geolocation is not supported by your browser.",
     "GEO_DENIED": "Unable to get your location. Please allow location access.",
-    "PROFILE_SUBMITTED_TOAST": "Profile submitted! We'll review it shortly."
+    "PROFILE_SUBMITTED_TOAST": "Profile submitted! We'll review it shortly.",
+    "SOCIAL_LINKS_TITLE": "Social Media Links",
+    "SOCIAL_LINKS_SUBTITLE": "Optional — help pet owners find and trust you.",
+    "INSTAGRAM_LABEL": "Instagram URL",
+    "INSTAGRAM_PLACEHOLDER": "https://instagram.com/yourprofile",
+    "FACEBOOK_LABEL": "Facebook URL",
+    "FACEBOOK_PLACEHOLDER": "https://facebook.com/yourpage"
   },
   "BOOKING": {
     "TITLE": "Book a Service",
@@ -651,7 +678,8 @@
     "WEEKLY_SCHEDULE": "Weekly Schedule",
     "REVIEWS_WITH_COUNT": "Reviews ({{count}})",
     "REVIEWS_TITLE": "Reviews",
-    "REVIEWS_COUNT": "{{count}} reviews"
+    "REVIEWS_COUNT": "{{count}} reviews",
+    "SOCIAL_LINKS": "Social Media"
   },
   "FITNESS": {
     "TITLE": "Fitness Dashboard",
@@ -785,13 +813,17 @@
     "PAY_NOW": "Pay Now",
     "PAID": "Paid",
     "PAYMENT_FAILED": "Payment Failed",
+    "CHAT_IN_APP": "Chat",
     "WHATSAPP": "WhatsApp",
     "WHATSAPP_MSG": "Hi {{name}}, regarding our booking for {{service}} on {{date}}...",
     "LEAVE_REVIEW": "Leave a Review",
     "REVIEWED": "Review submitted",
     "CARD_START": "Start",
     "CARD_END": "End",
-    "CARD_TOTAL": "Total"
+    "CARD_TOTAL": "Total",
+    "EMPTY_PROVIDER_TITLE": "No Incoming Requests",
+    "EMPTY_PROVIDER_SUBTITLE": "When pet owners book your services, their requests will appear here.",
+    "GO_TO_DASHBOARD": "Go to Dashboard"
   },
   "NOTIFICATIONS": {
     "TITLE": "Notifications",
@@ -977,6 +1009,70 @@
     "SUCCESS_TITLE": "SOS Alert Sent!",
     "SUCCESS_MESSAGE": "Your SOS alert for {{name}} is live! We've also created a community post for you to coordinate the search.",
     "EDIT_POST": "Edit Post — Add Details",
-    "CLOSE": "Close"
+    "CLOSE": "Close",
+    "IDENTIFYING_MARKS": "Identifying Marks",
+    "IDENTIFYING_MARKS_PLACEHOLDER": "E.g. scar on left ear, blue collar, limps slightly..."
+  },
+  "BREEDS": {
+    "OTHER": "Other",
+    "MIXED": "Mixed",
+    "LABRADOR_RETRIEVER": "Labrador Retriever",
+    "GOLDEN_RETRIEVER": "Golden Retriever",
+    "GERMAN_SHEPHERD": "German Shepherd",
+    "BELGIAN_MALINOIS": "Belgian Malinois",
+    "AUSTRALIAN_SHEPHERD": "Australian Shepherd",
+    "BORDER_COLLIE": "Border Collie",
+    "POODLE": "Poodle",
+    "POMERANIAN": "Pomeranian",
+    "SHIH_TZU": "Shih Tzu",
+    "MALTESE": "Maltese",
+    "JACK_RUSSELL": "Jack Russell Terrier",
+    "FRENCH_BULLDOG": "French Bulldog",
+    "ENGLISH_BULLDOG": "English Bulldog",
+    "PUG": "Pug",
+    "SIBERIAN_HUSKY": "Siberian Husky",
+    "PITBULL": "Pit Bull",
+    "AM_STAFF": "American Staffordshire Terrier",
+    "CANAAN_DOG": "Canaan Dog",
+    "PINSCHER": "Pinscher",
+    "CORGI": "Corgi",
+    "CAVALIER": "Cavalier King Charles Spaniel",
+    "PEKINGESE": "Pekingese",
+    "BEAGLE": "Beagle",
+    "DACHSHUND": "Dachshund",
+    "DOBERMAN": "Doberman",
+    "ROTTWEILER": "Rottweiler",
+    "AKITA": "Akita",
+    "CANE_CORSO": "Cane Corso",
+    "PAPILLON": "Papillon",
+    "WHIPPET": "Whippet",
+    "BOXER": "Boxer",
+    "SHAR_PEI": "Shar Pei",
+    "CHOW_CHOW": "Chow Chow",
+    "GREYHOUND": "Greyhound",
+    "SCHNAUZER": "Schnauzer",
+    "SAMOYED": "Samoyed",
+    "YORKSHIRE_TERRIER": "Yorkshire Terrier",
+    "SHIBA_INU": "Shiba Inu",
+    "MIXED_DSH": "Mixed / DSH",
+    "PERSIAN": "Persian",
+    "SIAMESE": "Siamese",
+    "BRITISH_SHORTHAIR": "British Shorthair",
+    "MAINE_COON": "Maine Coon",
+    "SPHYNX": "Sphynx",
+    "RAGDOLL": "Ragdoll",
+    "SCOTTISH_FOLD": "Scottish Fold",
+    "RUSSIAN_BLUE": "Russian Blue",
+    "BENGAL": "Bengal",
+    "ABYSSINIAN": "Abyssinian",
+    "SAVANNAH": "Savannah",
+    "TRICOLOR": "Tricolor / Calico",
+    "BURMESE": "Burmese",
+    "ORIENTAL": "Oriental Shorthair",
+    "NORWEGIAN_FOREST": "Norwegian Forest",
+    "DEVON_REX": "Devon Rex",
+    "BIRMAN": "Birman",
+    "GINGER_TABBY": "Ginger / Tabby",
+    "TURKISH_ANGORA": "Turkish Angora"
   }
 }

@@ -90,6 +90,8 @@ public class ProvidersController : ControllerBase
                 : request.ApartmentNumber.Trim(),
             Latitude = request.Latitude,
             Longitude = request.Longitude,
+            InstagramUrl = request.InstagramUrl?.Trim(),
+            FacebookUrl = request.FacebookUrl?.Trim(),
         };
 
         _db.ProviderProfiles.Add(profile);
@@ -186,6 +188,8 @@ public class ProvidersController : ControllerBase
             ApartmentNumber = string.IsNullOrWhiteSpace(request.ApartmentNumber)
                 ? null
                 : request.ApartmentNumber.Trim(),
+            InstagramUrl = request.InstagramUrl?.Trim(),
+            FacebookUrl = request.FacebookUrl?.Trim(),
         };
 
         _db.ProviderProfiles.Add(profile);
@@ -296,6 +300,9 @@ public class ProvidersController : ControllerBase
 
         if (request.AcceptsOffHoursRequests.HasValue)
             profile.AcceptsOffHoursRequests = request.AcceptsOffHoursRequests.Value;
+
+        profile.InstagramUrl = request.InstagramUrl?.Trim();
+        profile.FacebookUrl = request.FacebookUrl?.Trim();
 
         _db.ProviderServiceRates.RemoveRange(profile.ServiceRates);
         _db.ProviderServices.RemoveRange(profile.ProviderServices);
@@ -513,7 +520,9 @@ public class ProvidersController : ControllerBase
             profile.WhatsAppNumber,
             profile.WebsiteUrl,
             profile.OpeningHours,
-            profile.IsEmergencyService
+            profile.IsEmergencyService,
+            profile.InstagramUrl,
+            profile.FacebookUrl
         ));
     }
 

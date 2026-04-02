@@ -20,8 +20,11 @@ public record PostDto(
     DateTime CreatedAt,
     string AuthorRole,
     bool AuthorIsApprovedProvider,
-    string? Category = null
+    string? Category = null,
+    DateTime? UpdatedAt = null
 );
+
+public record UpdatePostDto(string Content);
 
 public record CreateCommentDto(string Content);
 

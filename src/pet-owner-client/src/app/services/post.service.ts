@@ -12,6 +12,7 @@ export interface Post {
   commentCount: number;
   likedByMe: boolean;
   createdAt: string;
+  updatedAt?: string | null;
   authorRole: string;
   authorIsApprovedProvider: boolean;
   communityGroupId: string | null;
@@ -68,6 +69,10 @@ export class PostService {
       longitude: location?.lng ?? null,
       city: location?.city ?? null,
     });
+  }
+
+  updatePost(postId: string, content: string): Observable<Post> {
+    return this.http.put<Post>(`/api/posts/${postId}`, { content });
   }
 
   delete(id: string): Observable<void> {

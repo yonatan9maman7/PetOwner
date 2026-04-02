@@ -90,7 +90,9 @@ public class MapController : ControllerBase
                 u.ProviderProfile.WhatsAppNumber,
                 u.ProviderProfile.WebsiteUrl,
                 u.ProviderProfile.OpeningHours,
-                u.ProviderProfile.IsEmergencyService))
+                u.ProviderProfile.IsEmergencyService,
+                u.ProviderProfile.InstagramUrl,
+                u.ProviderProfile.FacebookUrl))
             .FirstOrDefaultAsync();
 
         if (provider is null)

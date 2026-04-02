@@ -171,7 +171,9 @@
     "SENDING_RESET": "שולח...",
     "SAVING_PASSWORD": "שומר...",
     "PASSWORDS_MISMATCH": "הסיסמאות אינן תואמות",
-    "RESET_INVALID_TOKEN": "הקישור אינו תקף או שפג תוקפו. נא לבקש קישור חדש."
+    "RESET_INVALID_TOKEN": "הקישור אינו תקף או שפג תוקפו. נא לבקש קישור חדש.",
+    "SHOW_PASSWORD": "הצג סיסמה",
+    "HIDE_PASSWORD": "הסתר סיסמה"
   },
   "EARNINGS": {
     "TITLE": "הכנסות",
@@ -302,6 +304,13 @@
     "SELECT_BREED": "בחרו גזע...",
     "SPECIFY_ANIMAL": "ציינו סוג בעל חיים",
     "SPECIFY_BREED": "ציינו גזע",
+    "BREED_NAME_CUSTOM": "שם הגזע",
+    "BREED_QA_OTHER": "אחר",
+    "BREED_QA_MIXED": "מעורב",
+    "BREED_QA_LABRADOR": "לברדור",
+    "BREED_QA_GOLDEN": "גולדן רטריבר",
+    "BREED_QA_STREET_CAT": "חתול פח",
+    "BREED_QA_PERSIAN": "פרסי",
     "SPECIFY_ALLERGY": "ציינו אלרגיה",
     "HEALTH_RECORDS": "רשומות בריאות",
     "TRIAGE_HISTORY": "היסטוריית עוזר הבריאות",
@@ -329,6 +338,7 @@
     "BREED_LABRADOR": "לברדור",
     "BREED_GERMAN_SHEPHERD": "רועה גרמני",
     "BREED_FRENCH_BULLDOG": "בולדוג צרפתי",
+    "BREED_SIBERIAN_HUSKY": "האסקי סיבירי",
     "BREED_POODLE": "פודל",
     "BREED_BEAGLE": "ביגל",
     "BREED_BULLDOG": "בולדוג",
@@ -345,7 +355,7 @@
     "BREED_MALINOIS": "מלינואה",
     "BREED_SHIH_TZU": "שיצו",
     "BREED_POMERANIAN": "פומרניאן",
-    "BREED_STREET_CAT": "חתול רחוב",
+    "BREED_STREET_CAT": "חתול פח",
     "BREED_OTHER": "אחר",
     "SEARCH_BREED": "חפשו גזע...",
     "NO_BREED_MATCH": "לא נמצא גזע תואם",
@@ -355,7 +365,10 @@
     "RECORD_TYPE_VET_VISIT": "ביקור וטרינר",
     "ADD_NEW_FAMILY_MEMBER": "הוספת בן משפחה חדש",
     "TELL_US_ABOUT": "ספרו לנו על {{name}} 🐾",
-    "UPLOAD_AVATAR": "העלאת תמונה"
+    "UPLOAD_AVATAR": "העלאת תמונה",
+    "SPECIFY_BREED_BIRD_PH": "סוג/צבע (לדוגמה: תוכי אפור)",
+    "SPECIFY_BREED_RABBIT_PH": "סוג/צבע (לדוגמה: ננסי לבן)",
+    "SPECIFY_BREED_OTHER_PH": "גזע או תיאור (לא חובה)"
   },
   "TRIAGE": {
     "SYMPTOM_CHECKER": "בודק תסמינים",
@@ -401,6 +414,9 @@
     "SYMPTOM_PLACEHOLDER": "תארו את התסמינים ששמתם לב אליהם...",
     "ERROR_ASSESSMENT": "מצטערים, לא הצלחנו להשלים את ההערכה. נסו שוב או פנו ישירות לוטרינר."
   },
+  "POST": {
+    "EDITED": "נערך"
+  },
   "COMMUNITY": {
     "FEED_TITLE": "פיד הקהילה",
     "SUBTITLE": "שתפו רגעים עם חובבי חיות נוספים",
@@ -443,7 +459,12 @@
     "CREATING": "יוצר...",
     "ERROR_CREATE_GROUP": "יצירת הקבוצה נכשלה.",
     "LOST_AND_FOUND": "אבדות ומציאות",
-    "SOS_BADGE": "SOS — חיה אבודה"
+    "SOS_BADGE": "SOS — חיה אבודה",
+    "EDIT": "ערוך",
+    "SAVE": "שמור",
+    "SAVING": "שומר...",
+    "CANCEL_EDIT": "ביטול",
+    "ERROR_EDIT_POST": "עדכון הפוסט נכשל."
   },
   "WIZARD": {
     "STEP_OF": "שלב {{current}} מתוך {{total}}",
@@ -532,7 +553,13 @@
     "ERROR_SUBMIT_FAILED": "השליחה נכשלה. נסו שוב.",
     "GEO_NOT_SUPPORTED": "הדפדפן אינו תומך בגיאולוקציה.",
     "GEO_DENIED": "לא ניתן לקבל את המיקום. אפשרו גישה למיקום.",
-    "PROFILE_SUBMITTED_TOAST": "הפרופיל נשלח! נבדוק בקרוב."
+    "PROFILE_SUBMITTED_TOAST": "הפרופיל נשלח! נבדוק בקרוב.",
+    "SOCIAL_LINKS_TITLE": "קישורים לרשתות חברתיות",
+    "SOCIAL_LINKS_SUBTITLE": "אופציונלי — עוזר לבעלי חיות למצוא ולסמוך עליכם.",
+    "INSTAGRAM_LABEL": "כתובת אינסטגרם",
+    "INSTAGRAM_PLACEHOLDER": "https://instagram.com/yourprofile",
+    "FACEBOOK_LABEL": "כתובת פייסבוק",
+    "FACEBOOK_PLACEHOLDER": "https://facebook.com/yourpage"
   },
   "BOOKING": {
     "TITLE": "הזמנת שירות",
@@ -650,7 +677,8 @@
     "WEEKLY_SCHEDULE": "לוח שבועי",
     "REVIEWS_WITH_COUNT": "ביקורות ({{count}})",
     "REVIEWS_TITLE": "ביקורות",
-    "REVIEWS_COUNT": "{{count}} ביקורות"
+    "REVIEWS_COUNT": "{{count}} ביקורות",
+    "SOCIAL_LINKS": "רשתות חברתיות"
   },
   "FITNESS": {
     "TITLE": "לוח כושר",
@@ -784,13 +812,17 @@
     "PAY_NOW": "שלם עכשיו",
     "PAID": "שולם",
     "PAYMENT_FAILED": "התשלום נכשל",
+    "CHAT_IN_APP": "צ׳אט",
     "WHATSAPP": "וואטסאפ",
     "WHATSAPP_MSG": "היי {{name}}, בנוגע להזמנה שלנו ל{{service}} בתאריך {{date}}...",
     "LEAVE_REVIEW": "השאר ביקורת",
     "REVIEWED": "הביקורת נשלחה",
     "CARD_START": "התחלה",
     "CARD_END": "סיום",
-    "CARD_TOTAL": "סה\"כ"
+    "CARD_TOTAL": "סה\"כ",
+    "EMPTY_PROVIDER_TITLE": "אין בקשות נכנסות",
+    "EMPTY_PROVIDER_SUBTITLE": "כשבעלי חיות מחמד יזמינו את השירותים שלך, הבקשות יופיעו כאן.",
+    "GO_TO_DASHBOARD": "למרכז הבקרה"
   },
   "NOTIFICATIONS": {
     "TITLE": "התראות",
@@ -976,6 +1008,70 @@
     "SUCCESS_TITLE": "התראת SOS נשלחה!",
     "SUCCESS_MESSAGE": "התראת SOS עבור {{name}} פעילה! יצרנו גם פוסט בקהילה כדי לתאם את החיפוש.",
     "EDIT_POST": "עריכת פוסט — הוספת פרטים",
-    "CLOSE": "סגור"
+    "CLOSE": "סגור",
+    "IDENTIFYING_MARKS": "סימנים מזהים",
+    "IDENTIFYING_MARKS_PLACEHOLDER": "לדוגמה: צלקת באוזן שמאל, קולר כחול, צולע קלות..."
+  },
+  "BREEDS": {
+    "OTHER": "אחר",
+    "MIXED": "מעורב",
+    "LABRADOR_RETRIEVER": "לברדור רטריבר",
+    "GOLDEN_RETRIEVER": "גולדן רטריבר",
+    "GERMAN_SHEPHERD": "רועה גרמני",
+    "BELGIAN_MALINOIS": "רועה בלגי (מלינואה)",
+    "AUSTRALIAN_SHEPHERD": "רועה אוסטרלי",
+    "BORDER_COLLIE": "בורדר קולי",
+    "POODLE": "פודל",
+    "POMERANIAN": "פומרניאן",
+    "SHIH_TZU": "שיצו",
+    "MALTESE": "מלטז",
+    "JACK_RUSSELL": "ג'ק ראסל טרייר",
+    "FRENCH_BULLDOG": "בולדוג צרפתי",
+    "ENGLISH_BULLDOG": "בולדוג אנגלי",
+    "PUG": "פאג",
+    "SIBERIAN_HUSKY": "האסקי סיבירי",
+    "PITBULL": "פיטבול",
+    "AM_STAFF": "אמסטף",
+    "CANAAN_DOG": "כנעני",
+    "PINSCHER": "פינצ'ר",
+    "CORGI": "קורגי",
+    "CAVALIER": "קוואליר קינג צ'ארלס ספניאל",
+    "PEKINGESE": "פקינז",
+    "BEAGLE": "ביגל",
+    "DACHSHUND": "תחש (בייגלה)",
+    "DOBERMAN": "דוברמן",
+    "ROTTWEILER": "רוטוויילר",
+    "AKITA": "אקיטה",
+    "CANE_CORSO": "קיין קורסו",
+    "PAPILLON": "פפיון",
+    "WHIPPET": "וויפט",
+    "BOXER": "בוקסר",
+    "SHAR_PEI": "שר פיי",
+    "CHOW_CHOW": "צ'או צ'או",
+    "GREYHOUND": "גרייהאונד",
+    "SCHNAUZER": "שנאוצר",
+    "SAMOYED": "סמויד",
+    "YORKSHIRE_TERRIER": "יורקשיר טרייר",
+    "SHIBA_INU": "שיבא אינו",
+    "MIXED_DSH": "מעורב / פח",
+    "PERSIAN": "פרסי",
+    "SIAMESE": "סיאמי",
+    "BRITISH_SHORTHAIR": "בריטי",
+    "MAINE_COON": "מיין קון",
+    "SPHYNX": "ספינקס",
+    "RAGDOLL": "ראגדול",
+    "SCOTTISH_FOLD": "סקוטיש פולד",
+    "RUSSIAN_BLUE": "רוסי כחול",
+    "BENGAL": "בנגלי",
+    "ABYSSINIAN": "חבשי",
+    "SAVANNAH": "סוואנה",
+    "TRICOLOR": "חתול טריקולור",
+    "BURMESE": "בורמזי",
+    "ORIENTAL": "אוריינטלי",
+    "NORWEGIAN_FOREST": "נורווגי יער",
+    "DEVON_REX": "דבון רקס",
+    "BIRMAN": "בירמני",
+    "GINGER_TABBY": "ג'ינג'י",
+    "TURKISH_ANGORA": "טורקיש אנגורה"
   }
 }

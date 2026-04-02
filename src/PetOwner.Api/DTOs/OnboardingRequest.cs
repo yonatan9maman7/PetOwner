@@ -19,7 +19,9 @@ public record ProviderOnboardingRequest(
     [Required] string BuildingNumber,
     string? ApartmentNumber,
     [Required] string ReferenceName,
-    [Required] string ReferenceContact
+    [Required] string ReferenceContact,
+    [MaxLength(500), Url] string? InstagramUrl = null,
+    [MaxLength(500), Url] string? FacebookUrl = null
 );
 
 public record ProviderApplicationRequest
@@ -78,6 +80,12 @@ public record ProviderApplicationRequest
 
     [MaxLength(200)]
     public string? ReferenceContact { get; init; }
+
+    [MaxLength(500), Url]
+    public string? InstagramUrl { get; init; }
+
+    [MaxLength(500), Url]
+    public string? FacebookUrl { get; init; }
 }
 
 public record ProviderApplicationResponse(string Message, Guid ApplicationId);
@@ -106,7 +114,9 @@ public record ProviderMeResponse(
     string? WhatsAppNumber,
     string? WebsiteUrl,
     string? OpeningHours,
-    bool IsEmergencyService
+    bool IsEmergencyService,
+    string? InstagramUrl,
+    string? FacebookUrl
 );
 
 public record GenerateBioRequest(string UserNotes);
@@ -124,5 +134,7 @@ public record UpdateProfileDto(
     string Street,
     string BuildingNumber,
     string? ApartmentNumber,
-    bool? AcceptsOffHoursRequests
+    bool? AcceptsOffHoursRequests,
+    [MaxLength(500), Url] string? InstagramUrl = null,
+    [MaxLength(500), Url] string? FacebookUrl = null
 );

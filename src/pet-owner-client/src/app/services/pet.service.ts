@@ -1,6 +1,6 @@
-import { Injectable, inject } from '@angular/core';
+import { Injectable, inject, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Observable } from 'rxjs';
+import { Observable, tap } from 'rxjs';
 import { PetSpecies } from '../models/pet-species.model';
 
 export interface Pet {
@@ -48,6 +48,7 @@ export interface ReportLostPayload {
   lastSeenLat: number;
   lastSeenLng: number;
   contactPhone: string;
+  notes?: string;
 }
 
 export interface CreatePetPayload {
@@ -89,8 +90,11 @@ export class PetService {
   private readonly http = inject(HttpClient);
   private readonly baseUrl = '/api/pets';
 
+  /** Updated whenever `getAll()` emits successfully. */
+  readonly pets = signal<Pet[]>([]);
+
   getAll(): Observable<Pet[]> {
-    return this.http.get<Pet[]>(this.baseUrl);
+    return this.http.get<Pet[]>(this.baseUrl).pipe(tap((list) => this.pets.set(list)));
   }
 
   create(payload: CreatePetPayload): Observable<Pet> {

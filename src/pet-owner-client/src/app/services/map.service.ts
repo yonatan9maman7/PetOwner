@@ -32,6 +32,8 @@ export interface ProviderPublicProfile {
     photoUrl: string | null;
     createdAt: string;
   }[];
+  instagramUrl: string | null;
+  facebookUrl: string | null;
 }
 
 export interface UserMiniProfile {

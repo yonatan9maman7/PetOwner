@@ -45,8 +45,8 @@
         <span class="avatar-hint">{{ 'PETS.UPLOAD_AVATAR' | translate }}</span>
       </div>
 
-      <!-- Dynamic Title -->
-      <h2 class="form-title">
+      <!-- Dynamic Title (dir=auto so mixed Hebrew/English names render naturally) -->
+      <h2 class="form-title" dir="auto">
         @if (editingPet) {
           {{ 'PETS.EDIT_PET' | translate }}
         } @else if (nameValue()) {
@@ -192,6 +192,33 @@
             </div>
           }
 
+          <!-- Specify Breed (conditional — sits in same grid cell as breed autocomplete for Bird/Rabbit/Other) -->
+          @if (showSpecifyBreed()) {
+            <div class="form-field">
+              <label for="pf-specify-breed" class="field-label">
+                <span dir="auto">{{ 'PETS.BREED_NAME_CUSTOM' | translate }}</span>
+                @if (currentBreedOptions().length > 0) {
+                  <span class="required-mark">*</span>
+                }
+              </label>
+              <div class="input-wrapper">
+                <input id="pf-specify-breed" type="text" formControlName="specifyBreed" dir="auto"
+                  [attr.placeholder]="specifyBreedPlaceholderKey() ? (specifyBreedPlaceholderKey() | translate) : null"
+                  (blur)="onFieldBlur('specifyBreed')"
+                  [class.field-invalid]="petForm.get('specifyBreed')?.invalid && petForm.get('specifyBreed')?.touched"
+                  [class.field-shake]="shakingField() === 'specifyBreed'"
+                />
+                @if (petForm.get('specifyBreed')?.valid && petForm.get('specifyBreed')?.touched && petForm.get('specifyBreed')?.value) {
+                  <span class="valid-check">
+                    <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+                    </svg>
+                  </span>
+                }
+              </div>
+            </div>
+          }
+
           <!-- Weight -->
           <div class="form-field">
             <label for="pf-weight" class="field-label">
@@ -215,38 +242,14 @@
             </div>
           </div>
 
-          <!-- Specify Breed (conditional) -->
-          @if (showSpecifyBreed()) {
-            <div class="form-field full-width">
-              <label for="pf-specify-breed" class="field-label">
-                <span dir="auto">{{ 'PETS.SPECIFY_BREED' | translate }}</span>
-                <span class="required-mark">*</span>
-              </label>
-              <div class="input-wrapper">
-                <input id="pf-specify-breed" type="text" formControlName="specifyBreed" dir="auto"
-                  (blur)="onFieldBlur('specifyBreed')"
-                  [class.field-invalid]="petForm.get('specifyBreed')?.invalid && petForm.get('specifyBreed')?.touched"
-                  [class.field-shake]="shakingField() === 'specifyBreed'"
-                />
-                @if (petForm.get('specifyBreed')?.valid && petForm.get('specifyBreed')?.touched && petForm.get('specifyBreed')?.value) {
-                  <span class="valid-check">
-                    <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3">
-                      <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
-                    </svg>
-                  </span>
-                }
-              </div>
-            </div>
-          }
-
-          <!-- Neutered Toggle (full width) -->
+          <!-- Neutered Toggle (full width; logical CSS + flex so RTL aligns label/track correctly) -->
           <div class="form-field full-width">
-            <div class="neutered-card">
-              <div class="neutered-info">
+            <div class="neutered-card flex w-full flex-row items-center justify-between gap-4">
+              <div class="neutered-info min-w-0 flex-1">
                 <span class="neutered-label" dir="auto">{{ 'PETS.NEUTERED_QUESTION' | translate }}</span>
                 <p class="neutered-hint" dir="auto">{{ 'PETS.NEUTERED_HELP' | translate }}</p>
               </div>
-              <label for="pf-neutered" class="toggle-switch">
+              <label for="pf-neutered" class="toggle-switch shrink-0">
                 <input id="pf-neutered" type="checkbox" formControlName="isNeutered" class="sr-only peer" />
                 <span class="toggle-track"></span>
               </label>

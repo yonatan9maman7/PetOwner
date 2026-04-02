@@ -54,7 +54,8 @@ public class PostsController : ControllerBase
                 p.CreatedAt,
                 p.User.Role,
                 p.User.ProviderProfile != null && p.User.ProviderProfile.Status == ProviderStatus.Approved,
-                p.Category))
+                p.Category,
+                p.UpdatedAt))
             .ToListAsync();
 
         return Ok(posts);
@@ -76,6 +77,7 @@ public class PostsController : ControllerBase
             Latitude = dto.Latitude,
             Longitude = dto.Longitude,
             City = dto.City?.Trim(),
+            CreatedAt = DateTime.UtcNow,
         };
 
         _db.Posts.Add(post);
@@ -89,10 +91,45 @@ public class PostsController : ControllerBase
                 0, 0, false, p.CreatedAt,
                 p.User.Role,
                 p.User.ProviderProfile != null && p.User.ProviderProfile.Status == ProviderStatus.Approved,
-                p.Category))
+                p.Category,
+                p.UpdatedAt))
             .FirstAsync();
 
         return CreatedAtAction(nameof(GetFeed), null, created);
+    }
+
+    [HttpPut("{id:guid}")]
+    public async Task<IActionResult> Update(Guid id, [FromBody] UpdatePostDto dto)
+    {
+        if (string.IsNullOrWhiteSpace(dto.Content))
+            return BadRequest(new { message = "Post content is required." });
+
+        var post = await _db.Posts.FirstOrDefaultAsync(p => p.Id == id);
+        if (post is null) return NotFound(new { message = "Post not found." });
+
+        var userId = GetUserId();
+        if (post.UserId != userId)
+            return Forbid();
+
+        post.Content = dto.Content.Trim();
+        post.UpdatedAt = DateTime.UtcNow;
+        await _db.SaveChangesAsync();
+
+        var updated = await _db.Posts
+            .AsNoTracking()
+            .Where(p => p.Id == id)
+            .Select(p => new PostDto(
+                p.Id, p.UserId, p.User.Name, p.Content, p.ImageUrl,
+                p.LikeCount, p.CommentCount,
+                p.Likes.Any(l => l.UserId == userId),
+                p.CreatedAt,
+                p.User.Role,
+                p.User.ProviderProfile != null && p.User.ProviderProfile.Status == ProviderStatus.Approved,
+                p.Category,
+                p.UpdatedAt))
+            .FirstAsync();
+
+        return Ok(updated);
     }
 
     [HttpDelete("{id:guid}")]

@@ -120,4 +120,6 @@ export interface OnboardingApiPayload {
   apartmentNumber: string | null;
   referenceName: string;
   referenceContact: string;
+  instagramUrl?: string | null;
+  facebookUrl?: string | null;
 }

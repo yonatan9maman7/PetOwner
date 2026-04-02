@@ -17,6 +17,12 @@ import { BREED_I18N_MAP } from './breed.constants';
 import { PetFormComponent } from './pet-form/pet-form.component';
 import { PetHealthPassportComponent } from './pet-health-passport/pet-health-passport.component';
 import { Subject, debounceTime, distinctUntilChanged, switchMap } from 'rxjs';
+import * as L from 'leaflet';
+import {
+  CARTO_VOYAGER_TILE_URL,
+  CARTO_VOYAGER_TILE_OPTIONS,
+  applyMinimalMapAttribution,
+} from '../../shared/leaflet-defaults';
 
 @Component({
   selector: 'app-my-pets',
@@ -448,6 +454,9 @@ import { Subject, debounceTime, distinctUntilChanged, switchMap } from 'rxjs';
               }
             </div>
 
+            <!-- Mini-Map Preview -->
+            <div id="sos-mini-map" class="h-32 w-full rounded-xl border border-gray-200 bg-gray-100"></div>
+
             <!-- Emergency Phone -->
             <div>
               <label class="block text-start text-xs font-semibold text-slate-600 mb-1.5">
@@ -462,6 +471,22 @@ import { Subject, debounceTime, distinctUntilChanged, switchMap } from 'rxjs';
                 class="w-full text-start rounded-xl border-2 border-gray-200 px-4 py-2.5 text-sm
                        text-slate-900 placeholder-slate-400
                        focus:border-red-400 focus:ring-2 focus:ring-red-100 outline-none transition" />
+            </div>
+
+            <!-- Identifying Marks / Notes -->
+            <div>
+              <label class="block text-start text-xs font-semibold text-slate-600 mb-1.5">
+                {{ 'SOS.IDENTIFYING_MARKS' | translate }}
+              </label>
+              <textarea
+                dir="auto"
+                rows="2"
+                [attr.placeholder]="'SOS.IDENTIFYING_MARKS_PLACEHOLDER' | translate"
+                [value]="sosNotes()"
+                (input)="sosNotes.set($any($event.target).value)"
+                class="w-full text-start placeholder:text-start rounded-xl border-2 border-gray-200 px-4 py-2.5 text-sm
+                       text-slate-900 placeholder-slate-400 resize-none
+                       focus:border-red-400 focus:ring-2 focus:ring-red-100 outline-none transition"></textarea>
             </div>
 
             <!-- Actions -->
@@ -734,12 +759,15 @@ export class MyPetsComponent implements OnInit, OnDestroy {
   readonly sosSuggestions = signal<AddressSuggestion[]>([]);
   readonly sosSelectedAddress = signal<AddressSuggestion | null>(null);
   readonly sosPhone = signal('');
+  readonly sosNotes = signal('');
   readonly sosSubmitting = signal(false);
   readonly sosCooldownRemaining = signal<string | null>(null);
   readonly sosSuccessPet = signal<Pet | null>(null);
   private readonly router = inject(Router);
   private cooldownTimer: ReturnType<typeof setInterval> | null = null;
   private readonly sosSearch$ = new Subject<string>();
+  private sosMiniMap: L.Map | null = null;
+  private sosMiniMarker: L.Marker | null = null;
 
   private initSosSearch(): void {
     this.sosSearch$.pipe(
@@ -791,11 +819,15 @@ export class MyPetsComponent implements OnInit, OnDestroy {
     this.sosSuggestions.set([]);
     this.sosSelectedAddress.set(null);
     this.sosPhone.set('');
+    this.sosNotes.set('');
     this.initSosSearch();
+    this.destroySosMiniMap();
+    setTimeout(() => this.initSosMiniMap(), 0);
   }
 
   closeSosDialog(): void {
     this.sosPet.set(null);
+    this.destroySosMiniMap();
   }
 
   onSosAddressInput(value: string): void {
@@ -808,6 +840,7 @@ export class MyPetsComponent implements OnInit, OnDestroy {
     this.sosAddressQuery.set(s.displayName);
     this.sosSelectedAddress.set(s);
     this.sosSuggestions.set([]);
+    this.updateSosMiniMap(s.lat, s.lon);
   }
 
   submitSos(): void {
@@ -817,11 +850,13 @@ export class MyPetsComponent implements OnInit, OnDestroy {
     if (!pet || !addr || !phone) return;
 
     this.sosSubmitting.set(true);
+    const notes = this.sosNotes().trim();
     const payload: ReportLostPayload = {
       lastSeenLocation: addr.displayName,
       lastSeenLat: addr.lat,
       lastSeenLng: addr.lon,
       contactPhone: phone,
+      ...(notes ? { notes } : {}),
     };
 
     this.petService.reportLost(pet.id, payload).subscribe({
@@ -872,6 +907,40 @@ export class MyPetsComponent implements OnInit, OnDestroy {
 
   dismissSosSuccess(): void {
     this.sosSuccessPet.set(null);
+  }
+
+  private initSosMiniMap(): void {
+    const el = document.getElementById('sos-mini-map');
+    if (!el) return;
+    this.sosMiniMap = L.map(el, {
+      center: [32.07, 34.77],
+      zoom: 13,
+      zoomControl: false,
+      attributionControl: false,
+      dragging: false,
+      scrollWheelZoom: false,
+      doubleClickZoom: false,
+      touchZoom: false,
+    });
+    L.tileLayer(CARTO_VOYAGER_TILE_URL, CARTO_VOYAGER_TILE_OPTIONS).addTo(this.sosMiniMap);
+  }
+
+  private updateSosMiniMap(lat: number, lng: number): void {
+    if (!this.sosMiniMap) return;
+    this.sosMiniMap.setView([lat, lng], 15);
+    if (this.sosMiniMarker) {
+      this.sosMiniMarker.setLatLng([lat, lng]);
+    } else {
+      this.sosMiniMarker = L.marker([lat, lng]).addTo(this.sosMiniMap);
+    }
+  }
+
+  private destroySosMiniMap(): void {
+    if (this.sosMiniMap) {
+      this.sosMiniMap.remove();
+      this.sosMiniMap = null;
+      this.sosMiniMarker = null;
+    }
   }
 
   // ── UI helpers ──

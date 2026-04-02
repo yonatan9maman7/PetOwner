@@ -69,6 +69,7 @@ export class MapDashboardComponent implements OnInit, OnDestroy, AfterViewInit {
 
   readonly isLoggedIn = computed(() => this.auth.isLoggedIn());
   readonly isAdmin = computed(() => this.auth.userRole() === 'Admin');
+  readonly hasPets = computed(() => this.petService.pets().length > 0);
 
   private map!: L.Map;
   private markersLayer = L.layerGroup();
@@ -146,6 +147,9 @@ export class MapDashboardComponent implements OnInit, OnDestroy, AfterViewInit {
     this.locateUser();
     this.checkProviderStatus();
     this.loadLostPets();
+    this.petService.getAll().pipe(takeUntil(this.destroy$)).subscribe({
+      error: () => this.petService.pets.set([]),
+    });
     this.mapService.getServiceTypes().subscribe({
       next: (types) => this.serviceTypes.set(types),
     });
@@ -398,6 +402,10 @@ export class MapDashboardComponent implements OnInit, OnDestroy, AfterViewInit {
         this.toast.error('Failed to revoke provider status.');
       },
     });
+  }
+
+  navigateToSos(): void {
+    this.router.navigate(['/my-pets']);
   }
 
   closeLostPetSheet(): void {

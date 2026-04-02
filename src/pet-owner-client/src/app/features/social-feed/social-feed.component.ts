@@ -205,9 +205,14 @@ import { CommunityService, CommunityGroup } from '../../services/community.servi
                     >
                       {{ post.userName }}
                     </button>
-                    <p class="text-[11px] text-slate-400">{{ post.createdAt | date:'medium' }}</p>
+                    <p class="text-[11px] text-slate-400">{{ post.createdAt | date:'medium' }}@if (post.updatedAt) { <span class="ms-1 opacity-80">({{ 'POST.EDITED' | translate }})</span> }</p>
                   </div>
                   @if (post.userId === currentUserId()) {
+                    <button (click)="startEdit(post)" class="p-1.5 rounded-lg text-slate-300 hover:text-sky-500 hover:bg-sky-50 transition-colors" [attr.title]="'COMMUNITY.EDIT' | translate">
+                      <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                      </svg>
+                    </button>
                     <button (click)="deletePost(post)" class="p-1.5 rounded-lg text-slate-300 hover:text-red-500 hover:bg-red-50 transition-colors">
                       <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -218,7 +223,32 @@ import { CommunityService, CommunityGroup } from '../../services/community.servi
 
                 <!-- Post Content -->
                 <div class="px-5 pb-3">
-                  <p class="text-sm text-slate-700 whitespace-pre-wrap leading-relaxed" dir="auto">{{ post.content }}</p>
+                  @if (editingPostId() === post.id) {
+                    <textarea
+                      [(ngModel)]="editContent"
+                      dir="auto"
+                      rows="3"
+                      class="w-full resize-none rounded-xl border border-sky-300 px-4 py-3 text-sm text-start text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent transition"
+                    ></textarea>
+                    <div class="flex items-center gap-2 mt-2">
+                      <button
+                        (click)="saveEdit(post)"
+                        [disabled]="editSaving() || !editContent().trim()"
+                        class="px-4 py-1.5 bg-sky-600 text-white text-sm font-semibold rounded-lg hover:bg-sky-500 disabled:opacity-40 disabled:cursor-not-allowed transition"
+                      >
+                        {{ editSaving() ? ('COMMUNITY.SAVING' | translate) : ('COMMUNITY.SAVE' | translate) }}
+                      </button>
+                      <button
+                        (click)="cancelEdit()"
+                        [disabled]="editSaving()"
+                        class="px-4 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+                      >
+                        {{ 'COMMUNITY.CANCEL_EDIT' | translate }}
+                      </button>
+                    </div>
+                  } @else {
+                    <p class="text-sm text-slate-700 whitespace-pre-wrap leading-relaxed" dir="auto">{{ post.content }}</p>
+                  }
                 </div>
 
                 @if (post.imageUrl) {
@@ -230,28 +260,32 @@ import { CommunityService, CommunityGroup } from '../../services/community.servi
                   <button
                     type="button"
                     (click)="toggleLike(post)"
-                    class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors"
-                    [class]="post.likedByMe ? 'text-sky-600 bg-sky-50' : 'text-slate-400 hover:text-sky-600 hover:bg-sky-50'"
+                    class="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-colors cursor-pointer"
+                    [class]="post.likedByMe ? 'text-red-500 hover:bg-red-50' : 'text-gray-500 hover:bg-gray-100'"
                     [attr.aria-label]="'COMMUNITY.LIKE' | translate"
                   >
-                    <svg class="w-4.5 h-4.5" [attr.fill]="post.likedByMe ? 'currentColor' : 'none'" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                      <path stroke-linecap="round" stroke-linejoin="round" d="M14 9V5a3 3 0 00-3-3l-4 9v11h11.28a2 2 0 002-1.7l1.38-9a2 2 0 00-2-2.3H14zM7 22H4a2 2 0 01-2-2v-7a2 2 0 012-2h3" />
-                    </svg>
-                    {{ 'COMMUNITY.LIKE' | translate }}
-                    @if (post.likeCount) { <span>({{ post.likeCount }})</span> }
+                    @if (post.likedByMe) {
+                      <svg class="w-5 h-5 fill-current" viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M11.645 20.91l-.007-.003-.022-.012a15.247 15.247 0 01-.383-.218 25.18 25.18 0 01-4.244-3.17C4.688 15.36 2.25 12.174 2.25 8.25 2.25 5.322 4.714 3 7.688 3A5.5 5.5 0 0112 5.052 5.5 5.5 0 0116.313 3c2.973 0 5.437 2.322 5.437 5.25 0 3.925-2.438 7.111-4.739 9.256a25.175 25.175 0 01-4.244 3.17 15.247 15.247 0 01-.383.219l-.022.012-.007.004-.003.001a.752.752 0 01-.704 0l-.003-.001z" />
+                      </svg>
+                    } @else {
+                      <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12z" />
+                      </svg>
+                    }
+                    @if (post.likeCount) { <span>{{ post.likeCount }}</span> }
                   </button>
                   <button
                     type="button"
                     (click)="toggleComments(post)"
-                    class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors"
-                    [class]="expandedPostId() === post.id ? 'text-sky-600 bg-sky-50' : 'text-slate-400 hover:text-sky-500 hover:bg-sky-50'"
+                    class="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-colors cursor-pointer"
+                    [class]="expandedPostId() === post.id ? 'text-sky-600 hover:bg-sky-50' : 'text-gray-500 hover:bg-gray-100'"
                     [attr.aria-label]="'COMMUNITY.COMMENTS' | translate"
                   >
-                    <svg class="w-4.5 h-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                      <path stroke-linecap="round" stroke-linejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                    <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M12 20.25c4.97 0 9-3.694 9-8.25s-4.03-8.25-9-8.25S3 7.444 3 12c0 2.104.859 4.023 2.273 5.48.432.447.74 1.04.586 1.641a4.483 4.483 0 01-.923 1.785A5.969 5.969 0 006 21c1.282 0 2.47-.402 3.445-1.087.81.22 1.668.337 2.555.337z" />
                     </svg>
-                    {{ 'COMMUNITY.COMMENTS' | translate }}
-                    @if (post.commentCount) { <span>({{ post.commentCount }})</span> }
+                    @if (post.commentCount) { <span>{{ post.commentCount }}</span> }
                   </button>
                 </div>
 
@@ -555,6 +589,11 @@ export class SocialFeedComponent implements OnInit, AfterViewInit {
   // User
   currentUserId = signal<string | null>(null);
 
+  // Inline edit
+  editingPostId = signal<string | null>(null);
+  editContent = signal('');
+  editSaving = signal(false);
+
   // Mini profile
   miniProfile = signal<UserMiniProfile | null>(null);
   miniProfileLoading = signal(false);
@@ -780,6 +819,39 @@ export class SocialFeedComponent implements OnInit, AfterViewInit {
     this.postService.delete(post.id).subscribe({
       next: () => this.posts.update((prev) => prev.filter((p) => p.id !== post.id)),
       error: () => this.toast.error('Failed to delete post.'),
+    });
+  }
+
+  // --- Edit Post ---
+
+  startEdit(post: Post): void {
+    this.editingPostId.set(post.id);
+    this.editContent.set(post.content);
+  }
+
+  cancelEdit(): void {
+    this.editingPostId.set(null);
+    this.editContent.set('');
+  }
+
+  saveEdit(post: Post): void {
+    const content = this.editContent().trim();
+    if (!content || this.editSaving()) return;
+
+    this.editSaving.set(true);
+    this.postService.updatePost(post.id, content).subscribe({
+      next: (updated) => {
+        this.posts.update((prev) =>
+          prev.map((p) => (p.id === post.id ? { ...p, content: updated.content, updatedAt: updated.updatedAt } : p)),
+        );
+        this.editingPostId.set(null);
+        this.editContent.set('');
+        this.editSaving.set(false);
+      },
+      error: () => {
+        this.toast.error(this.translate.instant('COMMUNITY.ERROR_EDIT_POST'));
+        this.editSaving.set(false);
+      },
     });
   }
 

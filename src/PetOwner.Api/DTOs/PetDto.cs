@@ -32,7 +32,8 @@ public record ReportLostRequest(
     string LastSeenLocation,
     double LastSeenLat,
     double LastSeenLng,
-    string ContactPhone
+    string ContactPhone,
+    string? Notes = null
 );
 
 public record LostPetDto(
