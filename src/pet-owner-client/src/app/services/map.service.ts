@@ -1,6 +1,6 @@
-import { Injectable, inject } from '@angular/core';
+import { Injectable, inject, signal } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
-import { Observable } from 'rxjs';
+import { Observable, tap } from 'rxjs';
 import { MapPin } from '../models/map-pin.model';
 import { ServiceRateDto } from '../features/wizard/wizard.model';
 
@@ -63,6 +63,9 @@ export class MapService {
   private readonly http = inject(HttpClient);
   private readonly baseUrl = '/api/map';
 
+  /** Service-type filter chips (from API); updated by {@link getServiceTypes}. */
+  readonly serviceTypes = signal<string[]>([]);
+
   fetchPins(filters: MapSearchFilters = {}): Observable<MapPin[]> {
     let params = new HttpParams();
     if (filters.requestedTime) params = params.set('requestedTime', filters.requestedTime);
@@ -77,7 +80,9 @@ export class MapService {
   }
 
   getServiceTypes(): Observable<string[]> {
-    return this.http.get<string[]>(`${this.baseUrl}/service-types`);
+    return this.http.get<string[]>(`${this.baseUrl}/service-types`).pipe(
+      tap((types) => this.serviceTypes.set(types)),
+    );
   }
 
   getProviderProfile(providerId: string): Observable<ProviderPublicProfile> {

@@ -11,6 +11,7 @@ import { NotificationService, AppNotification } from './services/notification.se
 import { ChatService } from './services/chat.service';
 import { LanguageService } from './services/language.service';
 import { FavoriteService } from './services/favorite.service';
+import { MapService } from './services/map.service';
 import { ToastContainerComponent } from './shared/toast-container.component';
 import { TimeAgoPipe } from './shared/time-ago.pipe';
 
@@ -34,6 +35,8 @@ export class AppComponent {
   readonly auth = inject(AuthService);
   readonly providerService = inject(ProviderService);
   readonly notificationService = inject(NotificationService);
+  /** Alias for template: `@if (unreadCount() > 0)` */
+  readonly unreadCount = this.notificationService.unreadCount;
 
   constructor() {
     this.notificationService.notificationReceived$
@@ -48,9 +51,17 @@ export class AppComponent {
   readonly chatService = inject(ChatService);
   readonly language = inject(LanguageService);
   private readonly favoriteService = inject(FavoriteService);
+  private readonly mapService = inject(MapService);
 
   showNotificationPanel = signal(false);
+  /** Loaded when logged in from mini-profile API (auth user id). */
+  readonly headerProfileImageUrl = signal<string | null>(null);
   isProfileMenuOpen = signal(false);
+
+  /** Shell avatar URL while authenticated (mini-profile; null until loaded). */
+  readonly userAvatarUrl = computed(() =>
+    this.auth.isLoggedIn() ? this.headerProfileImageUrl() : null,
+  );
 
   readonly userInitial = computed(() => {
     const name = this.auth.userName();
@@ -119,10 +130,21 @@ export class AppComponent {
 
         this.providerService.getMe().subscribe();
         this.favoriteService.loadFavoriteIds();
+
+        const uid = this.auth.userId();
+        if (uid) {
+          this.mapService.getUserMiniProfile(uid).subscribe({
+            next: (p) => this.headerProfileImageUrl.set(p.profileImageUrl),
+            error: () => this.headerProfileImageUrl.set(null),
+          });
+        } else {
+          this.headerProfileImageUrl.set(null);
+        }
       } else {
         this.notificationService.stopConnection();
         this.chatService.stopConnection();
         this.providerService.providerStatus.set(null);
+        this.headerProfileImageUrl.set(null);
       }
     },
     { allowSignalWrites: true },

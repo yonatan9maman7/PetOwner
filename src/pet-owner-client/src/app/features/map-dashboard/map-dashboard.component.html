@@ -1,7 +1,9 @@
 <div class="flex flex-col h-full min-h-0 w-full max-w-full overflow-hidden bg-gray-50">
   <!-- Map fills space between app chrome (bottom nav padding on main); overlays sit above tiles. -->
   <div #mapHost class="flex-1 min-h-0 relative overflow-hidden">
-    <div id="map" class="absolute inset-0 z-0"></div>
+    <div class="absolute inset-0 z-0">
+      <div id="map" class="h-full w-full"></div>
+    </div>
 
     <!-- ─── Top Overlay Zone ─── -->
     <div class="absolute top-4 inset-x-0 z-[400] flex flex-col items-center pointer-events-none" dir="auto">
@@ -48,57 +50,6 @@
         </span>
       }
     </button>
-  </div>
-
-  <!-- Category Chips (Horizontal Scroll) -->
-  <div class="pointer-events-auto mt-2.5 w-[90%] md:w-[600px] relative">
-    <!-- Scroll toward inline-start (desktop) -->
-    <button
-      type="button"
-      (click)="scrollChips(true)"
-      class="hidden md:flex absolute start-0 top-1/2 -translate-y-1/2 z-10
-             bg-white/95 shadow-md rounded-full w-8 h-8 items-center justify-center
-             text-gray-500 hover:text-gray-800 hover:bg-gray-50
-             border border-gray-100 backdrop-blur-sm transition-colors duration-150">
-      <svg class="w-4 h-4 rtl:rotate-180" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-        <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
-      </svg>
-    </button>
-
-    <!-- Scroll toward inline-end (desktop) -->
-    <button
-      type="button"
-      (click)="scrollChips(false)"
-      class="hidden md:flex absolute end-0 top-1/2 -translate-y-1/2 z-10
-             bg-white/95 shadow-md rounded-full w-8 h-8 items-center justify-center
-             text-gray-500 hover:text-gray-800 hover:bg-gray-50
-             border border-gray-100 backdrop-blur-sm transition-colors duration-150">
-      <svg class="w-4 h-4 rtl:rotate-180" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-        <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
-      </svg>
-    </button>
-
-    <!-- Fade gradients at inline-start / inline-end (mirror in RTL) -->
-    <div class="absolute top-0 start-0 bottom-0 w-10 pointer-events-none rounded-s-full z-[5]
-                bg-gradient-to-r from-white/80 to-transparent rtl:bg-gradient-to-l"></div>
-    <div class="absolute top-0 end-0 bottom-0 w-10 pointer-events-none rounded-e-full z-[5]
-                bg-gradient-to-l from-white/80 to-transparent rtl:bg-gradient-to-r"></div>
-
-    <div #chipsContainer class="overflow-x-auto whitespace-nowrap scrollbar-hide flex gap-2 pb-1 px-5 md:px-10">
-      @for (cat of categories; track cat.value) {
-        <button
-          type="button"
-          (click)="selectCategory(cat.value)"
-          class="inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-medium shadow-sm
-                 cursor-pointer transition-all duration-150 shrink-0 border"
-          [class]="selectedCategory() === cat.value
-            ? 'bg-violet-600 text-white border-violet-600 shadow-md'
-            : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'">
-          <span class="text-base leading-none">{{ cat.icon }}</span>
-          {{ cat.labelKey | translate }}
-        </button>
-      }
-    </div>
   </div>
 
   <!-- Loading Indicator -->
@@ -274,6 +225,70 @@
     </div>
   }
     </div>
+
+    <div class="absolute top-24 inset-inline-start-0 w-full px-6 z-10 flex gap-3 overflow-x-auto no-scrollbar py-2 pointer-events-auto" dir="auto">
+      @for (svc of serviceTypes(); track svc) {
+        <button
+          type="button"
+          (click)="selectServiceTypeChip(svc)"
+          [class]="filterServiceType() === svc
+            ? 'flex items-center gap-2 px-6 py-2.5 bg-primary text-white rounded-full shadow-md font-headline font-semibold text-sm whitespace-nowrap'
+            : 'flex items-center gap-2 px-6 py-2.5 bg-surface-container-lowest text-on-surface-variant rounded-full shadow-sm font-headline font-semibold text-sm whitespace-nowrap hover:bg-surface-container-high transition-colors'">
+          <span class="material-symbols-outlined text-[18px]">{{ materialIconForServiceType(svc) }}</span>
+          {{ svc }}
+        </button>
+      }
+    </div>
+
+    @if (selectedProvider(); as p) {
+      <div class="absolute bottom-36 inset-inline-start-0 w-full px-6 z-20 pointer-events-auto" dir="auto">
+        <div class="bg-surface-container-lowest rounded-full shadow-2xl p-6 flex flex-col md:flex-row gap-6 items-start text-end">
+          <div
+            class="relative w-full md:w-32 h-48 md:h-32 rounded-lg overflow-hidden shrink-0"
+            role="button"
+            tabindex="0"
+            (click)="openProviderDetailsSheet()"
+            (keyup.enter)="openProviderDetailsSheet()">
+            @if (p.profileImageUrl) {
+              <img class="w-full h-full object-cover" [src]="p.profileImageUrl" [alt]="p.name" />
+            } @else {
+              <div class="w-full h-full bg-surface-container-high flex items-center justify-center text-4xl text-on-surface-variant">🐾</div>
+            }
+            @if ((p.averageRating ?? 0) >= 4.5 && p.reviewCount >= 3) {
+              <div class="absolute top-2 inset-inline-start-2 bg-secondary/90 backdrop-blur text-white text-[10px] px-3 py-1 rounded-full font-bold uppercase tracking-wider">
+                {{ 'MAP.RECOMMENDED' | translate }}
+              </div>
+            }
+          </div>
+          <div class="flex-1 w-full">
+            <div class="flex justify-between items-start w-full mb-2">
+              <div class="text-primary font-bold text-lg font-headline tracking-tight">
+                {{ 'MAP.PIN_RATE_HOUR' | translate: { rate: p.minRate } }}
+              </div>
+              <div class="text-end">
+                <h3 class="text-xl font-bold font-headline text-on-surface">{{ p.name }}</h3>
+                <div class="flex items-center justify-end gap-1 mt-1">
+                  <span class="text-on-surface-variant text-sm font-medium">{{ 'MAP.REVIEWS_INLINE' | translate: { count: p.reviewCount } }}</span>
+                  <span class="text-on-surface font-bold text-sm">{{ p.averageRating != null ? (p.averageRating | number:'1.1-1') : '—' }}</span>
+                  <span class="material-symbols-outlined text-secondary text-[18px]">star</span>
+                </div>
+              </div>
+            </div>
+            <div class="flex flex-wrap justify-end gap-2 my-4">
+              @for (tag of serviceLabels(p); track tag) {
+                <span class="px-3 py-1 bg-surface-container-high text-on-surface-variant rounded-full text-xs font-semibold">{{ tag }}</span>
+              }
+            </div>
+            <button
+              type="button"
+              (click)="viewProviderProfile(p.providerId)"
+              class="w-full py-4 bg-gradient-to-r from-primary to-[#00236F] text-white rounded-full font-headline font-bold text-md shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-95 transition-all">
+              {{ 'MAP.VIEW_PROFILE_CTA' | translate }}
+            </button>
+          </div>
+        </div>
+      </div>
+    }
   </div>
 </div>
 

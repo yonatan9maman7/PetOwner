@@ -62,6 +62,7 @@ public class TeletriageController : ControllerBase
             Assessment = result.Assessment,
             Recommendations = result.Recommendations,
             IsEmergency = result.IsEmergency,
+            CreatedAt = DateTime.UtcNow,
         };
 
         _db.TeletriageSessions.Add(session);

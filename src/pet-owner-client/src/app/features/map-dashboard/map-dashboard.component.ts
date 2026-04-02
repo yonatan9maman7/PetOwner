@@ -53,10 +53,11 @@ const DEFAULT_ZOOM = 15;
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class MapDashboardComponent implements OnInit, OnDestroy, AfterViewInit {
-  @ViewChild('chipsContainer') chipsContainer!: ElementRef<HTMLDivElement>;
   @ViewChild('mapHost') mapHost!: ElementRef<HTMLElement>;
 
-  private readonly mapService = inject(MapService);
+  readonly mapService = inject(MapService);
+  /** Same as {@link MapService.serviceTypes}; for template `serviceTypes()`. */
+  readonly serviceTypes = this.mapService.serviceTypes;
   readonly providerService = inject(ProviderService);
   private readonly petService = inject(PetService);
   private readonly auth = inject(AuthService);
@@ -87,6 +88,8 @@ export class MapDashboardComponent implements OnInit, OnDestroy, AfterViewInit {
   selectedLostPet = signal<LostPet | null>(null);
   isLostPetSheetOpen = signal(false);
   selectedPin = signal<MapPin | null>(null);
+  /** Alias for STITCH map card bindings (same as {@link selectedPin}). */
+  readonly selectedProvider = computed(() => this.selectedPin());
   isSheetOpen = signal(false);
   isLoadingPins = signal(false);
   contactLoading = signal(false);
@@ -114,18 +117,6 @@ export class MapDashboardComponent implements OnInit, OnDestroy, AfterViewInit {
   showFilterPanel = signal(false);
   searchQuery = signal('');
   selectedCategory = signal('');
-  readonly categories = [
-    { labelKey: 'MAP.FILTER_WALKERS', icon: '🚶', value: 'Dog Walker' },
-    { labelKey: 'MAP.FILTER_PROVIDERS', icon: '🏠', value: 'Pet Sitter' },
-    { labelKey: 'MAP.FILTER_BOARDING', icon: '🛏️', value: 'Boarding' },
-    { labelKey: 'MAP.FILTER_TRAINERS', icon: '🦮', value: 'Training' },
-    { labelKey: 'MAP.FILTER_INSURANCE', icon: '🛡️', value: 'Insurance' },
-    { labelKey: 'MAP.FILTER_VETS', icon: '🩺', value: 'Vet' },
-    { labelKey: 'MAP.FILTER_GROOMERS', icon: '✂️', value: 'Groomer' },
-    { labelKey: 'MAP.FILTER_SHOPS', icon: '🛒', value: 'Shop' },
-    { labelKey: 'MAP.FILTER_PARKS', icon: '🌳', value: 'Park' },
-  ];
-  serviceTypes = signal<string[]>([]);
   isFilterActive = computed(() =>
     !!this.filterDate() || !!this.filterTime() ||
     !!this.filterServiceType() || this.filterMinRating() !== null ||
@@ -146,9 +137,7 @@ export class MapDashboardComponent implements OnInit, OnDestroy, AfterViewInit {
     this.locateUser();
     this.checkProviderStatus();
     this.loadLostPets();
-    this.mapService.getServiceTypes().subscribe({
-      next: (types) => this.serviceTypes.set(types),
-    });
+    this.mapService.getServiceTypes().subscribe();
   }
 
   ngAfterViewInit(): void {
@@ -265,6 +254,10 @@ export class MapDashboardComponent implements OnInit, OnDestroy, AfterViewInit {
     this.markersLayer.addTo(this.map);
     this.lostPetsLayer.addTo(this.map);
 
+    this.map.on('click', () => {
+      this.selectedPin.set(null);
+    });
+
     this.map.on('moveend', this.onMapMoveEnd);
     this.mapMove$
       .pipe(
@@ -325,23 +318,40 @@ export class MapDashboardComponent implements OnInit, OnDestroy, AfterViewInit {
     this.showFilterPanel.update(v => !v);
   }
 
-  /** Scroll chip strip toward inline-start or inline-end (respects RTL). */
-  scrollChips(towardStart: boolean): void {
-    const container = this.chipsContainer?.nativeElement;
-    if (!container) return;
-    const scrollAmount = 200;
-    const rtl = getComputedStyle(container).direction === 'rtl';
-    const delta = towardStart
-      ? (rtl ? scrollAmount : -scrollAmount)
-      : (rtl ? -scrollAmount : scrollAmount);
-    container.scrollBy({ left: delta, behavior: 'smooth' });
-  }
-
-  selectCategory(value: string): void {
-    const next = this.selectedCategory() === value ? '' : value;
+  selectServiceTypeChip(svc: string): void {
+    const next = this.filterServiceType() === svc ? '' : svc;
     this.selectedCategory.set(next);
     this.filterServiceType.set(next);
     this.loadPins();
+  }
+
+  /** Material Symbols name for map filter chip (by API service type label). */
+  materialIconForServiceType(svc: string): string {
+    const key = svc.toLowerCase();
+    if (key.includes('walk')) return 'pets';
+    if (key.includes('sit')) return 'home_health';
+    if (key.includes('board')) return 'hotel';
+    if (key.includes('train')) return 'sports_handball';
+    if (key.includes('insur')) return 'shield';
+    if (key.includes('vet')) return 'medical_services';
+    if (key.includes('groom')) return 'content_cut';
+    if (key.includes('shop')) return 'store';
+    if (key.includes('park')) return 'park';
+    return 'pets';
+  }
+
+  serviceLabels(pin: MapPin): string[] {
+    return pin.services
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean);
+  }
+
+  openProviderDetailsSheet(): void {
+    const p = this.selectedPin();
+    if (!p) return;
+    this.isSheetOpen.set(true);
+    this.loadProviderReviews(p.providerId);
   }
 
   onSearch(term: string): void {
@@ -544,8 +554,6 @@ export class MapDashboardComponent implements OnInit, OnDestroy, AfterViewInit {
 
       marker.on('click', () => {
         this.selectedPin.set(pin);
-        this.isSheetOpen.set(true);
-        this.loadProviderReviews(pin.providerId);
       });
 
       this.markersLayer.addLayer(marker);

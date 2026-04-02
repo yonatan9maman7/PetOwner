@@ -1,0 +1,368 @@
+<div class="bg-background text-on-background min-h-screen min-h-[max(884px,100dvh)] flex flex-col items-center">
+  <header class="w-full top-0 sticky bg-[#FAF9F6] dark:bg-slate-950 flex items-center justify-between px-6 py-4 z-50">
+    <div class="flex items-center gap-4">
+      <a
+        routerLink="/"
+        class="text-[#1E3A8A] dark:text-blue-400 hover:opacity-80 transition-all scale-95 active:scale-90 inline-flex"
+        [attr.aria-label]="'AUTH.BACK_TO_MAP' | translate">
+        <span class="material-symbols-outlined">arrow_forward</span>
+      </a>
+      <h1 class="font-['Manrope'] font-bold text-2xl tracking-tight text-[#1E3A8A] dark:text-blue-400">
+        {{ 'AUTH.SANCTUARY_BRAND' | translate }}
+      </h1>
+    </div>
+    <div class="hidden md:flex gap-6 items-center">
+      <button
+        type="button"
+        (click)="languageService.toggleLanguage()"
+        class="text-slate-500 hover:opacity-80 transition-all text-xs font-bold tabular-nums"
+        [attr.aria-label]="'Switch language'">
+        {{ languageService.currentLang() === 'he' ? 'EN' : 'HE' }}
+      </button>
+      <a class="text-slate-500 hover:opacity-80 transition-all" href="#" (click)="$event.preventDefault()">{{ 'AUTH.SUPPORT' | translate }}</a>
+    </div>
+    <button
+      type="button"
+      (click)="languageService.toggleLanguage()"
+      class="md:hidden text-slate-500 hover:opacity-80 transition-all text-xs font-bold tabular-nums px-2"
+      [attr.aria-label]="'Switch language'">
+      {{ languageService.currentLang() === 'he' ? 'EN' : 'HE' }}
+    </button>
+  </header>
+  <main class="flex-1 w-full max-w-5xl px-4 py-8 md:py-16 flex flex-col md:flex-row items-center gap-12 lg:gap-20">
+    <div class="hidden lg:flex flex-col flex-1 relative">
+      <div class="rounded-xl overflow-hidden shadow-[0_24px_48px_-12px_rgba(30,58,138,0.08)] bg-surface-container-low aspect-[4/5] relative">
+        <img
+          alt=""
+          class="absolute inset-0 w-full h-full object-cover grayscale-[0.2]"
+          src="https://lh3.googleusercontent.com/aida-public/AB6AXuCqH03hruAn6SPNCx0yvbbUHEBDiKLb9Eoh97dY8VcRpZy-YnMzeRpelUVVs89kTSfkl-5gf9RRvR68EsMS3KdNp6NRrH6N2QlhSwOEQYqDbr9s1NoYlI0AdzTlWaQqsocLjZ__Psl2fifiUHiwkkuoEaSm1umJVktujwaj8z21aIMMgGENu3cj5PXA9djrsYOPe-x4v9gp9Ba0uxGr5dsi15uyzB9JXaFQOrj67jd_AAhAYH6VrO_1KAjzND17mO_N1_SoXIiO2qay" />
+        <div class="absolute inset-0 bg-gradient-to-t from-primary/60 to-transparent"></div>
+        <div class="absolute bottom-8 right-8 left-8 text-white">
+          <h2 class="text-3xl font-extrabold mb-2 leading-tight">{{ 'AUTH.HERO_TITLE' | translate }}</h2>
+          <p class="text-white/80 font-medium">{{ 'AUTH.HERO_SUBTITLE' | translate }}</p>
+        </div>
+      </div>
+      <div class="absolute -bottom-4 -left-4 bg-secondary-fixed-dim/40 backdrop-blur-xl px-6 py-4 rounded-lg shadow-xl border border-white/20">
+        <div class="flex items-center gap-3">
+          <span class="material-symbols-outlined text-primary" style="font-variation-settings: 'FILL' 1">pets</span>
+          <span class="font-bold text-primary">{{ 'AUTH.VIP_CHIP' | translate }}</span>
+        </div>
+      </div>
+    </div>
+    <div class="w-full lg:w-[480px]">
+      @if (view() === 'login') {
+        <section class="bg-surface-container-lowest rounded-xl shadow-[0_24px_48px_-12px_rgba(30,58,138,0.08)] p-8 md:p-10" id="login-screen">
+          <div class="flex flex-col items-center mb-10">
+            <div
+              class="w-16 h-16 bg-primary-container rounded-lg flex items-center justify-center mb-6 scale-95 active:scale-90 transition-transform">
+              <span class="material-symbols-outlined text-white text-3xl" style="font-variation-settings: 'FILL' 1">pets</span>
+            </div>
+            <h2 class="text-4xl font-extrabold text-primary mb-2 tracking-tight">{{ 'AUTH.PETOWNER_LOCKUP' | translate }}</h2>
+            <p class="text-on-surface-variant font-medium">{{ 'AUTH.LOGIN_TAGLINE' | translate }}</p>
+          </div>
+          <form [formGroup]="form" (ngSubmit)="onLoginSubmit()" class="space-y-6">
+            <div class="relative group">
+              <input
+                class="peer w-full bg-surface-container-low border-none rounded-lg px-4 pt-6 pb-2 text-on-surface focus:ring-2 focus:ring-secondary/30 transition-all"
+                id="login-email"
+                placeholder=" "
+                type="email"
+                formControlName="email"
+                dir="auto"
+                autocomplete="email" />
+              <label
+                class="absolute right-4 top-4 text-outline pointer-events-none transition-all peer-focus:text-xs peer-focus:top-2 peer-[:not(:placeholder-shown)]:text-xs peer-[:not(:placeholder-shown)]:top-2"
+                for="login-email"
+                >{{ 'AUTH.EMAIL_ADDRESS' | translate }}</label
+              >
+            </div>
+            @if (form.get('email')?.invalid && form.get('email')?.touched) {
+              <span class="block text-start text-xs text-error -mt-4">{{ 'AUTH.ERROR_EMAIL' | translate }}</span>
+            }
+            <div class="relative group">
+              <input
+                class="peer w-full bg-surface-container-low border-none rounded-lg px-4 pt-6 pb-2 text-on-surface focus:ring-2 focus:ring-secondary/30 transition-all"
+                id="login-password"
+                placeholder=" "
+                [type]="hideLoginPassword() ? 'password' : 'text'"
+                formControlName="password"
+                dir="auto"
+                autocomplete="current-password" />
+              <label
+                class="absolute right-4 top-4 text-outline pointer-events-none transition-all peer-focus:text-xs peer-focus:top-2 peer-[:not(:placeholder-shown)]:text-xs peer-[:not(:placeholder-shown)]:top-2"
+                for="login-password"
+                >{{ 'AUTH.PASSWORD' | translate }}</label
+              >
+              <button
+                class="absolute left-4 top-4 text-outline hover:text-primary transition-colors"
+                type="button"
+                (click)="hideLoginPassword.set(!hideLoginPassword())"
+                [attr.aria-label]="hideLoginPassword() ? 'Show password' : 'Hide password'">
+                <span class="material-symbols-outlined">{{ hideLoginPassword() ? 'visibility' : 'visibility_off' }}</span>
+              </button>
+            </div>
+            @if (form.get('password')?.invalid && form.get('password')?.touched) {
+              <span class="block text-start text-xs text-error -mt-4">{{ 'AUTH.ERROR_PASSWORD' | translate }}</span>
+            }
+            <div class="flex justify-start">
+              <button class="text-primary-container font-semibold text-sm hover:underline" type="button" (click)="setView('forgot')">
+                {{ 'AUTH.FORGOT_PASSWORD' | translate }}
+              </button>
+            </div>
+            @if (errorMsg()) {
+              <p class="rounded-lg bg-error-container px-3 py-2 text-start text-sm text-on-error-container">{{ errorMsg() }}</p>
+            }
+            <button
+              class="w-full py-4 rounded-xl bg-gradient-to-br from-primary-container to-primary text-white font-bold text-lg shadow-lg hover:opacity-90 active:scale-[0.98] transition-all"
+              type="submit"
+              [disabled]="loading()">
+              {{ loading() ? ('AUTH.PLEASE_WAIT' | translate) : ('AUTH.LOGIN' | translate) }}
+            </button>
+          </form>
+          <div class="relative my-8 flex items-center">
+            <div class="flex-grow border-t border-outline-variant/30"></div>
+            <span class="px-4 text-sm text-outline font-medium">{{ 'AUTH.OR_SIGN_IN_WITH' | translate }}</span>
+            <div class="flex-grow border-t border-outline-variant/30"></div>
+          </div>
+          <div class="grid grid-cols-2 gap-4">
+            <button type="button" class="flex items-center justify-center gap-3 py-3 px-4 rounded-lg bg-surface-container-low hover:bg-surface-container-high transition-colors text-on-surface font-medium">
+              <img
+                alt="Google"
+                class="w-5 h-5"
+                src="https://lh3.googleusercontent.com/aida-public/AB6AXuCK9BuHTEOzXEGTuPbKu6WB2uHO96gx-iuwKR_adsBAMKjEo-1IY2SZ2a7t3QTegRDXfFpAZmnHdEYIcwRHPX2N4lgureXUt7sNz1fRxXZiqqAv8va7IuatPv-VQHEor4K331d2NLF7g_JNanDqh_fh5Dw0Iw2ogzVc0sBqlhjuP9WB5KEYCBOfXuIvXA9OD7V6qpwCjfHd5LgewwkLXpcYh82d03YKjMQakVxQ5Fd8yiAiyJ5gH6zBBJ16nMm0acLOzy6khrUFEJiB" />
+              <span>Google</span>
+            </button>
+            <button type="button" class="flex items-center justify-center gap-3 py-3 px-4 rounded-lg bg-surface-container-low hover:bg-surface-container-high transition-colors text-on-surface font-medium">
+              <span class="material-symbols-outlined text-xl" style="font-variation-settings: 'FILL' 1">ios</span>
+              <span>Apple</span>
+            </button>
+          </div>
+          <div class="mt-10 text-center">
+            <p class="text-on-surface-variant font-medium">
+              {{ 'AUTH.NO_ACCOUNT' | translate }}
+              <button class="text-primary font-bold hover:underline ms-1" type="button" (click)="setView('register')">
+                {{ 'AUTH.REGISTER' | translate }}
+              </button>
+            </p>
+          </div>
+        </section>
+      }
+      @if (view() === 'register') {
+        <section class="bg-surface-container-lowest rounded-xl shadow-[0_24px_48px_-12px_rgba(30,58,138,0.08)] p-8 md:p-10" id="register-screen">
+          <h2 class="text-3xl font-extrabold text-primary mb-6 tracking-tight">{{ 'AUTH.CREATE_ACCOUNT_HEADING' | translate }}</h2>
+          <form [formGroup]="form" (ngSubmit)="onRegisterSubmit()" class="space-y-4">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <input
+                  class="w-full bg-surface-container-low border-none rounded-lg px-4 py-3 text-on-surface focus:ring-2 focus:ring-secondary/30 transition-all"
+                  [attr.placeholder]="'AUTH.FULL_NAME' | translate"
+                  type="text"
+                  formControlName="name"
+                  dir="auto" />
+                @if (form.get('name')?.invalid && form.get('name')?.touched) {
+                  <span class="block text-start text-xs text-error mt-1">{{ 'AUTH.ERROR_NAME' | translate }}</span>
+                }
+              </div>
+              <div>
+                <input
+                  class="w-full bg-surface-container-low border-none rounded-lg px-4 py-3 text-on-surface focus:ring-2 focus:ring-secondary/30 transition-all"
+                  [attr.placeholder]="'AUTH.PHONE' | translate"
+                  type="tel"
+                  formControlName="phone"
+                  dir="auto" />
+                @if (form.get('phone')?.invalid && form.get('phone')?.touched) {
+                  <span class="block text-start text-xs text-error mt-1">{{ 'AUTH.ERROR_PHONE' | translate }}</span>
+                }
+              </div>
+            </div>
+            <div>
+              <input
+                class="w-full bg-surface-container-low border-none rounded-lg px-4 py-3 text-on-surface focus:ring-2 focus:ring-secondary/30 transition-all"
+                [attr.placeholder]="'AUTH.EMAIL' | translate"
+                type="email"
+                formControlName="email"
+                dir="auto" />
+              @if (form.get('email')?.invalid && form.get('email')?.touched) {
+                <span class="block text-start text-xs text-error mt-1">{{ 'AUTH.ERROR_EMAIL' | translate }}</span>
+              }
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <input
+                  class="w-full bg-surface-container-low border-none rounded-lg px-4 py-3 text-on-surface focus:ring-2 focus:ring-secondary/30 transition-all"
+                  [attr.placeholder]="'AUTH.PASSWORD' | translate"
+                  type="password"
+                  formControlName="password"
+                  dir="auto"
+                  autocomplete="new-password" />
+                @if (form.get('password')?.invalid && form.get('password')?.touched) {
+                  <span class="block text-start text-xs text-error mt-1">{{ 'AUTH.ERROR_PASSWORD' | translate }}</span>
+                }
+              </div>
+              <div>
+                <input
+                  class="w-full bg-surface-container-low border-none rounded-lg px-4 py-3 text-on-surface focus:ring-2 focus:ring-secondary/30 transition-all"
+                  [attr.placeholder]="'AUTH.CONFIRM_PASSWORD' | translate"
+                  type="password"
+                  formControlName="confirmPassword"
+                  dir="auto"
+                  autocomplete="new-password" />
+                @if (form.get('confirmPassword')?.errors?.['mismatch'] && form.get('confirmPassword')?.touched) {
+                  <span class="block text-start text-xs text-error mt-1">{{ 'AUTH.PASSWORDS_MISMATCH' | translate }}</span>
+                }
+              </div>
+            </div>
+            <div class="pt-4">
+              <p class="text-sm font-bold text-on-surface-variant mb-3">{{ 'AUTH.ACCOUNT_TYPE_TITLE' | translate }}</p>
+              <div class="grid grid-cols-2 gap-4">
+                <label class="relative cursor-pointer group">
+                  <input class="peer sr-only" type="radio" formControlName="role" value="Owner" />
+                  <div
+                    class="p-4 rounded-lg bg-surface-container-low border-2 border-transparent peer-checked:border-primary peer-checked:bg-primary-container/10 transition-all flex flex-col items-center gap-2">
+                    <span class="material-symbols-outlined text-primary">person</span>
+                    <span class="text-sm font-bold">{{ 'AUTH.ROLE_OWNER_CARD' | translate }}</span>
+                  </div>
+                </label>
+                <label class="relative cursor-pointer group">
+                  <input class="peer sr-only" type="radio" formControlName="role" value="Provider" />
+                  <div
+                    class="p-4 rounded-lg bg-surface-container-low border-2 border-transparent peer-checked:border-primary peer-checked:bg-primary-container/10 transition-all flex flex-col items-center gap-2">
+                    <span class="material-symbols-outlined text-primary">medical_services</span>
+                    <span class="text-sm font-bold">{{ 'AUTH.ROLE_PROVIDER_CARD' | translate }}</span>
+                  </div>
+                </label>
+              </div>
+            </div>
+            <div class="flex items-start gap-2 pt-2">
+              <input
+                id="agreeTerms"
+                formControlName="agreeTerms"
+                type="checkbox"
+                class="mt-1 h-4 w-4 shrink-0 rounded border-outline text-primary-container focus:ring-2 focus:ring-secondary/30" />
+              <label for="agreeTerms" class="text-start text-sm text-on-surface-variant leading-snug">
+                {{ 'AUTH.TERMS_PREFIX' | translate }}
+                <button
+                  type="button"
+                  (click)="termsModalOpen.set(true)"
+                  class="inline border-0 bg-transparent p-0 font-bold text-primary hover:underline">
+                  {{ 'AUTH.TERMS_OF_SERVICE' | translate }}
+                </button>
+              </label>
+            </div>
+            @if (form.get('agreeTerms')?.invalid && form.get('agreeTerms')?.touched) {
+              <span class="block text-start text-xs text-error">{{ 'AUTH.ERROR_TERMS' | translate }}</span>
+            }
+            @if (errorMsg()) {
+              <p class="rounded-lg bg-error-container px-3 py-2 text-start text-sm text-on-error-container">{{ errorMsg() }}</p>
+            }
+            <button
+              class="w-full py-4 rounded-xl bg-gradient-to-br from-primary-container to-primary text-white font-bold text-lg shadow-lg hover:opacity-90 active:scale-[0.98] transition-all mt-6"
+              type="submit"
+              [disabled]="loading()">
+              {{ loading() ? ('AUTH.PLEASE_WAIT' | translate) : ('AUTH.BUTTON_CREATE_ACCOUNT' | translate) }}
+            </button>
+          </form>
+          <div class="mt-8 text-center border-t border-outline-variant/20 pt-6">
+            <p class="text-on-surface-variant font-medium">
+              {{ 'AUTH.ALREADY_HAVE_ACCOUNT' | translate }}
+              <button class="text-primary font-bold hover:underline ms-1" type="button" (click)="setView('login')">
+                {{ 'AUTH.LOGIN' | translate }}
+              </button>
+            </p>
+          </div>
+        </section>
+      }
+      @if (view() === 'forgot') {
+        <section class="bg-surface-container-lowest rounded-xl shadow-[0_24px_48px_-12px_rgba(30,58,138,0.08)] p-8 md:p-10" id="forgot-password-screen">
+          <div class="mb-8">
+            <h2 class="text-3xl font-extrabold text-primary mb-4 tracking-tight">{{ 'AUTH.RESET_PASSWORD_TITLE' | translate }}</h2>
+            <p class="text-on-surface-variant leading-relaxed">{{ 'AUTH.RESET_INTRO' | translate }}</p>
+          </div>
+          <form [formGroup]="form" (ngSubmit)="onForgotSubmit()" class="space-y-6">
+            <div class="relative group">
+              <input
+                class="w-full bg-surface-container-low border-none rounded-lg px-4 py-4 text-on-surface focus:ring-2 focus:ring-secondary/30 transition-all"
+                [attr.placeholder]="'AUTH.PLACEHOLDER_RESET_EMAIL' | translate"
+                type="email"
+                formControlName="email"
+                dir="auto"
+                autocomplete="email" />
+            </div>
+            @if (form.get('email')?.invalid && form.get('email')?.touched) {
+              <span class="block text-start text-xs text-error -mt-2">{{ 'AUTH.ERROR_EMAIL' | translate }}</span>
+            }
+            @if (errorMsg()) {
+              <p class="rounded-lg bg-error-container px-3 py-2 text-start text-sm text-on-error-container">{{ errorMsg() }}</p>
+            }
+            @if (forgotSent()) {
+              <p class="text-sm text-on-surface-variant">{{ 'AUTH.RESET_LINK_SENT' | translate }}</p>
+            }
+            <button
+              class="w-full py-4 rounded-xl bg-gradient-to-br from-primary-container to-primary text-white font-bold text-lg shadow-lg hover:opacity-90 active:scale-[0.98] transition-all"
+              type="submit"
+              [disabled]="loading()">
+              {{ loading() ? ('AUTH.SENDING_RESET' | translate) : ('AUTH.SEND_RESET_LINK' | translate) }}
+            </button>
+          </form>
+          <div class="mt-10 text-center">
+            <button
+              class="flex items-center justify-center gap-2 w-full text-on-surface-variant font-bold hover:text-primary transition-colors"
+              type="button"
+              (click)="setView('login')">
+              <span class="material-symbols-outlined text-sm">arrow_forward</span>
+              {{ 'AUTH.BACK_TO_LOGIN_SCREEN' | translate }}
+            </button>
+          </div>
+        </section>
+      }
+    </div>
+  </main>
+  <nav
+    class="md:hidden fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-4 pb-6 pt-3 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl rounded-t-[2rem] shadow-[0_-24px_48px_-12px_rgba(30,58,138,0.08)]">
+    @if (view() === 'register') {
+      <button
+        type="button"
+        class="flex flex-col items-center justify-center bg-[#1E3A8A]/10 text-[#1E3A8A] rounded-2xl px-5 py-2 scale-98 transition-transform duration-200"
+        (click)="setView('register')">
+        <span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1">person_add</span>
+        <span class="font-['Inter'] text-xs font-medium mt-1">{{ 'AUTH.NAV_REGISTRATION' | translate }}</span>
+      </button>
+    } @else {
+      <button
+        type="button"
+        class="flex flex-col items-center justify-center text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-transform duration-200 scale-98"
+        (click)="setView('register')">
+        <span class="material-symbols-outlined">person_add</span>
+        <span class="font-['Inter'] text-xs font-medium mt-1">{{ 'AUTH.NAV_REGISTRATION' | translate }}</span>
+      </button>
+    }
+    @if (view() === 'login') {
+      <button
+        type="button"
+        class="flex flex-col items-center justify-center bg-[#1E3A8A]/10 text-[#1E3A8A] rounded-2xl px-5 py-2 scale-98 transition-transform duration-200"
+        (click)="setView('login')">
+        <span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1">login</span>
+        <span class="font-['Inter'] text-xs font-medium mt-1">{{ 'AUTH.LOGIN' | translate }}</span>
+      </button>
+    } @else {
+      <button
+        type="button"
+        class="flex flex-col items-center justify-center text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-transform duration-200 scale-98"
+        (click)="setView('login')">
+        <span class="material-symbols-outlined">login</span>
+        <span class="font-['Inter'] text-xs font-medium mt-1">{{ 'AUTH.LOGIN' | translate }}</span>
+      </button>
+    }
+    <button
+      type="button"
+      class="flex flex-col items-center justify-center text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-transform duration-200 scale-98"
+      (click)="$event.preventDefault()">
+      <span class="material-symbols-outlined">help_outline</span>
+      <span class="font-['Inter'] text-xs font-medium mt-1">{{ 'AUTH.NAV_SUPPORT' | translate }}</span>
+    </button>
+  </nav>
+  <footer class="hidden md:block py-8 text-outline text-sm font-medium w-full text-center">
+    {{ 'AUTH.FOOTER_SANCTUARY' | translate }}
+  </footer>
+</div>
+<app-terms-modal [isOpen]="termsModalOpen()" (close)="termsModalOpen.set(false)" />

@@ -1,6 +1,9 @@
 {
   "NAV": {
     "HOME": "Home",
+    "DISCOVER": "Discover",
+    "CARE": "Care",
+    "BOOKINGS": "Bookings",
     "COMMUNITY": "Community",
     "BECOME_PROVIDER": "Join our provider community",
     "LOGOUT": "Log out",
@@ -123,7 +126,11 @@
     "FILTER_PARKS": "Parks",
     "FILTER_TRAINERS": "Trainers",
     "FILTER_INSURANCE": "Insurance",
-    "SEARCH_PLACEHOLDER": "Search services, vets..."
+    "SEARCH_PLACEHOLDER": "Search services, vets...",
+    "VIEW_PROFILE_CTA": "View profile",
+    "RECOMMENDED": "Featured",
+    "PIN_RATE_HOUR": "₪{{rate}}/hr",
+    "REVIEWS_INLINE": "({{count}} reviews)"
   },
   "AUTH": {
     "BACK_TO_MAP": "Back to map",
@@ -172,7 +179,26 @@
     "SENDING_RESET": "Sending...",
     "SAVING_PASSWORD": "Saving...",
     "PASSWORDS_MISMATCH": "Passwords do not match",
-    "RESET_INVALID_TOKEN": "This link is invalid or has expired. Please request a new one."
+    "RESET_INVALID_TOKEN": "This link is invalid or has expired. Please request a new one.",
+    "SANCTUARY_BRAND": "Pet-Care Sanctuary",
+    "HERO_TITLE": "The safe place for your pet",
+    "HERO_SUBTITLE": "Join the warmest, most professional pet owner community.",
+    "VIP_CHIP": "VIP-level care",
+    "PETOWNER_LOCKUP": "PetOwner",
+    "LOGIN_TAGLINE": "Welcome back to your digital home",
+    "OR_SIGN_IN_WITH": "Or sign in with",
+    "CREATE_ACCOUNT_HEADING": "Create a new account",
+    "ACCOUNT_TYPE_TITLE": "Choose account type:",
+    "ROLE_OWNER_CARD": "Pet owner",
+    "ROLE_PROVIDER_CARD": "Service provider",
+    "RESET_INTRO": "Enter your email address and we will send you a secure link to reset your password.",
+    "PLACEHOLDER_RESET_EMAIL": "Email address for reset",
+    "BACK_TO_LOGIN_SCREEN": "Back to sign in",
+    "FOOTER_SANCTUARY": "© 2024 Pet-Care Sanctuary. All rights reserved.",
+    "SUPPORT": "Support",
+    "NAV_REGISTRATION": "Registration",
+    "NAV_SUPPORT": "Support",
+    "BUTTON_CREATE_ACCOUNT": "Create account"
   },
   "EARNINGS": {
     "TITLE": "Earnings",
