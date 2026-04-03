@@ -2,7 +2,7 @@ import axios from "axios";
 import { useAuthStore } from "../store/authStore";
 
 const apiClient = axios.create({
-  baseURL: "https://petowner-app.azurewebsites.net/api",
+  baseURL: "http://10.0.0.51:5000/api",
   timeout: 15_000,
   headers: { "Content-Type": "application/json" },
 });

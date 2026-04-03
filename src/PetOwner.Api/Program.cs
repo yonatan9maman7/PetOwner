@@ -137,6 +137,7 @@ app.UseSwaggerUI();
 
 app.UseExceptionHandler();
 
+app.UseRouting();
 app.UseCors();
 app.UseAuthentication();
 app.UseAuthorization();

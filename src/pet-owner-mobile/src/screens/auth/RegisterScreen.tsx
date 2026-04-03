@@ -55,10 +55,10 @@ export function RegisterScreen() {
     setLoading(true);
     try {
       const { data } = await apiClient.post("/auth/register", {
-        fullName,
-        email,
-        phone,
-        password,
+        Name: fullName,
+        Email: email,
+        Phone: phone,
+        Password: password,
       });
       await setAuth(data.token, data.userId ?? data.id);
       navigation.navigate("Explore");
@@ -84,7 +84,7 @@ export function RegisterScreen() {
             flexGrow: 1,
             paddingHorizontal: 32,
             paddingTop: 20,
-            paddingBottom: 32,
+            paddingBottom: 120,
           }}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
@@ -127,13 +127,31 @@ export function RegisterScreen() {
               {t("fullNameLabel")}
             </Text>
             <View
-              style={rtlRow}
-              className="items-center bg-[#dde4e6] rounded-xl gap-3 px-5 h-14"
+              style={[
+                rtlRow,
+                {
+                  alignItems: "center",
+                  backgroundColor: "#dde4e6",
+                  borderRadius: 12,
+                  gap: 12,
+                  paddingHorizontal: 20,
+                  paddingVertical: 15,
+                  minHeight: 55,
+                },
+              ]}
             >
               <Ionicons name="person-outline" size={20} color="#74777f" />
               <TextInput
-                className="flex-1 text-base text-[#161d1f]"
-                style={rtlInput}
+                style={[
+                  rtlInput,
+                  {
+                    flex: 1,
+                    fontSize: 16,
+                    lineHeight: 20,
+                    color: "#161d1f",
+                    padding: 0,
+                  },
+                ]}
                 placeholder={t("fullNamePlaceholder")}
                 placeholderTextColor="#74777f99"
                 value={fullName}
@@ -150,13 +168,31 @@ export function RegisterScreen() {
               {t("emailLabel")}
             </Text>
             <View
-              style={rtlRow}
-              className="items-center bg-[#dde4e6] rounded-xl gap-3 px-5 h-14"
+              style={[
+                rtlRow,
+                {
+                  alignItems: "center",
+                  backgroundColor: "#dde4e6",
+                  borderRadius: 12,
+                  gap: 12,
+                  paddingHorizontal: 20,
+                  paddingVertical: 15,
+                  minHeight: 55,
+                },
+              ]}
             >
               <Ionicons name="mail-outline" size={20} color="#74777f" />
               <TextInput
-                className="flex-1 text-base text-[#161d1f]"
-                style={rtlInput}
+                style={[
+                  rtlInput,
+                  {
+                    flex: 1,
+                    fontSize: 16,
+                    lineHeight: 20,
+                    color: "#161d1f",
+                    padding: 0,
+                  },
+                ]}
                 placeholder={t("emailPlaceholder")}
                 placeholderTextColor="#74777f99"
                 value={email}
@@ -174,13 +210,31 @@ export function RegisterScreen() {
               {t("phoneLabel")}
             </Text>
             <View
-              style={rtlRow}
-              className="items-center bg-[#dde4e6] rounded-xl gap-3 px-5 h-14"
+              style={[
+                rtlRow,
+                {
+                  alignItems: "center",
+                  backgroundColor: "#dde4e6",
+                  borderRadius: 12,
+                  gap: 12,
+                  paddingHorizontal: 20,
+                  paddingVertical: 15,
+                  minHeight: 55,
+                },
+              ]}
             >
               <Ionicons name="call-outline" size={20} color="#74777f" />
               <TextInput
-                className="flex-1 text-base text-[#161d1f]"
-                style={rtlInput}
+                style={[
+                  rtlInput,
+                  {
+                    flex: 1,
+                    fontSize: 16,
+                    lineHeight: 20,
+                    color: "#161d1f",
+                    padding: 0,
+                  },
+                ]}
                 placeholder={t("phonePlaceholder")}
                 placeholderTextColor="#74777f99"
                 value={phone}
@@ -197,8 +251,18 @@ export function RegisterScreen() {
               {t("passwordLabel")}
             </Text>
             <View
-              style={rtlRow}
-              className="items-center bg-[#dde4e6] rounded-xl gap-3 px-5 h-14"
+              style={[
+                rtlRow,
+                {
+                  alignItems: "center",
+                  backgroundColor: "#dde4e6",
+                  borderRadius: 12,
+                  gap: 12,
+                  paddingHorizontal: 20,
+                  paddingVertical: 15,
+                  minHeight: 55,
+                },
+              ]}
             >
               <Ionicons
                 name="lock-closed-outline"
@@ -206,8 +270,16 @@ export function RegisterScreen() {
                 color="#74777f"
               />
               <TextInput
-                className="flex-1 text-base text-[#161d1f]"
-                style={rtlInput}
+                style={[
+                  rtlInput,
+                  {
+                    flex: 1,
+                    fontSize: 16,
+                    lineHeight: 20,
+                    color: "#161d1f",
+                    padding: 0,
+                  },
+                ]}
                 placeholder={t("passwordPlaceholder")}
                 placeholderTextColor="#74777f99"
                 value={password}

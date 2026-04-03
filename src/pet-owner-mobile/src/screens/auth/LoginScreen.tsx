@@ -106,7 +106,7 @@ function LoginForm() {
             flexGrow: 1,
             paddingHorizontal: 28,
             paddingTop: 20,
-            paddingBottom: 24,
+            paddingBottom: 120,
           }}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
@@ -146,13 +146,31 @@ function LoginForm() {
               {t("emailLabel")}
             </Text>
             <View
-              style={rtlRow}
-              className="items-center bg-[#dde4e6] rounded-xl gap-3 px-5 h-14"
+              style={[
+                rtlRow,
+                {
+                  alignItems: "center",
+                  backgroundColor: "#dde4e6",
+                  borderRadius: 12,
+                  gap: 12,
+                  paddingHorizontal: 20,
+                  paddingVertical: 15,
+                  minHeight: 55,
+                },
+              ]}
             >
               <Ionicons name="mail-outline" size={20} color="#74777f" />
               <TextInput
-                className="flex-1 text-base text-[#161d1f]"
-                style={rtlInput}
+                style={[
+                  rtlInput,
+                  {
+                    flex: 1,
+                    fontSize: 16,
+                    lineHeight: 20,
+                    color: "#161d1f",
+                    padding: 0,
+                  },
+                ]}
                 placeholder={t("emailPlaceholder")}
                 placeholderTextColor="#74777f99"
                 value={email}
@@ -170,8 +188,18 @@ function LoginForm() {
               {t("passwordLabel")}
             </Text>
             <View
-              style={rtlRow}
-              className="items-center bg-[#dde4e6] rounded-xl gap-3 px-5 h-14"
+              style={[
+                rtlRow,
+                {
+                  alignItems: "center",
+                  backgroundColor: "#dde4e6",
+                  borderRadius: 12,
+                  gap: 12,
+                  paddingHorizontal: 20,
+                  paddingVertical: 15,
+                  minHeight: 55,
+                },
+              ]}
             >
               <Ionicons
                 name="lock-closed-outline"
@@ -179,8 +207,16 @@ function LoginForm() {
                 color="#74777f"
               />
               <TextInput
-                className="flex-1 text-base text-[#161d1f]"
-                style={rtlInput}
+                style={[
+                  rtlInput,
+                  {
+                    flex: 1,
+                    fontSize: 16,
+                    lineHeight: 20,
+                    color: "#161d1f",
+                    padding: 0,
+                  },
+                ]}
                 placeholder={t("passwordPlaceholder")}
                 placeholderTextColor="#74777f99"
                 value={password}
