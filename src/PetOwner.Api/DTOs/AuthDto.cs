@@ -25,3 +25,14 @@ public record ResetPasswordDto(
     [Required] string Token,
     [Required, MinLength(6)] string NewPassword
 );
+
+public record UpdateUserProfileDto(
+    [Required] string Name,
+    string? Phone
+);
+
+public record UserProfileDto(
+    string Name,
+    string Email,
+    string Phone
+);

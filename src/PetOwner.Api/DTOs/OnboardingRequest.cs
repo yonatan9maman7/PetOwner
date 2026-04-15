@@ -3,10 +3,18 @@ using PetOwner.Data.Models;
 
 namespace PetOwner.Api.DTOs;
 
+public record ServicePackageDto(
+    Guid? Id,
+    string Title,
+    decimal Price,
+    string? Description
+);
+
 public record ServiceRateDto(
     ServiceType ServiceType,
     decimal Rate,
-    PricingUnit PricingUnit
+    PricingUnit PricingUnit,
+    List<ServicePackageDto>? Packages = null
 );
 
 public record ProviderOnboardingRequest(

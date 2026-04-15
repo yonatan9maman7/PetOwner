@@ -8,7 +8,9 @@ public class Vaccination
     public DateTime DateAdministered { get; set; }
     public DateTime? NextDueDate { get; set; }
     public string? Notes { get; set; }
+    public string? DocumentUrl { get; set; }
     public DateTime CreatedAt { get; set; }
 
     public Pet Pet { get; set; } = null!;
+    public MedicalRecord? LinkedRecord { get; set; }
 }

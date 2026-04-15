@@ -9,6 +9,7 @@ public class AdminStatsDto
     public int ActiveSOSReports { get; set; }
     public int PendingProviders { get; set; }
     public decimal TotalPlatformRevenue { get; set; }
+    public int UnreadContactInquiries { get; set; }
 }
 
 public class AdminUserDto

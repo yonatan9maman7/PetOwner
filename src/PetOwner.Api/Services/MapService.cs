@@ -23,6 +23,7 @@ public class MapService : IMapService
 
     public async Task<List<MapPinDto>> SearchProvidersAsync(MapSearchFilter filter)
     {
+        // Approved + explicitly "online" + not admin-suspended (suspended profiles may stay Approved in DB).
         var query = _db.Locations
             .AsNoTracking()
             .Where(l =>
@@ -30,6 +31,7 @@ public class MapService : IMapService
                 l.User != null &&
                 l.User.ProviderProfile != null &&
                 l.User.ProviderProfile.Status == ProviderStatus.Approved &&
+                !l.User.ProviderProfile.IsSuspended &&
                 l.User.ProviderProfile.IsAvailableNow);
 
         if (filter.RequestedTime.HasValue)
@@ -45,12 +47,20 @@ public class MapService : IMapService
                     && slot.EndTime > timeOfDay));
         }
 
-        var parsedServiceType = ServiceTypeCatalog.TryParseDisplayName(filter.ServiceType);
-        if (parsedServiceType.HasValue)
+        var parsedServiceTypes = new List<ServiceType>();
+        if (!string.IsNullOrWhiteSpace(filter.ServiceType))
         {
-            var st = parsedServiceType.Value;
+            foreach (var segment in filter.ServiceType.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+            {
+                var parsed = ServiceTypeCatalog.TryParseDisplayName(segment);
+                if (parsed.HasValue) parsedServiceTypes.Add(parsed.Value);
+            }
+        }
+
+        if (parsedServiceTypes.Count > 0)
+        {
             query = query.Where(l =>
-                l.User!.ProviderProfile!.ServiceRates.Any(r => r.Service == st));
+                l.User!.ProviderProfile!.ServiceRates.Any(r => parsedServiceTypes.Contains(r.Service)));
         }
 
         if (filter.MinRating.HasValue)
@@ -63,11 +73,10 @@ public class MapService : IMapService
 
         if (filter.MaxRate.HasValue)
         {
-            if (parsedServiceType.HasValue)
+            if (parsedServiceTypes.Count > 0)
             {
-                var svc = parsedServiceType.Value;
                 query = query.Where(l => l.User!.ProviderProfile!.ServiceRates
-                    .Any(r => r.Service == svc && r.Rate <= filter.MaxRate.Value));
+                    .Any(r => parsedServiceTypes.Contains(r.Service) && r.Rate <= filter.MaxRate.Value));
             }
             else
             {
@@ -79,8 +88,8 @@ public class MapService : IMapService
         if (filter.RadiusKm.HasValue && filter.Latitude.HasValue && filter.Longitude.HasValue)
         {
             var center = new Point(filter.Longitude.Value, filter.Latitude.Value) { SRID = 4326 };
-            var radiusDegrees = filter.RadiusKm.Value / 111.32;
-            query = query.Where(l => l.GeoLocation!.Distance(center) <= radiusDegrees);
+            var radiusMeters = filter.RadiusKm.Value * 1000;
+            query = query.Where(l => l.GeoLocation!.Distance(center) <= radiusMeters);
         }
 
         if (!string.IsNullOrWhiteSpace(filter.SearchTerm))

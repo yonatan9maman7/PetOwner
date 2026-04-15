@@ -207,6 +207,55 @@ namespace PetOwner.Data.Migrations
                     b.ToTable("CommunityGroups");
                 });
 
+            modelBuilder.Entity("PetOwner.Data.Models.ContactInquiry", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier")
+                        .HasDefaultValueSql("NEWSEQUENTIALID()");
+
+                    b.Property<string>("AppVersion")
+                        .HasMaxLength(32)
+                        .HasColumnType("nvarchar(32)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime2")
+                        .HasDefaultValueSql("GETUTCDATE()");
+
+                    b.Property<string>("Message")
+                        .IsRequired()
+                        .HasMaxLength(4000)
+                        .HasColumnType("nvarchar(4000)");
+
+                    b.Property<string>("Platform")
+                        .HasMaxLength(32)
+                        .HasColumnType("nvarchar(32)");
+
+                    b.Property<DateTime?>("ReadAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Subject")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("Topic")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("nvarchar(32)");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId");
+
+                    b.HasIndex("ReadAt", "CreatedAt");
+
+                    b.ToTable("ContactInquiries");
+                });
+
             modelBuilder.Entity("PetOwner.Data.Models.Conversation", b =>
                 {
                     b.Property<Guid>("Id")
@@ -423,9 +472,23 @@ namespace PetOwner.Data.Migrations
                         .HasMaxLength(30)
                         .HasColumnType("nvarchar(30)");
 
+                    b.Property<Guid?>("VaccinationId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("WeightLogId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.HasKey("Id");
 
                     b.HasIndex("PetId");
+
+                    b.HasIndex("VaccinationId")
+                        .IsUnique()
+                        .HasFilter("[VaccinationId] IS NOT NULL");
+
+                    b.HasIndex("WeightLogId")
+                        .IsUnique()
+                        .HasFilter("[WeightLogId] IS NOT NULL");
 
                     b.ToTable("MedicalRecords");
                 });
@@ -667,6 +730,39 @@ namespace PetOwner.Data.Migrations
                     b.HasIndex("UserId");
 
                     b.ToTable("Pets");
+                });
+
+            modelBuilder.Entity("PetOwner.Data.Models.PetHealthShare", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier")
+                        .HasDefaultValueSql("NEWSEQUENTIALID()");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime2")
+                        .HasDefaultValueSql("GETUTCDATE()");
+
+                    b.Property<DateTime>("ExpiresAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid>("PetId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Token")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PetId");
+
+                    b.HasIndex("Token")
+                        .IsUnique();
+
+                    b.ToTable("PetHealthShares");
                 });
 
             modelBuilder.Entity("PetOwner.Data.Models.Post", b =>
@@ -1033,6 +1129,35 @@ namespace PetOwner.Data.Migrations
                     b.ToTable("Services");
                 });
 
+            modelBuilder.Entity("PetOwner.Data.Models.ServicePackage", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier")
+                        .HasDefaultValueSql("NEWSEQUENTIALID()");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<decimal>("Price")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<Guid>("ProviderServiceRateId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProviderServiceRateId");
+
+                    b.ToTable("ServicePackages");
+                });
+
             modelBuilder.Entity("PetOwner.Data.Models.ServiceRequest", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1233,6 +1358,10 @@ namespace PetOwner.Data.Migrations
                     b.Property<DateTime>("DateAdministered")
                         .HasColumnType("datetime2");
 
+                    b.Property<string>("DocumentUrl")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
                     b.Property<DateTime?>("NextDueDate")
                         .HasColumnType("datetime2");
 
@@ -1330,6 +1459,17 @@ namespace PetOwner.Data.Migrations
                     b.Navigation("Owner");
 
                     b.Navigation("ProviderProfile");
+                });
+
+            modelBuilder.Entity("PetOwner.Data.Models.ContactInquiry", b =>
+                {
+                    b.HasOne("PetOwner.Data.Models.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("PetOwner.Data.Models.Conversation", b =>
@@ -1446,7 +1586,21 @@ namespace PetOwner.Data.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("PetOwner.Data.Models.Vaccination", "Vaccination")
+                        .WithOne("LinkedRecord")
+                        .HasForeignKey("PetOwner.Data.Models.MedicalRecord", "VaccinationId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("PetOwner.Data.Models.WeightLog", "WeightLog")
+                        .WithOne("LinkedRecord")
+                        .HasForeignKey("PetOwner.Data.Models.MedicalRecord", "WeightLogId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.Navigation("Pet");
+
+                    b.Navigation("Vaccination");
+
+                    b.Navigation("WeightLog");
                 });
 
             modelBuilder.Entity("PetOwner.Data.Models.Message", b =>
@@ -1499,6 +1653,17 @@ namespace PetOwner.Data.Migrations
                         .IsRequired();
 
                     b.Navigation("User");
+                });
+
+            modelBuilder.Entity("PetOwner.Data.Models.PetHealthShare", b =>
+                {
+                    b.HasOne("PetOwner.Data.Models.Pet", "Pet")
+                        .WithMany()
+                        .HasForeignKey("PetId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Pet");
                 });
 
             modelBuilder.Entity("PetOwner.Data.Models.Post", b =>
@@ -1622,6 +1787,17 @@ namespace PetOwner.Data.Migrations
                     b.Navigation("Reviewer");
 
                     b.Navigation("ServiceRequest");
+                });
+
+            modelBuilder.Entity("PetOwner.Data.Models.ServicePackage", b =>
+                {
+                    b.HasOne("PetOwner.Data.Models.ProviderServiceRate", "ProviderServiceRate")
+                        .WithMany("Packages")
+                        .HasForeignKey("ProviderServiceRateId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("ProviderServiceRate");
                 });
 
             modelBuilder.Entity("PetOwner.Data.Models.ServiceRequest", b =>
@@ -1749,6 +1925,11 @@ namespace PetOwner.Data.Migrations
                     b.Navigation("ServiceRates");
                 });
 
+            modelBuilder.Entity("PetOwner.Data.Models.ProviderServiceRate", b =>
+                {
+                    b.Navigation("Packages");
+                });
+
             modelBuilder.Entity("PetOwner.Data.Models.Service", b =>
                 {
                     b.Navigation("ProviderServices");
@@ -1786,6 +1967,16 @@ namespace PetOwner.Data.Migrations
                     b.Navigation("ServiceRequestsAsOwner");
 
                     b.Navigation("ServiceRequestsAsProvider");
+                });
+
+            modelBuilder.Entity("PetOwner.Data.Models.Vaccination", b =>
+                {
+                    b.Navigation("LinkedRecord");
+                });
+
+            modelBuilder.Entity("PetOwner.Data.Models.WeightLog", b =>
+                {
+                    b.Navigation("LinkedRecord");
                 });
 #pragma warning restore 612, 618
         }

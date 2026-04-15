@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import {
   View,
   Text,
@@ -15,14 +15,17 @@ import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import { useAuthStore } from "../../store/authStore";
 import { useTranslation } from "../../i18n";
+import { BrandedAppHeader } from "../../components/BrandedAppHeader";
 import { LanguageToggle } from "../../components/LanguageToggle";
-import apiClient from "../../api/client";
+import { authApi } from "../../api/client";
+import { useTheme } from "../../theme/ThemeContext";
 
 export function RegisterScreen() {
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [loading, setLoading] = useState(false);
   const [secureEntry, setSecureEntry] = useState(true);
@@ -30,8 +33,9 @@ export function RegisterScreen() {
   const navigation = useNavigation<any>();
   const setAuth = useAuthStore((s) => s.setAuth);
   const isLoggedIn = useAuthStore((s) => s.isLoggedIn);
-  const { t, isHebrew, rtlText, rtlStyle, rtlRow, rtlInput, alignCls } =
+  const { t, language, isHebrew, rtlText, rtlStyle, rtlRow, rtlInput, alignCls } =
     useTranslation();
+  const { colors } = useTheme();
 
   useEffect(() => {
     if (isLoggedIn) navigation.popToTop();
@@ -42,7 +46,8 @@ export function RegisterScreen() {
       !fullName.trim() ||
       !email.trim() ||
       !phone.trim() ||
-      !password.trim()
+      !password.trim() ||
+      !confirmPassword.trim()
     ) {
       Alert.alert(t("errorTitle"), t("fillAllFields"));
       return;
@@ -51,16 +56,22 @@ export function RegisterScreen() {
       Alert.alert(t("errorTitle"), t("acceptTermsError"));
       return;
     }
+    if (password !== confirmPassword) {
+      Alert.alert(t("errorTitle"), t("passwordMismatch"));
+      return;
+    }
 
     setLoading(true);
     try {
-      const { data } = await apiClient.post("/auth/register", {
-        Name: fullName,
-        Email: email,
-        Phone: phone,
-        Password: password,
+      const data = await authApi.register({
+        name: fullName,
+        email,
+        phone,
+        password,
+        role: "Owner",
+        languagePreference: language,
       });
-      await setAuth(data.token, data.userId ?? data.id);
+      await setAuth(data.token, data.userId);
       navigation.navigate("Explore");
     } catch (err: any) {
       const message = err.response?.data?.message ?? t("registerError");
@@ -70,10 +81,27 @@ export function RegisterScreen() {
     }
   };
 
-  const labelCls = `text-xs font-bold text-[#506356] mb-2 px-1 ${alignCls} ${!isHebrew ? "uppercase tracking-widest" : ""}`;
+  const labelCls = `text-xs font-bold mb-2 px-1 ${alignCls} ${!isHebrew ? "uppercase tracking-widest" : ""}`;
+
+  const canSubmit = useMemo(
+    () =>
+      fullName.trim().length > 0 &&
+      email.trim().length > 0 &&
+      phone.trim().length > 0 &&
+      password.trim().length > 0 &&
+      confirmPassword.trim().length > 0 &&
+      termsAccepted,
+    [fullName, email, phone, password, confirmPassword, termsAccepted],
+  );
+
+  const requiredAfterLabel = (
+    <Text style={{ color: colors.danger }} accessibilityLabel="required">
+      {" *"}
+    </Text>
+  );
 
   return (
-    <SafeAreaView className="flex-1 bg-white" edges={["top"]}>
+    <SafeAreaView className="flex-1" edges={["top"]} style={{ marginTop: -8, backgroundColor: colors.surface }}>
       <KeyboardAvoidingView
         className="flex-1"
         behavior={Platform.OS === "ios" ? "padding" : undefined}
@@ -82,40 +110,39 @@ export function RegisterScreen() {
           className="flex-1"
           contentContainerStyle={{
             flexGrow: 1,
-            paddingHorizontal: 32,
-            paddingTop: 20,
+            paddingHorizontal: 28,
+            paddingTop: 4,
             paddingBottom: 120,
           }}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          {/* ── Header ── */}
-          <View className="flex-row items-center justify-between mb-6">
-            <View className="flex-row items-center gap-3">
-              <View className="w-10 h-10 rounded-xl items-center justify-center bg-[#001a5a]">
-                <Ionicons name="paw" size={22} color="#fff" />
-              </View>
-              <Text className="text-2xl font-extrabold text-[#001a5a]">
-                PetOwner
-              </Text>
-            </View>
-            <LanguageToggle />
+          {/* ── Header: brand + language ── */}
+          <View className="mb-6">
+            <BrandedAppHeader
+              horizontalPadding={0}
+              elevated={false}
+              trailing={<LanguageToggle />}
+            />
           </View>
 
           {/* ── Hero ── */}
           <View className="items-center mb-7">
-            <View className="w-14 h-14 rounded-2xl bg-[#001a5a] items-center justify-center mb-4">
-              <Ionicons name="heart" size={24} color="#fff" />
+            <View
+              className="w-14 h-14 rounded-2xl items-center justify-center mb-4"
+              style={{ backgroundColor: colors.primary }}
+            >
+              <Ionicons name="heart" size={24} color={colors.textInverse} />
             </View>
             <Text
-              style={rtlStyle}
-              className="text-2xl font-bold text-[#161d1f] text-center mb-2"
+              style={[rtlStyle, { color: colors.text }]}
+              className="text-2xl font-bold text-center mb-2"
             >
               {t("registerTitle")}
             </Text>
             <Text
-              style={rtlStyle}
-              className="text-sm text-[#74777f] text-center"
+              style={[rtlStyle, { color: colors.textSecondary }]}
+              className="text-sm text-center"
             >
               {t("registerSubtitle")}
             </Text>
@@ -123,15 +150,16 @@ export function RegisterScreen() {
 
           {/* ── Full Name ── */}
           <View className="mb-4">
-            <Text style={rtlText} className={labelCls}>
+            <Text style={[rtlText, { color: colors.textSecondary }]} className={labelCls}>
               {t("fullNameLabel")}
+              {requiredAfterLabel}
             </Text>
             <View
               style={[
                 rtlRow,
                 {
                   alignItems: "center",
-                  backgroundColor: "#dde4e6",
+                  backgroundColor: colors.inputBg,
                   borderRadius: 12,
                   gap: 12,
                   paddingHorizontal: 20,
@@ -140,7 +168,7 @@ export function RegisterScreen() {
                 },
               ]}
             >
-              <Ionicons name="person-outline" size={20} color="#74777f" />
+              <Ionicons name="person-outline" size={20} color={colors.textSecondary} />
               <TextInput
                 style={[
                   rtlInput,
@@ -148,12 +176,12 @@ export function RegisterScreen() {
                     flex: 1,
                     fontSize: 16,
                     lineHeight: 20,
-                    color: "#161d1f",
+                    color: colors.text,
                     padding: 0,
                   },
                 ]}
                 placeholder={t("fullNamePlaceholder")}
-                placeholderTextColor="#74777f99"
+                placeholderTextColor={colors.textMuted}
                 value={fullName}
                 onChangeText={setFullName}
                 autoCapitalize="words"
@@ -164,15 +192,16 @@ export function RegisterScreen() {
 
           {/* ── Email ── */}
           <View className="mb-4">
-            <Text style={rtlText} className={labelCls}>
+            <Text style={[rtlText, { color: colors.textSecondary }]} className={labelCls}>
               {t("emailLabel")}
+              {requiredAfterLabel}
             </Text>
             <View
               style={[
                 rtlRow,
                 {
                   alignItems: "center",
-                  backgroundColor: "#dde4e6",
+                  backgroundColor: colors.inputBg,
                   borderRadius: 12,
                   gap: 12,
                   paddingHorizontal: 20,
@@ -181,7 +210,7 @@ export function RegisterScreen() {
                 },
               ]}
             >
-              <Ionicons name="mail-outline" size={20} color="#74777f" />
+              <Ionicons name="mail-outline" size={20} color={colors.textSecondary} />
               <TextInput
                 style={[
                   rtlInput,
@@ -189,12 +218,12 @@ export function RegisterScreen() {
                     flex: 1,
                     fontSize: 16,
                     lineHeight: 20,
-                    color: "#161d1f",
+                    color: colors.text,
                     padding: 0,
                   },
                 ]}
                 placeholder={t("emailPlaceholder")}
-                placeholderTextColor="#74777f99"
+                placeholderTextColor={colors.textMuted}
                 value={email}
                 onChangeText={setEmail}
                 keyboardType="email-address"
@@ -206,15 +235,16 @@ export function RegisterScreen() {
 
           {/* ── Phone ── */}
           <View className="mb-4">
-            <Text style={rtlText} className={labelCls}>
+            <Text style={[rtlText, { color: colors.textSecondary }]} className={labelCls}>
               {t("phoneLabel")}
+              {requiredAfterLabel}
             </Text>
             <View
               style={[
                 rtlRow,
                 {
                   alignItems: "center",
-                  backgroundColor: "#dde4e6",
+                  backgroundColor: colors.inputBg,
                   borderRadius: 12,
                   gap: 12,
                   paddingHorizontal: 20,
@@ -223,7 +253,7 @@ export function RegisterScreen() {
                 },
               ]}
             >
-              <Ionicons name="call-outline" size={20} color="#74777f" />
+              <Ionicons name="call-outline" size={20} color={colors.textSecondary} />
               <TextInput
                 style={[
                   rtlInput,
@@ -231,12 +261,12 @@ export function RegisterScreen() {
                     flex: 1,
                     fontSize: 16,
                     lineHeight: 20,
-                    color: "#161d1f",
+                    color: colors.text,
                     padding: 0,
                   },
                 ]}
                 placeholder={t("phonePlaceholder")}
-                placeholderTextColor="#74777f99"
+                placeholderTextColor={colors.textMuted}
                 value={phone}
                 onChangeText={setPhone}
                 keyboardType="phone-pad"
@@ -247,15 +277,16 @@ export function RegisterScreen() {
 
           {/* ── Password ── */}
           <View className="mb-5">
-            <Text style={rtlText} className={labelCls}>
+            <Text style={[rtlText, { color: colors.textSecondary }]} className={labelCls}>
               {t("passwordLabel")}
+              {requiredAfterLabel}
             </Text>
             <View
               style={[
                 rtlRow,
                 {
                   alignItems: "center",
-                  backgroundColor: "#dde4e6",
+                  backgroundColor: colors.inputBg,
                   borderRadius: 12,
                   gap: 12,
                   paddingHorizontal: 20,
@@ -267,7 +298,7 @@ export function RegisterScreen() {
               <Ionicons
                 name="lock-closed-outline"
                 size={20}
-                color="#74777f"
+                color={colors.textSecondary}
               />
               <TextInput
                 style={[
@@ -276,12 +307,12 @@ export function RegisterScreen() {
                     flex: 1,
                     fontSize: 16,
                     lineHeight: 20,
-                    color: "#161d1f",
+                    color: colors.text,
                     padding: 0,
                   },
                 ]}
                 placeholder={t("passwordPlaceholder")}
-                placeholderTextColor="#74777f99"
+                placeholderTextColor={colors.textMuted}
                 value={password}
                 onChangeText={setPassword}
                 secureTextEntry={secureEntry}
@@ -293,7 +324,62 @@ export function RegisterScreen() {
                 <Ionicons
                   name={secureEntry ? "eye-off-outline" : "eye-outline"}
                   size={20}
-                  color="#74777f"
+                  color={colors.textSecondary}
+                />
+              </Pressable>
+            </View>
+          </View>
+
+          {/* ── Confirm Password ── */}
+          <View className="mb-5">
+            <Text style={[rtlText, { color: colors.textSecondary }]} className={labelCls}>
+              {t("confirmPasswordLabel")}
+              {requiredAfterLabel}
+            </Text>
+            <View
+              style={[
+                rtlRow,
+                {
+                  alignItems: "center",
+                  backgroundColor: colors.inputBg,
+                  borderRadius: 12,
+                  gap: 12,
+                  paddingHorizontal: 20,
+                  paddingVertical: 15,
+                  minHeight: 55,
+                },
+              ]}
+            >
+              <Ionicons
+                name="lock-closed-outline"
+                size={20}
+                color={colors.textSecondary}
+              />
+              <TextInput
+                style={[
+                  rtlInput,
+                  {
+                    flex: 1,
+                    fontSize: 16,
+                    lineHeight: 20,
+                    color: colors.text,
+                    padding: 0,
+                  },
+                ]}
+                placeholder={t("confirmPasswordPlaceholder")}
+                placeholderTextColor={colors.textMuted}
+                value={confirmPassword}
+                onChangeText={setConfirmPassword}
+                secureTextEntry={secureEntry}
+              />
+              <Pressable
+                onPress={() => setSecureEntry((v) => !v)}
+                hitSlop={8}
+              >
+                <Ionicons
+                  name={secureEntry ? "eye-off-outline" : "eye-outline"}
+                  size={20}
+                  color={colors.textSecondary}
                 />
               </Pressable>
             </View>
@@ -306,15 +392,23 @@ export function RegisterScreen() {
             onPress={() => setTermsAccepted((v) => !v)}
           >
             <View
-              className={`w-5 h-5 rounded border-2 items-center justify-center ${termsAccepted ? "bg-[#001a5a] border-[#001a5a]" : "border-[#74777f]"}`}
+              className="w-5 h-5 rounded border-2 items-center justify-center"
+              style={
+                termsAccepted
+                  ? { backgroundColor: colors.primary, borderColor: colors.primary }
+                  : { borderColor: colors.textSecondary }
+              }
             >
               {termsAccepted && (
-                <Ionicons name="checkmark" size={14} color="#fff" />
+                <Ionicons name="checkmark" size={14} color={colors.textInverse} />
               )}
             </View>
-            <Text style={rtlText} className="text-sm text-[#74777f] flex-1">
+            <Text style={[rtlText, { color: colors.textSecondary }]} className="text-sm flex-1">
+              <Text style={{ color: colors.danger }} accessibilityLabel="required">
+                *{" "}
+              </Text>
               {t("termsAgree")}{" "}
-              <Text className="text-[#264191] font-bold">
+              <Text style={{ color: colors.primary }} className="font-bold">
                 {t("termsOfService")}
               </Text>
             </Text>
@@ -322,14 +416,18 @@ export function RegisterScreen() {
 
           {/* ── Register Button ── */}
           <Pressable
-            className="h-14 rounded-xl items-center justify-center bg-[#001a5a] active:opacity-90"
+            className="h-14 rounded-xl items-center justify-center"
+            style={{
+              backgroundColor: colors.primary,
+              opacity: loading || !canSubmit ? 0.45 : 1,
+            }}
             onPress={handleRegister}
-            disabled={loading}
+            disabled={loading || !canSubmit}
           >
             {loading ? (
-              <ActivityIndicator color="#fff" />
+              <ActivityIndicator color={colors.textInverse} />
             ) : (
-              <Text className="text-white text-base font-bold">
+              <Text className="text-base font-bold" style={{ color: colors.textInverse }}>
                 {t("registerButton")}
               </Text>
             )}
@@ -340,9 +438,9 @@ export function RegisterScreen() {
             style={{ marginTop: "auto", paddingTop: 20, alignItems: "center" }}
           >
             <Pressable onPress={() => navigation.goBack()}>
-              <Text style={rtlStyle} className="text-sm text-[#74777f]">
+              <Text style={[rtlStyle, { color: colors.textSecondary }]} className="text-sm">
                 {t("alreadyHaveAccount")}{" "}
-                <Text className="text-[#001a5a] font-bold">
+                <Text style={{ color: colors.text }} className="font-bold">
                   {t("signIn")}
                 </Text>
               </Text>

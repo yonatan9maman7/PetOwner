@@ -9,4 +9,5 @@ public class WeightLog
     public DateTime CreatedAt { get; set; }
 
     public Pet Pet { get; set; } = null!;
+    public MedicalRecord? LinkedRecord { get; set; }
 }

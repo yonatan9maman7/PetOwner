@@ -36,6 +36,9 @@ public class ApplicationDbContext : DbContext
     public DbSet<FavoriteProvider> FavoriteProviders => Set<FavoriteProvider>();
     public DbSet<Vaccination> Vaccinations => Set<Vaccination>();
     public DbSet<WeightLog> WeightLogs => Set<WeightLog>();
+    public DbSet<ServicePackage> ServicePackages => Set<ServicePackage>();
+    public DbSet<PetHealthShare> PetHealthShares => Set<PetHealthShare>();
+    public DbSet<ContactInquiry> ContactInquiries => Set<ContactInquiry>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -64,6 +67,9 @@ public class ApplicationDbContext : DbContext
         ConfigureFavoriteProvider(modelBuilder);
         ConfigureVaccination(modelBuilder);
         ConfigureWeightLog(modelBuilder);
+        ConfigureServicePackage(modelBuilder);
+        ConfigurePetHealthShare(modelBuilder);
+        ConfigureContactInquiry(modelBuilder);
     }
 
     private static void ConfigureUser(ModelBuilder modelBuilder)
@@ -559,6 +565,24 @@ public class ApplicationDbContext : DbContext
                 .WithMany(p => p.MedicalRecords)
                 .HasForeignKey(m => m.PetId)
                 .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(m => m.Vaccination)
+                .WithOne(v => v.LinkedRecord)
+                .HasForeignKey<MedicalRecord>(m => m.VaccinationId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            entity.HasOne(m => m.WeightLog)
+                .WithOne(w => w.LinkedRecord)
+                .HasForeignKey<MedicalRecord>(m => m.WeightLogId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            entity.HasIndex(m => m.VaccinationId)
+                .IsUnique()
+                .HasFilter("[VaccinationId] IS NOT NULL");
+
+            entity.HasIndex(m => m.WeightLogId)
+                .IsUnique()
+                .HasFilter("[WeightLogId] IS NOT NULL");
         });
     }
 
@@ -754,7 +778,11 @@ public class ApplicationDbContext : DbContext
             entity.Property(n => n.Title).IsRequired().HasMaxLength(200);
             entity.Property(n => n.Message).IsRequired().HasMaxLength(1000);
             entity.Property(n => n.IsRead).HasDefaultValue(false);
-            entity.Property(n => n.CreatedAt).HasDefaultValueSql("GETUTCDATE()");
+            entity.Property(n => n.CreatedAt)
+                .HasDefaultValueSql("GETUTCDATE()")
+                .HasConversion(
+                    v => v.Kind == DateTimeKind.Utc ? v : v.ToUniversalTime(),
+                    v => DateTime.SpecifyKind(v, DateTimeKind.Utc));
 
             entity.HasIndex(n => new { n.UserId, n.IsRead, n.CreatedAt });
 
@@ -979,6 +1007,9 @@ public class ApplicationDbContext : DbContext
             entity.Property(v => v.Notes)
                 .HasMaxLength(1000);
 
+            entity.Property(v => v.DocumentUrl)
+                .HasMaxLength(500);
+
             entity.Property(v => v.CreatedAt)
                 .HasDefaultValueSql("GETUTCDATE()");
 
@@ -1015,6 +1046,84 @@ public class ApplicationDbContext : DbContext
             entity.HasOne(w => w.Pet)
                 .WithMany(p => p.WeightLogs)
                 .HasForeignKey(w => w.PetId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+    }
+
+    private static void ConfigureServicePackage(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<ServicePackage>(entity =>
+        {
+            entity.HasKey(sp => sp.Id);
+
+            entity.Property(sp => sp.Id)
+                .HasDefaultValueSql("NEWSEQUENTIALID()");
+
+            entity.Property(sp => sp.Title)
+                .IsRequired()
+                .HasMaxLength(200);
+
+            entity.Property(sp => sp.Price)
+                .HasColumnType("decimal(18,2)")
+                .IsRequired();
+
+            entity.Property(sp => sp.Description)
+                .HasMaxLength(1000);
+
+            entity.HasOne(sp => sp.ProviderServiceRate)
+                .WithMany(r => r.Packages)
+                .HasForeignKey(sp => sp.ProviderServiceRateId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+    }
+
+    private static void ConfigurePetHealthShare(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<PetHealthShare>(entity =>
+        {
+            entity.HasKey(s => s.Id);
+
+            entity.Property(s => s.Id)
+                .HasDefaultValueSql("NEWSEQUENTIALID()");
+
+            entity.Property(s => s.Token)
+                .IsRequired()
+                .HasMaxLength(64);
+
+            entity.HasIndex(s => s.Token)
+                .IsUnique();
+
+            entity.Property(s => s.ExpiresAt)
+                .IsRequired();
+
+            entity.Property(s => s.CreatedAt)
+                .HasDefaultValueSql("GETUTCDATE()");
+
+            entity.HasOne(s => s.Pet)
+                .WithMany()
+                .HasForeignKey(s => s.PetId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+    }
+
+    private static void ConfigureContactInquiry(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<ContactInquiry>(entity =>
+        {
+            entity.HasKey(c => c.Id);
+            entity.Property(c => c.Id).HasDefaultValueSql("NEWSEQUENTIALID()");
+            entity.Property(c => c.Topic).IsRequired().HasMaxLength(32);
+            entity.Property(c => c.Subject).HasMaxLength(200);
+            entity.Property(c => c.Message).IsRequired().HasMaxLength(4000);
+            entity.Property(c => c.AppVersion).HasMaxLength(32);
+            entity.Property(c => c.Platform).HasMaxLength(32);
+            entity.Property(c => c.CreatedAt).HasDefaultValueSql("GETUTCDATE()");
+
+            entity.HasIndex(c => new { c.ReadAt, c.CreatedAt });
+
+            entity.HasOne(c => c.User)
+                .WithMany()
+                .HasForeignKey(c => c.UserId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
     }

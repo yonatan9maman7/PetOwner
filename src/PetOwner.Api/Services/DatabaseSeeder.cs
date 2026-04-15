@@ -29,13 +29,13 @@ public class DatabaseSeeder
         "Certified pet first-aid trained and deeply passionate about canine wellbeing."
     ];
 
-    // Florentin, Tel Aviv bounding box (used by SeedProvidersAsync)
-    private const double MinLatitude = 32.0540;
-    private const double MaxLatitude = 32.0600;
-    private const double MinLongitude = 34.7640;
-    private const double MaxLongitude = 34.7750;
+    // Tel Aviv bounding box (used by SeedProvidersAsync)
+    private const double MinLatitude = 32.0400;
+    private const double MaxLatitude = 32.1200;
+    private const double MinLongitude = 34.7400;
+    private const double MaxLongitude = 34.8100;
 
-    private static readonly string[] ServiceDefinitions = ["Dog Walker", "Pet Sitter", "Boarding", "Drop-in Visit", "Pet Trainer", "Pet Insurance"];
+    private static readonly string[] ServiceDefinitions = ["Dog Walker", "Pet Sitter", "Boarding", "Drop-in Visit", "Pet Trainer", "Pet Insurance", "Pet Store"];
 
     private static readonly (ServiceType Type, string Name, PricingUnit Unit, decimal MinRate, decimal MaxRate)[] ServiceRateDefinitions =
     [
@@ -45,10 +45,10 @@ public class DatabaseSeeder
         (ServiceType.DropInVisit, "Drop-in Visit", PricingUnit.PerVisit, 30, 80),
         (ServiceType.Training, "Pet Trainer", PricingUnit.PerSession, 100, 300),
         (ServiceType.Insurance, "Pet Insurance", PricingUnit.PerPackage, 150, 500),
+        (ServiceType.PetStore, "Pet Store", PricingUnit.PerVisit, 20, 200),
     ];
 
-    private static readonly string[] IsraeliCities =
-        ["Tel Aviv", "Ramat Gan", "Herzliya", "Givatayim", "Petah Tikva", "Rishon LeZion", "Netanya"];
+    private static readonly string[] IsraeliCities = ["Tel Aviv"];
 
     private static readonly string[] DogBreeds =
     [
@@ -85,9 +85,9 @@ public class DatabaseSeeder
         var passwordHash = BCrypt.Net.BCrypt.HashPassword(SeedPassword);
         var allServiceTypes = Enum.GetValues<ServiceType>();
 
-        // Central Israel bounding box (Tel Aviv / Ramat Gan / Herzliya area)
-        const double centralMinLat = 32.0400, centralMaxLat = 32.1700;
-        const double centralMinLng = 34.7600, centralMaxLng = 34.8200;
+        // Tel Aviv bounding box
+        const double centralMinLat = 32.0400, centralMaxLat = 32.1200;
+        const double centralMinLng = 34.7400, centralMaxLng = 34.8100;
 
         var phoneSalt = (int)(DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() % 100_000);
         var phoneIdx = 0;
@@ -105,6 +105,7 @@ public class DatabaseSeeder
             ServiceType.DropInVisit => serviceIds[3],
             ServiceType.Training => serviceIds[4],
             ServiceType.Insurance => serviceIds[5],
+            ServiceType.PetStore => serviceIds[6],
             _ => serviceIds[0],
         };
 
@@ -390,7 +391,7 @@ public class DatabaseSeeder
                     Bio = faker.PickRandom(DogLoverBios),
                     Status = ProviderStatus.Approved,
                     IsAvailableNow = isAvailable,
-                    City = faker.Address.City(),
+                    City = "Tel Aviv",
                     Street = faker.Address.StreetName(),
                     BuildingNumber = faker.Address.BuildingNumber(),
                     ApartmentNumber = faker.Random.Int(0, 4) == 0 ? faker.Random.Int(1, 32).ToString() : null,
@@ -415,7 +416,7 @@ public class DatabaseSeeder
         _db.Users.AddRange(users);
         await _db.SaveChangesAsync();
 
-        _logger.LogInformation("Seeded {Count} dummy providers in Florentin area", users.Count);
+        _logger.LogInformation("Seeded {Count} dummy providers in Tel Aviv area", users.Count);
         return users.Count;
     }
 

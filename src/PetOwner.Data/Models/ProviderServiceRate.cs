@@ -9,4 +9,5 @@ public class ProviderServiceRate
     public PricingUnit Unit { get; set; }
 
     public ProviderProfile ProviderProfile { get; set; } = null!;
+    public ICollection<ServicePackage> Packages { get; set; } = new List<ServicePackage>();
 }

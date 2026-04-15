@@ -33,7 +33,7 @@ public class PetHealthController : ControllerBase
             .OrderByDescending(v => v.DateAdministered)
             .Select(v => new VaccinationDto(
                 v.Id, v.PetId, v.VaccineName,
-                v.DateAdministered, v.NextDueDate, v.Notes, v.CreatedAt))
+                v.DateAdministered, v.NextDueDate, v.Notes, v.DocumentUrl, v.CreatedAt))
             .ToListAsync();
 
         return Ok(vaccinations);
@@ -53,7 +53,7 @@ public class PetHealthController : ControllerBase
 
         return Ok(new VaccinationDto(
             v.Id, v.PetId, v.VaccineName,
-            v.DateAdministered, v.NextDueDate, v.Notes, v.CreatedAt));
+            v.DateAdministered, v.NextDueDate, v.Notes, v.DocumentUrl, v.CreatedAt));
     }
 
     [HttpPost("vaccinations")]
@@ -71,15 +71,29 @@ public class PetHealthController : ControllerBase
             DateAdministered = request.DateAdministered,
             NextDueDate = request.NextDueDate,
             Notes = request.Notes?.Trim(),
+            DocumentUrl = request.DocumentUrl?.Trim(),
         };
 
         _db.Vaccinations.Add(vaccination);
         await _db.SaveChangesAsync();
 
+        var linkedRecord = new MedicalRecord
+        {
+            PetId = petId,
+            Type = "Vaccination",
+            Title = $"{vaccination.VaccineName} Vaccine",
+            Description = vaccination.Notes,
+            Date = vaccination.DateAdministered,
+            DocumentUrl = vaccination.DocumentUrl,
+            VaccinationId = vaccination.Id,
+        };
+        _db.MedicalRecords.Add(linkedRecord);
+        await _db.SaveChangesAsync();
+
         var dto = new VaccinationDto(
             vaccination.Id, vaccination.PetId, vaccination.VaccineName,
             vaccination.DateAdministered, vaccination.NextDueDate,
-            vaccination.Notes, vaccination.CreatedAt);
+            vaccination.Notes, vaccination.DocumentUrl, vaccination.CreatedAt);
 
         return CreatedAtAction(nameof(GetVaccination), new { petId, id = vaccination.Id }, dto);
     }
@@ -102,13 +116,24 @@ public class PetHealthController : ControllerBase
         vaccination.DateAdministered = request.DateAdministered;
         vaccination.NextDueDate = request.NextDueDate;
         vaccination.Notes = request.Notes?.Trim();
+        vaccination.DocumentUrl = request.DocumentUrl?.Trim();
+
+        var linkedRecord = await _db.MedicalRecords
+            .FirstOrDefaultAsync(m => m.VaccinationId == id);
+        if (linkedRecord is not null)
+        {
+            linkedRecord.Title = $"{vaccination.VaccineName} Vaccine";
+            linkedRecord.Description = vaccination.Notes;
+            linkedRecord.Date = vaccination.DateAdministered;
+            linkedRecord.DocumentUrl = vaccination.DocumentUrl;
+        }
 
         await _db.SaveChangesAsync();
 
         return Ok(new VaccinationDto(
             vaccination.Id, vaccination.PetId, vaccination.VaccineName,
             vaccination.DateAdministered, vaccination.NextDueDate,
-            vaccination.Notes, vaccination.CreatedAt));
+            vaccination.Notes, vaccination.DocumentUrl, vaccination.CreatedAt));
     }
 
     [HttpDelete("vaccinations/{id:guid}")]
@@ -121,6 +146,11 @@ public class PetHealthController : ControllerBase
 
         if (vaccination is null)
             return NotFound(new { message = "Vaccination record not found." });
+
+        var linkedRecord = await _db.MedicalRecords
+            .FirstOrDefaultAsync(m => m.VaccinationId == id);
+        if (linkedRecord is not null)
+            _db.MedicalRecords.Remove(linkedRecord);
 
         _db.Vaccinations.Remove(vaccination);
         await _db.SaveChangesAsync();
@@ -217,6 +247,17 @@ public class PetHealthController : ControllerBase
         _db.WeightLogs.Add(log);
         await _db.SaveChangesAsync();
 
+        var linkedRecord = new MedicalRecord
+        {
+            PetId = petId,
+            Type = "WeightLog",
+            Title = $"Weight: {log.Weight} kg",
+            Date = log.DateRecorded,
+            WeightLogId = log.Id,
+        };
+        _db.MedicalRecords.Add(linkedRecord);
+        await _db.SaveChangesAsync();
+
         var dto = new WeightLogDto(log.Id, log.PetId, log.Weight, log.DateRecorded, log.CreatedAt);
         return CreatedAtAction(nameof(GetWeightLog), new { petId, id = log.Id }, dto);
     }
@@ -238,6 +279,14 @@ public class PetHealthController : ControllerBase
         log.Weight = request.Weight;
         log.DateRecorded = request.DateRecorded;
 
+        var linkedRecord = await _db.MedicalRecords
+            .FirstOrDefaultAsync(m => m.WeightLogId == id);
+        if (linkedRecord is not null)
+        {
+            linkedRecord.Title = $"Weight: {log.Weight} kg";
+            linkedRecord.Date = log.DateRecorded;
+        }
+
         await _db.SaveChangesAsync();
 
         return Ok(new WeightLogDto(log.Id, log.PetId, log.Weight, log.DateRecorded, log.CreatedAt));
@@ -253,6 +302,11 @@ public class PetHealthController : ControllerBase
 
         if (log is null)
             return NotFound(new { message = "Weight log not found." });
+
+        var linkedRecord = await _db.MedicalRecords
+            .FirstOrDefaultAsync(m => m.WeightLogId == id);
+        if (linkedRecord is not null)
+            _db.MedicalRecords.Remove(linkedRecord);
 
         _db.WeightLogs.Remove(log);
         await _db.SaveChangesAsync();
@@ -281,7 +335,7 @@ public class PetHealthController : ControllerBase
 
     private static readonly HashSet<string> ValidRecordTypes = new(StringComparer.OrdinalIgnoreCase)
     {
-        "Vaccination", "Condition", "Medication", "VetVisit"
+        "Vaccination", "Condition", "Medication", "VetVisit", "WeightLog"
     };
 
     [HttpGet("health-records")]
@@ -294,7 +348,8 @@ public class PetHealthController : ControllerBase
             .Where(m => m.PetId == petId)
             .OrderByDescending(m => m.Date)
             .Select(m => new MedicalRecordDto(
-                m.Id, m.PetId, m.Type, m.Title, m.Description, m.Date, m.DocumentUrl, m.CreatedAt))
+                m.Id, m.PetId, m.Type, m.Title, m.Description, m.Date, m.DocumentUrl, m.CreatedAt,
+                m.VaccinationId, m.WeightLogId))
             .ToListAsync();
 
         return Ok(records);
@@ -314,7 +369,7 @@ public class PetHealthController : ControllerBase
 
         return Ok(new MedicalRecordDto(
             record.Id, record.PetId, record.Type, record.Title, record.Description,
-            record.Date, record.DocumentUrl, record.CreatedAt));
+            record.Date, record.DocumentUrl, record.CreatedAt, record.VaccinationId, record.WeightLogId));
     }
 
     [HttpPost("health-records")]
@@ -343,7 +398,7 @@ public class PetHealthController : ControllerBase
 
         var dto = new MedicalRecordDto(
             record.Id, record.PetId, record.Type, record.Title, record.Description,
-            record.Date, record.DocumentUrl, record.CreatedAt);
+            record.Date, record.DocumentUrl, record.CreatedAt, record.VaccinationId, record.WeightLogId);
 
         return CreatedAtAction(nameof(GetHealthRecord), new { petId, id = record.Id }, dto);
     }
@@ -375,7 +430,7 @@ public class PetHealthController : ControllerBase
 
         return Ok(new MedicalRecordDto(
             record.Id, record.PetId, record.Type, record.Title, record.Description,
-            record.Date, record.DocumentUrl, record.CreatedAt));
+            record.Date, record.DocumentUrl, record.CreatedAt, record.VaccinationId, record.WeightLogId));
     }
 
     [HttpDelete("health-records/{id:guid}")]

@@ -2,6 +2,7 @@ import { View, Text, Pressable } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import { useTranslation } from "../i18n";
+import { useTheme } from "../theme/ThemeContext";
 
 interface AuthPlaceholderProps {
   title: string;
@@ -16,32 +17,37 @@ export function AuthPlaceholder({
 }: AuthPlaceholderProps) {
   const navigation = useNavigation<any>();
   const { t, rtlStyle } = useTranslation();
+  const { colors } = useTheme();
 
   return (
     <View className="flex-1 items-center justify-center px-10">
-      <View className="w-20 h-20 rounded-full bg-[#f4fafd] items-center justify-center mb-8">
-        <Ionicons name={icon} size={36} color="#001a5a" />
+      <View
+        className="w-20 h-20 rounded-full items-center justify-center mb-8"
+        style={{ backgroundColor: colors.background }}
+      >
+        <Ionicons name={icon} size={36} color={colors.text} />
       </View>
 
       <Text
-        style={rtlStyle}
-        className="text-2xl font-bold text-[#161d1f] text-center mb-3"
+        style={[rtlStyle, { color: colors.text }]}
+        className="text-2xl font-bold text-center mb-3"
       >
         {title}
       </Text>
 
       <Text
-        style={rtlStyle}
-        className="text-base text-[#74777f] text-center leading-6 mb-10 px-2"
+        style={[rtlStyle, { color: colors.textSecondary }]}
+        className="text-base text-center leading-6 mb-10 px-2"
       >
         {subtitle}
       </Text>
 
       <Pressable
-        className="w-full h-14 rounded-2xl items-center justify-center bg-[#001a5a] active:opacity-90"
+        className="w-full h-14 rounded-2xl items-center justify-center active:opacity-90"
+        style={{ backgroundColor: colors.primary }}
         onPress={() => navigation.navigate("Login")}
       >
-        <Text className="text-white text-base font-bold">
+        <Text className="text-base font-bold" style={{ color: colors.primaryText }}>
           {t("loginButton")}
         </Text>
       </Pressable>

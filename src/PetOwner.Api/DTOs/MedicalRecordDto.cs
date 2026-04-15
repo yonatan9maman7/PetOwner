@@ -8,7 +8,9 @@ public record MedicalRecordDto(
     string? Description,
     DateTime Date,
     string? DocumentUrl,
-    DateTime CreatedAt
+    DateTime CreatedAt,
+    Guid? VaccinationId = null,
+    Guid? WeightLogId = null
 );
 
 public record CreateMedicalRecordDto(

@@ -15,8 +15,10 @@ import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import { useAuthStore } from "../../store/authStore";
 import { useTranslation } from "../../i18n";
+import { BrandedAppHeader } from "../../components/BrandedAppHeader";
 import { LanguageToggle } from "../../components/LanguageToggle";
-import apiClient from "../../api/client";
+import { authApi } from "../../api/client";
+import { useTheme } from "../../theme/ThemeContext";
 
 export function ForgotPasswordScreen() {
   const [email, setEmail] = useState("");
@@ -26,6 +28,7 @@ export function ForgotPasswordScreen() {
   const isLoggedIn = useAuthStore((s) => s.isLoggedIn);
   const { t, isHebrew, rtlText, rtlStyle, rtlRow, rtlInput, alignCls } =
     useTranslation();
+  const { colors } = useTheme();
 
   useEffect(() => {
     if (isLoggedIn) navigation.popToTop();
@@ -39,7 +42,7 @@ export function ForgotPasswordScreen() {
 
     setLoading(true);
     try {
-      await apiClient.post("/auth/forgot-password", { email });
+      await authApi.forgotPassword(email);
       Alert.alert(t("resetSentTitle"), t("resetSentMessage"), [
         { text: "OK", onPress: () => navigation.goBack() },
       ]);
@@ -51,10 +54,10 @@ export function ForgotPasswordScreen() {
     }
   };
 
-  const labelCls = `text-xs font-bold text-[#506356] mb-2 px-1 ${alignCls} ${!isHebrew ? "uppercase tracking-widest" : ""}`;
+  const labelCls = `text-xs font-bold mb-2 px-1 ${alignCls} ${!isHebrew ? "uppercase tracking-widest" : ""}`;
 
   return (
-    <SafeAreaView className="flex-1 bg-white" edges={["top"]}>
+    <SafeAreaView className="flex-1" edges={["top"]} style={{ marginTop: -8, backgroundColor: colors.surface }}>
       <KeyboardAvoidingView
         className="flex-1"
         behavior={Platform.OS === "ios" ? "padding" : undefined}
@@ -64,39 +67,38 @@ export function ForgotPasswordScreen() {
           contentContainerStyle={{
             flexGrow: 1,
             paddingHorizontal: 28,
-            paddingTop: 20,
+            paddingTop: 4,
             paddingBottom: 120,
           }}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          {/* ── Header ── */}
-          <View className="flex-row items-center justify-between mb-6">
-            <View className="flex-row items-center gap-3">
-              <View className="w-10 h-10 rounded-xl items-center justify-center bg-[#001a5a]">
-                <Ionicons name="paw" size={22} color="#fff" />
-              </View>
-              <Text className="text-2xl font-extrabold text-[#001a5a]">
-                PetOwner
-              </Text>
-            </View>
-            <LanguageToggle />
+          {/* ── Header: brand + language ── */}
+          <View className="mb-6">
+            <BrandedAppHeader
+              horizontalPadding={0}
+              elevated={false}
+              trailing={<LanguageToggle />}
+            />
           </View>
 
           {/* ── Hero ── */}
           <View className="items-center mb-8">
-            <View className="w-14 h-14 rounded-2xl bg-[#001a5a] items-center justify-center mb-4">
-              <Ionicons name="mail" size={24} color="#fff" />
+            <View
+              className="w-14 h-14 rounded-2xl items-center justify-center mb-4"
+              style={{ backgroundColor: colors.primary }}
+            >
+              <Ionicons name="mail" size={24} color={colors.textInverse} />
             </View>
             <Text
-              style={rtlStyle}
-              className="text-2xl font-bold text-[#161d1f] text-center mb-2"
+              style={[rtlStyle, { color: colors.text }]}
+              className="text-2xl font-bold text-center mb-2"
             >
               {t("forgotTitle")}
             </Text>
             <Text
-              style={rtlStyle}
-              className="text-sm text-[#74777f] text-center leading-5 px-2"
+              style={[rtlStyle, { color: colors.textSecondary }]}
+              className="text-sm text-center leading-5 px-2"
             >
               {t("forgotSubtitle")}
             </Text>
@@ -104,7 +106,7 @@ export function ForgotPasswordScreen() {
 
           {/* ── Email ── */}
           <View className="mb-6">
-            <Text style={rtlText} className={labelCls}>
+            <Text style={[rtlText, { color: colors.textSecondary }]} className={labelCls}>
               {t("forgotEmailLabel")}
             </Text>
             <View
@@ -112,7 +114,7 @@ export function ForgotPasswordScreen() {
                 rtlRow,
                 {
                   alignItems: "center",
-                  backgroundColor: "#dde4e6",
+                  backgroundColor: colors.inputBg,
                   borderRadius: 12,
                   gap: 12,
                   paddingHorizontal: 20,
@@ -121,7 +123,7 @@ export function ForgotPasswordScreen() {
                 },
               ]}
             >
-              <Ionicons name="mail-outline" size={20} color="#74777f" />
+              <Ionicons name="mail-outline" size={20} color={colors.textSecondary} />
               <TextInput
                 style={[
                   rtlInput,
@@ -129,12 +131,12 @@ export function ForgotPasswordScreen() {
                     flex: 1,
                     fontSize: 16,
                     lineHeight: 20,
-                    color: "#161d1f",
+                    color: colors.text,
                     padding: 0,
                   },
                 ]}
                 placeholder={t("forgotEmailPlaceholder")}
-                placeholderTextColor="#74777f99"
+                placeholderTextColor={colors.textMuted}
                 value={email}
                 onChangeText={setEmail}
                 keyboardType="email-address"
@@ -146,14 +148,15 @@ export function ForgotPasswordScreen() {
 
           {/* ── Send Reset Button ── */}
           <Pressable
-            className="h-14 rounded-xl items-center justify-center bg-[#001a5a] active:opacity-90"
+            className="h-14 rounded-xl items-center justify-center active:opacity-90"
+            style={{ backgroundColor: colors.primary }}
             onPress={handleForgotPassword}
             disabled={loading}
           >
             {loading ? (
-              <ActivityIndicator color="#fff" />
+              <ActivityIndicator color={colors.textInverse} />
             ) : (
-              <Text className="text-white text-base font-bold">
+              <Text className="text-base font-bold" style={{ color: colors.textInverse }}>
                 {t("sendResetLink")}
               </Text>
             )}
@@ -165,8 +168,8 @@ export function ForgotPasswordScreen() {
           >
             <Pressable onPress={() => navigation.goBack()}>
               <Text
-                style={rtlStyle}
-                className="text-sm font-bold text-[#74777f]"
+                style={[rtlStyle, { color: colors.textSecondary }]}
+                className="text-sm font-bold"
               >
                 {t("backToLogin")}
               </Text>

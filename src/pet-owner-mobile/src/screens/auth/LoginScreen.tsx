@@ -16,7 +16,9 @@ import { useNavigation } from "@react-navigation/native";
 import { useAuthStore } from "../../store/authStore";
 import { useTranslation } from "../../i18n";
 import { LanguageToggle } from "../../components/LanguageToggle";
-import apiClient from "../../api/client";
+import { BrandedAppHeader } from "../../components/BrandedAppHeader";
+import { authApi } from "../../api/client";
+import { useTheme } from "../../theme/ThemeContext";
 
 /* ─── LoginScreen (root) ─────────────────────────────────────────── */
 
@@ -24,29 +26,30 @@ export function LoginScreen() {
   const isLoggedIn = useAuthStore((s) => s.isLoggedIn);
   const logout = useAuthStore((s) => s.logout);
   const { t, rtlText, rtlStyle } = useTranslation();
+  const { colors } = useTheme();
 
   if (isLoggedIn) {
     return (
-      <SafeAreaView className="flex-1 bg-white" edges={["top"]}>
-        <View className="flex-row justify-end px-8 pt-4">
-          <LanguageToggle />
-        </View>
+      <SafeAreaView className="flex-1" edges={["top"]} style={{ marginTop: -8, backgroundColor: colors.surface }}>
         <View className="flex-1 items-center justify-center px-8">
-          <View className="w-20 h-20 rounded-full bg-[#f4fafd] items-center justify-center mb-6">
-            <Ionicons name="person" size={36} color="#001a5a" />
+          <View
+            className="w-20 h-20 rounded-full items-center justify-center mb-6"
+            style={{ backgroundColor: colors.background }}
+          >
+            <Ionicons name="person" size={36} color={colors.text} />
           </View>
           <Text
-            style={rtlStyle}
-            className="text-xl font-bold text-[#161d1f] text-center mb-6"
+            style={[rtlStyle, { color: colors.text }]}
+            className="text-xl font-bold text-center mb-6"
           >
             {t("myProfile")}
           </Text>
           <Pressable
             className="py-3.5 px-10 rounded-2xl active:opacity-80"
-            style={{ backgroundColor: "rgba(186,26,26,0.1)" }}
+            style={{ backgroundColor: colors.dangerLight }}
             onPress={logout}
           >
-            <Text className="text-base font-bold text-[#ba1a1a]">
+            <Text className="text-base font-bold" style={{ color: colors.danger }}>
               {t("logoutButton")}
             </Text>
           </Pressable>
@@ -69,6 +72,7 @@ function LoginForm() {
   const setAuth = useAuthStore((s) => s.setAuth);
   const { t, isHebrew, rtlText, rtlStyle, rtlRow, rtlInput, alignCls } =
     useTranslation();
+  const { colors } = useTheme();
 
   const handleLogin = async () => {
     if (!email.trim() || !password.trim()) {
@@ -78,11 +82,8 @@ function LoginForm() {
 
     setLoading(true);
     try {
-      const { data } = await apiClient.post("/auth/login", {
-        email,
-        password,
-      });
-      await setAuth(data.token, data.userId ?? data.id);
+      const data = await authApi.login({ email, password });
+      await setAuth(data.token, data.userId);
       navigation.navigate("Explore");
     } catch (err: any) {
       const message = err.response?.data?.message ?? t("loginError");
@@ -92,10 +93,10 @@ function LoginForm() {
     }
   };
 
-  const labelCls = `text-xs font-bold text-[#506356] mb-2 px-1 ${alignCls} ${!isHebrew ? "uppercase tracking-widest" : ""}`;
+  const labelCls = `text-xs font-bold mb-2 px-1 ${alignCls} ${!isHebrew ? "uppercase tracking-widest" : ""}`;
 
   return (
-    <SafeAreaView className="flex-1 bg-white" edges={["top"]}>
+    <SafeAreaView className="flex-1" edges={["top"]} style={{ marginTop: -8, backgroundColor: colors.surface }}>
       <KeyboardAvoidingView
         className="flex-1"
         behavior={Platform.OS === "ios" ? "padding" : undefined}
@@ -105,36 +106,32 @@ function LoginForm() {
           contentContainerStyle={{
             flexGrow: 1,
             paddingHorizontal: 28,
-            paddingTop: 20,
+            paddingTop: 4,
             paddingBottom: 120,
           }}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          {/* ── Header: Branding + Language Toggle ── */}
-          <View className="flex-row items-center justify-between mb-8">
-            <View className="flex-row items-center gap-3">
-              <View className="w-10 h-10 rounded-xl items-center justify-center bg-[#001a5a]">
-                <Ionicons name="paw" size={22} color="#fff" />
-              </View>
-              <Text className="text-2xl font-extrabold text-[#001a5a]">
-                PetOwner
-              </Text>
-            </View>
-            <LanguageToggle />
+          {/* ── Header: brand + language ── */}
+          <View className="mb-8">
+            <BrandedAppHeader
+              horizontalPadding={0}
+              elevated={false}
+              trailing={<LanguageToggle />}
+            />
           </View>
 
           {/* ── Welcome ── */}
           <View className="mb-6">
             <Text
-              style={rtlText}
-              className={`text-3xl font-bold text-[#161d1f] mb-2 ${alignCls}`}
+              style={[rtlText, { color: colors.text }]}
+              className={`text-3xl font-bold mb-2 ${alignCls}`}
             >
               {t("welcomeTitle")}
             </Text>
             <Text
-              style={rtlText}
-              className={`text-base leading-6 text-[#74777f] ${alignCls}`}
+              style={[rtlText, { color: colors.textSecondary }]}
+              className={`text-base leading-6 ${alignCls}`}
             >
               {t("welcomeSubtitle")}
             </Text>
@@ -142,7 +139,7 @@ function LoginForm() {
 
           {/* ── Email ── */}
           <View className="mb-4">
-            <Text style={rtlText} className={labelCls}>
+            <Text style={[rtlText, { color: colors.textSecondary }]} className={labelCls}>
               {t("emailLabel")}
             </Text>
             <View
@@ -150,7 +147,7 @@ function LoginForm() {
                 rtlRow,
                 {
                   alignItems: "center",
-                  backgroundColor: "#dde4e6",
+                  backgroundColor: colors.inputBg,
                   borderRadius: 12,
                   gap: 12,
                   paddingHorizontal: 20,
@@ -159,7 +156,7 @@ function LoginForm() {
                 },
               ]}
             >
-              <Ionicons name="mail-outline" size={20} color="#74777f" />
+              <Ionicons name="mail-outline" size={20} color={colors.textSecondary} />
               <TextInput
                 style={[
                   rtlInput,
@@ -167,12 +164,12 @@ function LoginForm() {
                     flex: 1,
                     fontSize: 16,
                     lineHeight: 20,
-                    color: "#161d1f",
+                    color: colors.text,
                     padding: 0,
                   },
                 ]}
                 placeholder={t("emailPlaceholder")}
-                placeholderTextColor="#74777f99"
+                placeholderTextColor={colors.textMuted}
                 value={email}
                 onChangeText={setEmail}
                 keyboardType="email-address"
@@ -184,7 +181,7 @@ function LoginForm() {
 
           {/* ── Password ── */}
           <View className="mb-3">
-            <Text style={rtlText} className={labelCls}>
+            <Text style={[rtlText, { color: colors.textSecondary }]} className={labelCls}>
               {t("passwordLabel")}
             </Text>
             <View
@@ -192,7 +189,7 @@ function LoginForm() {
                 rtlRow,
                 {
                   alignItems: "center",
-                  backgroundColor: "#dde4e6",
+                  backgroundColor: colors.inputBg,
                   borderRadius: 12,
                   gap: 12,
                   paddingHorizontal: 20,
@@ -204,7 +201,7 @@ function LoginForm() {
               <Ionicons
                 name="lock-closed-outline"
                 size={20}
-                color="#74777f"
+                color={colors.textSecondary}
               />
               <TextInput
                 style={[
@@ -213,12 +210,12 @@ function LoginForm() {
                     flex: 1,
                     fontSize: 16,
                     lineHeight: 20,
-                    color: "#161d1f",
+                    color: colors.text,
                     padding: 0,
                   },
                 ]}
                 placeholder={t("passwordPlaceholder")}
-                placeholderTextColor="#74777f99"
+                placeholderTextColor={colors.textMuted}
                 value={password}
                 onChangeText={setPassword}
                 secureTextEntry={secureEntry}
@@ -230,7 +227,7 @@ function LoginForm() {
                 <Ionicons
                   name={secureEntry ? "eye-off-outline" : "eye-outline"}
                   size={20}
-                  color="#74777f"
+                  color={colors.textSecondary}
                 />
               </Pressable>
             </View>
@@ -242,21 +239,22 @@ function LoginForm() {
             hitSlop={8}
             onPress={() => navigation.navigate("ForgotPasswordScreen")}
           >
-            <Text className="text-xs font-bold text-[#264191]">
+            <Text className="text-xs font-bold" style={{ color: colors.primary }}>
               {t("forgotPassword")}
             </Text>
           </Pressable>
 
           {/* ── Sign-In Button ── */}
           <Pressable
-            className="h-14 rounded-xl items-center justify-center bg-[#001a5a] active:opacity-90"
+            className="h-14 rounded-xl items-center justify-center active:opacity-90"
+            style={{ backgroundColor: colors.primary }}
             onPress={handleLogin}
             disabled={loading}
           >
             {loading ? (
-              <ActivityIndicator color="#fff" />
+              <ActivityIndicator color={colors.textInverse} />
             ) : (
-              <Text className="text-white text-base font-bold">
+              <Text className="text-base font-bold" style={{ color: colors.textInverse }}>
                 {t("loginButton")}
               </Text>
             )}
@@ -264,25 +262,35 @@ function LoginForm() {
 
           {/* ── Divider ── */}
           <View className="flex-row items-center my-6">
-            <View className="flex-1 h-px bg-[#c4c6cf]/30" />
+            <View className="flex-1 h-px" style={{ backgroundColor: colors.borderLight }} />
             <Text
-              style={rtlStyle}
-              className={`px-4 text-xs font-bold text-[#74777f] ${!isHebrew ? "uppercase tracking-wider" : ""}`}
+              style={[rtlStyle, { color: colors.textSecondary }]}
+              className={`px-4 text-xs font-bold ${!isHebrew ? "uppercase tracking-wider" : ""}`}
             >
               {t("socialDivider")}
             </Text>
-            <View className="flex-1 h-px bg-[#c4c6cf]/30" />
+            <View className="flex-1 h-px" style={{ backgroundColor: colors.borderLight }} />
           </View>
 
           {/* ── Social Login ── */}
           <View className="flex-row gap-4">
-            <Pressable className="flex-1 flex-row items-center justify-center gap-3 h-12 bg-[#e8eff1] rounded-xl active:bg-[#dde4e6]">
-              <Ionicons name="logo-apple" size={20} color="#161d1f" />
-              <Text className="text-sm font-bold text-[#161d1f]">Apple</Text>
+            <Pressable
+              className="flex-1 flex-row items-center justify-center gap-3 h-12 rounded-xl"
+              style={({ pressed }) => ({
+                backgroundColor: pressed ? colors.inputBg : colors.surfaceSecondary,
+              })}
+            >
+              <Ionicons name="logo-apple" size={20} color={colors.text} />
+              <Text className="text-sm font-bold" style={{ color: colors.text }}>Apple</Text>
             </Pressable>
-            <Pressable className="flex-1 flex-row items-center justify-center gap-3 h-12 bg-[#e8eff1] rounded-xl active:bg-[#dde4e6]">
-              <Ionicons name="logo-google" size={20} color="#161d1f" />
-              <Text className="text-sm font-bold text-[#161d1f]">Google</Text>
+            <Pressable
+              className="flex-1 flex-row items-center justify-center gap-3 h-12 rounded-xl"
+              style={({ pressed }) => ({
+                backgroundColor: pressed ? colors.inputBg : colors.surfaceSecondary,
+              })}
+            >
+              <Ionicons name="logo-google" size={20} color={colors.text} />
+              <Text className="text-sm font-bold" style={{ color: colors.text }}>Google</Text>
             </Pressable>
           </View>
 
@@ -291,9 +299,9 @@ function LoginForm() {
             style={{ marginTop: "auto", paddingTop: 16, alignItems: "center" }}
           >
             <Pressable onPress={() => navigation.navigate("RegisterScreen")}>
-              <Text style={rtlStyle} className="text-sm text-[#74777f]">
+              <Text style={[rtlStyle, { color: colors.textSecondary }]} className="text-sm">
                 {t("newToCommunity")}{" "}
-                <Text className="text-[#001a5a] font-bold">
+                <Text style={{ color: colors.text }} className="font-bold">
                   {t("createAccount")}
                 </Text>
               </Text>

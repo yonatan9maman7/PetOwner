@@ -11,5 +11,10 @@ public class MedicalRecord
     public string? DocumentUrl { get; set; }
     public DateTime CreatedAt { get; set; }
 
+    public Guid? VaccinationId { get; set; }
+    public Guid? WeightLogId { get; set; }
+
     public Pet Pet { get; set; } = null!;
+    public Vaccination? Vaccination { get; set; }
+    public WeightLog? WeightLog { get; set; }
 }

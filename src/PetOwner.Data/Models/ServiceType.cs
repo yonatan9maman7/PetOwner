@@ -7,5 +7,6 @@ public enum ServiceType
     Boarding,
     DropInVisit,
     Training,
-    Insurance
+    Insurance,
+    PetStore
 }

@@ -1,24 +1,66 @@
 import "./global.css";
 import { useEffect } from "react";
 import { I18nManager, Platform, View } from "react-native";
-import { NavigationContainer } from "@react-navigation/native";
+import { NavigationContainer, DefaultTheme, DarkTheme } from "@react-navigation/native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
+import { ErrorBoundary } from "react-error-boundary";
 import { StatusBar } from "expo-status-bar";
 import { AppNavigator } from "./src/navigation/AppNavigator";
 import { useAuthStore } from "./src/store/authStore";
+import { useThemeStore } from "./src/store/themeStore";
+import { ThemeProvider, useTheme } from "./src/theme/ThemeContext";
+import { ErrorFallback } from "./src/components/ErrorFallback";
+
+function AppInner() {
+  const { colors, isDark } = useTheme();
+
+  const navTheme = isDark
+    ? {
+        ...DarkTheme,
+        colors: {
+          ...DarkTheme.colors,
+          background: colors.background,
+          card: colors.surface,
+          text: colors.text,
+          border: colors.border,
+          primary: colors.primary,
+        },
+      }
+    : {
+        ...DefaultTheme,
+        colors: {
+          ...DefaultTheme.colors,
+          background: colors.background,
+          card: colors.surface,
+          text: colors.text,
+          border: colors.border,
+          primary: colors.primary,
+        },
+      };
+
+  return (
+    <NavigationContainer theme={navTheme}>
+      <AppNavigator />
+      <StatusBar style={isDark ? "light" : "dark"} />
+    </NavigationContainer>
+  );
+}
 
 export default function App() {
-  const hydrate = useAuthStore((s) => s.hydrate);
-  const hydrated = useAuthStore((s) => s.hydrated);
+  const hydrateAuth = useAuthStore((s) => s.hydrate);
+  const authHydrated = useAuthStore((s) => s.hydrated);
   const language = useAuthStore((s) => s.language);
+  const hydrateTheme = useThemeStore((s) => s.hydrate);
+  const themeHydrated = useThemeStore((s) => s.hydrated);
 
   useEffect(() => {
-    hydrate();
-  }, [hydrate]);
+    hydrateAuth();
+    hydrateTheme();
+  }, [hydrateAuth, hydrateTheme]);
 
   useEffect(() => {
-    if (!hydrated || Platform.OS === "web") return;
+    if (!authHydrated || Platform.OS === "web") return;
 
     const shouldBeRTL = language === "he";
     if (I18nManager.isRTL !== shouldBeRTL) {
@@ -30,20 +72,21 @@ export default function App() {
         );
       }
     }
-  }, [hydrated, language]);
+  }, [authHydrated, language]);
 
-  if (!hydrated) {
+  if (!authHydrated || !themeHydrated) {
     return <View style={{ flex: 1, backgroundColor: "#fff" }} />;
   }
 
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
-      <SafeAreaProvider>
-        <NavigationContainer>
-          <AppNavigator />
-          <StatusBar style="auto" />
-        </NavigationContainer>
-      </SafeAreaProvider>
-    </GestureHandlerRootView>
+    <ErrorBoundary FallbackComponent={ErrorFallback}>
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        <SafeAreaProvider>
+          <ThemeProvider>
+            <AppInner />
+          </ThemeProvider>
+        </SafeAreaProvider>
+      </GestureHandlerRootView>
+    </ErrorBoundary>
   );
 }

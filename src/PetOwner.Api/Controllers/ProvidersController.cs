@@ -104,13 +104,27 @@ public class ProvidersController : ControllerBase
 
         foreach (var svcRate in request.SelectedServices)
         {
-            _db.ProviderServiceRates.Add(new ProviderServiceRate
+            var rate = new ProviderServiceRate
             {
                 ProviderProfileId = userId,
                 Service = svcRate.ServiceType,
                 Rate = svcRate.Rate,
                 Unit = svcRate.PricingUnit,
-            });
+            };
+            _db.ProviderServiceRates.Add(rate);
+
+            if (svcRate.Packages is { Count: > 0 })
+            {
+                foreach (var pkg in svcRate.Packages)
+                {
+                    rate.Packages.Add(new ServicePackage
+                    {
+                        Title = pkg.Title.Trim(),
+                        Price = pkg.Price,
+                        Description = string.IsNullOrWhiteSpace(pkg.Description) ? null : pkg.Description.Trim(),
+                    });
+                }
+            }
 
             if (!ServiceTypeCatalog.TryGetDisplayName(svcRate.ServiceType, out var serviceName))
                 continue;
@@ -200,13 +214,27 @@ public class ProvidersController : ControllerBase
 
         foreach (var svcRate in request.SelectedServices)
         {
-            _db.ProviderServiceRates.Add(new ProviderServiceRate
+            var rate = new ProviderServiceRate
             {
                 ProviderProfileId = userId,
                 Service = svcRate.ServiceType,
                 Rate = svcRate.Rate,
                 Unit = svcRate.PricingUnit,
-            });
+            };
+            _db.ProviderServiceRates.Add(rate);
+
+            if (svcRate.Packages is { Count: > 0 })
+            {
+                foreach (var pkg in svcRate.Packages)
+                {
+                    rate.Packages.Add(new ServicePackage
+                    {
+                        Title = pkg.Title.Trim(),
+                        Price = pkg.Price,
+                        Description = string.IsNullOrWhiteSpace(pkg.Description) ? null : pkg.Description.Trim(),
+                    });
+                }
+            }
 
             if (!ServiceTypeCatalog.TryGetDisplayName(svcRate.ServiceType, out var serviceName))
                 continue;
@@ -260,6 +288,12 @@ public class ProvidersController : ControllerBase
         if (profile is null)
             return NotFound(new { message = "Provider profile not found." });
 
+        if (profile.Status != ProviderStatus.Approved)
+            return BadRequest(new { message = "Only approved providers can change map visibility." });
+
+        if (profile.IsSuspended)
+            return BadRequest(new { message = "Suspended providers cannot change availability." });
+
         profile.IsAvailableNow = request.IsAvailable;
         await _db.SaveChangesAsync();
 
@@ -275,6 +309,7 @@ public class ProvidersController : ControllerBase
         var profile = await _db.ProviderProfiles
             .Include(p => p.ProviderServices)
             .Include(p => p.ServiceRates)
+                .ThenInclude(r => r.Packages)
             .FirstOrDefaultAsync(p => p.UserId == userId);
 
         if (profile is null)
@@ -302,13 +337,27 @@ public class ProvidersController : ControllerBase
 
         foreach (var svcRate in request.SelectedServices)
         {
-            _db.ProviderServiceRates.Add(new ProviderServiceRate
+            var rate = new ProviderServiceRate
             {
                 ProviderProfileId = userId,
                 Service = svcRate.ServiceType,
                 Rate = svcRate.Rate,
                 Unit = svcRate.PricingUnit,
-            });
+            };
+            _db.ProviderServiceRates.Add(rate);
+
+            if (svcRate.Packages is { Count: > 0 })
+            {
+                foreach (var pkg in svcRate.Packages)
+                {
+                    rate.Packages.Add(new ServicePackage
+                    {
+                        Title = pkg.Title.Trim(),
+                        Price = pkg.Price,
+                        Description = string.IsNullOrWhiteSpace(pkg.Description) ? null : pkg.Description.Trim(),
+                    });
+                }
+            }
 
             if (!ServiceTypeCatalog.TryGetDisplayName(svcRate.ServiceType, out var serviceName))
                 continue;
@@ -480,6 +529,7 @@ public class ProvidersController : ControllerBase
             .Include(p => p.ProviderServices)
                 .ThenInclude(ps => ps.Service)
             .Include(p => p.ServiceRates)
+                .ThenInclude(r => r.Packages)
             .FirstOrDefaultAsync(p => p.UserId == userId);
 
         if (profile is null)
@@ -494,7 +544,10 @@ public class ProvidersController : ControllerBase
             profile.IsAvailableNow,
             profile.User.Name,
             profile.Bio,
-            profile.ServiceRates.Select(r => new ServiceRateDto(r.Service, r.Rate, r.Unit)).ToList(),
+            profile.ServiceRates.Select(r => new ServiceRateDto(
+                r.Service, r.Rate, r.Unit,
+                r.Packages.Select(p => new ServicePackageDto(p.Id, p.Title, p.Price, p.Description)).ToList()
+            )).ToList(),
             profile.City,
             profile.Street,
             profile.BuildingNumber,

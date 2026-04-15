@@ -15,7 +15,7 @@ public class MedicalRecordsController : ControllerBase
 {
     private static readonly HashSet<string> ValidTypes = new(StringComparer.OrdinalIgnoreCase)
     {
-        "Vaccination", "Condition", "Medication", "VetVisit"
+        "Vaccination", "Condition", "Medication", "VetVisit", "WeightLog"
     };
 
     private readonly ApplicationDbContext _db;
@@ -39,7 +39,8 @@ public class MedicalRecordsController : ControllerBase
             .Where(m => m.PetId == petId)
             .OrderByDescending(m => m.Date)
             .Select(m => new MedicalRecordDto(
-                m.Id, m.PetId, m.Type, m.Title, m.Description, m.Date, m.DocumentUrl, m.CreatedAt))
+                m.Id, m.PetId, m.Type, m.Title, m.Description, m.Date, m.DocumentUrl, m.CreatedAt,
+                m.VaccinationId, m.WeightLogId))
             .ToListAsync();
 
         return Ok(records);
@@ -63,7 +64,7 @@ public class MedicalRecordsController : ControllerBase
 
         return Ok(new MedicalRecordDto(
             record.Id, record.PetId, record.Type, record.Title, record.Description,
-            record.Date, record.DocumentUrl, record.CreatedAt));
+            record.Date, record.DocumentUrl, record.CreatedAt, record.VaccinationId, record.WeightLogId));
     }
 
     [HttpPost]
@@ -96,7 +97,7 @@ public class MedicalRecordsController : ControllerBase
 
         var dto = new MedicalRecordDto(
             record.Id, record.PetId, record.Type, record.Title, record.Description,
-            record.Date, record.DocumentUrl, record.CreatedAt);
+            record.Date, record.DocumentUrl, record.CreatedAt, record.VaccinationId, record.WeightLogId);
 
         return CreatedAtAction(nameof(GetRecord), new { petId, id = record.Id }, dto);
     }
@@ -130,7 +131,7 @@ public class MedicalRecordsController : ControllerBase
 
         return Ok(new MedicalRecordDto(
             record.Id, record.PetId, record.Type, record.Title, record.Description,
-            record.Date, record.DocumentUrl, record.CreatedAt));
+            record.Date, record.DocumentUrl, record.CreatedAt, record.VaccinationId, record.WeightLogId));
     }
 
     [HttpDelete("{id:guid}")]
@@ -181,7 +182,8 @@ public class MedicalRecordsController : ControllerBase
             .Where(m => m.PetId == booking.PetId.Value)
             .OrderByDescending(m => m.Date)
             .Select(m => new MedicalRecordDto(
-                m.Id, m.PetId, m.Type, m.Title, m.Description, m.Date, m.DocumentUrl, m.CreatedAt))
+                m.Id, m.PetId, m.Type, m.Title, m.Description, m.Date, m.DocumentUrl, m.CreatedAt,
+                m.VaccinationId, m.WeightLogId))
             .ToListAsync();
 
         return Ok(new { shared = true, records });

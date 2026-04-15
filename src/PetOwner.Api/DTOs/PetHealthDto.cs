@@ -11,6 +11,7 @@ public record VaccinationDto(
     DateTime DateAdministered,
     DateTime? NextDueDate,
     string? Notes,
+    string? DocumentUrl,
     DateTime CreatedAt
 );
 
@@ -18,14 +19,16 @@ public record CreateVaccinationRequest(
     VaccineName VaccineName,
     DateTime DateAdministered,
     DateTime? NextDueDate,
-    string? Notes
+    string? Notes,
+    string? DocumentUrl
 );
 
 public record UpdateVaccinationRequest(
     VaccineName VaccineName,
     DateTime DateAdministered,
     DateTime? NextDueDate,
-    string? Notes
+    string? Notes,
+    string? DocumentUrl
 );
 
 public record VaccineStatusDto(

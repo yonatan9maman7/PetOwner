@@ -50,6 +50,9 @@ public class AdminController : ControllerBase
                         b.PaymentStatus == PaymentStatus.Paid)
             .SumAsync(b => b.TotalPrice);
 
+        var unreadInquiries = await _db.ContactInquiries
+            .CountAsync(c => c.ReadAt == null);
+
         return Ok(new AdminStatsDto
         {
             TotalUsers = totalUsers,
@@ -58,7 +61,8 @@ public class AdminController : ControllerBase
             TotalBookings = totalBookings,
             ActiveSOSReports = activeSOSReports,
             PendingProviders = pendingProviders,
-            TotalPlatformRevenue = revenueBookings * PlatformFeePercent
+            TotalPlatformRevenue = revenueBookings * PlatformFeePercent,
+            UnreadContactInquiries = unreadInquiries
         });
     }
 
@@ -207,6 +211,7 @@ public class AdminController : ControllerBase
             return BadRequest(new { message = "Provider is already approved." });
 
         profile.Status = ProviderStatus.Approved;
+        profile.IsAvailableNow = true;
 
         var user = await _db.Users.FindAsync(providerId);
         if (user is not null)
@@ -351,6 +356,7 @@ public class AdminController : ControllerBase
 
         user.ProviderProfile.IsSuspended = false;
         user.ProviderProfile.SuspensionReason = null;
+        user.ProviderProfile.IsAvailableNow = true;
         user.Role = "Provider";
 
         await _db.SaveChangesAsync();
@@ -439,6 +445,7 @@ public class AdminController : ControllerBase
             return BadRequest(new { message = "Provider is already approved." });
 
         profile.Status = ProviderStatus.Approved;
+        profile.IsAvailableNow = true;
 
         var user = await _db.Users.FindAsync(id);
         if (user is not null)
@@ -454,6 +461,44 @@ public class AdminController : ControllerBase
             profile.UserId);
 
         return Ok(new { message = "Provider approved successfully." });
+    }
+
+    [HttpGet("inquiries")]
+    public async Task<IActionResult> GetInquiries()
+    {
+        var inquiries = await _db.ContactInquiries
+            .Include(c => c.User)
+            .OrderByDescending(c => c.CreatedAt)
+            .Select(c => new ContactInquiryAdminDto
+            {
+                Id = c.Id,
+                UserId = c.UserId,
+                UserName = c.User.Name,
+                UserEmail = c.User.Email,
+                Topic = c.Topic,
+                Subject = c.Subject,
+                Message = c.Message,
+                AppVersion = c.AppVersion,
+                Platform = c.Platform,
+                CreatedAt = c.CreatedAt,
+                ReadAt = c.ReadAt,
+            })
+            .ToListAsync();
+
+        return Ok(inquiries);
+    }
+
+    [HttpPatch("inquiries/{id:guid}/read")]
+    public async Task<IActionResult> MarkInquiryRead(Guid id)
+    {
+        var inquiry = await _db.ContactInquiries.FindAsync(id);
+        if (inquiry is null)
+            return NotFound(new { message = "Inquiry not found." });
+
+        inquiry.ReadAt ??= DateTime.UtcNow;
+        await _db.SaveChangesAsync();
+
+        return Ok(new { message = "Inquiry marked as read." });
     }
 
     [HttpPost("clear-sos")]
