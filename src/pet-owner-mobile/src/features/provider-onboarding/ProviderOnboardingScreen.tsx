@@ -8,6 +8,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useTranslation } from "../../i18n";
 import { useTheme } from "../../theme/ThemeContext";
 import { providerApi } from "../../api/client";
+import { useAuthStore } from "../../store/authStore";
 import { INDIVIDUAL_STEPS, BUSINESS_STEPS } from "./constants";
 import {
   createOnboardingFormSchema,
@@ -53,6 +54,7 @@ export function ProviderOnboardingScreen() {
       createOnboardingFormSchema({
         validationPhoneRequired: t("validationPhoneRequired"),
         validationPhoneInvalid: t("validationPhoneInvalid"),
+        validationPhoneInvalidBusiness: t("validationPhoneInvalidBusiness"),
       }),
     [language],
   );
@@ -116,7 +118,10 @@ export function ProviderOnboardingScreen() {
     const payload = formToPayload(values);
     setSubmitting(true);
     try {
-      await providerApi.apply(payload);
+      const res = await providerApi.apply(payload);
+      if (res.newAccessToken && res.applicationId) {
+        await useAuthStore.getState().setAuth(res.newAccessToken, res.applicationId);
+      }
       Alert.alert("", t("applicationSubmitted"), [
         { text: "OK", onPress: () => navigation.goBack() },
       ]);

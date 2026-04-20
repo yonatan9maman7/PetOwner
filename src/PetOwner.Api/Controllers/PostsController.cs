@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using PetOwner.Api.DTOs;
+using PetOwner.Api.Services;
 using PetOwner.Data;
 using PetOwner.Data.Models;
 
@@ -14,7 +15,13 @@ namespace PetOwner.Api.Controllers;
 public class PostsController : ControllerBase
 {
     private readonly ApplicationDbContext _db;
-    public PostsController(ApplicationDbContext db) => _db = db;
+    private readonly INotificationService _notifications;
+
+    public PostsController(ApplicationDbContext db, INotificationService notifications)
+    {
+        _db = db;
+        _notifications = notifications;
+    }
 
     [HttpGet("feed")]
     public async Task<IActionResult> GetFeed(
@@ -65,13 +72,13 @@ public class PostsController : ControllerBase
     {
         var userId = GetUserId();
 
-        if (string.IsNullOrWhiteSpace(dto.Content))
-            return BadRequest(new { message = "Post content is required." });
+        if (string.IsNullOrWhiteSpace(dto.Content) && string.IsNullOrWhiteSpace(dto.ImageUrl))
+            return BadRequest(new { message = "Post must have content or an image." });
 
         var post = new Post
         {
             UserId = userId,
-            Content = dto.Content.Trim(),
+            Content = dto.Content?.Trim() ?? string.Empty,
             ImageUrl = dto.ImageUrl?.Trim(),
             Latitude = dto.Latitude,
             Longitude = dto.Longitude,
@@ -131,17 +138,50 @@ public class PostsController : ControllerBase
         return Ok(new { liked = existing is null, likeCount = post.LikeCount });
     }
 
+    // ── Comments ────────────────────────────────────────────────────────────────
+
     [HttpGet("{postId:guid}/comments")]
     public async Task<IActionResult> GetComments(Guid postId)
     {
-        var comments = await _db.PostComments
+        var userId = GetUserId();
+
+        var raw = await _db.PostComments
             .AsNoTracking()
             .Where(c => c.PostId == postId)
             .OrderBy(c => c.CreatedAt)
-            .Select(c => new CommentDto(c.Id, c.UserId, c.User.Name, c.Content, c.CreatedAt))
+            .Select(c => new
+            {
+                c.Id,
+                c.ParentCommentId,
+                c.UserId,
+                UserName = c.User.Name,
+                c.Content,
+                c.CreatedAt,
+                c.EditedAt,
+                c.LikeCount,
+                LikedByMe = c.Likes.Any(l => l.UserId == userId),
+            })
             .ToListAsync();
 
-        return Ok(comments);
+        // Build tree in memory
+        var byParent = raw
+            .Where(c => c.ParentCommentId != null)
+            .GroupBy(c => c.ParentCommentId!.Value)
+            .ToDictionary(g => g.Key, g => g.ToList());
+
+        CommentDto Build(dynamic c) => new CommentDto(
+            c.Id, c.ParentCommentId, c.UserId, c.UserName, c.Content,
+            c.CreatedAt, c.EditedAt, c.LikeCount, c.LikedByMe,
+            byParent.TryGetValue((Guid)c.Id, out var kids)
+                ? kids.Select(k => Build(k)).ToArray()
+                : Array.Empty<CommentDto>());
+
+        var tree = raw
+            .Where(c => c.ParentCommentId == null)
+            .Select(c => Build(c))
+            .ToList();
+
+        return Ok(tree);
     }
 
     [HttpPost("{postId:guid}/comments")]
@@ -152,13 +192,27 @@ public class PostsController : ControllerBase
         if (string.IsNullOrWhiteSpace(dto.Content))
             return BadRequest(new { message = "Comment content is required." });
 
-        var post = await _db.Posts.FirstOrDefaultAsync(p => p.Id == postId);
+        var post = await _db.Posts
+            .Include(p => p.User)
+            .FirstOrDefaultAsync(p => p.Id == postId);
         if (post is null) return NotFound(new { message = "Post not found." });
+
+        if (dto.ParentCommentId is Guid parentId)
+        {
+            var parent = await _db.PostComments
+                .Where(c => c.Id == parentId && c.PostId == postId)
+                .Select(c => new { c.Id, c.ParentCommentId, c.UserId })
+                .FirstOrDefaultAsync();
+            if (parent is null) return NotFound(new { message = "Parent comment not found." });
+            if (parent.ParentCommentId is not null)
+                return BadRequest(new { message = "Replies to replies are not allowed." });
+        }
 
         var comment = new PostComment
         {
             PostId = postId,
             UserId = userId,
+            ParentCommentId = dto.ParentCommentId,
             Content = dto.Content.Trim(),
         };
 
@@ -166,9 +220,37 @@ public class PostsController : ControllerBase
         post.CommentCount++;
         await _db.SaveChangesAsync();
 
-        var userName = await _db.Users.Where(u => u.Id == userId).Select(u => u.Name).FirstAsync();
+        var commenterName = await _db.Users
+            .Where(u => u.Id == userId)
+            .Select(u => u.Name)
+            .FirstAsync();
 
-        return Ok(new CommentDto(comment.Id, comment.UserId, userName, comment.Content, comment.CreatedAt));
+        // Notifications
+        await NotifyCommentAsync(post, comment, commenterName, dto.ParentCommentId);
+
+        return Ok(new CommentDto(
+            comment.Id, comment.ParentCommentId, comment.UserId, commenterName,
+            comment.Content, comment.CreatedAt, comment.EditedAt,
+            0, false, Array.Empty<CommentDto>()));
+    }
+
+    [HttpPatch("comments/{commentId:guid}")]
+    public async Task<IActionResult> EditComment(Guid commentId, [FromBody] EditCommentDto dto)
+    {
+        var userId = GetUserId();
+
+        if (string.IsNullOrWhiteSpace(dto.Content))
+            return BadRequest(new { message = "Comment content is required." });
+
+        var comment = await _db.PostComments
+            .FirstOrDefaultAsync(c => c.Id == commentId && c.UserId == userId);
+        if (comment is null) return NotFound(new { message = "Comment not found." });
+
+        comment.Content = dto.Content.Trim();
+        comment.EditedAt = DateTime.UtcNow;
+        await _db.SaveChangesAsync();
+
+        return Ok(new { comment.Id, comment.Content, comment.EditedAt });
     }
 
     [HttpDelete("comments/{commentId:guid}")]
@@ -177,15 +259,129 @@ public class PostsController : ControllerBase
         var userId = GetUserId();
         var comment = await _db.PostComments
             .Include(c => c.Post)
+            .Include(c => c.Replies)
             .FirstOrDefaultAsync(c => c.Id == commentId && c.UserId == userId);
 
         if (comment is null) return NotFound(new { message = "Comment not found." });
 
-        comment.Post.CommentCount = Math.Max(0, comment.Post.CommentCount - 1);
+        var totalDecrement = 1 + comment.Replies.Count;
+        comment.Post.CommentCount = Math.Max(0, comment.Post.CommentCount - totalDecrement);
         _db.PostComments.Remove(comment);
         await _db.SaveChangesAsync();
 
         return NoContent();
+    }
+
+    [HttpPost("comments/{commentId:guid}/like")]
+    public async Task<IActionResult> ToggleCommentLike(Guid commentId)
+    {
+        var userId = GetUserId();
+        var comment = await _db.PostComments.FirstOrDefaultAsync(c => c.Id == commentId);
+        if (comment is null) return NotFound(new { message = "Comment not found." });
+
+        var existing = await _db.PostCommentLikes
+            .FirstOrDefaultAsync(l => l.CommentId == commentId && l.UserId == userId);
+
+        if (existing is not null)
+        {
+            _db.PostCommentLikes.Remove(existing);
+            comment.LikeCount = Math.Max(0, comment.LikeCount - 1);
+        }
+        else
+        {
+            _db.PostCommentLikes.Add(new PostCommentLike { CommentId = commentId, UserId = userId });
+            comment.LikeCount++;
+        }
+
+        await _db.SaveChangesAsync();
+        return Ok(new { liked = existing is null, likeCount = comment.LikeCount });
+    }
+
+    // ── Helpers ────────────────────────────────────────────────────────────────
+
+    private async Task NotifyCommentAsync(
+        Post post,
+        PostComment comment,
+        string commenterName,
+        Guid? parentCommentId)
+    {
+        var alreadyNotified = new HashSet<Guid> { comment.UserId };
+
+        // Notify post author (unless they're the commenter)
+        if (post.UserId != comment.UserId)
+        {
+            alreadyNotified.Add(post.UserId);
+            await _notifications.CreateAsync(
+                post.UserId,
+                "POST_COMMENT",
+                commenterName,
+                $"{commenterName} commented on your post",
+                post.Id);
+        }
+
+        // If this is a reply, notify the parent comment author
+        if (parentCommentId.HasValue)
+        {
+            var parentAuthorId = await _db.PostComments
+                .Where(c => c.Id == parentCommentId.Value)
+                .Select(c => c.UserId)
+                .FirstOrDefaultAsync();
+
+            if (parentAuthorId != default && !alreadyNotified.Contains(parentAuthorId))
+            {
+                alreadyNotified.Add(parentAuthorId);
+                await _notifications.CreateAsync(
+                    parentAuthorId,
+                    "POST_COMMENT",
+                    commenterName,
+                    $"{commenterName} replied to your comment",
+                    post.Id);
+            }
+        }
+
+        // Notify @-mentioned users from post participants
+        var mentions = ExtractMentions(comment.Content);
+        if (mentions.Count > 0)
+        {
+            var participantNames = await _db.PostComments
+                .AsNoTracking()
+                .Where(c => c.PostId == comment.PostId)
+                .Select(c => new { c.UserId, c.User.Name })
+                .Distinct()
+                .ToListAsync();
+
+            // Also include post author
+            participantNames.Add(new { UserId = post.UserId, post.User.Name });
+
+            foreach (var participant in participantNames)
+            {
+                if (alreadyNotified.Contains(participant.UserId)) continue;
+                var firstName = participant.Name.Split(' ')[0];
+                if (mentions.Any(m => string.Equals(m, firstName, StringComparison.OrdinalIgnoreCase)
+                                   || string.Equals(m, participant.Name, StringComparison.OrdinalIgnoreCase)))
+                {
+                    alreadyNotified.Add(participant.UserId);
+                    await _notifications.CreateAsync(
+                        participant.UserId,
+                        "POST_COMMENT",
+                        commenterName,
+                        $"{commenterName} mentioned you in a comment",
+                        post.Id);
+                }
+            }
+        }
+    }
+
+    private static List<string> ExtractMentions(string content)
+    {
+        var mentions = new List<string>();
+        var words = content.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        foreach (var word in words)
+        {
+            if (word.StartsWith('@') && word.Length > 1)
+                mentions.Add(word[1..].TrimEnd(',', '.', '!', '?'));
+        }
+        return mentions;
     }
 
     private Guid GetUserId() =>

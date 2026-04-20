@@ -2,7 +2,7 @@ import { View, Text } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useTranslation } from "../../../../i18n";
 import type { PetDto } from "../../../../types/api";
-import { speciesEmoji } from "../constants";
+import { getSpeciesEmoji } from "../constants";
 
 interface PetHeroCardProps {
   pet: PetDto;
@@ -34,7 +34,7 @@ export function PetHeroCard({ pet, primaryColor }: PetHeroCardProps) {
           marginBottom: 12,
         }}
       >
-        <Text style={{ fontSize: 38 }}>{speciesEmoji[pet.species] ?? "🐾"}</Text>
+        <Text style={{ fontSize: 38 }}>{getSpeciesEmoji(pet.species)}</Text>
       </View>
       <Text
         style={{

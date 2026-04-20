@@ -82,7 +82,7 @@ namespace PetOwner.Data.Migrations
                 column: "VaccinationId",
                 principalTable: "Vaccinations",
                 principalColumn: "Id",
-                onDelete: ReferentialAction.SetNull);
+                onDelete: ReferentialAction.NoAction);
 
             migrationBuilder.AddForeignKey(
                 name: "FK_MedicalRecords_WeightLogs_WeightLogId",
@@ -90,7 +90,7 @@ namespace PetOwner.Data.Migrations
                 column: "WeightLogId",
                 principalTable: "WeightLogs",
                 principalColumn: "Id",
-                onDelete: ReferentialAction.SetNull);
+                onDelete: ReferentialAction.NoAction);
         }
 
         /// <inheritdoc />

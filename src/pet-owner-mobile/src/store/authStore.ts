@@ -103,20 +103,52 @@ function startHubs() {
   import("./chatStore").then((m) => {
     m.useChatStore.getState().fetchConversations().catch(() => {});
   });
+  // Register Expo push token with the backend (no-op on web / simulator).
+  import("../services/pushService").then(async (push) => {
+    try {
+      const pushToken = await push.registerForPushNotifications();
+      if (pushToken) {
+        const { notificationsApi } = await import("../api/client");
+        await notificationsApi
+          .registerPushToken(pushToken, Platform.OS as "ios" | "android")
+          .catch(() => {});
+      }
+    } catch {
+      // Non-fatal — push notification registration should never block auth.
+    }
+  });
 }
 
-function stopHubs() {
-  import("../services/signalr").then((m) => m.stopConnection().catch(() => {}));
-  import("./notificationStore").then((m) => {
-    m.stopNotificationHub().catch(() => {});
-    m.useNotificationStore.getState().reset();
-  });
-  import("./favoritesStore").then((m) => {
-    m.useFavoritesStore.getState().reset();
-  });
-  import("./chatStore").then((m) => {
-    m.useChatStore.getState().reset();
-  });
+/**
+ * Tears down SignalR, notification hub, stores, and push registration.
+ * Must be awaited during logout **before** clearing the JWT so `DELETE /api/users/push-token` stays authorized.
+ */
+async function stopHubsAsync(): Promise<void> {
+  const signalr = await import("../services/signalr");
+  await signalr.stopConnection().catch(() => {});
+
+  const notificationStore = await import("./notificationStore");
+  await notificationStore.stopNotificationHub().catch(() => {});
+  notificationStore.useNotificationStore.getState().reset();
+
+  const favoritesStore = await import("./favoritesStore");
+  favoritesStore.useFavoritesStore.getState().reset();
+
+  const chatStore = await import("./chatStore");
+  chatStore.useChatStore.getState().reset();
+
+  const push = await import("../services/pushService");
+  try {
+    const storedToken = await push.getStoredToken();
+    if (storedToken) {
+      const { notificationsApi } = await import("../api/client");
+      await notificationsApi.removePushToken(storedToken).catch(() => {});
+    }
+    await push.clearStoredToken();
+  } catch {
+    // Non-fatal — still clear local token if possible
+    await push.clearStoredToken().catch(() => {});
+  }
 }
 
 export const useAuthStore = create<AuthState>((set, get) => ({
@@ -136,9 +168,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   logout: async () => {
-    stopHubs();
+    await stopHubsAsync();
     await storage.remove("auth_token");
     await storage.remove("user_id");
+    // Wipe biometric credentials on explicit logout — security signal.
+    import("../services/biometricService").then((m) => m.disable().catch(() => {}));
     set({ token: null, userId: null, user: null, isLoggedIn: false });
   },
 

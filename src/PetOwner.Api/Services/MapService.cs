@@ -23,7 +23,8 @@ public class MapService : IMapService
 
     public async Task<List<MapPinDto>> SearchProvidersAsync(MapSearchFilter filter)
     {
-        // Approved + explicitly "online" + not admin-suspended (suspended profiles may stay Approved in DB).
+        // Approved + location + not admin-suspended. Do not require IsAvailableNow — that toggle is for
+        // "I'm online right now" and would hide most providers on the explore map (default is false).
         var query = _db.Locations
             .AsNoTracking()
             .Where(l =>
@@ -31,8 +32,7 @@ public class MapService : IMapService
                 l.User != null &&
                 l.User.ProviderProfile != null &&
                 l.User.ProviderProfile.Status == ProviderStatus.Approved &&
-                !l.User.ProviderProfile.IsSuspended &&
-                l.User.ProviderProfile.IsAvailableNow);
+                !l.User.ProviderProfile.IsSuspended);
 
         if (filter.RequestedTime.HasValue)
         {
@@ -106,6 +106,12 @@ public class MapService : IMapService
             {
                 query = query.Where(l => l.User!.Name.Contains(term));
             }
+        }
+
+        if (filter.ProviderTypeFilter.HasValue)
+        {
+            var wanted = filter.ProviderTypeFilter.Value;
+            query = query.Where(l => l.User!.ProviderProfile!.Type == wanted);
         }
 
         // Avoid string.Join / enum formatting inside EF projection (often fails SQL translation).

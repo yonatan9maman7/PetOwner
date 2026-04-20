@@ -1,6 +1,10 @@
 import type { ProviderApplicationPayload } from "../../types/api";
 import type { OnboardingFormValues } from "./schemas";
-import { SERVICES, DESCRIPTION_MAX_LENGTH } from "./constants";
+import {
+  servicesForOnboarding,
+  DESCRIPTION_MAX_LENGTH,
+  DOG_CARE_SERVICE_TYPES,
+} from "./constants";
 
 const DAY_NAMES_EN = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
@@ -47,7 +51,7 @@ export function formToPayload(values: OnboardingFormValues): ProviderApplication
   let primaryServiceType = 6; // PetStore default for Business
 
   if (!isBusiness) {
-    const enabledServices = SERVICES.filter(
+    const enabledServices = servicesForOnboarding(0).filter(
       (svc) => values.services[String(svc.serviceType)]?.enabled,
     );
     selectedServices = enabledServices.map((svc) => {
@@ -68,6 +72,10 @@ export function formToPayload(values: OnboardingFormValues): ProviderApplication
     primaryServiceType = selectedServices[0]?.serviceType ?? 0;
   }
 
+  const needsDogPrefs = [...DOG_CARE_SERVICE_TYPES].some(
+    (id) => values.services[String(id)]?.enabled,
+  );
+
   return {
     type: values.providerType,
     businessName: isBusiness ? values.businessName.trim() : undefined,
@@ -78,6 +86,7 @@ export function formToPayload(values: OnboardingFormValues): ProviderApplication
     apartmentNumber: values.apartmentNumber.trim() || undefined,
     latitude: values.latitude,
     longitude: values.longitude,
+    bio: values.bio.trim(),
     phoneNumber: values.phoneNumber.trim(),
     whatsAppNumber: values.whatsAppNumber.trim() || undefined,
     websiteUrl: values.websiteUrl.trim() || undefined,
@@ -87,5 +96,7 @@ export function formToPayload(values: OnboardingFormValues): ProviderApplication
     selectedServices,
     referenceName: values.referenceName.trim() || undefined,
     referenceContact: values.referenceContact.trim() || undefined,
+    acceptedDogSizes: needsDogPrefs ? values.acceptedDogSizes : [],
+    maxDogsCapacity: needsDogPrefs ? Number(values.maxDogsCapacity) : null,
   };
 }

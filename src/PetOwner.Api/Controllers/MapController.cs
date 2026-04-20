@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -22,6 +23,57 @@ public class MapController : ControllerBase
         _db = db;
     }
 
+    private static bool IsInMemoryDatabase(ApplicationDbContext db) =>
+        db.Database.ProviderName?.Contains("InMemory", StringComparison.Ordinal) == true;
+
+    /// <summary>
+    /// InMemory EF provider does not translate ExecuteUpdate with column-based increments.
+    /// </summary>
+    private async Task IncrementSearchAppearanceCountsAsync(IReadOnlyList<Guid> userIds, CancellationToken cancellationToken = default)
+    {
+        if (userIds.Count == 0)
+            return;
+
+        if (IsInMemoryDatabase(_db))
+        {
+            var profiles = await _db.ProviderProfiles
+                .Where(p => userIds.Contains(p.UserId))
+                .ToListAsync(cancellationToken);
+            foreach (var p in profiles)
+                p.SearchAppearanceCount++;
+            await _db.SaveChangesAsync(cancellationToken);
+        }
+        else
+        {
+            await _db.ProviderProfiles
+                .Where(p => userIds.Contains(p.UserId))
+                .ExecuteUpdateAsync(
+                    s => s.SetProperty(p => p.SearchAppearanceCount, p => p.SearchAppearanceCount + 1),
+                    cancellationToken);
+        }
+    }
+
+    private async Task IncrementProfileViewCountAsync(Guid providerUserId, CancellationToken cancellationToken = default)
+    {
+        if (IsInMemoryDatabase(_db))
+        {
+            var profile = await _db.ProviderProfiles
+                .FirstOrDefaultAsync(p => p.UserId == providerUserId, cancellationToken);
+            if (profile is null)
+                return;
+            profile.ProfileViewCount++;
+            await _db.SaveChangesAsync(cancellationToken);
+        }
+        else
+        {
+            await _db.ProviderProfiles
+                .Where(p => p.UserId == providerUserId)
+                .ExecuteUpdateAsync(
+                    s => s.SetProperty(p => p.ProfileViewCount, p => p.ProfileViewCount + 1),
+                    cancellationToken);
+        }
+    }
+
     [HttpGet("pins")]
     public async Task<IActionResult> GetPins(
         [FromQuery] DateTime? requestedTime,
@@ -31,11 +83,21 @@ public class MapController : ControllerBase
         [FromQuery] double? radiusKm,
         [FromQuery] double? latitude,
         [FromQuery] double? longitude,
-        [FromQuery] string? searchTerm)
+        [FromQuery] string? searchTerm,
+        [FromQuery] ProviderType? providerType = null)
     {
         var filter = new MapSearchFilter(
-            requestedTime, serviceType, minRating, maxRate, radiusKm, latitude, longitude, searchTerm);
+            requestedTime, serviceType, minRating, maxRate, radiusKm, latitude, longitude, searchTerm, providerType);
         var pins = await _mapService.SearchProvidersAsync(filter);
+
+        // Search-appearance tracking — increment per returned provider for the stats dashboard.
+        // Done as a single atomic UPDATE so we don't pay the cost of round-tripping each entity.
+        if (pins.Count > 0)
+        {
+            var ids = pins.Select(p => p.ProviderId).ToList();
+            await IncrementSearchAppearanceCountsAsync(ids, HttpContext.RequestAborted);
+        }
+
         return Ok(pins);
     }
 
@@ -93,11 +155,20 @@ public class MapController : ControllerBase
                 u.ProviderProfile.WhatsAppNumber,
                 u.ProviderProfile.WebsiteUrl,
                 u.ProviderProfile.OpeningHours,
-                u.ProviderProfile.IsEmergencyService))
+                u.ProviderProfile.IsEmergencyService,
+                u.ProviderProfile.AcceptedDogSizes,
+                u.ProviderProfile.MaxDogsCapacity))
             .FirstOrDefaultAsync();
 
         if (provider is null)
             return NotFound(new { message = "Provider not found." });
+
+        // Profile-view tracking — only count views from a different authenticated user
+        // (or anonymous viewers). The provider browsing themselves shouldn't inflate stats.
+        var viewerIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        var isSelfView = Guid.TryParse(viewerIdClaim, out var viewerId) && viewerId == providerId;
+        if (!isSelfView)
+            await IncrementProfileViewCountAsync(providerId, HttpContext.RequestAborted);
 
         return Ok(provider);
     }

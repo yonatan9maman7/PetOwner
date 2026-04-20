@@ -1,5 +1,8 @@
+import { Alert } from "react-native";
+import axios from "axios";
 import { create } from "zustand";
 import { chatApi } from "../api/client";
+import { translate } from "../i18n";
 import { useAuthStore } from "./authStore";
 import type {
   ChatConversationDto,
@@ -76,8 +79,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
     try {
       const conversations = await chatApi.getConversations();
       set({ conversations, loading: false });
-    } catch {
+    } catch (error) {
       set({ loading: false });
+      if (axios.isAxiosError(error) && error.response?.status === 401) return;
+      Alert.alert(translate("genericErrorTitle"), translate("genericErrorDesc"));
     }
   },
 
@@ -91,8 +96,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
         activeOtherUserId: otherUserId,
         loading: false,
       });
-    } catch {
+    } catch (error) {
       set({ loading: false });
+      if (axios.isAxiosError(error) && error.response?.status === 401) return;
+      Alert.alert(translate("genericErrorTitle"), translate("genericErrorDesc"));
     }
   },
 

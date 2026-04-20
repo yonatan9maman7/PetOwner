@@ -5,7 +5,7 @@ import {
   type BottomTabBarProps,
 } from "@react-navigation/bottom-tabs";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
-import { getFocusedRouteNameFromRoute } from "@react-navigation/native";
+import { createNavigationContainerRef, getFocusedRouteNameFromRoute } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuthStore } from "../store/authStore";
 import { useNotificationStore } from "../store/notificationStore";
@@ -25,6 +25,11 @@ import { ActivityLogScreen } from "../screens/pets/ActivityLogScreen";
 import { AddPetScreen } from "../screens/pets/AddPetScreen";
 import { CommunityScreen } from "../screens/community/CommunityScreen";
 import { GroupDetailScreen } from "../screens/community/GroupDetailScreen";
+import { PalProfileScreen } from "../screens/community/pals/PalProfileScreen";
+import { PlaydatePrefsScreen } from "../screens/community/pals/PlaydatePrefsScreen";
+import { LiveBeaconDetailScreen } from "../screens/community/pals/LiveBeaconDetailScreen";
+import { PlaydateEventDetailScreen } from "../screens/community/pals/PlaydateEventDetailScreen";
+import { CreatePlaydateEventScreen } from "../screens/community/pals/CreatePlaydateEventScreen";
 import { LoginScreen } from "../screens/auth/LoginScreen";
 import { RegisterScreen } from "../screens/auth/RegisterScreen";
 import { ForgotPasswordScreen } from "../screens/auth/ForgotPasswordScreen";
@@ -50,8 +55,12 @@ import { TermsScreen } from "../screens/profile/TermsScreen";
 import { ProviderOnboardingScreen } from "../features/provider-onboarding/ProviderOnboardingScreen";
 import { BookingScreen } from "../screens/explore/BookingScreen";
 import { MyBookingsScreen } from "../screens/profile/MyBookingsScreen";
+import { MyStatsScreen } from "../screens/profile/MyStatsScreen";
 import { PaymentCheckoutScreen } from "../screens/profile/PaymentCheckoutScreen";
 import { FavoritesScreen } from "../screens/profile/FavoritesScreen";
+
+/** Module-level ref used by App.tsx to route deep-links from push notification taps. */
+export const navigationRef = createNavigationContainerRef();
 
 const HIDDEN_TAB_SCREENS = new Set([
   "AddPet",
@@ -76,9 +85,15 @@ const HIDDEN_TAB_SCREENS = new Set([
   "ContactUs",
   "Terms",
   "GroupDetail",
+  "PalProfile",
+  "PlaydatePrefs",
+  "LiveBeaconDetail",
+  "PlaydateEventDetail",
+  "CreatePlaydateEvent",
   "ProviderOnboarding",
   "Booking",
   "MyBookings",
+  "MyStats",
   "Favorites",
   "AllReviews",
   "WriteReview",
@@ -152,6 +167,11 @@ function CommunityStackScreen() {
     <CommunityStack.Navigator screenOptions={{ headerShown: false }}>
       <CommunityStack.Screen name="CommunityMain" component={CommunityScreen} />
       <CommunityStack.Screen name="GroupDetail" component={GroupDetailScreen} />
+      <CommunityStack.Screen name="PalProfile" component={PalProfileScreen} />
+      <CommunityStack.Screen name="PlaydatePrefs" component={PlaydatePrefsScreen} />
+      <CommunityStack.Screen name="LiveBeaconDetail" component={LiveBeaconDetailScreen} />
+      <CommunityStack.Screen name="PlaydateEventDetail" component={PlaydateEventDetailScreen} />
+      <CommunityStack.Screen name="CreatePlaydateEvent" component={CreatePlaydateEventScreen} />
     </CommunityStack.Navigator>
   );
 }
@@ -207,6 +227,7 @@ function ProfileStackScreen() {
       <ProfileStack.Screen name="ProviderProfile" component={ProviderProfileScreen} />
       <ProfileStack.Screen name="Booking" component={BookingScreen} />
       <ProfileStack.Screen name="MyBookings" component={MyBookingsScreen} />
+      <ProfileStack.Screen name="MyStats" component={MyStatsScreen} />
       <ProfileStack.Screen name="Triage" component={TriageScreen} />
       <ProfileStack.Screen name="Notifications" component={NotificationsScreen} />
       <ProfileStack.Screen name="NotificationSettings" component={NotificationSettingsScreen} />

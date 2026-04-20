@@ -1,6 +1,8 @@
 import { z } from "zod";
+import type { DogSize } from "../../types/api";
 import { SERVICES } from "./constants";
 import {
+  isIsraeliBusinessPhoneValid,
   isIsraeliMobileValid,
   isPhoneInputEmpty,
   normalizePhoneForCompare,
@@ -9,6 +11,7 @@ import {
 export type OnboardingFormSchemaMessages = {
   validationPhoneRequired: string;
   validationPhoneInvalid: string;
+  validationPhoneInvalidBusiness: string;
 };
 
 const packageSchema = z.object({
@@ -31,27 +34,14 @@ const slotSchema = z.object({
 });
 
 export function createOnboardingFormSchema(msgs: OnboardingFormSchemaMessages) {
-  return z.object({
+  return z
+    .object({
     providerType: z.number(),
     businessName: z.string(),
     bio: z.string(),
     imageUri: z.string(),
     imageUrl: z.string(),
-    phoneNumber: z.string().superRefine((val, ctx) => {
-      if (isPhoneInputEmpty(val)) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: msgs.validationPhoneRequired,
-        });
-        return;
-      }
-      if (!isIsraeliMobileValid(val)) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: msgs.validationPhoneInvalid,
-        });
-      }
-    }),
+    phoneNumber: z.string(),
     whatsAppNumber: z.string(),
     websiteUrl: z.string(),
     city: z.string(),
@@ -66,7 +56,34 @@ export function createOnboardingFormSchema(msgs: OnboardingFormSchemaMessages) {
     referenceContact: z.string(),
     availabilitySlots: z.array(slotSchema),
     specialOffers: z.string(),
-  });
+    acceptedDogSizes: z.array(z.enum(["SMALL", "MEDIUM", "LARGE", "GIANT"])),
+    maxDogsCapacity: z.string(),
+  })
+    .superRefine((data, ctx) => {
+      if (isPhoneInputEmpty(data.phoneNumber)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: msgs.validationPhoneRequired,
+          path: ["phoneNumber"],
+        });
+        return;
+      }
+      if (data.providerType === 1) {
+        if (!isIsraeliBusinessPhoneValid(data.phoneNumber)) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: msgs.validationPhoneInvalidBusiness,
+            path: ["phoneNumber"],
+          });
+        }
+      } else if (!isIsraeliMobileValid(data.phoneNumber)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: msgs.validationPhoneInvalid,
+          path: ["phoneNumber"],
+        });
+      }
+    });
 }
 
 export type OnboardingFormSchema = ReturnType<typeof createOnboardingFormSchema>;
@@ -98,13 +115,19 @@ export function buildDefaultValues(): OnboardingFormValues {
     referenceContact: "",
     availabilitySlots: [],
     specialOffers: "",
+    acceptedDogSizes: [] as DogSize[],
+    maxDogsCapacity: "",
   };
 }
 
 export function validateStep1(values: OnboardingFormValues): string | null {
   if (!values.bio || values.bio.trim().length < 10) return "bioMinLength";
   if (isPhoneInputEmpty(values.phoneNumber)) return "validationPhoneRequired";
-  if (!isIsraeliMobileValid(values.phoneNumber)) return "validationPhoneInvalid";
+  if (values.providerType === 1) {
+    if (!isIsraeliBusinessPhoneValid(values.phoneNumber)) return "validationPhoneInvalidBusiness";
+  } else if (!isIsraeliMobileValid(values.phoneNumber)) {
+    return "validationPhoneInvalid";
+  }
   if (!values.city.trim()) return "cityRequired";
   if (!values.street.trim()) return "streetRequired";
   if (!values.buildingNumber.trim()) return "buildingRequired";
@@ -120,6 +143,14 @@ export function validateStep2(values: OnboardingFormValues): string | null {
   for (const s of enabled) {
     const rate = Number(s.rate);
     if (!s.rate || isNaN(rate) || rate <= 0) return "serviceRateRequired";
+  }
+  const needsDogPrefs =
+    values.services["0"]?.enabled || values.services["2"]?.enabled;
+  if (needsDogPrefs) {
+    if (!values.acceptedDogSizes?.length) return "acceptedSizesRequired";
+    const cap = Number(values.maxDogsCapacity);
+    if (!values.maxDogsCapacity.trim() || isNaN(cap) || cap < 1)
+      return "maxCapacityInvalid";
   }
   return null;
 }

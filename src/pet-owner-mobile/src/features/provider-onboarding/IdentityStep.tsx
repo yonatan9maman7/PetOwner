@@ -14,8 +14,9 @@ import { useFormContext } from "react-hook-form";
 import * as ImagePicker from "expo-image-picker";
 import { useTranslation } from "../../i18n";
 import { useTheme } from "../../theme/ThemeContext";
-import { filesApi } from "../../api/client";
+import { filesApi, providerApi } from "../../api/client";
 import { AddressMapModal } from "./AddressMapModal";
+import { FieldLabel } from "./FieldLabel";
 import type { OnboardingFormValues } from "./schemas";
 
 export function IdentityStep() {
@@ -25,6 +26,8 @@ export function IdentityStep() {
   const phoneNumberError = formState.errors.phoneNumber?.message;
   const [uploading, setUploading] = useState(false);
   const [showMap, setShowMap] = useState(false);
+  const [aiNotes, setAiNotes] = useState("");
+  const [generatingBio, setGeneratingBio] = useState(false);
 
   const providerType = watch("providerType");
   const bio = watch("bio");
@@ -65,6 +68,20 @@ export function IdentityStep() {
 
   const hasAddress = city.trim().length > 0;
 
+  const handleGenerateBio = async () => {
+    const notes = aiNotes.trim();
+    if (!notes || generatingBio) return;
+    setGeneratingBio(true);
+    try {
+      const result = await providerApi.generateBio(notes);
+      setValue("bio", result.bio);
+    } catch {
+      Alert.alert(t("errorTitle"), t("toastBioFail"));
+    } finally {
+      setGeneratingBio(false);
+    }
+  };
+
   return (
     <ScrollView
       contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 24, gap: 20 }}
@@ -74,7 +91,7 @@ export function IdentityStep() {
     >
       {/* Provider Type */}
       <View>
-        <SectionLabel text={t("onbProviderType")} isRTL={isRTL} />
+        <FieldLabel text={t("onbProviderType")} isRTL={isRTL} />
         <View style={{ flexDirection: isRTL ? "row-reverse" : "row", gap: 10 }}>
           <TypeChip
             label={t("onbIndividual")}
@@ -91,7 +108,7 @@ export function IdentityStep() {
 
       {providerType === 1 && (
         <View>
-          <SectionLabel text={t("onbBusinessName")} isRTL={isRTL} />
+          <FieldLabel text={t("onbBusinessName")} isRTL={isRTL} required />
           <StyledInput
             value={businessName}
             onChangeText={(v) => setValue("businessName", v)}
@@ -103,7 +120,7 @@ export function IdentityStep() {
 
       {/* Profile Photo */}
       <View>
-        <SectionLabel text={t("profilePicture")} isRTL={isRTL} />
+        <FieldLabel text={t("profilePicture")} isRTL={isRTL} />
         <Pressable
           onPress={pickImage}
           disabled={uploading}
@@ -133,45 +150,111 @@ export function IdentityStep() {
         </Text>
       </View>
 
-      {/* Bio */}
-      <View>
-        <SectionLabel text={t("bioTitle")} isRTL={isRTL} />
-        <TextInput
-          value={bio}
-          onChangeText={(v) => setValue("bio", v)}
-          placeholder={t("bioPlaceholder")}
-          multiline
-          maxLength={1500}
+      {/* Bio: AI notes → generate (same API as web /providers/generate-bio) → public bio */}
+      <View style={{ gap: 10 }}>
+        <View>
+          <FieldLabel
+            text={providerType === 1 ? t("tellAiLabelBusiness") : t("tellAiLabel")}
+            isRTL={isRTL}
+          />
+          <Text
+            style={{
+              fontSize: 13,
+              color: colors.textMuted,
+              lineHeight: 18,
+              marginBottom: 8,
+              textAlign: isRTL ? "right" : "left",
+              writingDirection: isRTL ? "rtl" : "ltr",
+            }}
+          >
+            {providerType === 1 ? t("magicBioSubtitleBusiness") : t("magicBioSubtitle")}
+          </Text>
+          <TextInput
+            value={aiNotes}
+            onChangeText={setAiNotes}
+            placeholder={t("aiNotesPlaceholder")}
+            multiline
+            maxLength={2000}
+            style={{
+              backgroundColor: colors.surface,
+              borderRadius: 14,
+              paddingHorizontal: 14,
+              paddingVertical: 12,
+              fontSize: 15,
+              color: colors.text,
+              borderWidth: 1,
+              borderColor: colors.border,
+              minHeight: 72,
+              textAlignVertical: "top",
+              ...rtlInput,
+            }}
+            placeholderTextColor={colors.textMuted}
+          />
+        </View>
+
+        <Pressable
+          onPress={handleGenerateBio}
+          disabled={!aiNotes.trim() || generatingBio}
           style={{
-            backgroundColor: colors.surface,
+            flexDirection: isRTL ? "row-reverse" : "row",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 8,
+            paddingVertical: 14,
             borderRadius: 14,
-            paddingHorizontal: 14,
-            paddingVertical: 12,
-            fontSize: 15,
-            color: colors.text,
-            borderWidth: 1,
-            borderColor: colors.border,
-            minHeight: 100,
-            textAlignVertical: "top",
-            ...rtlInput,
+            backgroundColor: colors.primary,
+            opacity: !aiNotes.trim() || generatingBio ? 0.55 : 1,
           }}
-          placeholderTextColor={colors.textMuted}
-        />
-        <Text style={{ fontSize: 11, color: colors.textMuted, textAlign: isRTL ? "left" : "right", marginTop: 2 }}>
-          {bio.length}/1500
-        </Text>
+        >
+          {generatingBio ? (
+            <ActivityIndicator color="#fff" />
+          ) : (
+            <Ionicons name="sparkles" size={18} color="#fff" />
+          )}
+          <Text style={{ fontSize: 15, fontWeight: "700", color: "#fff" }}>
+            {generatingBio ? t("generating") : t("magicBioButton")}
+          </Text>
+        </Pressable>
+
+        <View>
+          <FieldLabel text={t("yourBioLabel")} isRTL={isRTL} required />
+          <TextInput
+            value={bio}
+            onChangeText={(v) => setValue("bio", v)}
+            placeholder={t("bioPolishedPlaceholder")}
+            multiline
+            maxLength={1500}
+            style={{
+              backgroundColor: colors.surface,
+              borderRadius: 14,
+              paddingHorizontal: 14,
+              paddingVertical: 12,
+              fontSize: 15,
+              color: colors.text,
+              borderWidth: 1,
+              borderColor: colors.border,
+              minHeight: 120,
+              textAlignVertical: "top",
+              ...rtlInput,
+            }}
+            placeholderTextColor={colors.textMuted}
+          />
+          <Text style={{ fontSize: 11, color: colors.textMuted, textAlign: isRTL ? "left" : "right", marginTop: 2 }}>
+            {bio.length}/1500
+          </Text>
+        </View>
       </View>
 
       {/* Phone */}
       <View>
-        <SectionLabel text={t("phoneNumber")} isRTL={isRTL} />
+        <FieldLabel text={t("phoneNumber")} isRTL={isRTL} required />
         <StyledInput
           value={phoneNumber}
           onChangeText={(v) => {
             setValue("phoneNumber", v);
             clearErrors("phoneNumber");
           }}
-          placeholder={t("phoneNumberPlaceholder")}
+          placeholder={providerType === 1 ? t("phoneNumberPlaceholderBusiness") : t("phoneNumberPlaceholder")}
           keyboardType="phone-pad"
           isRTL={isRTL}
           errorMessage={phoneNumberError}
@@ -180,7 +263,7 @@ export function IdentityStep() {
 
       {/* WhatsApp */}
       <View>
-        <SectionLabel text={t("onbWhatsApp")} isRTL={isRTL} />
+        <FieldLabel text={t("onbWhatsApp")} isRTL={isRTL} />
         <StyledInput
           value={whatsAppNumber}
           onChangeText={(v) => setValue("whatsAppNumber", v)}
@@ -192,7 +275,7 @@ export function IdentityStep() {
 
       {/* Website */}
       <View>
-        <SectionLabel text={t("onbWebsite")} isRTL={isRTL} />
+        <FieldLabel text={t("onbWebsite")} isRTL={isRTL} />
         <StyledInput
           value={websiteUrl}
           onChangeText={(v) => setValue("websiteUrl", v)}
@@ -205,7 +288,7 @@ export function IdentityStep() {
 
       {/* Address */}
       <View>
-        <SectionLabel text={t("onbAddress")} isRTL={isRTL} />
+        <FieldLabel text={t("onbAddress")} isRTL={isRTL} required />
         <Pressable
           onPress={() => setShowMap(true)}
           style={{
@@ -242,23 +325,6 @@ export function IdentityStep() {
         }}
       />
     </ScrollView>
-  );
-}
-
-function SectionLabel({ text, isRTL }: { text: string; isRTL: boolean }) {
-  const { colors } = useTheme();
-  return (
-    <Text
-      style={{
-        fontSize: 14,
-        fontWeight: "700",
-        color: colors.text,
-        marginBottom: 8,
-        textAlign: isRTL ? "right" : "left",
-      }}
-    >
-      {text}
-    </Text>
   );
 }
 

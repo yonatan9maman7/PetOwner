@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Hosting;
 using PetOwner.Api.DTOs;
 using PetOwner.Api.Services;
 using PetOwner.Data;
@@ -16,19 +17,25 @@ public class AdminController : ControllerBase
     private readonly ApplicationDbContext _db;
     private readonly DatabaseSeeder _seeder;
     private readonly INotificationService _notifications;
+    private readonly ILogger<AdminController> _logger;
+    private readonly IHostEnvironment _hostEnvironment;
     // private readonly IEmailService _emailService;
     private const decimal PlatformFeePercent = 0.10m;
 
     public AdminController(
         ApplicationDbContext db,
         DatabaseSeeder seeder,
-        INotificationService notifications
+        INotificationService notifications,
+        ILogger<AdminController> logger,
+        IHostEnvironment hostEnvironment
         // IEmailService emailService
     )
     {
         _db = db;
         _seeder = seeder;
         _notifications = notifications;
+        _logger = logger;
+        _hostEnvironment = hostEnvironment;
         // _emailService = emailService;
     }
 
@@ -217,14 +224,46 @@ public class AdminController : ControllerBase
         if (user is not null)
             user.Role = "Provider";
 
-        await _db.SaveChangesAsync();
+        try
+        {
+            await _db.SaveChangesAsync();
+        }
+        catch (DbUpdateException ex)
+        {
+            _logger.LogError(
+                ex,
+                "ApproveProvider: SaveChanges failed for provider {ProviderId}. Inner: {Inner}",
+                providerId,
+                ex.GetBaseException().Message);
 
-        await _notifications.CreateAsync(
-            profile.UserId,
-            "Admin",
-            "NOTIFICATIONS.PROVIDER_APPROVED_TITLE",
-            "NOTIFICATIONS.PROVIDER_APPROVED",
-            profile.UserId);
+            // Admin-only endpoint: surface SQL/client error so operators can fix schema (e.g. missing migration).
+            var sqlHint = _hostEnvironment.IsDevelopment() ? string.Empty
+                : " If this mentions an invalid column or object, apply pending EF migrations to the database.";
+            var detail = ex.GetBaseException().Message + sqlHint;
+
+            return StatusCode(StatusCodes.Status500InternalServerError, new ProblemDetails
+            {
+                Title = "Approval could not be saved",
+                Detail = detail,
+                Status = StatusCodes.Status500InternalServerError,
+                Instance = HttpContext.Request.Path.Value,
+            });
+        }
+
+        try
+        {
+            await _notifications.CreateAsync(
+                profile.UserId,
+                "Admin",
+                "NOTIFICATIONS.PROVIDER_APPROVED_TITLE",
+                "NOTIFICATIONS.PROVIDER_APPROVED",
+                profile.UserId);
+        }
+        catch (Exception ex)
+        {
+            // Approval is already persisted — do not fail the request if push/SignalR fails.
+            _logger.LogWarning(ex, "ApproveProvider: notification delivery failed for user {UserId}", profile.UserId);
+        }
 
         return Ok(new { message = "Provider approved successfully." });
     }
@@ -431,36 +470,6 @@ public class AdminController : ControllerBase
         await _db.SaveChangesAsync();
 
         return Ok(new { message = $"Pet '{pet.Name}' deleted successfully." });
-    }
-
-    [HttpPost("providers/{id:guid}/approve")]
-    public async Task<IActionResult> ApproveProviderPost(Guid id)
-    {
-        var profile = await _db.ProviderProfiles.FindAsync(id);
-
-        if (profile is null)
-            return NotFound(new { message = "Provider not found." });
-
-        if (profile.Status == ProviderStatus.Approved)
-            return BadRequest(new { message = "Provider is already approved." });
-
-        profile.Status = ProviderStatus.Approved;
-        profile.IsAvailableNow = true;
-
-        var user = await _db.Users.FindAsync(id);
-        if (user is not null)
-            user.Role = "Provider";
-
-        await _db.SaveChangesAsync();
-
-        await _notifications.CreateAsync(
-            profile.UserId,
-            "Admin",
-            "NOTIFICATIONS.PROVIDER_APPROVED_TITLE",
-            "NOTIFICATIONS.PROVIDER_APPROVED",
-            profile.UserId);
-
-        return Ok(new { message = "Provider approved successfully." });
     }
 
     [HttpGet("inquiries")]

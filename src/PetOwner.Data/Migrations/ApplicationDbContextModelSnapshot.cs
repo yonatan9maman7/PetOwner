@@ -23,6 +23,39 @@ namespace PetOwner.Data.Migrations
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
 
+            modelBuilder.Entity("PetOwner.Data.Models.AchievementUnlocked", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier")
+                        .HasDefaultValueSql("NEWSEQUENTIALID()");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("Scope")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<DateTime>("UnlockedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime2")
+                        .HasDefaultValueSql("GETUTCDATE()");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId", "Code")
+                        .IsUnique();
+
+                    b.ToTable("AchievementsUnlocked");
+                });
+
             modelBuilder.Entity("PetOwner.Data.Models.Activity", b =>
                 {
                     b.Property<Guid>("Id")
@@ -101,6 +134,10 @@ namespace PetOwner.Data.Migrations
                         .HasColumnType("uniqueidentifier")
                         .HasDefaultValueSql("NEWSEQUENTIALID()");
 
+                    b.Property<string>("CancelledByRole")
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("datetime2")
@@ -129,6 +166,9 @@ namespace PetOwner.Data.Migrations
 
                     b.Property<Guid>("ProviderProfileId")
                         .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime?>("RespondedAt")
+                        .HasColumnType("datetime2");
 
                     b.Property<string>("Service")
                         .IsRequired()
@@ -658,6 +698,10 @@ namespace PetOwner.Data.Migrations
                         .HasMaxLength(30)
                         .HasColumnType("nvarchar(30)");
 
+                    b.Property<string>("DogSize")
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)");
+
                     b.Property<string>("FeedingSchedule")
                         .HasMaxLength(1000)
                         .HasColumnType("nvarchar(1000)");
@@ -711,6 +755,18 @@ namespace PetOwner.Data.Migrations
                     b.Property<int>("Species")
                         .HasColumnType("int");
 
+                    b.Property<int>("Sterilization")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(0);
+
+                    b.Property<string>("TagsCsv")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)")
+                        .HasDefaultValue("");
+
                     b.Property<Guid>("UserId")
                         .HasColumnType("uniqueidentifier");
 
@@ -763,6 +819,265 @@ namespace PetOwner.Data.Migrations
                         .IsUnique();
 
                     b.ToTable("PetHealthShares");
+                });
+
+            modelBuilder.Entity("PetOwner.Data.Models.PlaydateBeacon", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier")
+                        .HasDefaultValueSql("NEWSEQUENTIALID()");
+
+                    b.Property<string>("City")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime2")
+                        .HasDefaultValueSql("GETUTCDATE()");
+
+                    b.Property<DateTime?>("EndedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("ExpiresAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<double>("Latitude")
+                        .HasColumnType("float");
+
+                    b.Property<double>("Longitude")
+                        .HasColumnType("float");
+
+                    b.Property<string>("PetIdsCsv")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)")
+                        .HasDefaultValue("");
+
+                    b.Property<string>("PlaceName")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("nvarchar(120)");
+
+                    b.Property<string>("Species")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)")
+                        .HasDefaultValue("DOG");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ExpiresAt");
+
+                    b.HasIndex("Latitude", "Longitude");
+
+                    b.HasIndex("UserId", "ExpiresAt");
+
+                    b.ToTable("PlaydateBeacons");
+                });
+
+            modelBuilder.Entity("PetOwner.Data.Models.PlaydateEvent", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier")
+                        .HasDefaultValueSql("NEWSEQUENTIALID()");
+
+                    b.Property<string>("AllowedSpeciesCsv")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)")
+                        .HasDefaultValue("DOG");
+
+                    b.Property<string>("CancellationReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<DateTime?>("CancelledAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("City")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime2")
+                        .HasDefaultValueSql("GETUTCDATE()");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<DateTime?>("EndsAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid>("HostUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<double>("Latitude")
+                        .HasColumnType("float");
+
+                    b.Property<string>("LocationName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<double>("Longitude")
+                        .HasColumnType("float");
+
+                    b.Property<int?>("MaxPets")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("ScheduledFor")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("nvarchar(120)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("HostUserId");
+
+                    b.HasIndex("Latitude", "Longitude");
+
+                    b.HasIndex("ScheduledFor", "CancelledAt");
+
+                    b.ToTable("PlaydateEvents");
+                });
+
+            modelBuilder.Entity("PetOwner.Data.Models.PlaydateEventComment", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier")
+                        .HasDefaultValueSql("NEWSEQUENTIALID()");
+
+                    b.Property<string>("Content")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime2")
+                        .HasDefaultValueSql("GETUTCDATE()");
+
+                    b.Property<Guid>("EventId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId");
+
+                    b.HasIndex("EventId", "CreatedAt");
+
+                    b.ToTable("PlaydateEventComments");
+                });
+
+            modelBuilder.Entity("PetOwner.Data.Models.PlaydatePrefs", b =>
+                {
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Bio")
+                        .HasMaxLength(280)
+                        .HasColumnType("nvarchar(280)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime2")
+                        .HasDefaultValueSql("GETUTCDATE()");
+
+                    b.Property<bool>("IncludeAsProvider")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(false);
+
+                    b.Property<DateTime>("LastActiveAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime2")
+                        .HasDefaultValueSql("GETUTCDATE()");
+
+                    b.Property<int>("MaxDistanceKm")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(5);
+
+                    b.Property<bool>("OptedIn")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(false);
+
+                    b.Property<string>("PreferredDogSizesCsv")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)")
+                        .HasDefaultValue("");
+
+                    b.Property<string>("PreferredSpeciesCsv")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)")
+                        .HasDefaultValue("");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime2")
+                        .HasDefaultValueSql("GETUTCDATE()");
+
+                    b.HasKey("UserId");
+
+                    b.HasIndex("OptedIn", "LastActiveAt");
+
+                    b.ToTable("PlaydatePrefs");
+                });
+
+            modelBuilder.Entity("PetOwner.Data.Models.PlaydateRsvp", b =>
+                {
+                    b.Property<Guid>("EventId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime2")
+                        .HasDefaultValueSql("GETUTCDATE()");
+
+                    b.Property<Guid?>("PetId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime2")
+                        .HasDefaultValueSql("GETUTCDATE()");
+
+                    b.HasKey("EventId", "UserId");
+
+                    b.HasIndex("PetId");
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("PlaydateRsvps");
                 });
 
             modelBuilder.Entity("PetOwner.Data.Models.Post", b =>
@@ -837,6 +1152,17 @@ namespace PetOwner.Data.Migrations
                         .HasColumnType("datetime2")
                         .HasDefaultValueSql("GETUTCDATE()");
 
+                    b.Property<DateTime?>("EditedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("LikeCount")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(0);
+
+                    b.Property<Guid?>("ParentCommentId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<Guid>("PostId")
                         .HasColumnType("uniqueidentifier");
 
@@ -845,11 +1171,35 @@ namespace PetOwner.Data.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("ParentCommentId");
+
                     b.HasIndex("PostId");
 
                     b.HasIndex("UserId");
 
                     b.ToTable("PostComments");
+                });
+
+            modelBuilder.Entity("PetOwner.Data.Models.PostCommentLike", b =>
+                {
+                    b.Property<Guid>("CommentId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime2")
+                        .HasDefaultValueSql("GETUTCDATE()");
+
+                    b.HasKey("CommentId", "UserId");
+
+                    b.HasIndex("CommentId");
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("PostCommentLikes");
                 });
 
             modelBuilder.Entity("PetOwner.Data.Models.PostLike", b =>
@@ -876,6 +1226,11 @@ namespace PetOwner.Data.Migrations
                 {
                     b.Property<Guid>("UserId")
                         .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("AcceptedDogSizes")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
 
                     b.Property<bool>("AcceptsOffHoursRequests")
                         .ValueGeneratedOnAdd()
@@ -929,6 +1284,9 @@ namespace PetOwner.Data.Migrations
                     b.Property<double?>("Longitude")
                         .HasColumnType("float");
 
+                    b.Property<int?>("MaxDogsCapacity")
+                        .HasColumnType("int");
+
                     b.Property<string>("OpeningHours")
                         .HasMaxLength(2000)
                         .HasColumnType("nvarchar(2000)");
@@ -940,6 +1298,11 @@ namespace PetOwner.Data.Migrations
                     b.Property<string>("ProfileImageUrl")
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<int>("ProfileViewCount")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(0);
+
                     b.Property<string>("ReferenceContact")
                         .HasMaxLength(200)
                         .HasColumnType("nvarchar(200)");
@@ -949,6 +1312,11 @@ namespace PetOwner.Data.Migrations
                         .HasColumnType("nvarchar(200)");
 
                     b.Property<int>("ReviewCount")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(0);
+
+                    b.Property<int>("SearchAppearanceCount")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("int")
                         .HasDefaultValue(0);
@@ -1343,6 +1711,96 @@ namespace PetOwner.Data.Migrations
                     b.ToTable("Users");
                 });
 
+            modelBuilder.Entity("PetOwner.Data.Models.UserNotificationPrefs", b =>
+                {
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<bool>("Achievements")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(true);
+
+                    b.Property<bool>("Bookings")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(true);
+
+                    b.Property<bool>("Community")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(true);
+
+                    b.Property<bool>("Marketing")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(true);
+
+                    b.Property<bool>("Messages")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(true);
+
+                    b.Property<bool>("PushEnabled")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(true);
+
+                    b.Property<bool>("Triage")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(true);
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime2")
+                        .HasDefaultValueSql("GETUTCDATE()");
+
+                    b.HasKey("UserId");
+
+                    b.ToTable("UserNotificationPrefs");
+                });
+
+            modelBuilder.Entity("PetOwner.Data.Models.UserPushToken", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier")
+                        .HasDefaultValueSql("NEWSEQUENTIALID()");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime2")
+                        .HasDefaultValueSql("GETUTCDATE()");
+
+                    b.Property<DateTime>("LastUsedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime2")
+                        .HasDefaultValueSql("GETUTCDATE()");
+
+                    b.Property<string>("Platform")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)");
+
+                    b.Property<string>("Token")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Token")
+                        .IsUnique();
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("UserPushTokens");
+                });
+
             modelBuilder.Entity("PetOwner.Data.Models.Vaccination", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1410,6 +1868,17 @@ namespace PetOwner.Data.Migrations
                     b.HasIndex("PetId", "DateRecorded");
 
                     b.ToTable("WeightLogs");
+                });
+
+            modelBuilder.Entity("PetOwner.Data.Models.AchievementUnlocked", b =>
+                {
+                    b.HasOne("PetOwner.Data.Models.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("PetOwner.Data.Models.Activity", b =>
@@ -1589,12 +2058,12 @@ namespace PetOwner.Data.Migrations
                     b.HasOne("PetOwner.Data.Models.Vaccination", "Vaccination")
                         .WithOne("LinkedRecord")
                         .HasForeignKey("PetOwner.Data.Models.MedicalRecord", "VaccinationId")
-                        .OnDelete(DeleteBehavior.SetNull);
+                        .OnDelete(DeleteBehavior.NoAction);
 
                     b.HasOne("PetOwner.Data.Models.WeightLog", "WeightLog")
                         .WithOne("LinkedRecord")
                         .HasForeignKey("PetOwner.Data.Models.MedicalRecord", "WeightLogId")
-                        .OnDelete(DeleteBehavior.SetNull);
+                        .OnDelete(DeleteBehavior.NoAction);
 
                     b.Navigation("Pet");
 
@@ -1666,6 +2135,84 @@ namespace PetOwner.Data.Migrations
                     b.Navigation("Pet");
                 });
 
+            modelBuilder.Entity("PetOwner.Data.Models.PlaydateBeacon", b =>
+                {
+                    b.HasOne("PetOwner.Data.Models.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("PetOwner.Data.Models.PlaydateEvent", b =>
+                {
+                    b.HasOne("PetOwner.Data.Models.User", "Host")
+                        .WithMany()
+                        .HasForeignKey("HostUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Host");
+                });
+
+            modelBuilder.Entity("PetOwner.Data.Models.PlaydateEventComment", b =>
+                {
+                    b.HasOne("PetOwner.Data.Models.PlaydateEvent", "Event")
+                        .WithMany("Comments")
+                        .HasForeignKey("EventId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("PetOwner.Data.Models.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Event");
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("PetOwner.Data.Models.PlaydatePrefs", b =>
+                {
+                    b.HasOne("PetOwner.Data.Models.User", "User")
+                        .WithOne("PlaydatePrefs")
+                        .HasForeignKey("PetOwner.Data.Models.PlaydatePrefs", "UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("PetOwner.Data.Models.PlaydateRsvp", b =>
+                {
+                    b.HasOne("PetOwner.Data.Models.PlaydateEvent", "Event")
+                        .WithMany("Rsvps")
+                        .HasForeignKey("EventId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("PetOwner.Data.Models.Pet", "Pet")
+                        .WithMany()
+                        .HasForeignKey("PetId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("PetOwner.Data.Models.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Event");
+
+                    b.Navigation("Pet");
+
+                    b.Navigation("User");
+                });
+
             modelBuilder.Entity("PetOwner.Data.Models.Post", b =>
                 {
                     b.HasOne("PetOwner.Data.Models.User", "User")
@@ -1679,6 +2226,11 @@ namespace PetOwner.Data.Migrations
 
             modelBuilder.Entity("PetOwner.Data.Models.PostComment", b =>
                 {
+                    b.HasOne("PetOwner.Data.Models.PostComment", "ParentComment")
+                        .WithMany("Replies")
+                        .HasForeignKey("ParentCommentId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("PetOwner.Data.Models.Post", "Post")
                         .WithMany("Comments")
                         .HasForeignKey("PostId")
@@ -1691,7 +2243,28 @@ namespace PetOwner.Data.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
+                    b.Navigation("ParentComment");
+
                     b.Navigation("Post");
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("PetOwner.Data.Models.PostCommentLike", b =>
+                {
+                    b.HasOne("PetOwner.Data.Models.PostComment", "Comment")
+                        .WithMany("Likes")
+                        .HasForeignKey("CommentId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("PetOwner.Data.Models.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Comment");
 
                     b.Navigation("User");
                 });
@@ -1852,6 +2425,28 @@ namespace PetOwner.Data.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("PetOwner.Data.Models.UserNotificationPrefs", b =>
+                {
+                    b.HasOne("PetOwner.Data.Models.User", "User")
+                        .WithOne("NotificationPrefs")
+                        .HasForeignKey("PetOwner.Data.Models.UserNotificationPrefs", "UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("PetOwner.Data.Models.UserPushToken", b =>
+                {
+                    b.HasOne("PetOwner.Data.Models.User", "User")
+                        .WithMany("PushTokens")
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("User");
+                });
+
             modelBuilder.Entity("PetOwner.Data.Models.Vaccination", b =>
                 {
                     b.HasOne("PetOwner.Data.Models.Pet", "Pet")
@@ -1909,11 +2504,25 @@ namespace PetOwner.Data.Migrations
                     b.Navigation("WeightLogs");
                 });
 
+            modelBuilder.Entity("PetOwner.Data.Models.PlaydateEvent", b =>
+                {
+                    b.Navigation("Comments");
+
+                    b.Navigation("Rsvps");
+                });
+
             modelBuilder.Entity("PetOwner.Data.Models.Post", b =>
                 {
                     b.Navigation("Comments");
 
                     b.Navigation("Likes");
+                });
+
+            modelBuilder.Entity("PetOwner.Data.Models.PostComment", b =>
+                {
+                    b.Navigation("Likes");
+
+                    b.Navigation("Replies");
                 });
 
             modelBuilder.Entity("PetOwner.Data.Models.ProviderProfile", b =>
@@ -1952,13 +2561,19 @@ namespace PetOwner.Data.Migrations
 
                     b.Navigation("Location");
 
+                    b.Navigation("NotificationPrefs");
+
                     b.Navigation("Notifications");
 
                     b.Navigation("Pets");
 
+                    b.Navigation("PlaydatePrefs");
+
                     b.Navigation("Posts");
 
                     b.Navigation("ProviderProfile");
+
+                    b.Navigation("PushTokens");
 
                     b.Navigation("ReviewsGiven");
 

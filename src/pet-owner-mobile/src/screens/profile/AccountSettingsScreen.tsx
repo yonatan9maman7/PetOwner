@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { View, Text, TouchableOpacity, ScrollView, Alert, Platform, StyleSheet, Modal } from "react-native";
+import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Modal } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
@@ -341,7 +341,6 @@ function ProfileHeader() {
 
 export function AccountSettingsScreen() {
   const navigation = useNavigation<any>();
-  const logout = useAuthStore((s) => s.logout);
   const language = useAuthStore((s) => s.language);
   const { t, isRTL } = useTranslation();
   const { colors, preference } = useTheme();
@@ -351,17 +350,6 @@ export function AccountSettingsScreen() {
     light: t("themeLight"),
     dark: t("themeDark"),
     system: t("themeSystem"),
-  };
-
-  const handleLogout = () => {
-    if (Platform.OS === "web") {
-      if (window.confirm(t("logoutButton") + "?")) logout();
-      return;
-    }
-    Alert.alert(t("logoutConfirmation"), "", [
-      { text: t("cancel"), style: "cancel" },
-      { text: t("logoutButton"), style: "destructive", onPress: logout },
-    ]);
   };
 
   return (
@@ -515,26 +503,6 @@ export function AccountSettingsScreen() {
             />
           </GroupCard>
         </View>
-
-        {/* ── Log out ── */}
-        <TouchableOpacity
-          onPress={handleLogout}
-          activeOpacity={0.8}
-          style={{
-            flexDirection: "row",
-            alignItems: "center",
-            justifyContent: "center",
-            marginTop: 4,
-            paddingVertical: 16,
-            borderRadius: 14,
-            backgroundColor: colors.danger,
-          }}
-        >
-          <Ionicons name="log-out-outline" size={20} color="#fff" style={{ marginRight: 8 }} />
-          <Text style={{ fontSize: 16, fontWeight: "700", color: "#ffffff" }}>
-            {t("logoutButton")}
-          </Text>
-        </TouchableOpacity>
 
         <Text style={{ textAlign: "center", fontSize: 12, color: colors.textMuted, marginTop: 20 }}>
           PetOwner v1.0.0

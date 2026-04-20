@@ -17,12 +17,13 @@ const TOAST_DURATION = 4500;
 const TYPE_CONFIG: Record<string, { icon: string; bg: string; accent: string }> = {
   sos: { icon: "warning", bg: "#fef2f2", accent: "#dc2626" },
   sos_resolved: { icon: "checkmark-circle", bg: "#ecfdf5", accent: "#059669" },
-  chat: { icon: "chatbubble", bg: "#eff6ff", accent: "#2563eb" },
+  chat: { icon: "chatbubble", bg: "#e8ecf4", accent: "#001a5a" },
   booking: { icon: "calendar", bg: "#faf5ff", accent: "#7c3aed" },
   BookingCreated: { icon: "calendar", bg: "#faf5ff", accent: "#7c3aed" },
   BookingConfirmed: { icon: "checkmark-circle", bg: "#ecfdf5", accent: "#059669" },
+  BookingCompleted: { icon: "checkmark-circle", bg: "#dbeafe", accent: "#1d4ed8" },
   NewRequest: { icon: "mail-unread", bg: "#faf5ff", accent: "#7c3aed" },
-  ProviderApplication: { icon: "person-add", bg: "#eff6ff", accent: "#2563eb" },
+  ProviderApplication: { icon: "person-add", bg: "#e8ecf4", accent: "#001a5a" },
   review: { icon: "star", bg: "#fffbeb", accent: "#d97706" },
 };
 const DEFAULT_CONFIG = { icon: "notifications", bg: "#f8fafc", accent: "#6366f1" };
@@ -106,6 +107,7 @@ export function NotificationToast() {
         navigation.navigate("Profile", { screen: "MyBookings", params: { tab: "incoming" } });
         break;
       case "BookingConfirmed":
+      case "BookingCompleted":
       case "RequestCompleted":
       case "RequestCancelled":
       case "RequestAccepted":

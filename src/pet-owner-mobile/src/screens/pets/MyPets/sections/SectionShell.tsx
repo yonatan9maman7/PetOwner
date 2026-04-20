@@ -6,7 +6,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTranslation, type TranslationKey } from "../../../../i18n";
 import { useTheme } from "../../../../theme/ThemeContext";
 import type { PetDto } from "../../../../types/api";
-import { speciesEmoji, TILE_CONFIG, SECTION_SCROLL_TAB_BAR_CLEARANCE } from "../constants";
+import { getSpeciesEmoji, TILE_CONFIG, SECTION_SCROLL_TAB_BAR_CLEARANCE } from "../constants";
 import type { Section } from "../types";
 
 type NonNullSection = Exclude<Section, null>;
@@ -117,7 +117,7 @@ export function SectionShell({
                 borderRadius: 10,
               }}
             >
-              <Text style={{ fontSize: 14 }}>{speciesEmoji[pet.species] ?? "🐾"}</Text>
+              <Text style={{ fontSize: 14 }}>{getSpeciesEmoji(pet.species)}</Text>
               <Text
                 style={{
                   fontSize: 13,

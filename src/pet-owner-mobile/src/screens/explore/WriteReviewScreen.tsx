@@ -98,7 +98,7 @@ export function WriteReviewScreen() {
             b.ownerId === userId &&
             b.providerProfileId === providerId &&
             !b.hasReview &&
-            (b.status === "Completed" || b.paymentStatus === "Paid"),
+            b.status === "Completed",
         );
         setResolvedBookingId(eligible?.id ?? null);
       } catch {

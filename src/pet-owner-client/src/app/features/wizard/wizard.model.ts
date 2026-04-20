@@ -108,16 +108,3 @@ export interface ServiceRateApiDto {
   rate: number;
   pricingUnit: number;
 }
-
-export interface OnboardingApiPayload {
-  selectedServices: ServiceRateApiDto[];
-  bio: string;
-  latitude: number | null;
-  longitude: number | null;
-  city: string;
-  street: string;
-  buildingNumber: string;
-  apartmentNumber: string | null;
-  referenceName: string;
-  referenceContact: string;
-}

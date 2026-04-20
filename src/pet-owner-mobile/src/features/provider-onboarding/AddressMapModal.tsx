@@ -122,6 +122,7 @@ export function AddressMapModal({ visible, onClose, onConfirm, initial }: Props)
           <View style={{ paddingHorizontal: 20, gap: 12, marginTop: 4 }}>
             <CityAutocompleteInput
               label={t("addressCity")}
+              required
               value={city}
               onChangeText={setCity}
               onCitySelect={(cityName, newLat, newLng) => {
@@ -131,10 +132,10 @@ export function AddressMapModal({ visible, onClose, onConfirm, initial }: Props)
               }}
               isRTL={isRTL}
             />
-            <Field label={t("addressStreet")} value={street} onChangeText={setStreet} isRTL={isRTL} />
+            <Field label={t("addressStreet")} required value={street} onChangeText={setStreet} isRTL={isRTL} />
             <View style={{ flexDirection: "row", gap: 12 }}>
               <View style={{ flex: 1 }}>
-                <Field label={t("addressBuilding")} value={building} onChangeText={setBuilding} isRTL={isRTL} />
+                <Field label={t("addressBuilding")} required value={building} onChangeText={setBuilding} isRTL={isRTL} />
               </View>
               <View style={{ flex: 1 }}>
                 <Field label={t("addressApartment")} value={apartment} onChangeText={setApartment} isRTL={isRTL} />
@@ -163,17 +164,20 @@ function Field({
   value,
   onChangeText,
   isRTL,
+  required,
 }: {
   label: string;
   value: string;
   onChangeText: (v: string) => void;
   isRTL: boolean;
+  required?: boolean;
 }) {
   const { colors } = useTheme();
   return (
     <View>
       <Text style={{ fontSize: 13, fontWeight: "600", color: colors.text, marginBottom: 4, textAlign: isRTL ? "right" : "left" }}>
         {label}
+        {required ? <Text style={{ color: colors.danger }}> *</Text> : null}
       </Text>
       <TextInput
         value={value}

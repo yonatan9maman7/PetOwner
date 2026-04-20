@@ -18,15 +18,18 @@ public class BookingsController : ControllerBase
     private readonly ApplicationDbContext _db;
     private readonly IGrowPaymentService _growPayment;
     private readonly INotificationService _notifications;
+    private readonly IAchievementService _achievements;
 
     public BookingsController(
         ApplicationDbContext db,
         IGrowPaymentService growPayment,
-        INotificationService notifications)
+        INotificationService notifications,
+        IAchievementService achievements)
     {
         _db = db;
         _growPayment = growPayment;
         _notifications = notifications;
+        _achievements = achievements;
     }
 
     [HttpPost]
@@ -156,6 +159,7 @@ public class BookingsController : ControllerBase
             return BadRequest(new { message = "Only pending bookings can be confirmed." });
 
         booking.Status = BookingStatus.Confirmed;
+        booking.RespondedAt = DateTime.UtcNow;
         booking.PaymentUrl = await _growPayment.GeneratePaymentLinkAsync(booking);
         await _db.SaveChangesAsync();
 
@@ -165,6 +169,43 @@ public class BookingsController : ControllerBase
             "BookingConfirmed",
             "Booking Confirmed",
             $"Your booking with {providerName} was approved!",
+            booking.Id);
+
+        return NoContent();
+    }
+
+    [HttpPut("{id:guid}/complete")]
+    public async Task<IActionResult> Complete(Guid id)
+    {
+        var userId = GetUserId();
+
+        var booking = await _db.Bookings
+            .Include(b => b.ProviderProfile).ThenInclude(p => p.User)
+            .FirstOrDefaultAsync(b => b.Id == id);
+
+        if (booking is null)
+            return NotFound(new { message = "Booking not found." });
+
+        if (booking.ProviderProfileId != userId)
+            return Forbid();
+
+        if (booking.Status == BookingStatus.Cancelled)
+            return BadRequest(new { message = "Cannot complete a cancelled booking." });
+
+        if (booking.Status == BookingStatus.Completed)
+            return BadRequest(new { message = "Booking is already completed." });
+
+        if (booking.Status != BookingStatus.Confirmed)
+            return BadRequest(new { message = "Only confirmed bookings can be marked complete." });
+
+        booking.Status = BookingStatus.Completed;
+        await _db.SaveChangesAsync();
+
+        await _notifications.CreateAsync(
+            booking.OwnerId,
+            "BookingCompleted",
+            "Booking Completed",
+            $"Your booking with {booking.ProviderProfile.User.Name} was marked complete.",
             booking.Id);
 
         return NoContent();
@@ -182,10 +223,21 @@ public class BookingsController : ControllerBase
         if (booking.OwnerId != userId && booking.ProviderProfileId != userId)
             return Forbid();
 
+        if (booking.PaymentStatus == PaymentStatus.Paid)
+            return BadRequest(new { message = "Cannot cancel a booking after payment has been completed." });
+
         if (booking.Status == BookingStatus.Cancelled)
             return BadRequest(new { message = "Booking is already cancelled." });
 
         booking.Status = BookingStatus.Cancelled;
+        booking.CancelledByRole = booking.ProviderProfileId == userId
+            ? BookingActorRole.Provider
+            : BookingActorRole.Owner;
+
+        // Cancellation is also a "response" from the provider's perspective for response-time stats.
+        if (booking.CancelledByRole == BookingActorRole.Provider && booking.RespondedAt is null)
+            booking.RespondedAt = DateTime.UtcNow;
+
         await _db.SaveChangesAsync();
 
         return NoContent();

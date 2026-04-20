@@ -30,6 +30,14 @@ import {
   createAddPetMicrochipSchema,
   type AddPetMicrochipFormValues,
 } from "./addPetSchema";
+import type { TranslationKey } from "../../i18n";
+import {
+  ALLERGY_OPTIONS,
+  findSimilarBreed,
+  getBreedsForSpecies,
+  parseAllergiesFromString,
+  serializeAllergies,
+} from "./addPetHelpers";
 import { BrandedAppHeader } from "../../components/BrandedAppHeader";
 import { usePetsStore } from "../../store/petsStore";
 import { PetSpecies } from "../../types/api";
@@ -45,37 +53,24 @@ const speciesCards: { value: PetSpecies; emoji: string; labelKey: string }[] = [
   { value: PetSpecies.Other, emoji: "🐾", labelKey: "speciesOther" },
 ];
 
-const DOG_BREEDS = [
-  "Mixed / Mutt",
-  "Golden Retriever",
-  "Labrador",
-  "German Shepherd",
-  "Poodle",
-  "Border Collie",
-  "Malinois",
-  "French Bulldog",
-  "Shih Tzu",
-  "Pomeranian",
-  "Other",
-];
-
-const CAT_BREEDS = [
-  "Mixed",
-  "Persian",
-  "Siamese",
-  "British Shorthair",
-  "Sphynx",
-  "Maine Coon",
-  "Street Cat",
-  "Tricolor / Calico",
-  "Other",
-];
-
-function getBreedsForSpecies(s: PetSpecies | null): string[] {
-  if (s === PetSpecies.Dog) return DOG_BREEDS;
-  if (s === PetSpecies.Cat) return CAT_BREEDS;
-  return [];
-}
+const ALLERGY_LABEL_KEYS: Record<string, TranslationKey> = {
+  chicken: "allergyChicken",
+  beef: "allergyBeef",
+  dairy: "allergyDairy",
+  grain_wheat: "allergyGrainWheat",
+  soy: "allergySoy",
+  fish: "allergyFish",
+  eggs: "allergyEggs",
+  lamb: "allergyLamb",
+  flea_bite: "allergyFleaBite",
+  pollen: "allergyPollen",
+  dust_mites: "allergyDustMites",
+  mold: "allergyMold",
+  preservatives: "allergyPreservatives",
+  medication: "allergyMedication",
+  rubber_latex: "allergyRubberLatex",
+  other: "allergyOther",
+};
 
 export function AddPetScreen() {
   const navigation = useNavigation<any>();
@@ -111,6 +106,7 @@ export function AddPetScreen() {
   const [name, setName] = useState("");
   const [species, setSpecies] = useState<PetSpecies | null>(null);
   const [breed, setBreed] = useState("");
+  const [customBreedOther, setCustomBreedOther] = useState("");
   const [customSpecies, setCustomSpecies] = useState("");
 
   // Step 2
@@ -119,7 +115,10 @@ export function AddPetScreen() {
   const [weightUnit, setWeightUnit] = useState<"kg" | "lbs">("kg");
   const [isNeutered, setIsNeutered] = useState(false);
   const [allergyMode, setAllergyMode] = useState<"none" | "has">("none");
-  const [allergies, setAllergies] = useState("");
+  const [selectedAllergyIds, setSelectedAllergyIds] = useState<Set<string>>(
+    () => new Set(),
+  );
+  const [allergyOtherText, setAllergyOtherText] = useState("");
   const [conditionMode, setConditionMode] = useState<"none" | "has">("none");
   const [medicalConditions, setMedicalConditions] = useState("");
   const [notes, setNotes] = useState("");
@@ -149,10 +148,28 @@ export function AddPetScreen() {
     if (pet) {
       setName(pet.name);
       setSpecies(pet.species);
-      setBreed(pet.breed ?? "");
+      const b = pet.breed ?? "";
+      if (pet.species === PetSpecies.Dog || pet.species === PetSpecies.Cat) {
+        const list = getBreedsForSpecies(pet.species);
+        if (b && list.includes(b)) {
+          setBreed(b);
+          setCustomBreedOther("");
+        } else if (b) {
+          setBreed("Other");
+          setCustomBreedOther(b);
+        } else {
+          setBreed("");
+          setCustomBreedOther("");
+        }
+      } else {
+        setBreed(b);
+        setCustomBreedOther("");
+      }
       setAge(String(pet.age));
       setWeight(pet.weight != null ? String(pet.weight) : "");
-      setAllergies(pet.allergies ?? "");
+      const parsedAll = parseAllergiesFromString(pet.allergies ?? "");
+      setSelectedAllergyIds(parsedAll.ids);
+      setAllergyOtherText(parsedAll.otherText);
       setMedicalConditions(pet.medicalConditions ?? "");
       setNotes(pet.notes ?? "");
       setIsNeutered(pet.isNeutered);
@@ -161,7 +178,9 @@ export function AddPetScreen() {
       resetMicrochipField({ microchipNumber: pet.microchipNumber ?? "" });
       setVetName(pet.vetName ?? "");
       setVetPhone(pet.vetPhone ?? "");
-      if (pet.allergies?.trim()) setAllergyMode("has");
+      if (parsedAll.ids.size > 0 || parsedAll.otherText.trim()) {
+        setAllergyMode("has");
+      }
       if (pet.medicalConditions?.trim()) setConditionMode("has");
       if (pet.imageUrl) setAvatarUri(pet.imageUrl);
     }
@@ -199,11 +218,18 @@ export function AddPetScreen() {
   const step1Ready =
     name.trim().length > 0 &&
     species !== null &&
-    (!breedRequired || breed.trim().length > 0) &&
+    (!breedRequired ||
+      (breed.trim().length > 0 &&
+        (breed !== "Other" || customBreedOther.trim().length > 0))) &&
     (species !== PetSpecies.Other || customSpecies.trim().length > 0);
 
+  const allergiesStepOk =
+    allergyMode === "none" ||
+    (selectedAllergyIds.size > 0 &&
+      (!selectedAllergyIds.has("other") || allergyOtherText.trim().length > 0));
+
   const step2Ready =
-    age.trim().length > 0 && !isNaN(Number(age));
+    age.trim().length > 0 && !isNaN(Number(age)) && allergiesStepOk;
 
   const isStep1Valid = (): boolean => step1Ready;
 
@@ -213,6 +239,46 @@ export function AddPetScreen() {
     if (currentStep === 1 && !isStep1Valid()) return;
     if (currentStep === 2 && !isStep2Valid()) return;
     setCurrentStep((s) => Math.min(s + 1, 3));
+    animateStep();
+  };
+
+  const proceedFromStep1 = () => {
+    if (!step1Ready) return;
+    if (
+      (species === PetSpecies.Dog || species === PetSpecies.Cat) &&
+      breed === "Other" &&
+      customBreedOther.trim()
+    ) {
+      const list = getBreedsForSpecies(species);
+      const match = findSimilarBreed(customBreedOther, list);
+      if (match) {
+        Alert.alert(
+          t("breedMatchTitle"),
+          t("breedMatchMessage").replace("{breed}", match),
+          [
+            {
+              text: t("breedMatchUseSuggested"),
+              onPress: () => {
+                setBreed(match);
+                setCustomBreedOther("");
+                setCurrentStep(2);
+                animateStep();
+              },
+            },
+            {
+              text: t("breedMatchKeepMine"),
+              style: "cancel",
+              onPress: () => {
+                setCurrentStep(2);
+                animateStep();
+              },
+            },
+          ],
+        );
+        return;
+      }
+    }
+    setCurrentStep(2);
     animateStep();
   };
 
@@ -240,14 +306,39 @@ export function AddPetScreen() {
     }
     const microchipOk = await triggerMicrochipField("microchipNumber");
     if (!microchipOk) return;
+    if (
+      (species === PetSpecies.Dog || species === PetSpecies.Cat) &&
+      breed === "Other" &&
+      !customBreedOther.trim()
+    ) {
+      Alert.alert(t("errorTitle"), t("validationCustomBreedRequired"));
+      return;
+    }
+    if (allergyMode === "has") {
+      if (selectedAllergyIds.size === 0) {
+        Alert.alert(t("errorTitle"), t("validationAllergiesRequired"));
+        return;
+      }
+      if (selectedAllergyIds.has("other") && !allergyOtherText.trim()) {
+        Alert.alert(t("errorTitle"), t("validationAllergyOtherRequired"));
+        return;
+      }
+    }
     setSaving(true);
     try {
-      const breedValue =
-        species === PetSpecies.Other && customSpecies.trim()
-          ? breed.trim()
-            ? `${customSpecies.trim()} - ${breed.trim()}`
-            : customSpecies.trim()
-          : breed.trim() || undefined;
+      let breedValue: string | undefined;
+      if (species === PetSpecies.Other && customSpecies.trim()) {
+        breedValue = breed.trim()
+          ? `${customSpecies.trim()} - ${breed.trim()}`
+          : customSpecies.trim();
+      } else if (species === PetSpecies.Dog || species === PetSpecies.Cat) {
+        breedValue =
+          breed === "Other"
+            ? customBreedOther.trim() || undefined
+            : breed.trim() || undefined;
+      } else {
+        breedValue = breed.trim() || undefined;
+      }
 
       const data: CreatePetRequest = {
         name: name.trim(),
@@ -260,7 +351,10 @@ export function AddPetScreen() {
             : Number(weight)
           : undefined,
         allergies:
-          allergyMode === "has" ? allergies.trim() || undefined : undefined,
+          allergyMode === "has"
+            ? serializeAllergies(selectedAllergyIds, allergyOtherText).trim() ||
+              undefined
+            : undefined,
         medicalConditions:
           conditionMode === "has"
             ? medicalConditions.trim() || undefined
@@ -486,7 +580,10 @@ export function AddPetScreen() {
                         <Pressable
                           key={card.value}
                           onPress={() => {
-                            if (species !== card.value) setBreed("");
+                            if (species !== card.value) {
+                              setBreed("");
+                              setCustomBreedOther("");
+                            }
                             setSpecies(card.value);
                           }}
                           style={{
@@ -597,6 +694,30 @@ export function AddPetScreen() {
                         placeholderTextColor={colors.textMuted}
                         textAlign={textAlign}
                       />
+                    )}
+                    {breedRequired && breed === "Other" && (
+                      <View style={{ gap: 8, marginTop: 4 }}>
+                        <Text
+                          style={{
+                            fontSize: 13,
+                            fontWeight: "700",
+                            color: colors.text,
+                            paddingHorizontal: 4,
+                            textAlign,
+                          }}
+                        >
+                          {t("customBreedLabel")}{" "}
+                          <Text style={{ color: colors.danger }}>*</Text>
+                        </Text>
+                        <TextInput
+                          style={inputStyle(isRTL, colors)}
+                          value={customBreedOther}
+                          onChangeText={setCustomBreedOther}
+                          placeholder={t("customBreedPlaceholder")}
+                          placeholderTextColor={colors.textMuted}
+                          textAlign={textAlign}
+                        />
+                      </View>
                     )}
                   </View>
                 )}
@@ -794,7 +915,8 @@ export function AddPetScreen() {
                     <Pressable
                       onPress={() => {
                         setAllergyMode("none");
-                        setAllergies("");
+                        setSelectedAllergyIds(new Set());
+                        setAllergyOtherText("");
                       }}
                       style={{
                         flex: 1,
@@ -840,14 +962,92 @@ export function AddPetScreen() {
                     </Pressable>
                   </View>
                   {allergyMode === "has" && (
-                    <TextInput
-                      style={[inputStyle(isRTL, colors), { marginTop: 4 }]}
-                      value={allergies}
-                      onChangeText={setAllergies}
-                      placeholder={t("specifyAllergy")}
-                      placeholderTextColor={colors.textMuted}
-                      textAlign={textAlign}
-                    />
+                    <View style={{ gap: 10, marginTop: 4 }}>
+                      <Text
+                        style={{
+                          fontSize: 12,
+                          fontWeight: "500",
+                          color: colors.textSecondary,
+                          paddingHorizontal: 4,
+                          textAlign,
+                        }}
+                      >
+                        {t("allergySelectHint")}
+                      </Text>
+                      <View
+                        style={{
+                          flexDirection: isRTL ? "row-reverse" : "row",
+                          flexWrap: "wrap",
+                          gap: 8,
+                        }}
+                      >
+                        {ALLERGY_OPTIONS.map((opt) => {
+                          const selected = selectedAllergyIds.has(opt.id);
+                          const labelKey = ALLERGY_LABEL_KEYS[opt.id];
+                          return (
+                            <Pressable
+                              key={opt.id}
+                              onPress={() => {
+                                setSelectedAllergyIds((prev) => {
+                                  const next = new Set(prev);
+                                  if (next.has(opt.id)) {
+                                    next.delete(opt.id);
+                                    if (opt.id === "other") setAllergyOtherText("");
+                                  } else {
+                                    next.add(opt.id);
+                                  }
+                                  return next;
+                                });
+                              }}
+                              style={{
+                                paddingHorizontal: 14,
+                                paddingVertical: 10,
+                                borderRadius: 20,
+                                borderWidth: 1.5,
+                                borderColor: selected ? colors.primary : colors.borderLight,
+                                backgroundColor: selected
+                                  ? colors.primaryLight
+                                  : colors.surface,
+                              }}
+                            >
+                              <Text
+                                style={{
+                                  fontSize: 13,
+                                  fontWeight: selected ? "700" : "500",
+                                  color: selected ? colors.primary : colors.textSecondary,
+                                }}
+                              >
+                                {labelKey ? t(labelKey) : opt.storageLabel}
+                              </Text>
+                            </Pressable>
+                          );
+                        })}
+                      </View>
+                      {selectedAllergyIds.has("other") && (
+                        <View style={{ gap: 6 }}>
+                          <Text
+                            style={{
+                              fontSize: 12,
+                              fontWeight: "600",
+                              color: colors.text,
+                              paddingHorizontal: 4,
+                              textAlign,
+                            }}
+                          >
+                            {t("allergyOtherDetail")}{" "}
+                            <Text style={{ color: colors.danger }}>*</Text>
+                          </Text>
+                          <TextInput
+                            style={inputStyle(isRTL, colors)}
+                            value={allergyOtherText}
+                            onChangeText={setAllergyOtherText}
+                            placeholder={t("specifyAllergy")}
+                            placeholderTextColor={colors.textMuted}
+                            textAlign={textAlign}
+                          />
+                        </View>
+                      )}
+                    </View>
                   )}
                 </View>
 
@@ -1279,7 +1479,7 @@ export function AddPetScreen() {
           >
             {currentStep === 1 && (
               <Pressable
-                onPress={nextStep}
+                onPress={proceedFromStep1}
                 disabled={!step1Ready}
                 style={{
                   flex: 1,
@@ -1458,6 +1658,7 @@ export function AddPetScreen() {
                 <Pressable
                   onPress={() => {
                     setBreed(item);
+                    if (item !== "Other") setCustomBreedOther("");
                     setShowBreedPicker(false);
                   }}
                   style={{
@@ -1552,7 +1753,7 @@ export function AddPetScreen() {
                   "#0d9488",
                   "#f59e0b",
                   "#ec4899",
-                  "#3b82f6",
+                  "#001a5a",
                   "#fef08a",
                 ]}
               />
@@ -1569,7 +1770,7 @@ export function AddPetScreen() {
                   "#0d9488",
                   "#f59e0b",
                   "#ec4899",
-                  "#3b82f6",
+                  "#001a5a",
                   "#fef08a",
                 ]}
               />

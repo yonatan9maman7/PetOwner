@@ -6,7 +6,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useTranslation } from "../../../i18n";
 import { useTheme } from "../../../theme/ThemeContext";
 import type { PetDto } from "../../../types/api";
-import { speciesEmoji } from "../MyPets/constants";
+import { getSpeciesEmoji } from "../MyPets/constants";
 
 interface ActivityLogSectionShellProps {
   pet: PetDto | null;
@@ -72,7 +72,7 @@ export function ActivityLogSectionShell({ pet, onBack, children }: ActivityLogSe
                   backgroundColor: "rgba(255,255,255,0.2)",
                 }}
               >
-                <Text className="text-sm">{speciesEmoji[pet.species] ?? "🐾"}</Text>
+                <Text className="text-sm">{getSpeciesEmoji(pet.species)}</Text>
                 <Text className="text-[13px] font-semibold" style={{ color: "rgba(255,255,255,0.9)" }}>
                   {pet.name}
                 </Text>

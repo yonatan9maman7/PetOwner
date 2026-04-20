@@ -25,6 +25,7 @@ import * as Location from "expo-location";
 import { useTranslation } from "../../i18n";
 import { useTheme } from "../../theme/ThemeContext";
 import { triageApi, petsApi } from "../../api/client";
+import { getSpeciesEmoji } from "./MyPets/constants";
 import { PetSpecies } from "../../types/api";
 import type {
   PetDto,
@@ -39,15 +40,6 @@ const SEVERITY_COLOR: Record<TriageSeverity, string> = {
   Medium: "#f59e0b",
   High: "#f97316",
   Critical: "#ef4444",
-};
-
-const speciesEmoji: Record<number, string> = {
-  [PetSpecies.Dog]: "🐕",
-  [PetSpecies.Cat]: "🐈",
-  [PetSpecies.Bird]: "🐦",
-  [PetSpecies.Rabbit]: "🐇",
-  [PetSpecies.Reptile]: "🦎",
-  [PetSpecies.Other]: "🐾",
 };
 
 /* ──────── Chat message types ──────── */
@@ -819,7 +811,7 @@ export function TriageScreen() {
                       }}
                     >
                       <Text style={{ fontSize: 16 }}>
-                        {speciesEmoji[pet.species] ?? "🐾"}
+                        {getSpeciesEmoji(pet.species)}
                       </Text>
                       <Text
                         style={{

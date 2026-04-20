@@ -49,5 +49,8 @@ export function sendMessage(
   recipientId: string,
   content: string,
 ): Promise<void> {
-  return connection?.invoke("SendMessage", recipientId, content) ?? Promise.resolve();
+  if (!connection) {
+    return Promise.reject(new Error("Chat connection not ready"));
+  }
+  return connection.invoke("SendMessage", recipientId, content);
 }

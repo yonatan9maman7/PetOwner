@@ -1,4 +1,5 @@
 using PetOwner.Api.DTOs;
+using PetOwner.Data.Models;
 
 namespace PetOwner.Api.Services;
 
@@ -10,7 +11,8 @@ public record MapSearchFilter(
     double? RadiusKm = null,
     double? Latitude = null,
     double? Longitude = null,
-    string? SearchTerm = null
+    string? SearchTerm = null,
+    ProviderType? ProviderTypeFilter = null
 );
 
 public interface IMapService

@@ -16,9 +16,13 @@ export interface ThemeColors {
   textInverse: string;
   border: string;
   borderLight: string;
+  /** Links, spinners, refresh controls; in dark mode stays lighter for contrast on dark backgrounds. */
   primary: string;
+  /** Soft tint behind icons / chips (navy-tinted in light theme). */
   primaryLight: string;
   primaryText: string;
+  /** Filled primary CTAs and language toggle — matches bottom tab bar / nav chrome. */
+  brand: string;
   danger: string;
   dangerLight: string;
   success: string;
@@ -57,9 +61,10 @@ const light: ThemeColors = {
   textInverse: "#ffffff",
   border: "#e2e8f0",
   borderLight: "#f1f5f9",
-  primary: "#2563eb",
-  primaryLight: "#eef2ff",
+  primary: "#001a5a",
+  primaryLight: "#e8ecf4",
   primaryText: "#ffffff",
+  brand: "#001a5a",
   danger: "#dc2626",
   dangerLight: "#fef2f2",
   success: "#059669",
@@ -72,7 +77,7 @@ const light: ThemeColors = {
   shadow: "#000000",
   overlay: "rgba(0,0,0,0.5)",
   inputBg: "#f8fafc",
-  cardHighlight: "#eff6ff",
+  cardHighlight: "#e8ecf4",
   iconBlueBg: "#eef2ff",
   iconGreenBg: "#ecfdf5",
   iconPurpleBg: "#f5f3ff",
@@ -97,9 +102,10 @@ const dark: ThemeColors = {
   textInverse: "#0c1322",
   border: "#2a3a52",
   borderLight: "#1e2d42",
-  primary: "#3b82f6",
+  primary: "#60a5fa",
   primaryLight: "#1e3a5f",
   primaryText: "#ffffff",
+  brand: "#0c1322",
   danger: "#ef4444",
   dangerLight: "#3b1a1a",
   success: "#10b981",

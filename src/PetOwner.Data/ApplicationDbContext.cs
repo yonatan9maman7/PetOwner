@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.ChangeTracking;
 using PetOwner.Data.Models;
 
 namespace PetOwner.Data;
@@ -24,6 +25,7 @@ public class ApplicationDbContext : DbContext
     public DbSet<Post> Posts => Set<Post>();
     public DbSet<PostLike> PostLikes => Set<PostLike>();
     public DbSet<PostComment> PostComments => Set<PostComment>();
+    public DbSet<PostCommentLike> PostCommentLikes => Set<PostCommentLike>();
     public DbSet<Conversation> Conversations => Set<Conversation>();
     public DbSet<Message> Messages => Set<Message>();
     public DbSet<Notification> Notifications => Set<Notification>();
@@ -39,6 +41,14 @@ public class ApplicationDbContext : DbContext
     public DbSet<ServicePackage> ServicePackages => Set<ServicePackage>();
     public DbSet<PetHealthShare> PetHealthShares => Set<PetHealthShare>();
     public DbSet<ContactInquiry> ContactInquiries => Set<ContactInquiry>();
+    public DbSet<UserPushToken> UserPushTokens => Set<UserPushToken>();
+    public DbSet<UserNotificationPrefs> UserNotificationPrefs => Set<UserNotificationPrefs>();
+    public DbSet<AchievementUnlocked> AchievementsUnlocked => Set<AchievementUnlocked>();
+    public DbSet<PlaydatePrefs> PlaydatePrefs => Set<PlaydatePrefs>();
+    public DbSet<PlaydateEvent> PlaydateEvents => Set<PlaydateEvent>();
+    public DbSet<PlaydateRsvp> PlaydateRsvps => Set<PlaydateRsvp>();
+    public DbSet<PlaydateEventComment> PlaydateEventComments => Set<PlaydateEventComment>();
+    public DbSet<PlaydateBeacon> PlaydateBeacons => Set<PlaydateBeacon>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -70,6 +80,12 @@ public class ApplicationDbContext : DbContext
         ConfigureServicePackage(modelBuilder);
         ConfigurePetHealthShare(modelBuilder);
         ConfigureContactInquiry(modelBuilder);
+        ConfigureUserPushToken(modelBuilder);
+        ConfigureUserNotificationPrefs(modelBuilder);
+        ConfigureAchievementUnlocked(modelBuilder);
+        ConfigurePlaydatePrefs(modelBuilder);
+        ConfigurePlaydateEvent(modelBuilder);
+        ConfigurePlaydateBeacon(modelBuilder);
     }
 
     private static void ConfigureUser(ModelBuilder modelBuilder)
@@ -200,6 +216,21 @@ public class ApplicationDbContext : DbContext
 
             entity.Property(p => p.ApartmentNumber)
                 .HasMaxLength(50);
+
+            entity.Property(p => p.AcceptedDogSizes)
+                .HasConversion(
+                    (List<DogSize> v) => string.Join(',', v.Select(x => x.ToString())),
+                    v => ParseDogSizesFromColumn(v))
+                .HasMaxLength(500)
+                .Metadata.SetValueComparer(new ValueComparer<List<DogSize>>(
+                    (a, b) => ReferenceEquals(a, b) || (a != null && b != null && a.SequenceEqual(b)),
+                    v => v.Aggregate(0, (h, e) => HashCode.Combine(h, e.GetHashCode())),
+                    v => v.ToList()));
+
+            entity.Property(p => p.MaxDogsCapacity);
+
+            entity.Property(p => p.ProfileViewCount).HasDefaultValue(0);
+            entity.Property(p => p.SearchAppearanceCount).HasDefaultValue(0);
 
             entity.HasOne(p => p.User)
                 .WithOne(u => u.ProviderProfile)
@@ -342,6 +373,18 @@ public class ApplicationDbContext : DbContext
                 .HasMaxLength(30);
 
             entity.Property(p => p.CommunityPostId);
+
+            entity.Property(p => p.DogSize)
+                .HasConversion<string>()
+                .HasMaxLength(10);
+
+            entity.Property(p => p.TagsCsv)
+                .HasMaxLength(500)
+                .HasDefaultValue("");
+
+            entity.Property(p => p.Sterilization)
+                .HasConversion<int>()
+                .HasDefaultValue(SterilizationStatus.Unknown);
 
             entity.HasOne(p => p.User)
                 .WithMany(u => u.Pets)
@@ -566,15 +609,17 @@ public class ApplicationDbContext : DbContext
                 .HasForeignKey(m => m.PetId)
                 .OnDelete(DeleteBehavior.Cascade);
 
+            // NO ACTION: SQL Server rejects multiple cascade paths (Pet→MedicalRecords + Pet→Vaccinations
+            // + MedicalRecords→Vaccinations). SET NULL still participates in cascade graph.
             entity.HasOne(m => m.Vaccination)
                 .WithOne(v => v.LinkedRecord)
                 .HasForeignKey<MedicalRecord>(m => m.VaccinationId)
-                .OnDelete(DeleteBehavior.SetNull);
+                .OnDelete(DeleteBehavior.NoAction);
 
             entity.HasOne(m => m.WeightLog)
                 .WithOne(w => w.LinkedRecord)
                 .HasForeignKey<MedicalRecord>(m => m.WeightLogId)
-                .OnDelete(DeleteBehavior.SetNull);
+                .OnDelete(DeleteBehavior.NoAction);
 
             entity.HasIndex(m => m.VaccinationId)
                 .IsUnique()
@@ -710,6 +755,7 @@ public class ApplicationDbContext : DbContext
             entity.HasKey(c => c.Id);
             entity.Property(c => c.Id).HasDefaultValueSql("NEWSEQUENTIALID()");
             entity.Property(c => c.Content).IsRequired().HasMaxLength(1000);
+            entity.Property(c => c.LikeCount).HasDefaultValue(0);
             entity.Property(c => c.CreatedAt).HasDefaultValueSql("GETUTCDATE()");
 
             entity.HasOne(c => c.Post)
@@ -721,6 +767,30 @@ public class ApplicationDbContext : DbContext
                 .WithMany()
                 .HasForeignKey(c => c.UserId)
                 .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasOne(c => c.ParentComment)
+                .WithMany(c => c.Replies)
+                .HasForeignKey(c => c.ParentCommentId)
+                .IsRequired(false)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<PostCommentLike>(entity =>
+        {
+            entity.HasKey(cl => new { cl.CommentId, cl.UserId });
+            entity.Property(cl => cl.CreatedAt).HasDefaultValueSql("GETUTCDATE()");
+
+            entity.HasOne(cl => cl.Comment)
+                .WithMany(c => c.Likes)
+                .HasForeignKey(cl => cl.CommentId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(cl => cl.User)
+                .WithMany()
+                .HasForeignKey(cl => cl.UserId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasIndex(cl => cl.CommentId);
         });
     }
 
@@ -834,6 +904,10 @@ public class ApplicationDbContext : DbContext
 
             entity.Property(b => b.Notes)
                 .HasMaxLength(500);
+
+            entity.Property(b => b.CancelledByRole)
+                .HasConversion<string>()
+                .HasMaxLength(20);
 
             entity.HasIndex(b => new { b.OwnerId, b.Status });
             entity.HasIndex(b => new { b.ProviderProfileId, b.Status });
@@ -1126,5 +1200,223 @@ public class ApplicationDbContext : DbContext
                 .HasForeignKey(c => c.UserId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
+    }
+
+    private static void ConfigureUserPushToken(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<UserPushToken>(entity =>
+        {
+            entity.HasKey(t => t.Id);
+
+            entity.Property(t => t.Id)
+                .HasDefaultValueSql("NEWSEQUENTIALID()");
+
+            entity.Property(t => t.Token)
+                .IsRequired()
+                .HasMaxLength(500);
+
+            entity.HasIndex(t => t.Token)
+                .IsUnique();
+
+            entity.Property(t => t.Platform)
+                .IsRequired()
+                .HasMaxLength(10);
+
+            entity.Property(t => t.CreatedAt)
+                .HasDefaultValueSql("GETUTCDATE()");
+
+            entity.Property(t => t.LastUsedAt)
+                .HasDefaultValueSql("GETUTCDATE()");
+
+            entity.HasIndex(t => t.UserId);
+
+            entity.HasOne(t => t.User)
+                .WithMany(u => u.PushTokens)
+                .HasForeignKey(t => t.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+    }
+
+    private static void ConfigureUserNotificationPrefs(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<UserNotificationPrefs>(entity =>
+        {
+            entity.HasKey(p => p.UserId);
+
+            entity.Property(p => p.PushEnabled).HasDefaultValue(true);
+            entity.Property(p => p.Messages).HasDefaultValue(true);
+            entity.Property(p => p.Bookings).HasDefaultValue(true);
+            entity.Property(p => p.Community).HasDefaultValue(true);
+            entity.Property(p => p.Triage).HasDefaultValue(true);
+            entity.Property(p => p.Marketing).HasDefaultValue(true);
+            entity.Property(p => p.Achievements).HasDefaultValue(true);
+
+            entity.Property(p => p.UpdatedAt)
+                .HasDefaultValueSql("GETUTCDATE()");
+
+            entity.HasOne(p => p.User)
+                .WithOne(u => u.NotificationPrefs)
+                .HasForeignKey<UserNotificationPrefs>(p => p.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+    }
+
+    private static void ConfigureAchievementUnlocked(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<AchievementUnlocked>(entity =>
+        {
+            entity.HasKey(a => a.Id);
+
+            entity.Property(a => a.Id)
+                .HasDefaultValueSql("NEWSEQUENTIALID()");
+
+            entity.Property(a => a.Code)
+                .IsRequired()
+                .HasMaxLength(50);
+
+            entity.Property(a => a.Scope)
+                .IsRequired()
+                .HasMaxLength(20);
+
+            entity.Property(a => a.UnlockedAt)
+                .HasDefaultValueSql("GETUTCDATE()");
+
+            // Unique per (UserId, Code) — guarantees idempotent unlock.
+            entity.HasIndex(a => new { a.UserId, a.Code })
+                .IsUnique();
+
+            entity.HasOne(a => a.User)
+                .WithMany()
+                .HasForeignKey(a => a.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+    }
+
+    private static void ConfigurePlaydatePrefs(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<PlaydatePrefs>(entity =>
+        {
+            entity.HasKey(p => p.UserId);
+
+            entity.Property(p => p.OptedIn).HasDefaultValue(false);
+            entity.Property(p => p.MaxDistanceKm).HasDefaultValue(5);
+            entity.Property(p => p.Bio).HasMaxLength(280);
+            entity.Property(p => p.PreferredSpeciesCsv).HasMaxLength(200).HasDefaultValue("");
+            entity.Property(p => p.PreferredDogSizesCsv).HasMaxLength(100).HasDefaultValue("");
+            entity.Property(p => p.IncludeAsProvider).HasDefaultValue(false);
+            entity.Property(p => p.CreatedAt).HasDefaultValueSql("GETUTCDATE()");
+            entity.Property(p => p.UpdatedAt).HasDefaultValueSql("GETUTCDATE()");
+            entity.Property(p => p.LastActiveAt).HasDefaultValueSql("GETUTCDATE()");
+
+            entity.HasIndex(p => new { p.OptedIn, p.LastActiveAt });
+
+            entity.HasOne(p => p.User)
+                .WithOne(u => u.PlaydatePrefs)
+                .HasForeignKey<PlaydatePrefs>(p => p.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+    }
+
+    private static void ConfigurePlaydateEvent(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<PlaydateEvent>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Id).HasDefaultValueSql("NEWSEQUENTIALID()");
+            entity.Property(e => e.Title).IsRequired().HasMaxLength(120);
+            entity.Property(e => e.Description).HasMaxLength(1000);
+            entity.Property(e => e.LocationName).IsRequired().HasMaxLength(200);
+            entity.Property(e => e.City).HasMaxLength(100);
+            entity.Property(e => e.AllowedSpeciesCsv).HasMaxLength(200).HasDefaultValue("DOG");
+            entity.Property(e => e.CancellationReason).HasMaxLength(500);
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql("GETUTCDATE()");
+
+            entity.HasIndex(e => new { e.ScheduledFor, e.CancelledAt });
+            entity.HasIndex(e => new { e.Latitude, e.Longitude });
+
+            entity.HasOne(e => e.Host)
+                .WithMany()
+                .HasForeignKey(e => e.HostUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<PlaydateRsvp>(entity =>
+        {
+            entity.HasKey(r => new { r.EventId, r.UserId });
+            entity.Property(r => r.Status).HasConversion<int>().IsRequired();
+            entity.Property(r => r.CreatedAt).HasDefaultValueSql("GETUTCDATE()");
+            entity.Property(r => r.UpdatedAt).HasDefaultValueSql("GETUTCDATE()");
+
+            entity.HasOne(r => r.Event)
+                .WithMany(e => e.Rsvps)
+                .HasForeignKey(r => r.EventId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(r => r.User)
+                .WithMany()
+                .HasForeignKey(r => r.UserId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasOne(r => r.Pet)
+                .WithMany()
+                .HasForeignKey(r => r.PetId)
+                .IsRequired(false)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<PlaydateEventComment>(entity =>
+        {
+            entity.HasKey(c => c.Id);
+            entity.Property(c => c.Id).HasDefaultValueSql("NEWSEQUENTIALID()");
+            entity.Property(c => c.Content).IsRequired().HasMaxLength(1000);
+            entity.Property(c => c.CreatedAt).HasDefaultValueSql("GETUTCDATE()");
+
+            entity.HasIndex(c => new { c.EventId, c.CreatedAt });
+
+            entity.HasOne(c => c.Event)
+                .WithMany(e => e.Comments)
+                .HasForeignKey(c => c.EventId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(c => c.User)
+                .WithMany()
+                .HasForeignKey(c => c.UserId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+    }
+
+    private static void ConfigurePlaydateBeacon(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<PlaydateBeacon>(entity =>
+        {
+            entity.HasKey(b => b.Id);
+            entity.Property(b => b.Id).HasDefaultValueSql("NEWSEQUENTIALID()");
+            entity.Property(b => b.PlaceName).IsRequired().HasMaxLength(120);
+            entity.Property(b => b.City).HasMaxLength(100);
+            entity.Property(b => b.PetIdsCsv).HasMaxLength(500).HasDefaultValue("");
+            entity.Property(b => b.Species).IsRequired().HasMaxLength(20).HasDefaultValue("DOG");
+            entity.Property(b => b.CreatedAt).HasDefaultValueSql("GETUTCDATE()");
+
+            entity.HasIndex(b => new { b.UserId, b.ExpiresAt });
+            entity.HasIndex(b => b.ExpiresAt);
+            entity.HasIndex(b => new { b.Latitude, b.Longitude });
+
+            entity.HasOne(b => b.User)
+                .WithMany()
+                .HasForeignKey(b => b.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+    }
+
+    private static List<DogSize> ParseDogSizesFromColumn(string v)
+    {
+        if (string.IsNullOrWhiteSpace(v)) return new List<DogSize>();
+        var list = new List<DogSize>();
+        foreach (var part in v.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            if (Enum.TryParse<DogSize>(part, ignoreCase: true, out var e))
+                list.Add(e);
+        }
+        return list;
     }
 }

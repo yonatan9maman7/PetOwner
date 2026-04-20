@@ -1,5 +1,8 @@
 using System.Text;
+using System.Text.Json.Serialization;
+using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using NetTopologySuite.Geometries;
@@ -11,20 +14,31 @@ using PetOwner.Data.Models;
 
 var builder = WebApplication.CreateBuilder(args);
 
-const string developmentJwtFallback = "DevOnly_JwtKey_ChangeBeforeSharing_1234567890";
-const string developmentAdminPasswordFallback = "123123";
-
-if (builder.Environment.IsDevelopment() && string.IsNullOrWhiteSpace(builder.Configuration["Jwt:Key"]))
+if (string.IsNullOrWhiteSpace(builder.Configuration.GetConnectionString("DefaultConnection")))
 {
-    builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
+    var databaseUrl = Environment.GetEnvironmentVariable("DATABASE_URL");
+    if (!string.IsNullOrWhiteSpace(databaseUrl))
     {
-        ["Jwt:Key"] = developmentJwtFallback
-    });
+        builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["ConnectionStrings:DefaultConnection"] = databaseUrl
+        });
+    }
 }
 
-builder.Services.AddControllers();
-builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+const string developmentAdminPasswordFallback = "123123";
+
+builder.Services.AddControllers()
+    .AddJsonOptions(o =>
+    {
+        o.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
+    });
+if (builder.Environment.IsDevelopment())
+{
+    builder.Services.AddEndpointsApiExplorer();
+    builder.Services.AddSwaggerGen();
+}
+
 builder.Services.AddProblemDetails();
 builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
 
@@ -47,11 +61,36 @@ else
 
 builder.Services.AddCors(options =>
 {
-    options.AddDefaultPolicy(policy =>
-        policy.SetIsOriginAllowed(_ => true)
-              .AllowAnyMethod()
-              .AllowAnyHeader()
-              .AllowCredentials());
+    if (builder.Environment.IsDevelopment())
+    {
+        options.AddDefaultPolicy(policy =>
+            policy.SetIsOriginAllowed(_ => true)
+                  .AllowAnyMethod()
+                  .AllowAnyHeader()
+                  .AllowCredentials());
+    }
+    else
+    {
+        var origins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>()
+            ?? Array.Empty<string>();
+        var allowed = origins
+            .Select(o => o.Trim())
+            .Where(o => o.Length > 0)
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
+        if (allowed.Length == 0)
+        {
+            throw new InvalidOperationException(
+                "Cors:AllowedOrigins must list at least one origin when ASPNETCORE_ENVIRONMENT is not Development. " +
+                "Set Cors:AllowedOrigins in configuration (e.g. appsettings or environment variables).");
+        }
+
+        options.AddDefaultPolicy(policy =>
+            policy.WithOrigins(allowed)
+                  .AllowAnyMethod()
+                  .AllowAnyHeader()
+                  .AllowCredentials());
+    }
 });
 
 var jwtKey = builder.Configuration["Jwt:Key"];
@@ -91,6 +130,26 @@ builder.Services.AddAuthentication(options =>
 });
 
 builder.Services.AddAuthorization();
+
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    options.AddPolicy("AuthPolicy", context =>
+    {
+        var ip = context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+        return RateLimitPartition.GetFixedWindowLimiter(
+            ip,
+            _ => new FixedWindowRateLimiterOptions
+            {
+                AutoReplenishment = true,
+                PermitLimit = 5,
+                Window = TimeSpan.FromMinutes(1),
+                QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                QueueLimit = 0,
+            });
+    });
+});
+
 builder.Services.AddSingleton<ITokenService, TokenService>();
 builder.Services.AddScoped<IMapService, MapService>();
 builder.Services.AddScoped<DatabaseSeeder>();
@@ -99,7 +158,12 @@ builder.Services.AddHostedService<VaccinationReminderService>();
 
 builder.Services.Configure<StripeSettings>(builder.Configuration.GetSection(StripeSettings.SectionName));
 builder.Services.AddScoped<IPaymentService, StripePaymentService>();
-builder.Services.AddScoped<IGrowPaymentService, DummyGrowPaymentService>();
+
+builder.Services.Configure<GrowSettings>(builder.Configuration.GetSection(GrowSettings.SectionName));
+builder.Services.AddHttpClient<IGrowPaymentService, GrowPaymentService>(client =>
+{
+    client.Timeout = TimeSpan.FromSeconds(60);
+});
 
 builder.Services.Configure<BlobStorageSettings>(builder.Configuration.GetSection(BlobStorageSettings.SectionName));
 builder.Services.AddScoped<IBlobService, BlobService>();
@@ -111,6 +175,14 @@ builder.Services.AddScoped<IEmailService, SmtpEmailService>();
 
 builder.Services.AddSignalR();
 builder.Services.AddScoped<INotificationService, NotificationService>();
+builder.Services.AddScoped<IAchievementService, AchievementService>();
+builder.Services.AddHttpClient<IExpoPushService, ExpoPushService>(client =>
+{
+    client.BaseAddress = new Uri("https://exp.host");
+    client.Timeout = TimeSpan.FromSeconds(15);
+    client.DefaultRequestHeaders.Add("Accept", "application/json");
+    client.DefaultRequestHeaders.Add("Accept-Encoding", "gzip, deflate");
+});
 
 var app = builder.Build();
 
@@ -119,7 +191,8 @@ using (var scope = app.Services.CreateScope())
     var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
     if (app.Environment.IsDevelopment())
         db.Database.EnsureCreated();
-    // Production/non-dev: migrations are applied manually (`dotnet ef database update`), not at startup.
+    else if (app.Environment.IsProduction())
+        db.Database.Migrate();
 
     if (app.Environment.IsDevelopment())
     {
@@ -133,12 +206,16 @@ using (var scope = app.Services.CreateScope())
     }
 }
 
-app.UseSwagger();
-app.UseSwaggerUI();
+if (app.Environment.IsDevelopment())
+{
+    app.UseSwagger();
+    app.UseSwaggerUI();
+}
 
 app.UseExceptionHandler();
 
 app.UseRouting();
+app.UseRateLimiter();
 app.UseCors();
 app.UseAuthentication();
 app.UseAuthorization();

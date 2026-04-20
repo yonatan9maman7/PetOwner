@@ -12,6 +12,7 @@ import {
   Share,
   StyleSheet,
 } from "react-native";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import {
@@ -24,7 +25,12 @@ import { useAuthStore } from "../../store/authStore";
 import { useFavoritesStore } from "../../store/favoritesStore";
 import { useTheme } from "../../theme/ThemeContext";
 import { mapApi } from "../../api/client";
-import type { ProviderPublicProfileDto } from "../../types/api";
+import type { DogSize, ProviderPublicProfileDto } from "../../types/api";
+import {
+  DOG_ICON_SIZES,
+  DOG_SIZE_LABEL_KEYS,
+  DOG_SIZE_ORDER,
+} from "../../features/provider-onboarding/dogSizeConstants";
 import { ReviewCard } from "./components/ReviewCard";
 
 const DAY_KEYS = ["daySun", "dayMon", "dayTue", "dayWed", "dayThu", "dayFri", "daySat"] as const;
@@ -335,6 +341,18 @@ export function ProviderProfileScreen() {
   const today = new Date().getDay();
   const hasHours = Object.keys(groupedSlots).length > 0 || profile.openingHours;
 
+  const offersDogWalkingOrBoarding = profile.services.some(
+    (s) => s.includes("Dog Walking") || s.includes("Boarding"),
+  );
+  const orderedSizes = (profile.acceptedDogSizes ?? []).filter((x): x is DogSize =>
+    DOG_SIZE_ORDER.includes(x as DogSize),
+  ).sort(
+    (a, b) => DOG_SIZE_ORDER.indexOf(a) - DOG_SIZE_ORDER.indexOf(b),
+  );
+  const showDogPrefsBlock =
+    offersDogWalkingOrBoarding &&
+    (orderedSizes.length > 0 || profile.maxDogsCapacity != null);
+
   /* ─── Render ─── */
   return (
     <View style={[s.flex, { backgroundColor: colors.background }]}>
@@ -516,6 +534,81 @@ export function ProviderProfileScreen() {
                       </Text>
                     </View>
                   ))}
+                </View>
+              )}
+            </View>
+          )}
+
+          {/* ── Accepted sizes & capacity (dog walking / boarding) ── */}
+          {showDogPrefsBlock && (
+            <View
+              className="rounded-[20px] p-5 shadow-sm"
+              style={[
+                s.sectionCard,
+                {
+                  backgroundColor: colors.surface,
+                  shadowColor: colors.shadow,
+                },
+              ]}
+            >
+              <SectionHeader title={t("acceptedSizes")} />
+              {orderedSizes.length > 0 && (
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={{
+                    flexDirection: isRTL ? "row-reverse" : "row",
+                    gap: 12,
+                    paddingVertical: 4,
+                  }}
+                >
+                  {orderedSizes.map((id) => (
+                    <View
+                      key={id}
+                      className="items-center rounded-2xl border border-neutral-200/80 px-3 py-3"
+                      style={{
+                        borderColor: colors.borderLight,
+                        backgroundColor: colors.surfaceSecondary,
+                        minWidth: 80,
+                      }}
+                    >
+                      <MaterialCommunityIcons
+                        name="dog"
+                        size={DOG_ICON_SIZES[id]}
+                        color={colors.primary}
+                      />
+                      <Text
+                        className="mt-2 text-center text-[11px] font-semibold leading-tight"
+                        style={{ color: colors.textSecondary }}
+                        numberOfLines={3}
+                      >
+                        {t(DOG_SIZE_LABEL_KEYS[id])}
+                      </Text>
+                    </View>
+                  ))}
+                </ScrollView>
+              )}
+              {profile.maxDogsCapacity != null && (
+                <View
+                  className={`mt-4 flex-row items-center gap-2 rounded-xl px-3 py-2.5 ${
+                    isRTL ? "flex-row-reverse" : ""
+                  }`}
+                  style={{ backgroundColor: colors.surfaceSecondary }}
+                >
+                  <MaterialCommunityIcons
+                    name="paw"
+                    size={20}
+                    color={colors.primary}
+                  />
+                  <Text
+                    className="flex-1 text-sm font-bold"
+                    style={[rtlText, { color: colors.text }]}
+                  >
+                    {t("maxCapacityTakesUpTo").replace(
+                      "{{count}}",
+                      String(profile.maxDogsCapacity),
+                    )}
+                  </Text>
                 </View>
               )}
             </View>

@@ -1,20 +1,21 @@
-import { useState } from "react";
-import { View, Text, TextInput, Pressable, ScrollView, Switch } from "react-native";
+import { useState, useEffect } from "react";
+import {
+  View,
+  Text,
+  TextInput,
+  Pressable,
+  ScrollView,
+  Switch,
+  Platform,
+  Modal,
+} from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useFormContext } from "react-hook-form";
 import { useTranslation } from "../../i18n";
 import { useTheme } from "../../theme/ThemeContext";
-import { SERVICES, DAY_KEYS } from "./constants";
+import { servicesForOnboarding, DAY_FULL_KEYS } from "./constants";
+import { FieldLabel } from "./FieldLabel";
 import type { OnboardingFormValues } from "./schemas";
-
-const TIME_OPTIONS = [
-  "06:00", "06:30", "07:00", "07:30", "08:00", "08:30",
-  "09:00", "09:30", "10:00", "10:30", "11:00", "11:30",
-  "12:00", "12:30", "13:00", "13:30", "14:00", "14:30",
-  "15:00", "15:30", "16:00", "16:30", "17:00", "17:30",
-  "18:00", "18:30", "19:00", "19:30", "20:00", "20:30",
-  "21:00", "21:30", "22:00",
-];
 
 type Slot = { dayOfWeek: number; startTime: string; endTime: string };
 
@@ -44,6 +45,29 @@ const PRESETS: Preset[] = [
   },
 ];
 
+function parseHHMM(hhmm: string): Date {
+  const d = new Date();
+  if (hhmm) {
+    const [h, m] = hhmm.split(":").map(Number);
+    if (!Number.isNaN(h) && !Number.isNaN(m)) {
+      d.setHours(h, m, 0, 0);
+      return d;
+    }
+  }
+  d.setSeconds(0, 0);
+  return d;
+}
+
+function toHHMM(d: Date): string {
+  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+}
+
+function sortSlotsForDisplay(slots: Slot[]): Slot[] {
+  return [...slots].sort((a, b) =>
+    a.dayOfWeek !== b.dayOfWeek ? a.dayOfWeek - b.dayOfWeek : a.startTime.localeCompare(b.startTime),
+  );
+}
+
 export function AvailabilityReviewStep() {
   const { t, isRTL } = useTranslation();
   const { colors } = useTheme();
@@ -65,26 +89,25 @@ export function AvailabilityReviewStep() {
 
   const isBusiness = providerType === 1;
 
-  const [addingDay, setAddingDay] = useState<number | null>(null);
-  const [newStart, setNewStart] = useState("09:00");
-  const [newEnd, setNewEnd] = useState("17:00");
-
-  const addSlot = () => {
-    if (addingDay === null) return;
-    setValue("availabilitySlots", [
-      ...slots,
-      { dayOfWeek: addingDay, startTime: newStart, endTime: newEnd },
-    ]);
-    setAddingDay(null);
-    setNewStart("09:00");
-    setNewEnd("17:00");
-  };
-
   const removeSlot = (idx: number) => {
     setValue("availabilitySlots", slots.filter((_, i) => i !== idx));
   };
 
-  const enabledServices = SERVICES.filter((svc) => services[String(svc.serviceType)]?.enabled);
+  const updateSlot = (idx: number, patch: Partial<Slot>) => {
+    const next = slots.map((s, i) => (i === idx ? { ...s, ...patch } : s));
+    setValue("availabilitySlots", next);
+  };
+
+  const addShiftForDay = (dayOfWeek: number) => {
+    setValue("availabilitySlots", [
+      ...slots,
+      { dayOfWeek, startTime: "09:00", endTime: "17:00" },
+    ]);
+  };
+
+  const enabledServices = servicesForOnboarding(providerType).filter((svc) => services[String(svc.serviceType)]?.enabled);
+
+  const summarySlots = sortSlotsForDisplay(slots);
 
   return (
     <ScrollView
@@ -92,7 +115,6 @@ export function AvailabilityReviewStep() {
       keyboardShouldPersistTaps="handled"
       showsVerticalScrollIndicator={false}
     >
-      {/* Availability */}
       <View>
         <Text style={{ fontSize: 22, fontWeight: "800", color: colors.text, textAlign: isRTL ? "right" : "left" }}>
           {t("weeklyAvailability")}
@@ -102,7 +124,6 @@ export function AvailabilityReviewStep() {
         </Text>
       </View>
 
-      {/* Quick-fill Presets */}
       <View style={{ gap: 8 }}>
         <Text style={{ fontSize: 13, fontWeight: "700", color: colors.text, textAlign: isRTL ? "right" : "left" }}>
           {t("onbQuickFill")}
@@ -135,103 +156,111 @@ export function AvailabilityReviewStep() {
         })}
       </View>
 
-      {/* Or customize per-day */}
       <Text style={{ fontSize: 13, fontWeight: "700", color: colors.text, textAlign: isRTL ? "right" : "left" }}>
         {t("onbCustomSchedule")}
       </Text>
 
-      {/* Day Buttons */}
-      <View style={{ flexDirection: isRTL ? "row-reverse" : "row", gap: 6, flexWrap: "wrap" }}>
-        {DAY_KEYS.map((dayKey, dayIdx) => {
-          const hasSlots = slots.some((s) => s.dayOfWeek === dayIdx);
+      <View style={{ gap: 14 }}>
+        {DAY_FULL_KEYS.map((dayKey, dayIdx) => {
+          const daySlots = slots
+            .map((s, slotIdx) => ({ s, slotIdx }))
+            .filter((x) => x.s.dayOfWeek === dayIdx);
+
           return (
-            <Pressable
+            <View
               key={dayIdx}
-              onPress={() => setAddingDay(addingDay === dayIdx ? null : dayIdx)}
               style={{
-                width: 42,
-                height: 42,
+                backgroundColor: colors.surface,
                 borderRadius: 12,
-                alignItems: "center",
-                justifyContent: "center",
-                backgroundColor: addingDay === dayIdx ? colors.primary : hasSlots ? colors.primaryLight : colors.surfaceSecondary,
+                padding: 12,
                 borderWidth: 1,
-                borderColor: addingDay === dayIdx ? colors.primary : hasSlots ? colors.primaryLight : colors.border,
+                borderColor: colors.border,
               }}
             >
-              <Text style={{ fontSize: 13, fontWeight: "700", color: addingDay === dayIdx ? "#fff" : colors.text }}>
-                {t(dayKey)}
-              </Text>
-            </Pressable>
+              <View style={{ flexDirection: isRTL ? "row-reverse" : "row", alignItems: "flex-start", gap: 10 }}>
+                <Text
+                  style={{
+                    width: 108,
+                    flexShrink: 0,
+                    fontSize: 14,
+                    fontWeight: "700",
+                    color: colors.text,
+                    textAlign: isRTL ? "right" : "left",
+                  }}
+                  numberOfLines={2}
+                >
+                  {t(dayKey)}
+                </Text>
+                <View style={{ flex: 1, gap: 10, minWidth: 0 }}>
+                  {daySlots.length === 0 ? (
+                    <View
+                      style={{
+                        flexDirection: isRTL ? "row-reverse" : "row",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        flexWrap: "wrap",
+                        gap: 8,
+                      }}
+                    >
+                      <Text style={{ fontSize: 13, color: colors.textMuted }}>{t("onbUnavailable")}</Text>
+                      <Pressable
+                        onPress={() => addShiftForDay(dayIdx)}
+                        style={{
+                          flexDirection: isRTL ? "row-reverse" : "row",
+                          alignItems: "center",
+                          gap: 4,
+                          paddingVertical: 6,
+                          paddingHorizontal: 10,
+                          borderRadius: 8,
+                          backgroundColor: colors.primaryLight,
+                        }}
+                      >
+                        <Ionicons name="add-circle-outline" size={18} color={colors.primary} />
+                        <Text style={{ fontSize: 13, fontWeight: "600", color: colors.primary }}>{t("onbAddHours")}</Text>
+                      </Pressable>
+                    </View>
+                  ) : (
+                    <>
+                      {daySlots.map(({ s, slotIdx }, rowIdx) => (
+                        <View
+                          key={`${slotIdx}-${rowIdx}`}
+                          style={{
+                            flexDirection: isRTL ? "row-reverse" : "row",
+                            alignItems: "center",
+                            flexWrap: "wrap",
+                            gap: 8,
+                          }}
+                        >
+                          <CompactTimeChip value={s.startTime} onChange={(v) => updateSlot(slotIdx, { startTime: v })} isRTL={isRTL} />
+                          <Text style={{ fontSize: 15, color: colors.textMuted }}>–</Text>
+                          <CompactTimeChip value={s.endTime} onChange={(v) => updateSlot(slotIdx, { endTime: v })} isRTL={isRTL} />
+                          <Pressable onPress={() => removeSlot(slotIdx)} hitSlop={8}>
+                            <Ionicons name="close-circle" size={22} color={colors.danger} />
+                          </Pressable>
+                          {rowIdx === daySlots.length - 1 ? (
+                            <Pressable
+                              onPress={() => addShiftForDay(dayIdx)}
+                              hitSlop={8}
+                              style={{
+                                flexDirection: isRTL ? "row-reverse" : "row",
+                                alignItems: "center",
+                                padding: 4,
+                              }}
+                            >
+                              <Ionicons name="add-circle" size={24} color={colors.primary} />
+                            </Pressable>
+                          ) : null}
+                        </View>
+                      ))}
+                    </>
+                  )}
+                </View>
+              </View>
+            </View>
           );
         })}
       </View>
 
-      {/* Add Slot Panel */}
-      {addingDay !== null && (
-        <View style={{ backgroundColor: colors.surface, borderRadius: 14, padding: 14, borderWidth: 1, borderColor: colors.border }}>
-          <Text style={{ fontSize: 13, fontWeight: "700", color: colors.text, marginBottom: 10, textAlign: isRTL ? "right" : "left" }}>
-            {t(DAY_KEYS[addingDay])}
-          </Text>
-          <View style={{ flexDirection: "row", gap: 12, alignItems: "center" }}>
-            <View style={{ flex: 1 }}>
-              <Text style={{ fontSize: 11, color: colors.textSecondary, marginBottom: 2 }}>{t("onbSlotStart")}</Text>
-              <TimePicker value={newStart} onChange={setNewStart} />
-            </View>
-            <Text style={{ fontSize: 18, color: colors.textMuted, marginTop: 14 }}>→</Text>
-            <View style={{ flex: 1 }}>
-              <Text style={{ fontSize: 11, color: colors.textSecondary, marginBottom: 2 }}>{t("onbSlotEnd")}</Text>
-              <TimePicker value={newEnd} onChange={setNewEnd} />
-            </View>
-          </View>
-          <Pressable
-            onPress={addSlot}
-            style={{
-              marginTop: 10,
-              backgroundColor: colors.primary,
-              borderRadius: 10,
-              paddingVertical: 10,
-              alignItems: "center",
-            }}
-          >
-            <Text style={{ color: "#fff", fontWeight: "700", fontSize: 14 }}>{t("onbAddSlot")}</Text>
-          </Pressable>
-        </View>
-      )}
-
-      {/* Existing Slots */}
-      {slots.length > 0 && (
-        <View style={{ gap: 6 }}>
-          {slots.map((slot, idx) => (
-            <View
-              key={idx}
-              style={{
-                flexDirection: isRTL ? "row-reverse" : "row",
-                alignItems: "center",
-                backgroundColor: colors.surface,
-                borderRadius: 10,
-                paddingHorizontal: 14,
-                paddingVertical: 10,
-                borderWidth: 1,
-                borderColor: colors.border,
-                gap: 8,
-              }}
-            >
-              <View style={{ width: 28, height: 28, borderRadius: 8, backgroundColor: colors.primaryLight, alignItems: "center", justifyContent: "center" }}>
-                <Text style={{ fontSize: 11, fontWeight: "700", color: colors.text }}>{t(DAY_KEYS[slot.dayOfWeek])}</Text>
-              </View>
-              <Text style={{ flex: 1, fontSize: 14, color: colors.text }}>
-                {slot.startTime} – {slot.endTime}
-              </Text>
-              <Pressable onPress={() => removeSlot(idx)} hitSlop={8}>
-                <Ionicons name="close-circle" size={20} color={colors.danger} />
-              </Pressable>
-            </View>
-          ))}
-        </View>
-      )}
-
-      {/* Special Offers (Business only) */}
       {isBusiness && (
         <View>
           <Text style={{ fontSize: 16, fontWeight: "700", color: colors.text, marginBottom: 8, textAlign: isRTL ? "right" : "left" }}>
@@ -262,7 +291,6 @@ export function AvailabilityReviewStep() {
         </View>
       )}
 
-      {/* Emergency Toggle */}
       <View
         style={{
           flexDirection: isRTL ? "row-reverse" : "row",
@@ -286,10 +314,10 @@ export function AvailabilityReviewStep() {
         />
       </View>
 
-      {/* References with explanation */}
       <View>
         <Text style={{ fontSize: 16, fontWeight: "700", color: colors.text, marginBottom: 4, textAlign: isRTL ? "right" : "left" }}>
-          {t("reference")} *
+          {t("reference")}
+          <Text style={{ color: colors.danger }}> *</Text>
         </Text>
         <View
           style={{
@@ -309,13 +337,15 @@ export function AvailabilityReviewStep() {
         </View>
         <View style={{ gap: 10 }}>
           <SmallInput
-            label={`${t("onbReferenceName")} *`}
+            label={t("onbReferenceName")}
+            required
             value={referenceName}
             onChangeText={(v) => setValue("referenceName", v)}
             isRTL={isRTL}
           />
           <SmallInput
-            label={`${t("onbReferenceContact")} *`}
+            label={t("onbReferenceContact")}
+            required
             value={referenceContact}
             onChangeText={(v) => { setValue("referenceContact", v); clearErrors("referenceContact"); }}
             isRTL={isRTL}
@@ -325,7 +355,6 @@ export function AvailabilityReviewStep() {
         </View>
       </View>
 
-      {/* Summary */}
       <View style={{ borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 16 }}>
         <Text style={{ fontSize: 18, fontWeight: "800", color: colors.text, marginBottom: 12, textAlign: isRTL ? "right" : "left" }}>
           {t("onbSummary")}
@@ -333,11 +362,14 @@ export function AvailabilityReviewStep() {
 
         <SummaryRow label={t("onbProviderType")} value={isBusiness ? `${t("onbBusiness")} — ${businessName}` : t("onbIndividual")} isRTL={isRTL} />
         {imageUrl ? <SummaryRow label={t("profilePicture")} value="✓" isRTL={isRTL} /> : null}
-        <SummaryRow label={t("bioTitle")} value={bio.slice(0, 60) + (bio.length > 60 ? "…" : "")} isRTL={isRTL} />
+        <SummaryRow
+          label={isBusiness ? t("bioTitleBusiness") : t("bioTitle")}
+          value={bio.slice(0, 60) + (bio.length > 60 ? "…" : "")}
+          isRTL={isRTL}
+        />
         <SummaryRow label={t("phoneNumber")} value={phoneNumber} isRTL={isRTL} />
         <SummaryRow label={t("onbAddress")} value={`${street} ${buildingNumber}, ${city}`} isRTL={isRTL} />
 
-        {/* Services summary (Individual only) */}
         {!isBusiness && enabledServices.length > 0 && (
           <>
             <Text style={{ fontSize: 14, fontWeight: "700", color: colors.text, marginTop: 10, marginBottom: 4, textAlign: isRTL ? "right" : "left" }}>
@@ -356,7 +388,6 @@ export function AvailabilityReviewStep() {
           </>
         )}
 
-        {/* Special offers summary (Business only) */}
         {isBusiness && specialOffers.trim().length > 0 && (
           <SummaryRow
             label={t("onbSpecialOffers")}
@@ -365,14 +396,14 @@ export function AvailabilityReviewStep() {
           />
         )}
 
-        {slots.length > 0 && (
+        {summarySlots.length > 0 && (
           <>
             <Text style={{ fontSize: 14, fontWeight: "700", color: colors.text, marginTop: 10, marginBottom: 4, textAlign: isRTL ? "right" : "left" }}>
               {t("weeklyAvailability")}:
             </Text>
-            {slots.map((s, i) => (
-              <Text key={i} style={{ fontSize: 13, color: colors.textSecondary, marginStart: 8, textAlign: isRTL ? "right" : "left" }}>
-                • {t(DAY_KEYS[s.dayOfWeek])} {s.startTime}–{s.endTime}
+            {summarySlots.map((s, i) => (
+              <Text key={`${s.dayOfWeek}-${i}-${s.startTime}`} style={{ fontSize: 13, color: colors.textSecondary, marginStart: 8, textAlign: isRTL ? "right" : "left" }}>
+                • {t(DAY_FULL_KEYS[s.dayOfWeek])} {s.startTime}–{s.endTime}
               </Text>
             ))}
           </>
@@ -399,6 +430,7 @@ function SmallInput({
   isRTL,
   keyboardType,
   errorMessage,
+  required,
 }: {
   label: string;
   value: string;
@@ -406,14 +438,13 @@ function SmallInput({
   isRTL: boolean;
   keyboardType?: "default" | "phone-pad";
   errorMessage?: string;
+  required?: boolean;
 }) {
   const { colors } = useTheme();
   const hasError = !!errorMessage;
   return (
     <View>
-      <Text style={{ fontSize: 12, fontWeight: "600", color: colors.text, marginBottom: 4, textAlign: isRTL ? "right" : "left" }}>
-        {label}
-      </Text>
+      <FieldLabel text={label} isRTL={isRTL} required={required} variant="small" />
       <TextInput
         value={value}
         onChangeText={onChangeText}
@@ -440,28 +471,124 @@ function SmallInput({
   );
 }
 
-function TimePicker({ value, onChange }: { value: string; onChange: (v: string) => void }) {
-  const { colors } = useTheme();
+function CompactTimeChip({
+  value,
+  onChange,
+  isRTL,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  isRTL: boolean;
+}) {
+  const { colors, isDark } = useTheme();
+  const [show, setShow] = useState(false);
+  const [draft, setDraft] = useState(() => parseHHMM(value));
+
+  useEffect(() => {
+    if (!show) setDraft(parseHHMM(value));
+  }, [value, show]);
+
+  const display = value || "--:--";
+
+  if (Platform.OS === "web") {
+    return (
+      <TextInput
+        value={value}
+        onChangeText={onChange}
+        placeholder="09:00"
+        placeholderTextColor={colors.textMuted}
+        style={{
+          borderWidth: 1,
+          borderColor: colors.border,
+          borderRadius: 8,
+          paddingHorizontal: 10,
+          paddingVertical: 8,
+          backgroundColor: colors.surfaceSecondary,
+          minWidth: 72,
+          fontSize: 14,
+          fontWeight: "600",
+          color: colors.text,
+          textAlign: "center",
+        }}
+      />
+    );
+  }
+
+  const DateTimePicker = require("@react-native-community/datetimepicker").default;
+
   return (
-    <ScrollView
-      horizontal
-      showsHorizontalScrollIndicator={false}
-      contentContainerStyle={{ gap: 4, paddingVertical: 2 }}
-    >
-      {TIME_OPTIONS.map((t) => (
-        <Pressable
-          key={t}
-          onPress={() => onChange(t)}
-          style={{
-            paddingHorizontal: 10,
-            paddingVertical: 6,
-            borderRadius: 8,
-            backgroundColor: t === value ? colors.primary : colors.surfaceSecondary,
+    <>
+      <Pressable
+        onPress={() => {
+          setDraft(parseHHMM(value));
+          setShow(true);
+        }}
+        style={{
+          borderWidth: 1,
+          borderColor: colors.border,
+          borderRadius: 8,
+          paddingHorizontal: 12,
+          paddingVertical: 8,
+          backgroundColor: colors.surfaceSecondary,
+          minWidth: 72,
+        }}
+      >
+        <Text style={{ fontSize: 14, fontWeight: "600", color: colors.text, textAlign: "center" }}>{display}</Text>
+      </Pressable>
+
+      {show && Platform.OS === "ios" && (
+        <Modal transparent animationType="slide" onRequestClose={() => setShow(false)}>
+          <View style={{ flex: 1, justifyContent: "flex-end" }}>
+            <Pressable style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.4)" }} onPress={() => setShow(false)} />
+            <View
+              style={{
+                backgroundColor: colors.surface,
+                borderTopLeftRadius: 16,
+                borderTopRightRadius: 16,
+                paddingBottom: 28,
+              }}
+            >
+              <View style={{ flexDirection: isRTL ? "row-reverse" : "row", justifyContent: "flex-end", padding: 12 }}>
+                <Pressable
+                  onPress={() => {
+                    onChange(toHHMM(draft));
+                    setShow(false);
+                  }}
+                >
+                  <Text style={{ fontSize: 16, fontWeight: "600", color: "#007AFF" }}>Done</Text>
+                </Pressable>
+              </View>
+              <View style={{ alignItems: "center", minHeight: 216 }}>
+                <DateTimePicker
+                  value={draft}
+                  mode="time"
+                  display="spinner"
+                  is24Hour
+                  themeVariant={isDark ? "dark" : "light"}
+                  style={{ height: 216, width: "100%" }}
+                  onChange={(_: unknown, d?: Date) => {
+                    if (d) setDraft(d);
+                  }}
+                />
+              </View>
+            </View>
+          </View>
+        </Modal>
+      )}
+
+      {show && Platform.OS === "android" && (
+        <DateTimePicker
+          value={parseHHMM(value)}
+          mode="time"
+          display="default"
+          is24Hour
+          onChange={(ev: { type: string }, d?: Date) => {
+            setShow(false);
+            if (ev.type === "set" && d) onChange(toHHMM(d));
           }}
-        >
-          <Text style={{ fontSize: 12, fontWeight: "600", color: t === value ? "#fff" : colors.text }}>{t}</Text>
-        </Pressable>
-      ))}
-    </ScrollView>
+        />
+      )}
+    </>
   );
 }
+

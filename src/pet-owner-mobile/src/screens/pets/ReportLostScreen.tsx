@@ -32,21 +32,13 @@ import { useTranslation } from "../../i18n";
 import { useTheme } from "../../theme/ThemeContext";
 import { PetSpecies } from "../../types/api";
 import type { PetDto } from "../../types/api";
+import { getSpeciesEmoji } from "./MyPets/constants";
 
 const TEL_AVIV = {
   latitude: 32.0853,
   longitude: 34.7818,
   latitudeDelta: 0.035,
   longitudeDelta: 0.035,
-};
-
-const speciesEmoji: Record<number, string> = {
-  [PetSpecies.Dog]: "🐕",
-  [PetSpecies.Cat]: "🐈",
-  [PetSpecies.Bird]: "🐦",
-  [PetSpecies.Rabbit]: "🐇",
-  [PetSpecies.Reptile]: "🦎",
-  [PetSpecies.Other]: "🐾",
 };
 
 interface NominatimResult {
@@ -444,7 +436,7 @@ export function ReportLostScreen() {
                     }}
                   >
                     <Text style={{ fontSize: 18 }}>
-                      {speciesEmoji[pet.species] ?? "🐾"}
+                      {getSpeciesEmoji(pet.species)}
                     </Text>
                     <Text
                       style={{

@@ -693,25 +693,11 @@ export class RequestsComponent implements OnInit {
     const req = this.reviewingRequest();
     if (!req || this.reviewRating() === 0) return;
 
-    this.submittingReview.set(true);
-
-    this.reviewService.createForServiceRequest({
-      requestId: req.id,
-      rating: this.reviewRating(),
-      comment: this.reviewCommentValue.trim(),
-      communicationRating: this.communicationRating() || null,
-      reliabilityRating: this.reliabilityRating() || null,
-    }).subscribe({
-      next: () => {
-        this.submittingReview.set(false);
-        this.closeReviewModal();
-        this.toast.success('Review submitted! Thanks for your feedback.');
-        this.loadRequests();
-      },
-      error: () => {
-        this.submittingReview.set(false);
-      },
-    });
+    this.submittingReview.set(false);
+    this.closeReviewModal();
+    this.toast.warning(
+      'Reviews for legacy service requests are no longer supported. Complete a booking to review your provider.',
+    );
   }
 
   viewMedicalRecords(bookingId: string): void {

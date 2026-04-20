@@ -1,5 +1,7 @@
 import { View, Text } from "react-native";
 import type { PetDto } from "../../../../types/api";
+import { useTranslation, type TranslationKey } from "../../../../i18n";
+import { ALLERGY_LABEL_I18N } from "../../addPetHelpers";
 
 interface PetAllergyChipsProps {
   pet: PetDto;
@@ -8,7 +10,22 @@ interface PetAllergyChipsProps {
   borderLight: string;
 }
 
+function formatAllergySegment(
+  raw: string,
+  t: (key: TranslationKey) => string,
+): string {
+  const s = raw.trim();
+  if (!s) return s;
+  const key = ALLERGY_LABEL_I18N[s] ?? ALLERGY_LABEL_I18N[s.replace(/\s+/g, " ")];
+  if (key) return t(key);
+  for (const [label, k] of Object.entries(ALLERGY_LABEL_I18N)) {
+    if (label.toLowerCase() === s.toLowerCase()) return t(k);
+  }
+  return s;
+}
+
 export function PetAllergyChips({ pet, isRTL, surfaceColor, borderLight }: PetAllergyChipsProps) {
+  const { t } = useTranslation();
   if (!pet.allergies && !pet.medicalConditions) return null;
 
   return (
@@ -34,7 +51,9 @@ export function PetAllergyChips({ pet, isRTL, surfaceColor, borderLight }: PetAl
             borderRadius: 8,
           }}
         >
-          <Text style={{ fontSize: 11, fontWeight: "600", color: "#dc2626" }}>⚠ {a.trim()}</Text>
+          <Text style={{ fontSize: 11, fontWeight: "600", color: "#dc2626" }}>
+            ⚠ {formatAllergySegment(a, t)}
+          </Text>
         </View>
       ))}
       {pet.medicalConditions?.split(",").map((c, i) => (

@@ -14,6 +14,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
+import axios from "axios";
 import { adminApi } from "../../api/client";
 import { useTranslation } from "../../i18n";
 import { useTheme } from "../../theme/ThemeContext";
@@ -321,8 +322,15 @@ export function AdminDashboardScreen() {
       await adminApi.approveProvider(userId);
       setPending((prev) => prev.filter((p) => p.userId !== userId));
       await loadStats();
-    } catch {
-      Alert.alert("Error", "Failed to approve");
+    } catch (e: unknown) {
+      const msg =
+        axios.isAxiosError(e) && e.response?.data
+          ? String(
+              (e.response.data as { message?: string }).message ??
+                JSON.stringify(e.response.data),
+            )
+          : "Failed to approve";
+      Alert.alert("Error", msg);
     }
     setActionLoading(null);
   };

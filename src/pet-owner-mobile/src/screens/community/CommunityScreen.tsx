@@ -1,4 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from "react";
+import axios from "axios";
 import {
   View,
   Text,
@@ -9,7 +10,9 @@ import {
   StyleSheet,
   Modal,
   RefreshControl,
+  Image,
 } from "react-native";
+import * as ImagePicker from "expo-image-picker";
 import { FlashList } from "@shopify/flash-list";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -20,12 +23,15 @@ import { useTheme } from "../../theme/ThemeContext";
 import { AuthPlaceholder } from "../../components/AuthPlaceholder";
 import { BrandedAppHeader } from "../../components/BrandedAppHeader";
 import { ListSkeleton, ListEmptyState } from "../../components/shared";
-import { postsApi, communityApi } from "../../api/client";
-import type { PostDto, CommentDto, CommunityGroupDto } from "../../types/api";
+import { ImageLightbox } from "../../components/ImageLightbox";
+import { CommentsBottomSheet } from "./CommentsBottomSheet";
+import { postsApi, communityApi, filesApi } from "../../api/client";
+import { PalsScreen } from "./pals/PalsScreen";
+import type { PostDto, CommunityGroupDto } from "../../types/api";
 
 const PAGE_SIZE = 20;
 
-type MainTab = "feed" | "groups";
+type MainTab = "feed" | "pals" | "groups";
 type Channel = "global" | "lost_and_found";
 
 function relativeTime(iso: string): string {
@@ -56,8 +62,9 @@ function PostCard({
   onDelete,
   rtlText,
   rtlRow,
-  rtlInput,
   t,
+  isLikePending,
+  isDeletePending,
 }: {
   post: PostDto;
   currentUserId: string | null;
@@ -65,45 +72,18 @@ function PostCard({
   onDelete: (id: string) => void;
   rtlText: object;
   rtlRow: object;
-  rtlInput: object;
+  rtlInput?: object;
   t: (k: any) => string;
+  isLikePending?: boolean;
+  isDeletePending?: boolean;
 }) {
   const { colors } = useTheme();
   const styles = getStyles(colors);
 
-  const [commentsOpen, setCommentsOpen] = useState(false);
-  const [comments, setComments] = useState<CommentDto[]>([]);
-  const [loadingComments, setLoadingComments] = useState(false);
-  const [commentText, setCommentText] = useState("");
-  const [submitting, setSubmitting] = useState(false);
-
-  const toggleComments = async () => {
-    if (commentsOpen) {
-      setCommentsOpen(false);
-      return;
-    }
-    setCommentsOpen(true);
-    setLoadingComments(true);
-    try {
-      setComments(await postsApi.getComments(post.id));
-    } catch {}
-    setLoadingComments(false);
-  };
-
-  const submitComment = async () => {
-    const content = commentText.trim();
-    if (!content || submitting) return;
-    setSubmitting(true);
-    try {
-      const newComment = await postsApi.addComment(post.id, { content });
-      setComments((prev) => [...prev, newComment]);
-      setCommentText("");
-      post.commentCount += 1;
-    } catch {}
-    setSubmitting(false);
-  };
-
   const isMine = currentUserId === post.userId;
+  const [lightboxOpen, setLightboxOpen] = useState(false);
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const [localCommentCount, setLocalCommentCount] = useState(post.commentCount);
 
   return (
     <View style={styles.card}>
@@ -130,6 +110,7 @@ function PostCard({
         </View>
         {isMine && (
           <Pressable
+            disabled={isDeletePending}
             onPress={() =>
               Alert.alert(t("deletePostConfirm"), "", [
                 { text: t("cancel"), style: "cancel" },
@@ -141,24 +122,39 @@ function PostCard({
               ])
             }
             hitSlop={8}
+            style={{ opacity: isDeletePending ? 0.45 : 1 }}
           >
             <Ionicons name="trash-outline" size={18} color={colors.textMuted} />
           </Pressable>
         )}
       </View>
 
-      <Text style={[styles.contentText, rtlText]}>{post.content}</Text>
+      {!!post.content && (
+        <Text style={[styles.contentText, rtlText]}>{post.content}</Text>
+      )}
 
       {post.imageUrl && (
-        <View style={styles.imagePlaceholder}>
-          <Ionicons name="image-outline" size={32} color={colors.textMuted} />
-        </View>
+        <>
+          <Pressable onPress={() => setLightboxOpen(true)}>
+            <Image
+              source={{ uri: post.imageUrl }}
+              style={styles.postImage}
+              resizeMode="cover"
+            />
+          </Pressable>
+          <ImageLightbox
+            visible={lightboxOpen}
+            imageUrl={post.imageUrl}
+            onClose={() => setLightboxOpen(false)}
+          />
+        </>
       )}
 
       <View style={[styles.actionBar, rtlRow]}>
         <Pressable
-          style={[styles.actionBtn, rtlRow]}
+          style={[styles.actionBtn, rtlRow, { opacity: isLikePending ? 0.5 : 1 }]}
           onPress={() => onToggleLike(post.id)}
+          disabled={isLikePending}
         >
           <Ionicons
             name={post.likedByMe ? "heart" : "heart-outline"}
@@ -174,74 +170,28 @@ function PostCard({
             {post.likeCount}
           </Text>
         </Pressable>
-        <Pressable style={[styles.actionBtn, rtlRow]} onPress={toggleComments}>
+        <Pressable
+          style={[styles.actionBtn, rtlRow]}
+          onPress={() => setSheetOpen(true)}
+        >
           <Ionicons
-            name={commentsOpen ? "chatbubble" : "chatbubble-outline"}
+            name="chatbubble-outline"
             size={18}
             color={colors.textSecondary}
           />
-          <Text style={styles.actionText}>{post.commentCount}</Text>
+          <Text style={styles.actionText}>{localCommentCount}</Text>
         </Pressable>
       </View>
 
-      {commentsOpen && (
-        <View style={styles.commentSection}>
-          {loadingComments ? (
-            <ActivityIndicator
-              size="small"
-              color={colors.text}
-              style={{ paddingVertical: 12 }}
-            />
-          ) : (
-            comments.map((c) => (
-              <View key={c.id} style={[styles.commentItem, rtlRow]}>
-                <View style={styles.commentAvatar}>
-                  <Text style={styles.commentAvatarText}>
-                    {initials(c.userName)}
-                  </Text>
-                </View>
-                <View style={{ flex: 1 }}>
-                  <View style={[styles.commentHeader, rtlRow]}>
-                    <Text style={[styles.commentAuthor, rtlText]}>
-                      {c.userName}
-                    </Text>
-                    <Text style={styles.commentTime}>
-                      {relativeTime(c.createdAt)}
-                    </Text>
-                  </View>
-                  <Text style={[styles.commentContent, rtlText]}>
-                    {c.content}
-                  </Text>
-                </View>
-              </View>
-            ))
-          )}
-          <View style={[styles.commentInputRow, rtlRow]}>
-            <TextInput
-              style={[styles.commentInput, rtlInput]}
-              placeholder={t("writeComment")}
-              placeholderTextColor={colors.textMuted}
-              value={commentText}
-              onChangeText={setCommentText}
-              editable={!submitting}
-            />
-            <Pressable
-              onPress={submitComment}
-              disabled={!commentText.trim() || submitting}
-              style={[
-                styles.commentSendBtn,
-                (!commentText.trim() || submitting) && { opacity: 0.4 },
-              ]}
-            >
-              {submitting ? (
-                <ActivityIndicator size="small" color={colors.textInverse} />
-              ) : (
-                <Ionicons name="send" size={16} color={colors.textInverse} />
-              )}
-            </Pressable>
-          </View>
-        </View>
-      )}
+      <CommentsBottomSheet
+        visible={sheetOpen}
+        onClose={() => setSheetOpen(false)}
+        postId={post.id}
+        postAuthorId={post.userId}
+        onCommentCountChange={(delta) => {
+          setLocalCommentCount((n) => Math.max(0, n + delta));
+        }}
+      />
     </View>
   );
 }
@@ -268,6 +218,8 @@ export function CommunityScreen() {
   const [composerOpen, setComposerOpen] = useState(false);
   const [newPostContent, setNewPostContent] = useState("");
   const [posting, setPosting] = useState(false);
+  const [pickedImageUri, setPickedImageUri] = useState<string | null>(null);
+  const [uploadingImage, setUploadingImage] = useState(false);
   const channelRef = useRef(channel);
   channelRef.current = channel;
 
@@ -283,6 +235,10 @@ export function CommunityScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [groupsRefreshing, setGroupsRefreshing] = useState(false);
   const composerInputRef = useRef<TextInput>(null);
+  const likeLockRef = useRef<Set<string>>(new Set());
+  const deleteLockRef = useRef<Set<string>>(new Set());
+  const [likeBusy, setLikeBusy] = useState<Record<string, boolean>>({});
+  const [deleteBusy, setDeleteBusy] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     if (!composerOpen) return;
@@ -301,10 +257,15 @@ export function CommunityScreen() {
         setPosts((prev) => (replace ? data : [...prev, ...data]));
         setHasMore(data.length >= PAGE_SIZE);
         setPage(p);
-      } catch {}
-      setLoading(false);
+      } catch (error) {
+        if (!(axios.isAxiosError(error) && error.response?.status === 401)) {
+          Alert.alert(t("genericErrorTitle"), t("genericErrorDesc"));
+        }
+      } finally {
+        setLoading(false);
+      }
     },
-    [],
+    [t],
   );
 
   const onRefreshFeed = useCallback(async () => {
@@ -317,23 +278,33 @@ export function CommunityScreen() {
     setGroupsLoading(true);
     try {
       setGroups(await communityApi.getGroups());
-    } catch {}
-    setGroupsLoading(false);
-  }, []);
+    } catch (error) {
+      if (!(axios.isAxiosError(error) && error.response?.status === 401)) {
+        Alert.alert(t("genericErrorTitle"), t("genericErrorDesc"));
+      }
+    } finally {
+      setGroupsLoading(false);
+    }
+  }, [t]);
 
   const onRefreshGroups = useCallback(async () => {
     setGroupsRefreshing(true);
     try {
       setGroups(await communityApi.getGroups());
-    } catch {}
-    setGroupsRefreshing(false);
-  }, []);
+    } catch (error) {
+      if (!(axios.isAxiosError(error) && error.response?.status === 401)) {
+        Alert.alert(t("genericErrorTitle"), t("genericErrorDesc"));
+      }
+    } finally {
+      setGroupsRefreshing(false);
+    }
+  }, [t]);
 
   useFocusEffect(
     useCallback(() => {
       if (!isLoggedIn) return;
       if (mainTab === "feed") loadFeed(1, channelRef.current, true);
-      else loadGroups();
+      else if (mainTab === "groups") loadGroups();
     }, [isLoggedIn, mainTab, loadFeed, loadGroups]),
   );
 
@@ -344,24 +315,38 @@ export function CommunityScreen() {
 
   const handlePublish = async () => {
     const content = newPostContent.trim();
-    if (!content || posting) return;
+    if ((!content && !pickedImageUri) || posting) return;
     setPosting(true);
     try {
+      let imageUrl: string | undefined;
+      if (pickedImageUri) {
+        setUploadingImage(true);
+        const up = await filesApi.uploadImage(pickedImageUri, "posts");
+        imageUrl = up.url;
+        setUploadingImage(false);
+      }
       const post = await postsApi.create({
         content,
+        imageUrl,
         category:
           channel === "lost_and_found" ? "lost_and_found" : undefined,
       } as any);
       setPosts((prev) => [post, ...prev]);
       setNewPostContent("");
+      setPickedImageUri(null);
       setComposerOpen(false);
     } catch {
       Alert.alert(t("errorTitle"), t("postError"));
+    } finally {
+      setUploadingImage(false);
+      setPosting(false);
     }
-    setPosting(false);
   };
 
-  const handleToggleLike = async (id: string) => {
+  const handleToggleLike = useCallback(async (id: string) => {
+    if (likeLockRef.current.has(id)) return;
+    likeLockRef.current.add(id);
+    setLikeBusy((p) => ({ ...p, [id]: true }));
     try {
       const result = await postsApi.toggleLike(id);
       setPosts((prev) =>
@@ -371,15 +356,40 @@ export function CommunityScreen() {
             : p,
         ),
       );
-    } catch {}
-  };
+    } catch (error) {
+      if (!(axios.isAxiosError(error) && error.response?.status === 401)) {
+        Alert.alert(t("genericErrorTitle"), t("genericErrorDesc"));
+      }
+    } finally {
+      likeLockRef.current.delete(id);
+      setLikeBusy((p) => {
+        const n = { ...p };
+        delete n[id];
+        return n;
+      });
+    }
+  }, [t]);
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = useCallback(async (id: string) => {
+    if (deleteLockRef.current.has(id)) return;
+    deleteLockRef.current.add(id);
+    setDeleteBusy((p) => ({ ...p, [id]: true }));
     try {
       await postsApi.deletePost(id);
       setPosts((prev) => prev.filter((p) => p.id !== id));
-    } catch {}
-  };
+    } catch (error) {
+      if (!(axios.isAxiosError(error) && error.response?.status === 401)) {
+        Alert.alert(t("genericErrorTitle"), t("genericErrorDesc"));
+      }
+    } finally {
+      deleteLockRef.current.delete(id);
+      setDeleteBusy((p) => {
+        const n = { ...p };
+        delete n[id];
+        return n;
+      });
+    }
+  }, [t]);
 
   const loadMore = () => {
     if (!loading && hasMore) loadFeed(page + 1, channel, false);
@@ -432,7 +442,7 @@ export function CommunityScreen() {
         gap: 10,
       }}
     >
-      {(["feed", "groups"] as MainTab[]).map((tab) => {
+      {(["feed", "pals", "groups"] as MainTab[]).map((tab) => {
         const active = mainTab === tab;
         return (
           <Pressable
@@ -455,7 +465,7 @@ export function CommunityScreen() {
                 color: active ? colors.textInverse : colors.textSecondary,
               }}
             >
-              {tab === "feed" ? t("globalFeed") : t("groupsTab")}
+              {tab === "feed" ? t("globalFeed") : tab === "pals" ? t("palsTab") : t("groupsTab")}
             </Text>
           </Pressable>
         );
@@ -511,8 +521,70 @@ export function CommunityScreen() {
               multiline
               value={newPostContent}
               onChangeText={setNewPostContent}
-              editable={!posting}
+              editable={!posting && !uploadingImage}
             />
+
+            {/* Image picker row */}
+            <View
+              style={{
+                flexDirection: isRTL ? "row-reverse" : "row",
+                alignItems: "center",
+                gap: 8,
+                marginTop: 10,
+              }}
+            >
+              <Pressable
+                disabled={posting || uploadingImage}
+                onPress={async () => {
+                  const perm = await ImagePicker.requestCameraPermissionsAsync();
+                  if (!perm.granted) return;
+                  const r = await ImagePicker.launchCameraAsync({
+                    allowsEditing: true,
+                    aspect: [4, 3],
+                    quality: 0.8,
+                  });
+                  if (!r.canceled) setPickedImageUri(r.assets[0].uri);
+                }}
+                style={styles.pickerIconBtn}
+              >
+                <Ionicons name="camera-outline" size={22} color={colors.textSecondary} />
+              </Pressable>
+              <Pressable
+                disabled={posting || uploadingImage}
+                onPress={async () => {
+                  const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+                  if (!perm.granted) return;
+                  const r = await ImagePicker.launchImageLibraryAsync({
+                    mediaTypes: ["images"],
+                    allowsEditing: true,
+                    aspect: [4, 3],
+                    quality: 0.8,
+                  });
+                  if (!r.canceled) setPickedImageUri(r.assets[0].uri);
+                }}
+                style={styles.pickerIconBtn}
+              >
+                <Ionicons name="image-outline" size={22} color={colors.textSecondary} />
+              </Pressable>
+            </View>
+
+            {/* Image thumbnail preview */}
+            {pickedImageUri && (
+              <View style={{ marginTop: 10 }}>
+                <Image
+                  source={{ uri: pickedImageUri }}
+                  style={styles.composerThumbnail}
+                  resizeMode="cover"
+                />
+                <Pressable
+                  onPress={() => setPickedImageUri(null)}
+                  style={styles.thumbnailRemoveBtn}
+                >
+                  <Ionicons name="close-circle" size={24} color="rgba(255,255,255,0.9)" />
+                </Pressable>
+              </View>
+            )}
+
             <View
               style={[
                 styles.composerActions,
@@ -523,6 +595,7 @@ export function CommunityScreen() {
                 onPress={() => {
                   setComposerOpen(false);
                   setNewPostContent("");
+                  setPickedImageUri(null);
                 }}
                 style={styles.composerCancel}
               >
@@ -530,13 +603,13 @@ export function CommunityScreen() {
               </Pressable>
               <Pressable
                 onPress={handlePublish}
-                disabled={!newPostContent.trim() || posting}
+                disabled={(!newPostContent.trim() && !pickedImageUri) || posting || uploadingImage}
                 style={[
                   styles.publishBtn,
-                  (!newPostContent.trim() || posting) && { opacity: 0.5 },
+                  ((!newPostContent.trim() && !pickedImageUri) || posting || uploadingImage) && { opacity: 0.5 },
                 ]}
               >
-                {posting ? (
+                {posting || uploadingImage ? (
                   <ActivityIndicator size="small" color={colors.textInverse} />
                 ) : (
                   <Text style={styles.publishText}>{t("publishPost")}</Text>
@@ -700,8 +773,12 @@ export function CommunityScreen() {
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background, marginTop: -8 }} edges={["top"]}>
       <BrandedAppHeader />
 
-      {mainTab === "feed" ? (
-        loading && posts.length === 0 ? (
+      {mainTab === "pals" ? (
+        <>
+          {renderTopTabs()}
+          <PalsScreen />
+        </>
+      ) : mainTab === "feed" ? (        loading && posts.length === 0 ? (
           <>
             {renderFeedHeader()}
             <ListSkeleton rows={4} variant="card" />
@@ -735,38 +812,43 @@ export function CommunityScreen() {
                   rtlRow={rtlRow}
                   rtlInput={rtlInput}
                   t={t}
+                  isLikePending={!!likeBusy[item.id]}
+                  isDeletePending={!!deleteBusy[item.id]}
                 />
               )}
             />
           </View>
         )
       ) : groupsLoading && groups.length === 0 ? (
-        <>
+        <View style={{ flex: 1 }}>
           {renderGroupsHeader()}
           <ListSkeleton rows={5} variant="card" />
-        </>
+        </View>
       ) : (
-        <FlashList
-          data={groups}
-          keyExtractor={(item) => item.id}
-          ListHeaderComponent={renderGroupsHeader}
-          ListEmptyComponent={renderGroupsEmpty}
-          contentContainerStyle={{ paddingBottom: 120 }}
-          refreshControl={
-            <RefreshControl
-              refreshing={groupsRefreshing}
-              onRefresh={onRefreshGroups}
-              tintColor={colors.text}
-              colors={[colors.text]}
-            />
-          }
-          renderItem={renderGroupCard}
-        />
+        <View style={{ flex: 1 }}>
+          {/* Tabs stay outside FlashList so taps always reach them (header-inside-list caused stuck touches). */}
+          {renderGroupsHeader()}
+          <FlashList
+            style={{ flex: 1 }}
+            data={groups}
+            keyExtractor={(item) => item.id}
+            ListEmptyComponent={renderGroupsEmpty}
+            contentContainerStyle={{ paddingBottom: 120 }}
+            refreshControl={
+              <RefreshControl
+                refreshing={groupsRefreshing}
+                onRefresh={onRefreshGroups}
+                tintColor={colors.text}
+                colors={[colors.text]}
+              />
+            }
+            renderItem={renderGroupCard}
+          />
+        </View>
       )}
 
       {/* Admin-only: Create Group FAB */}
-      {mainTab === "groups" && isAdmin && (
-        <Pressable
+      {mainTab === "groups" && isAdmin && (        <Pressable
           onPress={() => setCreateModalOpen(true)}
           style={{
             position: "absolute",
@@ -1051,6 +1133,27 @@ const getStyles = (colors: any) =>
     sosBadgeText: { color: colors.textInverse, fontSize: 10, fontWeight: "700" },
     timeText: { fontSize: 12, color: colors.textMuted, marginTop: 1 },
     contentText: { fontSize: 15, color: colors.text, lineHeight: 22, marginTop: 12 },
+    postImage: {
+      width: "100%",
+      aspectRatio: 4 / 3,
+      borderRadius: 12,
+      marginTop: 12,
+      backgroundColor: colors.surfaceSecondary,
+    },
+    composerThumbnail: {
+      width: "100%",
+      aspectRatio: 4 / 3,
+      borderRadius: 12,
+      backgroundColor: colors.surfaceSecondary,
+    },
+    thumbnailRemoveBtn: {
+      position: "absolute",
+      top: 8,
+      right: 8,
+    },
+    pickerIconBtn: {
+      padding: 6,
+    },
     imagePlaceholder: {
       height: 180,
       borderRadius: 12,

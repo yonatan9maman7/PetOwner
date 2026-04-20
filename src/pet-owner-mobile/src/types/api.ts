@@ -141,6 +141,8 @@ export interface MapSearchFilters {
   latitude?: number;
   longitude?: number;
   searchTerm?: string;
+  /** When set, API returns only providers of this account type (e.g. clinics vs solo walkers). */
+  providerType?: ProviderType;
 }
 
 export interface ServiceRateDto {
@@ -179,14 +181,6 @@ export interface CreateBookingReviewRequest {
   comment: string;
 }
 
-export interface CreateServiceRequestReviewRequest {
-  requestId: string;
-  rating: number;
-  comment: string;
-  communicationRating?: number;
-  reliabilityRating?: number;
-}
-
 export interface ProviderPublicProfileDto {
   providerId: string;
   name: string;
@@ -205,6 +199,8 @@ export interface ProviderPublicProfileDto {
   websiteUrl?: string;
   openingHours?: string;
   isEmergencyService: boolean;
+  acceptedDogSizes?: DogSize[];
+  maxDogsCapacity?: number | null;
 }
 
 export interface UserMiniProfileDto {
@@ -256,6 +252,8 @@ export enum ServiceType {
   Training = 'Training',
   Insurance = 'Insurance',
   PetStore = 'PetStore',
+  HouseSitting = 'HouseSitting',
+  DoggyDayCare = 'DoggyDayCare',
 }
 
 export enum PricingUnit {
@@ -279,31 +277,41 @@ export enum ProviderStatus {
   Revoked = 'Revoked',
 }
 
+/** Matches backend `DogSize` enum (JSON string values). */
+export type DogSize = 'SMALL' | 'MEDIUM' | 'LARGE' | 'GIANT';
+
 export interface ProviderMeResponse {
-  userId: string;
-  bio: string;
-  profileImageUrl: string;
+  /** Present when API includes it; backend primary field is `userName`. */
+  userId?: string;
+  userName?: string;
+  bio: string | null;
+  profileImageUrl: string | null;
   serviceRates: ServiceRateDto[];
   isAvailableNow: boolean;
   acceptsOffHoursRequests: boolean;
   status: ProviderStatus;
   type: ProviderType;
-  businessName: string;
+  businessName: string | null;
   services: string[];
   city: string;
   street: string;
   buildingNumber: string;
-  apartmentNumber: string;
-  latitude: number;
-  longitude: number;
-  phoneNumber: string;
-  whatsAppNumber: string;
-  websiteUrl: string;
-  openingHours: string;
+  apartmentNumber: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  phoneNumber: string | null;
+  whatsAppNumber: string | null;
+  websiteUrl: string | null;
+  openingHours: string | null;
   isEmergencyService: boolean;
-  averageRating: number;
+  averageRating: number | null;
   reviewCount: number;
-  stripeConnectAccountId: string;
+  stripeConnectAccountId?: string | null;
+  /** Backend sends when profile is admin-suspended while status may stay Approved. */
+  isSuspended?: boolean;
+  suspensionReason?: string | null;
+  acceptedDogSizes?: DogSize[];
+  maxDogsCapacity?: number | null;
 }
 
 export interface GenerateBioRequest {
@@ -396,6 +404,72 @@ export interface EarningsTransactionDto {
   capturedAt?: string;
 }
 
+// ── My Stats Dashboard ───────────────────────────────────────────────────────
+
+/** Date-window selector for the stats dashboard. */
+export type StatRange = "7d" | "30d" | "year" | "all";
+
+export interface TopServiceDto {
+  service: string;
+  count: number;
+  totalAmount: number;
+}
+
+export interface AchievementDto {
+  /** Stable code, e.g. "owner.first_paid" or "provider.10_paid". Mobile maps code → label/icon. */
+  code: string;
+  /** "owner" or "provider" — used to filter UI per persona. */
+  scope: string;
+  unlockedAt: string;
+}
+
+export interface OwnerStatsDto {
+  range: StatRange;
+  totalSpent: number;
+  paidBookings: number;
+  totalBookings: number;
+  favoriteProvidersCount: number;
+  reviewsWritten: number;
+  averageRatingGiven: number;
+  cancellationRate: number;
+  upcomingSpend: number;
+  memberSince: string;
+  topService: TopServiceDto | null;
+  achievements: AchievementDto[];
+}
+
+export interface ProviderBookingStatsDto {
+  range: StatRange;
+  totalEarned: number;
+  monthEarned: number;
+  monthEarnedDeltaPct: number;
+  completedBookings: number;
+  totalBookings: number;
+  averageRating: number;
+  reviewCount: number;
+  acceptanceRate: number;
+  avgResponseMinutes: number | null;
+  repeatClientsCount: number;
+  uniquePetsServed: number;
+  hoursWorked: number;
+  profileViewCount: number;
+  searchAppearanceCount: number;
+  cancellationRateByMe: number;
+  pendingPayouts: number;
+  isStarSitter: boolean;
+  topService: TopServiceDto | null;
+  achievements: AchievementDto[];
+}
+
+export interface EarningsSparklinePointDto {
+  weekStart: string;
+  total: number;
+}
+
+export interface EarningsSparklineDto {
+  buckets: EarningsSparklinePointDto[];
+}
+
 export interface NotificationDto {
   id: string;
   userId?: string;
@@ -478,14 +552,20 @@ export interface CreatePostDto {
 
 export interface CommentDto {
   id: string;
+  parentCommentId: string | null;
   userId: string;
   userName: string;
   content: string;
   createdAt: string;
+  editedAt: string | null;
+  likeCount: number;
+  likedByMe: boolean;
+  replies: CommentDto[];
 }
 
 export interface CreateCommentDto {
   content: string;
+  parentCommentId?: string;
 }
 
 export interface CreateCommunityGroupRequest {
@@ -565,6 +645,8 @@ export interface UpdateProfileDto {
   buildingNumber: string;
   apartmentNumber?: string;
   acceptsOffHoursRequests?: boolean;
+  acceptedDogSizes: DogSize[];
+  maxDogsCapacity?: number | null;
 }
 
 export interface ProviderApplicationPayload {
@@ -577,21 +659,28 @@ export interface ProviderApplicationPayload {
   apartmentNumber?: string;
   latitude: number;
   longitude: number;
-  phoneNumber: string;
+  /** When omitted, the API uses the account phone from the user profile. */
+  phoneNumber?: string;
   whatsAppNumber?: string;
   websiteUrl?: string;
   openingHours?: string;
   isEmergencyService: boolean;
   description: string;
+  /** Short public bio; API falls back to description when omitted. */
+  bio?: string;
   imageUrl?: string;
   selectedServices: ServiceRatePayload[];
   referenceName?: string;
   referenceContact?: string;
+  acceptedDogSizes: DogSize[];
+  maxDogsCapacity?: number | null;
 }
 
 export interface ProviderApplicationResponse {
   message: string;
   applicationId: string;
+  /** Issued when the account role is updated to Provider (same as legacy /onboarding). */
+  newAccessToken?: string;
 }
 
 export interface AdminStatsDto {
@@ -862,3 +951,149 @@ export interface ActivitySummaryDto {
   currentStreak: number;
   weeklyBreakdown: Record<string, number>;
 }
+
+// ─── Playdate Pals ────────────────────────────────────────────────────────────
+
+export type DogSizeValue = 'SMALL' | 'MEDIUM' | 'LARGE' | 'GIANT';
+export type SterilizationStatusValue = 'Spayed' | 'Neutered' | 'Intact';
+export type RsvpStatusValue = 'Going' | 'Maybe' | 'NotGoing';
+
+export interface PlaydatePrefsDto {
+  optedIn: boolean;
+  maxDistanceKm: number;
+  bio: string | null;
+  preferredSpecies: string[];
+  preferredDogSizes: string[];
+  includeAsProvider: boolean;
+  isProvider: boolean;
+  hasPet: boolean;
+  lastActiveAt: string | null;
+}
+
+export interface UpdatePlaydatePrefsDto {
+  optedIn: boolean;
+  maxDistanceKm: number;
+  bio?: string | null;
+  preferredSpecies?: string[];
+  preferredDogSizes?: string[];
+  includeAsProvider?: boolean;
+}
+
+export interface PalPetDto {
+  id: string;
+  name: string;
+  species: string;
+  breed: string | null;
+  age: number;
+  imageUrl: string | null;
+  dogSize: DogSizeValue | null;
+  sterilization: SterilizationStatusValue | null;
+  tags: string[];
+}
+
+export interface PalDto {
+  userId: string;
+  name: string;
+  distanceKm: number;
+  city: string | null;
+  bio: string | null;
+  pets: PalPetDto[];
+  lastActiveAt: string;
+}
+
+export interface PlaydateRequestDto {
+  message?: string;
+  petId?: string;
+}
+
+export interface PlaydateRequestResponse {
+  otherUserId: string;
+  otherUserName: string;
+  prefilledMessage: string;
+}
+
+export interface LiveBeaconDto {
+  id: string;
+  hostUserId: string;
+  hostUserName: string;
+  placeName: string;
+  latitude: number;
+  longitude: number;
+  city: string | null;
+  createdAt: string;
+  expiresAt: string;
+  species: string;
+  pets: PalPetDto[];
+  distanceKm: number;
+}
+
+export interface CreateLiveBeaconDto {
+  placeName: string;
+  latitude: number;
+  longitude: number;
+  city?: string;
+  durationMinutes: number;
+  petIds: string[];
+  species: string;
+}
+
+export interface PlaydateEventDto {
+  id: string;
+  hostUserId: string;
+  hostUserName: string;
+  title: string;
+  description: string | null;
+  locationName: string;
+  latitude: number;
+  longitude: number;
+  city: string | null;
+  scheduledFor: string;
+  endsAt: string | null;
+  allowedSpecies: string[];
+  maxPets: number | null;
+  goingCount: number;
+  maybeCount: number;
+  myRsvpStatus: RsvpStatusValue | null;
+  myRsvpPetId: string | null;
+  distanceKm: number | null;
+  isCancelled: boolean;
+}
+
+export interface PlaydateAttendeeDto {
+  userId: string;
+  userName: string;
+  status: RsvpStatusValue;
+  pet: PalPetDto | null;
+}
+
+export interface PlaydateEventDetailDto {
+  event: PlaydateEventDto;
+  attendees: PlaydateAttendeeDto[];
+}
+
+export interface CreatePlaydateEventDto {
+  title: string;
+  description?: string;
+  locationName: string;
+  latitude: number;
+  longitude: number;
+  city?: string;
+  scheduledFor: string;
+  endsAt?: string;
+  allowedSpecies: string[];
+  maxPets?: number;
+}
+
+export interface RsvpDto {
+  status: RsvpStatusValue;
+  petId?: string;
+}
+
+export interface PlaydateCommentDto {
+  id: string;
+  userId: string;
+  userName: string;
+  content: string;
+  createdAt: string;
+}
+

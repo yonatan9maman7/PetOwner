@@ -95,6 +95,6 @@ export class PetHealthService {
   // ── Medical Records ──
 
   getHealthRecords(petId: string): Observable<any[]> {
-    return this.http.get<any[]>(`/api/pets/${petId}/health-records`);
+    return this.http.get<any[]>(`/api/pets/${petId}/medical-records`);
   }
 }

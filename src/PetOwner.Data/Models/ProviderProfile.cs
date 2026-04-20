@@ -22,9 +22,21 @@ public class ProviderProfile
     public decimal? AverageRating { get; set; }
     public int ReviewCount { get; set; }
     public string? StripeConnectAccountId { get; set; }
+
+    /// <summary>Cumulative count of times this provider's profile page has been viewed by other users.</summary>
+    public int ProfileViewCount { get; set; }
+
+    /// <summary>Cumulative count of times this provider has appeared in a search/explore result list.</summary>
+    public int SearchAppearanceCount { get; set; }
     public bool AcceptsOffHoursRequests { get; set; } = true;
     public string? ReferenceName { get; set; }
     public string? ReferenceContact { get; set; }
+
+    /// <summary>Dog size bands this provider accepts (walking / boarding).</summary>
+    public List<DogSize> AcceptedDogSizes { get; set; } = [];
+
+    /// <summary>Max dogs per walk or max dogs hosted at once.</summary>
+    public int? MaxDogsCapacity { get; set; }
 
     public string City { get; set; } = null!;
     public string Street { get; set; } = null!;

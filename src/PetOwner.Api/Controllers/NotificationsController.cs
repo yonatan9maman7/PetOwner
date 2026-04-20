@@ -45,7 +45,6 @@ public class NotificationsController : ControllerBase
         return Ok(new { count });
     }
 
-    [HttpPatch("{id:guid}/read")]
     [HttpPut("{id:guid}/read")]
     public async Task<IActionResult> MarkAsRead(Guid id)
     {

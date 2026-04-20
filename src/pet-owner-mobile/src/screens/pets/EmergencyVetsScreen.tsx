@@ -10,6 +10,7 @@ import {
   RefreshControl,
   Platform,
   StyleSheet,
+  Alert,
 } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -49,14 +50,8 @@ export function EmergencyVetsScreen() {
     [],
   );
 
-  const requestAndFetch = useCallback(async () => {
-    setState("loading");
+  const fetchVetsAndLocation = useCallback(async () => {
     try {
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== "granted") {
-        setState("location-denied");
-        return;
-      }
       const loc = await Location.getCurrentPositionAsync({
         accuracy: Location.Accuracy.Balanced,
       });
@@ -68,9 +63,47 @@ export function EmergencyVetsScreen() {
     }
   }, [fetchVets]);
 
+  const ensurePermissionAndFetch = useCallback(
+    async (showSettingsAlertWhenBlocked: boolean) => {
+      setState("loading");
+      try {
+        const { status, canAskAgain } = await Location.getForegroundPermissionsAsync();
+
+        if (status === "granted") {
+          await fetchVetsAndLocation();
+          return;
+        }
+
+        if (canAskAgain) {
+          const { status: newStatus } = await Location.requestForegroundPermissionsAsync();
+          if (newStatus === "granted") {
+            await fetchVetsAndLocation();
+          } else {
+            setState("location-denied");
+          }
+        } else {
+          setState("location-denied");
+          if (showSettingsAlertWhenBlocked) {
+            Alert.alert(
+              t("locationPermissionAlertTitle"),
+              t("locationPermissionAlertDesc"),
+              [
+                { text: t("cancel"), style: "cancel" },
+                { text: t("openSettings"), onPress: () => Linking.openSettings() },
+              ],
+            );
+          }
+        }
+      } catch {
+        setState("error");
+      }
+    },
+    [fetchVetsAndLocation, t],
+  );
+
   useEffect(() => {
-    requestAndFetch();
-  }, [requestAndFetch]);
+    ensurePermissionAndFetch(false);
+  }, [ensurePermissionAndFetch]);
 
   const onRefresh = useCallback(async () => {
     if (!coords) return;
@@ -252,7 +285,7 @@ export function EmergencyVetsScreen() {
           </View>
           <Text style={[styles.emptyTitle, rtlText]}>{t("locationRequired")}</Text>
           <Pressable
-            onPress={requestAndFetch}
+            onPress={() => ensurePermissionAndFetch(true)}
             style={[styles.enableBtn, { backgroundColor: colors.primary }]}
           >
             <Text style={styles.enableBtnText}>{t("enableLocation")}</Text>
@@ -265,7 +298,7 @@ export function EmergencyVetsScreen() {
           </View>
           <Text style={[styles.emptyTitle, rtlText]}>{t("triageError")}</Text>
           <Pressable
-            onPress={requestAndFetch}
+            onPress={() => ensurePermissionAndFetch(false)}
             style={[styles.enableBtn, { backgroundColor: colors.primary }]}
           >
             <Ionicons name="refresh" size={18} color="#fff" />

@@ -11,6 +11,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation, useRoute, useFocusEffect } from "@react-navigation/native";
+import axios from "axios";
 import { useTranslation } from "../../i18n";
 import { useTheme } from "../../theme/ThemeContext";
 import { useAuthStore } from "../../store/authStore";
@@ -82,11 +83,16 @@ export function MyBookingsScreen() {
       try {
         const data = await bookingsApi.getMine();
         setAllBookings(data);
-      } catch {}
-      setLoading(false);
-      setRefreshing(false);
+      } catch (error) {
+        if (!(axios.isAxiosError(error) && error.response?.status === 401)) {
+          Alert.alert(t("genericErrorTitle"), t("genericErrorDesc"));
+        }
+      } finally {
+        setLoading(false);
+        setRefreshing(false);
+      }
     },
-    [],
+    [t],
   );
 
   useFocusEffect(
@@ -168,16 +174,35 @@ export function MyBookingsScreen() {
     ]);
   };
 
+  const handleMarkComplete = (booking: BookingDto) => {
+    Alert.alert(t("markCompleted"), undefined, [
+      { text: t("backStep"), style: "cancel" },
+      {
+        text: t("markCompleted"),
+        onPress: async () => {
+          try {
+            await bookingsApi.complete(booking.id);
+            fetchBookings(true);
+          } catch {
+            Alert.alert(t("errorTitle"));
+          }
+        },
+      },
+    ]);
+  };
+
   const renderOutgoingCard = ({ item }: { item: BookingDto }) => {
     const isPaid = item.paymentStatus === "Paid";
     const sc = isPaid
       ? STATUS_COLORS.Paid
       : STATUS_COLORS[item.status] ?? STATUS_COLORS.Pending;
     const canCancel =
-      item.status === "Pending" || item.status === "Confirmed";
+      item.status !== "Completed" &&
+      item.status !== "Cancelled" &&
+      item.paymentStatus !== "Paid" &&
+      (item.status === "Pending" || item.status === "Confirmed");
     const canLeaveReview =
-      !item.hasReview &&
-      (item.status === "Completed" || item.paymentStatus === "Paid");
+      !item.hasReview && item.status === "Completed";
     const canPay =
       item.status === "Confirmed" &&
       !!item.paymentUrl &&
@@ -365,6 +390,10 @@ export function MyBookingsScreen() {
   const renderIncomingCard = ({ item }: { item: BookingDto }) => {
     const sc = STATUS_COLORS[item.status] ?? STATUS_COLORS.Pending;
     const isPending = item.status === "Pending";
+    const canMarkComplete =
+      item.status !== "Completed" &&
+      item.status !== "Cancelled" &&
+      (item.status === "Confirmed" || item.paymentStatus === "Paid");
 
     return (
       <View
@@ -538,6 +567,20 @@ export function MyBookingsScreen() {
             </View>
           )}
         </View>
+
+        {canMarkComplete ? (
+          <Pressable
+            onPress={() => handleMarkComplete(item)}
+            className="mt-3 py-3 rounded-xl items-center"
+            style={{ backgroundColor: colors.primary }}
+          >
+            <Text
+              style={{ fontSize: 14, fontWeight: "700", color: colors.primaryText }}
+            >
+              {t("markCompleted")}
+            </Text>
+          </Pressable>
+        ) : null}
 
         {item.notes ? (
           <Text

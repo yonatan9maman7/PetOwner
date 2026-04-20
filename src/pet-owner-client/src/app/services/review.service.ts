@@ -1,8 +1,6 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
-import { Review, CreateReviewPayload } from '../models/service-request.model';
-
 export interface CreateBookingReviewPayload {
   bookingId: string;
   rating: number;
@@ -33,10 +31,6 @@ export class ReviewService {
 
   create(payload: CreateBookingReviewPayload): Observable<{ id: string }> {
     return this.http.post<{ id: string }>(this.baseUrl, payload);
-  }
-
-  createForServiceRequest(payload: CreateReviewPayload): Observable<Review> {
-    return this.http.post<Review>(`${this.baseUrl}/service-request`, payload);
   }
 
   getByProvider(providerId: string): Observable<ProviderReview[]> {

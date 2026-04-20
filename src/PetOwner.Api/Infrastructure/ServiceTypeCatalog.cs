@@ -17,6 +17,8 @@ public static class ServiceTypeCatalog
         [ServiceType.Training] = "Pet Trainer",
         [ServiceType.Insurance] = "Pet Insurance",
         [ServiceType.PetStore] = "Pet Store",
+        [ServiceType.HouseSitting] = "House Sitting",
+        [ServiceType.DoggyDayCare] = "Doggy Day Care",
     };
 
     public static string ToDisplayName(ServiceType serviceType) =>

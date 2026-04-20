@@ -11,7 +11,7 @@ import * as Clipboard from "expo-clipboard";
 import { Ionicons } from "@expo/vector-icons";
 import QRCode from "qrcode";
 import { SvgXml } from "react-native-svg";
-import { petHealthApi } from "../api/client";
+import { medicalApi } from "../api/client";
 import { useTranslation } from "../i18n";
 import { useTheme } from "../theme/ThemeContext";
 import type { HealthPassportShareDto } from "../types/api";
@@ -40,7 +40,7 @@ export function ShareHealthPassportModal({ petId, visible, onClose }: Props) {
       return;
     }
     setLoading(true);
-    petHealthApi
+    medicalApi
       .createShareLink(petId)
       .then(async (shareData) => {
         setData(shareData);

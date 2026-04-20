@@ -1532,12 +1532,12 @@ namespace PetOwner.Data.Migrations
                     b.HasOne("PetOwner.Data.Models.Vaccination", "Vaccination")
                         .WithOne("LinkedRecord")
                         .HasForeignKey("PetOwner.Data.Models.MedicalRecord", "VaccinationId")
-                        .OnDelete(DeleteBehavior.SetNull);
+                        .OnDelete(DeleteBehavior.NoAction);
 
                     b.HasOne("PetOwner.Data.Models.WeightLog", "WeightLog")
                         .WithOne("LinkedRecord")
                         .HasForeignKey("PetOwner.Data.Models.MedicalRecord", "WeightLogId")
-                        .OnDelete(DeleteBehavior.SetNull);
+                        .OnDelete(DeleteBehavior.NoAction);
 
                     b.Navigation("Pet");
 

@@ -4,7 +4,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useTranslation, type TranslationKey } from "../../../../i18n";
 import type { ThemeColors } from "../../../../theme/ThemeContext";
 import { useTheme } from "../../../../theme/ThemeContext";
-import { petHealthApi } from "../../../../api/client";
+import { medicalApi } from "../../../../api/client";
 import { DatePickerField } from "../../../../components/DatePickerField";
 import { ListSkeleton } from "../../../../components/shared/ListSkeleton";
 import type { WeightLogDto } from "../../../../types/api";
@@ -16,13 +16,13 @@ function formatAxisWeightKg(v: number): string {
   return r.toFixed(1);
 }
 
-function weightChartX(i: number, n: number, plotW: number, isRTL: boolean, marginX: number): number {
+/** Time-series charts stay LTR (oldest left, newest right) regardless of app locale. */
+function weightChartX(i: number, n: number, plotW: number, marginX: number): number {
   if (plotW <= 0) return 0;
   if (n <= 1) return plotW / 2;
   const inner = plotW - 2 * marginX;
   const u = i / (n - 1);
-  const xLtr = marginX + u * inner;
-  return isRTL ? plotW - xLtr : xLtr;
+  return marginX + u * inner;
 }
 
 function WeightChartLine({
@@ -96,7 +96,7 @@ function WeightTrendChart({
   const showMidTick = span >= 1.2;
 
   const yAt = (w: number) => MARGIN_Y_TOP + (1 - (w - vMin) / vRange) * drawH;
-  const xAt = (i: number) => weightChartX(i, n, plotW, isRTL, MARGIN_X);
+  const xAt = (i: number) => weightChartX(i, n, plotW, MARGIN_X);
   const labelInterval = Math.max(1, Math.floor(n / 5));
 
   const cardStyle = {
@@ -110,11 +110,12 @@ function WeightTrendChart({
     elevation: 1,
   } as const;
 
-  const axisTextStyle = {
+  const yAxisTextStyle = {
     fontSize: 10,
     color: colors.textMuted,
     fontWeight: "600" as const,
-    textAlign: (isRTL ? "right" : "left") as "right" | "left",
+    textAlign: "right" as const,
+    writingDirection: "ltr" as const,
   };
 
   if (n === 1) {
@@ -137,7 +138,10 @@ function WeightTrendChart({
         >
           {t("weightChartMoreDataHint")}
         </Text>
-        <View style={{ height: PLOT_H, alignSelf: "stretch" }} onLayout={(e) => setPlotW(e.nativeEvent.layout.width)}>
+        <View
+          style={{ height: PLOT_H, alignSelf: "stretch", direction: "ltr" }}
+          onLayout={(e) => setPlotW(e.nativeEvent.layout.width)}
+        >
           <View
             style={{
               position: "absolute",
@@ -198,7 +202,7 @@ function WeightTrendChart({
         </View>
       </View>
 
-      <View style={{ flexDirection: isRTL ? "row-reverse" : "row", gap: 8, alignItems: "flex-start" }}>
+      <View style={{ flexDirection: "row", gap: 8, alignItems: "flex-start", direction: "ltr" }}>
         <View style={{ width: 36 }}>
           <View
             style={{
@@ -208,18 +212,18 @@ function WeightTrendChart({
               paddingBottom: MARGIN_Y_BOT,
             }}
           >
-            <Text style={axisTextStyle}>{formatAxisWeightKg(vMax)}</Text>
+            <Text style={yAxisTextStyle}>{formatAxisWeightKg(vMax)}</Text>
             {showMidTick ? (
-              <Text style={{ ...axisTextStyle, marginVertical: -4 }}>{formatAxisWeightKg((vMax + vMin) / 2)}</Text>
+              <Text style={{ ...yAxisTextStyle, marginVertical: -4 }}>{formatAxisWeightKg((vMax + vMin) / 2)}</Text>
             ) : (
               <View />
             )}
-            <Text style={axisTextStyle}>{formatAxisWeightKg(vMin)}</Text>
+            <Text style={yAxisTextStyle}>{formatAxisWeightKg(vMin)}</Text>
           </View>
           <View style={{ height: 28 }} />
         </View>
 
-        <View style={{ flex: 1 }} onLayout={(e) => setPlotW(e.nativeEvent.layout.width)}>
+        <View style={{ flex: 1, direction: "ltr" }} onLayout={(e) => setPlotW(e.nativeEvent.layout.width)}>
           <View style={{ height: PLOT_H, position: "relative" }}>
             {[0, 0.25, 0.5, 0.75, 1].map((pct) => (
               <View
@@ -277,7 +281,7 @@ function WeightTrendChart({
               })}
           </View>
 
-          <View style={{ height: 24, marginTop: 4, position: "relative" }}>
+          <View style={{ height: 24, marginTop: 4, position: "relative", direction: "ltr" }}>
             {plotW > 0 &&
               sorted.map((log, i) =>
                 i % labelInterval === 0 || i === n - 1 ? (
@@ -291,6 +295,7 @@ function WeightTrendChart({
                       color: colors.textMuted,
                       fontWeight: "500",
                       textAlign: "center",
+                      writingDirection: "ltr",
                     }}
                     numberOfLines={1}
                   >
@@ -332,7 +337,7 @@ export function WeightSection({ petId, reloadNonce = 0 }: { petId: string; reloa
 
   const load = useCallback(async () => {
     try {
-      setHistory(await petHealthApi.getWeightHistory(petId));
+      setHistory(await medicalApi.getWeightHistory(petId));
     } catch {}
   }, [petId]);
 
@@ -353,7 +358,7 @@ export function WeightSection({ petId, reloadNonce = 0 }: { petId: string; reloa
     }
     setSaving(true);
     try {
-      await petHealthApi.addWeightLog(petId, {
+      await medicalApi.addWeightLog(petId, {
         weight: w,
         dateRecorded: formDate,
       });
@@ -394,7 +399,7 @@ export function WeightSection({ petId, reloadNonce = 0 }: { petId: string; reloa
     }
     setSaving(true);
     try {
-      await petHealthApi.updateWeightLog(petId, editingId, {
+      await medicalApi.updateWeightLog(petId, editingId, {
         weight: w,
         dateRecorded: editDate,
       });
@@ -410,7 +415,7 @@ export function WeightSection({ petId, reloadNonce = 0 }: { petId: string; reloa
   const deleteLog = async (logId: string) => {
     if (editingId === logId) cancelEditLog();
     try {
-      await petHealthApi.deleteWeightLog(petId, logId);
+      await medicalApi.deleteWeightLog(petId, logId);
       await load();
     } catch {}
   };
@@ -442,7 +447,7 @@ export function WeightSection({ petId, reloadNonce = 0 }: { petId: string; reloa
               marginBottom: 12,
             }}
           >
-            <Ionicons name="analytics-outline" size={32} color="#93c5fd" />
+            <Ionicons name="analytics-outline" size={32} color={colors.primary} />
           </View>
           <Text style={{ color: colors.textMuted, fontSize: 15, fontWeight: "600", textAlign: "center" }}>{t("noWeightData")}</Text>
         </View>
@@ -512,7 +517,7 @@ export function WeightSection({ petId, reloadNonce = 0 }: { petId: string; reloa
                         flex: 1,
                         paddingVertical: 12,
                         borderRadius: 12,
-                        backgroundColor: canSave ? colors.primary : "#93c5fd",
+                        backgroundColor: canSave ? colors.primary : colors.primaryLight,
                         alignItems: "center",
                         opacity: canSave ? 1 : 0.6,
                       }}
@@ -623,7 +628,7 @@ export function WeightSection({ petId, reloadNonce = 0 }: { petId: string; reloa
                     flex: 1,
                     paddingVertical: 12,
                     borderRadius: 12,
-                    backgroundColor: canSave ? colors.primary : "#93c5fd",
+                    backgroundColor: canSave ? colors.primary : colors.primaryLight,
                     alignItems: "center",
                     opacity: canSave ? 1 : 0.6,
                   }}

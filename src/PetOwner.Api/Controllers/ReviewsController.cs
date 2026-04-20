@@ -38,8 +38,8 @@ public class ReviewsController : ControllerBase
         if (booking.OwnerId != userId)
             return Forbid();
 
-        if (booking.Status != BookingStatus.Completed && booking.PaymentStatus != PaymentStatus.Paid)
-            return BadRequest(new { message = "Can only review a completed or paid booking." });
+        if (booking.Status != BookingStatus.Completed)
+            return BadRequest(new { message = "Can only review a completed booking." });
 
         var existingReview = await _db.Reviews
             .AnyAsync(r => r.BookingId == request.BookingId);
@@ -63,65 +63,6 @@ public class ReviewsController : ControllerBase
         await RecalculateProviderRating(booking.ProviderProfileId);
 
         return CreatedAtAction(nameof(GetProviderReviews), new { providerId = booking.ProviderProfileId }, new { review.Id });
-    }
-
-    [HttpPost("service-request")]
-    public async Task<IActionResult> CreateServiceRequestReview([FromBody] CreateReviewDto request)
-    {
-        var userId = GetUserId();
-
-        if (request.Rating is < 1 or > 5)
-            return BadRequest(new { message = "Rating must be between 1 and 5." });
-
-        if (request.CommunicationRating.HasValue && request.CommunicationRating is < 1 or > 5)
-            return BadRequest(new { message = "CommunicationRating must be between 1 and 5." });
-
-        if (request.ReliabilityRating.HasValue && request.ReliabilityRating is < 1 or > 5)
-            return BadRequest(new { message = "ReliabilityRating must be between 1 and 5." });
-
-        var serviceRequest = await _db.ServiceRequests
-            .AsNoTracking()
-            .FirstOrDefaultAsync(sr => sr.Id == request.RequestId);
-
-        if (serviceRequest is null)
-            return NotFound(new { message = "Service request not found." });
-
-        if (serviceRequest.Status != "Completed")
-            return BadRequest(new { message = "Can only review a completed service request." });
-
-        if (serviceRequest.PetOwnerId != userId && serviceRequest.ProviderId != userId)
-            return Forbid();
-
-        var existingReview = await _db.Reviews
-            .AnyAsync(r => r.ServiceRequestId == request.RequestId);
-
-        if (existingReview)
-            return Conflict(new { message = "A review already exists for this service request." });
-
-        var revieweeId = serviceRequest.PetOwnerId == userId
-            ? serviceRequest.ProviderId
-            : serviceRequest.PetOwnerId;
-
-        var isVerified = serviceRequest.ScheduledStart.HasValue;
-
-        var review = new Review
-        {
-            ServiceRequestId = request.RequestId,
-            ReviewerId = userId,
-            RevieweeId = revieweeId,
-            Rating = request.Rating,
-            Comment = request.Comment,
-            IsVerified = isVerified,
-            CommunicationRating = request.CommunicationRating,
-            ReliabilityRating = request.ReliabilityRating,
-        };
-
-        _db.Reviews.Add(review);
-        await _db.SaveChangesAsync();
-
-        await RecalculateProviderRating(revieweeId);
-
-        return CreatedAtAction(nameof(GetProviderReviews), new { providerId = revieweeId }, new { review.Id });
     }
 
     [HttpGet("provider/{providerId:guid}")]

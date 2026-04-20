@@ -7,7 +7,7 @@ import { useAuthStore } from "../../../store/authStore";
 import { useMyPetsUiStore } from "../../../store/myPetsUiStore";
 import { useTranslation } from "../../../i18n";
 import { usePetsStore } from "../../../store/petsStore";
-import { petHealthApi, triageApi } from "../../../api/client";
+import { medicalApi, triageApi } from "../../../api/client";
 import * as Print from "expo-print";
 import * as Sharing from "expo-sharing";
 import { generateHealthPassportHtml } from "../../../utils/HealthPassportPdf";
@@ -109,9 +109,9 @@ export function MyPetsScreen() {
       const user = useAuthStore.getState().user;
       const lang = useAuthStore.getState().language;
       const [vaccineStatuses, weightHistory, medicalRecords, triageHistory] = await Promise.all([
-        petHealthApi.getVaccineStatus(pet.id),
-        petHealthApi.getWeightHistory(pet.id),
-        petHealthApi.getMedicalRecords(pet.id),
+        medicalApi.getVaccineStatus(pet.id),
+        medicalApi.getWeightHistory(pet.id),
+        medicalApi.getMedicalRecords(pet.id),
         triageApi.getHistory(pet.id).catch(() => []),
       ]);
       const html = generateHealthPassportHtml({
@@ -189,7 +189,7 @@ export function MyPetsScreen() {
                 alignItems: "center",
                 justifyContent: "center",
                 gap: 8,
-                backgroundColor: colors.primary,
+                backgroundColor: colors.brand,
                 paddingHorizontal: 32,
                 paddingVertical: 16,
                 borderRadius: 18,
@@ -222,7 +222,7 @@ export function MyPetsScreen() {
             onAddPress={() => navigation.navigate("AddPet")}
             pagerRef={pagerRef}
             isRTL={isRTL}
-            primaryColor={colors.primary}
+            primaryColor={colors.brand}
             borderColor={colors.border}
             textSecondary={colors.textSecondary}
           />
@@ -260,12 +260,12 @@ export function MyPetsScreen() {
                   elevation: 8,
                 }}
               >
-                <PetHeroCard pet={item} primaryColor={colors.primary} />
+                <PetHeroCard pet={item} primaryColor={colors.brand} />
                 <PetCardActions
                   pet={item}
                   isRTL={isRTL}
                   surfaceColor={colors.surface}
-                  primaryColor={colors.primary}
+                  primaryColor={colors.brand}
                   primaryLight={colors.primaryLight}
                   onEdit={(p) => navigation.navigate("AddPet", { petId: p.id })}
                   onDelete={handleDelete}

@@ -8,5 +8,7 @@ public enum ServiceType
     DropInVisit,
     Training,
     Insurance,
-    PetStore
+    PetStore,
+    HouseSitting,
+    DoggyDayCare
 }

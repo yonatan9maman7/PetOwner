@@ -8,7 +8,7 @@ const COLORS = {
   surface: "#ffffff",
   text: "#001a5a",
   textSecondary: "#64748b",
-  primary: "#2563eb",
+  primary: "#001a5a",
   primaryText: "#ffffff",
   dangerLight: "#fef2f2",
   danger: "#dc2626",

@@ -3,7 +3,8 @@ import { Ionicons } from "@expo/vector-icons";
 import { useFormContext } from "react-hook-form";
 import { useTranslation } from "../../i18n";
 import { useTheme } from "../../theme/ThemeContext";
-import { SERVICES } from "./constants";
+import { servicesForOnboarding } from "./constants";
+import { FieldLabel } from "./FieldLabel";
 import type { OnboardingFormValues } from "./schemas";
 
 let _pkgId = 0;
@@ -16,8 +17,10 @@ export function PackagesStep() {
   const { colors } = useTheme();
   const { watch, setValue } = useFormContext<OnboardingFormValues>();
   const services = watch("services");
+  const providerType = watch("providerType");
+  const serviceDefs = servicesForOnboarding(providerType);
 
-  const enabledDefs = SERVICES.filter((svc) => services[String(svc.serviceType)]?.enabled);
+  const enabledDefs = serviceDefs.filter((svc) => services[String(svc.serviceType)]?.enabled);
 
   if (enabledDefs.length === 0) {
     return (
@@ -114,6 +117,7 @@ export function PackagesStep() {
                     setValue(`services.${key}.packages`, updated);
                   }}
                   isRTL={isRTL}
+                  required
                 />
 
                 <View style={{ flexDirection: "row", gap: 10, marginTop: 8 }}>
@@ -129,6 +133,7 @@ export function PackagesStep() {
                       }}
                       isRTL={isRTL}
                       keyboardType="numeric"
+                      required
                     />
                   </View>
                 </View>
@@ -183,6 +188,7 @@ function PackageInput({
   onChangeText,
   isRTL,
   keyboardType,
+  required,
 }: {
   label: string;
   placeholder: string;
@@ -190,13 +196,12 @@ function PackageInput({
   onChangeText: (v: string) => void;
   isRTL: boolean;
   keyboardType?: "default" | "numeric";
+  required?: boolean;
 }) {
   const { colors } = useTheme();
   return (
     <View>
-      <Text style={{ fontSize: 11, fontWeight: "600", color: colors.textSecondary, marginBottom: 3, textAlign: isRTL ? "right" : "left" }}>
-        {label}
-      </Text>
+      <FieldLabel text={label} isRTL={isRTL} required={required} variant="small" />
       <TextInput
         value={value}
         onChangeText={onChangeText}

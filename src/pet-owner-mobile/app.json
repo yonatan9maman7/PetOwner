@@ -13,7 +13,10 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSFaceIDUsageDescription": "Allow PetOwner to use Face ID for fast and secure sign-in."
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -21,16 +24,41 @@
         "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "useNextNotificationsApi": true,
+      "notification": {
+        "icon": "./assets/adaptive-icon.png",
+        "color": "#000000"
+      }
     },
     "web": {
       "bundler": "metro",
       "favicon": "./assets/favicon.png"
     },
+    "extra": {
+      "eas": {
+        "projectId": "YOUR_EAS_PROJECT_ID"
+      }
+    },
     "plugins": [
       "expo-secure-store",
       "@react-native-community/datetimepicker",
-      "expo-font"
+      "expo-font",
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "Allow PetOwner to use Face ID for fast and secure sign-in."
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/adaptive-icon.png",
+          "color": "#000000",
+          "sounds": [],
+          "mode": "production"
+        }
+      ]
     ]
   }
 }

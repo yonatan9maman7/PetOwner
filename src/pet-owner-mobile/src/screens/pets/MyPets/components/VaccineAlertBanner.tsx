@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { View, Text, Pressable } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useTranslation } from "../../../../i18n";
-import { petHealthApi } from "../../../../api/client";
+import { medicalApi } from "../../../../api/client";
 
 interface VaccineAlertBannerProps {
   petId: string;
@@ -15,7 +15,7 @@ export function VaccineAlertBanner({ petId, onPress }: VaccineAlertBannerProps) 
   const [dueSoonCount, setDueSoonCount] = useState(0);
 
   useEffect(() => {
-    petHealthApi
+    medicalApi
       .getVaccineStatus(petId)
       .then((statuses) => {
         setOverdueCount(statuses.filter((s) => s.status === "Overdue").length);

@@ -1,15 +1,29 @@
 import { useState, useCallback } from "react";
-import { View, Text, ScrollView, ActivityIndicator, TouchableOpacity } from "react-native";
+import { View, Text, ScrollView, ActivityIndicator, TouchableOpacity, Alert, Platform } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation, useFocusEffect } from "@react-navigation/native";
+import axios from "axios";
 import { useAuthStore } from "../../store/authStore";
 import { useNotificationStore } from "../../store/notificationStore";
 import { providerApi, bookingsApi } from "../../api/client";
 import { useTranslation } from "../../i18n";
 import { useTheme } from "../../theme/ThemeContext";
 import { BrandedAppHeader } from "../../components/BrandedAppHeader";
-import type { ProviderStatus } from "../../types/api";
+import type { ProviderMeResponse } from "../../types/api";
+
+/** Normalize API payload (camelCase + occasional PascalCase from proxies). */
+function readProviderStatusRaw(profile: ProviderMeResponse): string {
+  const p = profile as ProviderMeResponse & { Status?: string };
+  const s = p.status ?? p.Status;
+  return typeof s === "string" ? s.trim().toLowerCase() : "";
+}
+
+function isProfileSuspended(profile: ProviderMeResponse): boolean {
+  const p = profile as ProviderMeResponse & { IsSuspended?: boolean };
+  if (p.isSuspended === true || p.IsSuspended === true) return true;
+  return readProviderStatusRaw(profile) === "suspended";
+}
 
 interface SettingsRowProps {
   icon: keyof typeof Ionicons.glyphMap;
@@ -84,6 +98,24 @@ function SettingsRow({
   );
 }
 
+/** Same outer layout as NavyButton so loading does not shift content below (settings list). */
+function ProviderCTALoadingSlot() {
+  const { colors } = useTheme();
+  return (
+    <View
+      accessibilityRole="progressbar"
+      accessibilityLabel="Loading"
+      className="py-5 px-8 rounded-xl mb-4 flex-row items-center justify-center"
+      style={{
+        backgroundColor: colors.cardHighlight,
+        minHeight: 72,
+      }}
+    >
+      <ActivityIndicator color={colors.text} />
+    </View>
+  );
+}
+
 function NavyButton({
   label,
   icon,
@@ -132,13 +164,31 @@ function NavyButton({
   );
 }
 
-type ProviderCTAState = "none" | "pending" | "approved" | "loading";
+type ProviderCTAState =
+  | "none"
+  | "pending"
+  | "approved"
+  | "loading"
+  | "suspended"
+  | "inactive";
 
 export function ProfileScreen() {
   const navigation = useNavigation<any>();
   const user = useAuthStore((s) => s.user);
+  const logout = useAuthStore((s) => s.logout);
   const { t, isRTL, rtlStyle } = useTranslation();
   const { colors } = useTheme();
+
+  const handleLogout = () => {
+    if (Platform.OS === "web") {
+      if (window.confirm(t("logoutButton") + "?")) logout();
+      return;
+    }
+    Alert.alert(t("logoutConfirmation"), "", [
+      { text: t("cancel"), style: "cancel" },
+      { text: t("logoutButton"), style: "destructive", onPress: logout },
+    ]);
+  };
 
   const unreadCount = useNotificationStore((s) => s.unreadCount);
   const role = user?.role ?? "Owner";
@@ -165,12 +215,30 @@ export function ProfileScreen() {
         .getMe()
         .then((profile) => {
           if (cancelled) return;
-          if (profile.status === "Pending") setProviderCTA("pending");
-          else if (profile.status === "Approved") setProviderCTA("approved");
+          const st = readProviderStatusRaw(profile);
+          const suspended = isProfileSuspended(profile);
+          if (st === "banned" || st === "revoked") {
+            setProviderCTA("inactive");
+            return;
+          }
+          if (suspended) {
+            setProviderCTA("suspended");
+            return;
+          }
+          if (st === "pending") setProviderCTA("pending");
+          else if (st === "approved") setProviderCTA("approved");
           else setProviderCTA("none");
         })
-        .catch(() => {
-          if (!cancelled) setProviderCTA("none");
+        .catch((err: unknown) => {
+          if (cancelled) return;
+          if (axios.isAxiosError(err) && err.response?.status === 404) {
+            setProviderCTA("none");
+            return;
+          }
+          if (axios.isAxiosError(err) && err.response?.status === 401) {
+            return;
+          }
+          setProviderCTA("none");
         });
       return () => {
         cancelled = true;
@@ -269,11 +337,7 @@ export function ProfileScreen() {
           </View>
         </View>
 
-        {providerCTA === "loading" && (
-          <View style={{ alignItems: "center", marginBottom: 16 }}>
-            <ActivityIndicator color={colors.text} />
-          </View>
-        )}
+        {providerCTA === "loading" && <ProviderCTALoadingSlot />}
 
         {providerCTA === "approved" && (
           <NavyButton
@@ -288,6 +352,26 @@ export function ProfileScreen() {
           <NavyButton
             label={t("onbPendingCta")}
             icon="time-outline"
+            onPress={() => {}}
+            isRTL={isRTL}
+            disabled
+          />
+        )}
+
+        {providerCTA === "suspended" && (
+          <NavyButton
+            label={t("notifAccountSuspendedTitle")}
+            icon="ban-outline"
+            onPress={() => {}}
+            isRTL={isRTL}
+            disabled
+          />
+        )}
+
+        {providerCTA === "inactive" && (
+          <NavyButton
+            label={t("providerAccessEnded")}
+            icon="alert-circle-outline"
             onPress={() => {}}
             isRTL={isRTL}
             disabled
@@ -326,10 +410,15 @@ export function ProfileScreen() {
           }}
         >
           <SettingsRow
+            icon="stats-chart-outline"
+            label={t("myStats")}
+            onPress={() => navigation.navigate("MyStats")}
+            isFirst
+          />
+          <SettingsRow
             icon="calendar-outline"
             label={t("myBookings")}
             onPress={() => navigation.navigate("MyBookings")}
-            isFirst
             badge={pendingIncomingBookings > 0 ? pendingIncomingBookings : undefined}
           />
           <SettingsRow
@@ -349,6 +438,26 @@ export function ProfileScreen() {
             badge={unreadCount}
           />
         </View>
+
+        <TouchableOpacity
+          onPress={handleLogout}
+          activeOpacity={0.8}
+          style={{
+            flexDirection: isRTL ? "row-reverse" : "row",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 8,
+            marginTop: 8,
+            paddingVertical: 16,
+            borderRadius: 14,
+            backgroundColor: colors.danger,
+          }}
+        >
+          <Ionicons name="log-out-outline" size={20} color="#fff" />
+          <Text style={{ fontSize: 16, fontWeight: "700", color: "#ffffff" }}>
+            {t("logoutButton")}
+          </Text>
+        </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>
   );

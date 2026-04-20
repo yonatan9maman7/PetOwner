@@ -1,3 +1,5 @@
+using PetOwner.Data.Models;
+
 namespace PetOwner.Api.DTOs;
 
 public record MapPinDto(
@@ -33,7 +35,9 @@ public record ProviderPublicProfileDto(
     string? WhatsAppNumber,
     string? WebsiteUrl,
     string? OpeningHours,
-    bool IsEmergencyService
+    bool IsEmergencyService,
+    List<DogSize> AcceptedDogSizes,
+    int? MaxDogsCapacity
 );
 
 public record PublicAvailabilitySlotDto(int DayOfWeek, string StartTime, string EndTime);

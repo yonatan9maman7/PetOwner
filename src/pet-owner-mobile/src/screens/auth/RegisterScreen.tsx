@@ -130,7 +130,7 @@ export function RegisterScreen() {
           <View className="items-center mb-7">
             <View
               className="w-14 h-14 rounded-2xl items-center justify-center mb-4"
-              style={{ backgroundColor: colors.primary }}
+              style={{ backgroundColor: colors.brand }}
             >
               <Ionicons name="heart" size={24} color={colors.textInverse} />
             </View>
@@ -395,7 +395,7 @@ export function RegisterScreen() {
               className="w-5 h-5 rounded border-2 items-center justify-center"
               style={
                 termsAccepted
-                  ? { backgroundColor: colors.primary, borderColor: colors.primary }
+                  ? { backgroundColor: colors.brand, borderColor: colors.brand }
                   : { borderColor: colors.textSecondary }
               }
             >
@@ -418,7 +418,7 @@ export function RegisterScreen() {
           <Pressable
             className="h-14 rounded-xl items-center justify-center"
             style={{
-              backgroundColor: colors.primary,
+              backgroundColor: colors.brand,
               opacity: loading || !canSubmit ? 0.45 : 1,
             }}
             onPress={handleRegister}

@@ -12,7 +12,10 @@ import {
   Linking,
   Modal,
   Keyboard,
+  Alert,
+  FlatList,
 } from "react-native";
+import axios from "axios";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation, useRoute } from "@react-navigation/native";
@@ -30,7 +33,12 @@ import { useTheme } from "../../theme/ThemeContext";
 import { DatePickerField } from "../../components/DatePickerField";
 import { TimePickerField } from "../../components/TimePickerField";
 import { mapApi } from "../../api/client";
-import type { MapPinDto, MapSearchFilters } from "../../types/api";
+import { ProviderType, type MapPinDto, type MapSearchFilters } from "../../types/api";
+import {
+  groupPinsForMapMarkers,
+  markerItemHasSelectedProvider,
+  sortMarkerItemsStable,
+} from "./mapCollision";
 
 const TEL_AVIV = {
   latitude: 32.0853,
@@ -56,6 +64,8 @@ const SERVICE_ICONS: Record<string, { icon: string; active: string }> = {
   "pet sitter": { icon: "eye-outline", active: "eye" },
   "pet trainer": { icon: "school-outline", active: "school" },
   "pet store": { icon: "storefront-outline", active: "storefront" },
+  "house sitting": { icon: "key-outline", active: "key" },
+  "doggy day care": { icon: "sunny-outline", active: "sunny" },
 };
 
 const SERVICE_I18N_MAP: Record<string, string> = {
@@ -70,12 +80,20 @@ const SERVICE_I18N_MAP: Record<string, string> = {
   "pet trainer": "serviceTraining",
   training: "serviceTraining",
   insurance: "serviceInsurance",
+  "house sitting": "serviceHouseSitting",
+  "doggy day care": "serviceDoggyDayCare",
 };
 
 function getServiceIcon(name: string, isActive: boolean) {
   const entry = SERVICE_ICONS[name.toLowerCase()];
   if (!entry) return isActive ? "paw" : "paw-outline";
   return isActive ? entry.active : entry.icon;
+}
+
+function formatMapPinRating(rating: unknown): string | null {
+  if (rating == null) return null;
+  const n = Number(rating);
+  return Number.isFinite(n) ? n.toFixed(1) : null;
 }
 
 /* ──────── Paw Marker ──────── */
@@ -133,6 +151,24 @@ const pawMarkerStyles = StyleSheet.create({
     justifyContent: "center",
     borderWidth: 2,
   },
+  clusterBubbleWrap: {
+    position: "relative",
+    width: 44,
+    height: 44,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  clusterCountBadge: {
+    position: "absolute",
+    top: 0,
+    minWidth: 20,
+    height: 20,
+    borderRadius: 10,
+    paddingHorizontal: 5,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 2,
+  },
   arrow: {
     width: 0,
     height: 0,
@@ -144,6 +180,78 @@ const pawMarkerStyles = StyleSheet.create({
     borderRightColor: "transparent",
   },
 });
+
+/** Stacked providers at the same coordinates — shows count badge. */
+function ClusterPawMarker({
+  count,
+  active,
+  isRTL,
+}: {
+  count: number;
+  active?: boolean;
+  isRTL: boolean;
+}) {
+  const { colors } = useTheme();
+  const badgeSide = isRTL ? { left: 2 } : { right: 2 };
+  return (
+    <View style={pawMarkerStyles.hitArea}>
+      <View style={pawMarkerStyles.clusterBubbleWrap}>
+        <View
+          style={[
+            pawMarkerStyles.bubble,
+            active
+              ? {
+                  backgroundColor: colors.text,
+                  borderColor: colors.surface,
+                  shadowColor: colors.text,
+                  shadowOffset: { width: 0, height: 4 },
+                  shadowOpacity: 0.3,
+                  shadowRadius: 8,
+                  elevation: 8,
+                }
+              : {
+                  backgroundColor: colors.surface,
+                  borderColor: colors.borderLight,
+                  shadowColor: colors.shadow,
+                  shadowOffset: { width: 0, height: 2 },
+                  shadowOpacity: 0.12,
+                  shadowRadius: 6,
+                  elevation: 4,
+                },
+          ]}
+        >
+          <Ionicons name="paw" size={18} color={active ? colors.textInverse : colors.text} />
+        </View>
+        <View
+          style={[
+            pawMarkerStyles.clusterCountBadge,
+            badgeSide,
+            {
+              backgroundColor: active ? colors.primaryLight : colors.danger,
+              borderColor: colors.surface,
+            },
+          ]}
+        >
+          <Text
+            style={{
+              fontSize: 11,
+              fontWeight: "800",
+              color: active ? colors.text : "#fff",
+            }}
+          >
+            {count > 99 ? "99+" : count}
+          </Text>
+        </View>
+      </View>
+      <View
+        style={[
+          pawMarkerStyles.arrow,
+          { borderTopColor: active ? colors.text : colors.surface },
+        ]}
+      />
+    </View>
+  );
+}
 
 /* ──────── Avatar with SVG fallback ──────── */
 
@@ -188,10 +296,13 @@ export function ExploreScreen() {
   const [pins, setPins] = useState<MapPinDto[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedPin, setSelectedPin] = useState<MapPinDto | null>(null);
+  const [collocatedChooserPins, setCollocatedChooserPins] = useState<MapPinDto[] | null>(null);
   const mapRef = useRef<any>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const moveDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const markerJustTappedRef = useRef(false);
+  /** Ignore stale map/pin responses when the user pans or zooms faster than the network. */
+  const pinsFetchGenRef = useRef(0);
 
   /* Service types from API */
   const [serviceTypes, setServiceTypes] = useState<string[]>([]);
@@ -214,6 +325,15 @@ export function ExploreScreen() {
   const mapRegionRef = useRef(TEL_AVIV);
 
   /* ─── Active filter count (badge) ─── */
+  const mapMarkerItems = useMemo(
+    () => sortMarkerItemsStable(groupPinsForMapMarkers(pins)),
+    [pins],
+  );
+
+  const selectedPinRatingLabel = selectedPin
+    ? formatMapPinRating(selectedPin.averageRating)
+    : null;
+
   const activeFilterCount = useMemo(() => {
     let count = 0;
     if (activeServices.size > 0) count += activeServices.size;
@@ -265,14 +385,16 @@ export function ExploreScreen() {
       const region = mapRegionRef.current;
       const latDelta = region.latitudeDelta / 2;
       const lngDelta = region.longitudeDelta / 2;
+      // Distance from map center to a corner of the visible region, with extra padding so
+      // providers near the viewport edge are not dropped (projection vs SQL geography tolerance).
       const diagKm =
         Math.sqrt(
           Math.pow(latDelta * 111, 2) +
             Math.pow(lngDelta * 111 * Math.cos((region.latitude * Math.PI) / 180), 2),
-        ) * 1.2;
+        ) * 1.38;
       f.latitude = region.latitude;
       f.longitude = region.longitude;
-      f.radiusKm = Math.max(1.2, Math.min(diagKm, 80));
+      f.radiusKm = Math.max(1.75, Math.min(diagKm, 80));
     }
 
     return Object.keys(f).length > 0 ? f : undefined;
@@ -291,17 +413,25 @@ export function ExploreScreen() {
   /* ─── Fetch pins ─── */
   const fetchPins = useCallback(
     async (filters?: MapSearchFilters) => {
+      const gen = ++pinsFetchGenRef.current;
       setLoading(true);
       try {
         const data = await mapApi.fetchPins(filters);
+        if (gen !== pinsFetchGenRef.current) return;
         setPins(data);
-      } catch {
+      } catch (error) {
+        if (gen !== pinsFetchGenRef.current) return;
         setPins([]);
+        if (!(axios.isAxiosError(error) && error.response?.status === 401)) {
+          Alert.alert(t("genericErrorTitle"), t("genericErrorDesc"));
+        }
       } finally {
-        setLoading(false);
+        if (gen === pinsFetchGenRef.current) {
+          setLoading(false);
+        }
       }
     },
-    [],
+    [t],
   );
 
   const loadPins = useCallback(() => {
@@ -341,15 +471,27 @@ export function ExploreScreen() {
     if (pins.length > 0) {
       tryFocus(pins);
     } else {
-      // Pins not yet loaded — fetch without filters and then focus
+      // Pins not yet loaded — fetch without filters and then focus (same gen guard as fetchPins)
+      const gen = ++pinsFetchGenRef.current;
       setLoading(true);
-      mapApi.fetchPins().then((data) => {
-        setPins(data);
-        setLoading(false);
-        tryFocus(data);
-      }).catch(() => setLoading(false));
+      mapApi
+        .fetchPins()
+        .then((data) => {
+          if (gen !== pinsFetchGenRef.current) return;
+          setPins(data);
+          tryFocus(data);
+        })
+        .catch((error) => {
+          if (gen !== pinsFetchGenRef.current) return;
+          if (!(axios.isAxiosError(error) && error.response?.status === 401)) {
+            Alert.alert(t("genericErrorTitle"), t("genericErrorDesc"));
+          }
+        })
+        .finally(() => {
+          if (gen === pinsFetchGenRef.current) setLoading(false);
+        });
     }
-  }, [route.params?.focusProviderId]);
+  }, [route.params?.focusProviderId, t]);
 
   /* ─── Service pill toggle (same as web) ─── */
   const toggleServiceFilter = useCallback(
@@ -367,6 +509,7 @@ export function ExploreScreen() {
   /* ─── Search (debounced) ─── */
   const handleSearchSubmit = useCallback(() => {
     setSelectedPin(null);
+    setCollocatedChooserPins(null);
     loadPinsRef.current();
   }, []);
 
@@ -376,6 +519,7 @@ export function ExploreScreen() {
       if (debounceRef.current) clearTimeout(debounceRef.current);
       debounceRef.current = setTimeout(() => {
         setSelectedPin(null);
+        setCollocatedChooserPins(null);
         loadPinsRef.current();
       }, 500);
     },
@@ -388,6 +532,7 @@ export function ExploreScreen() {
       mapRegionRef.current = region;
       if (moveDebounceRef.current) clearTimeout(moveDebounceRef.current);
       moveDebounceRef.current = setTimeout(() => {
+        setCollocatedChooserPins(null);
         loadPinsRef.current();
       }, 500);
     },
@@ -398,6 +543,7 @@ export function ExploreScreen() {
   const applyFilter = useCallback(() => {
     setShowFilterPanel(false);
     setSelectedPin(null);
+    setCollocatedChooserPins(null);
     loadPinsRef.current();
   }, []);
 
@@ -410,6 +556,7 @@ export function ExploreScreen() {
     setFilterTime("");
     setSearchText("");
     setSelectedPin(null);
+    setCollocatedChooserPins(null);
     setShowFilterPanel(false);
     setTimeout(() => loadPinsRef.current(), 0);
   }, []);
@@ -417,8 +564,28 @@ export function ExploreScreen() {
   /* ─── Marker press ─── */
   const handleMarkerPress = useCallback((pin: MapPinDto) => {
     markerJustTappedRef.current = true;
-    setTimeout(() => { markerJustTappedRef.current = false; }, 300);
+    setTimeout(() => {
+      markerJustTappedRef.current = false;
+    }, 300);
+    setCollocatedChooserPins(null);
     setSelectedPin(pin);
+  }, []);
+
+  const openCollocatedChooser = useCallback((clusterPins: MapPinDto[]) => {
+    markerJustTappedRef.current = true;
+    setTimeout(() => {
+      markerJustTappedRef.current = false;
+    }, 300);
+    setCollocatedChooserPins(clusterPins);
+  }, []);
+
+  const pickFromCollocatedList = useCallback((pin: MapPinDto) => {
+    markerJustTappedRef.current = true;
+    setTimeout(() => {
+      markerJustTappedRef.current = false;
+    }, 300);
+    setSelectedPin(pin);
+    setCollocatedChooserPins(null);
   }, []);
 
   const handleWhatsApp = useCallback((pin: MapPinDto) => {
@@ -444,7 +611,10 @@ export function ExploreScreen() {
         onRegionChangeComplete={handleRegionChange}
         onPress={() => {
           Keyboard.dismiss();
-          if (!markerJustTappedRef.current) setSelectedPin(null);
+          if (!markerJustTappedRef.current) {
+            setSelectedPin(null);
+            setCollocatedChooserPins(null);
+          }
         }}
         {...(Platform.OS === "android" && { mapType: "standard" })}
       >
@@ -454,21 +624,53 @@ export function ExploreScreen() {
             anchor={{ x: 0.5, y: 0.5 }}
             tracksViewChanges={false}
           >
-            <View style={styles.userDotOuter}>
-              <View style={styles.userDotInner} />
+            <View
+              style={[
+                styles.userDotOuter,
+                { backgroundColor: `${colors.primary}33` },
+              ]}
+            >
+              <View
+                style={[styles.userDotInner, { backgroundColor: colors.primary }]}
+              />
             </View>
           </MarkerWrapper>
         )}
-        {pins.map((pin) => (
-          <MarkerWrapper
-            key={pin.providerId}
-            coordinate={{ latitude: pin.latitude, longitude: pin.longitude }}
-            onPress={() => handleMarkerPress(pin)}
-            tracksViewChanges={false}
-          >
-            <PawMarker active={selectedPin?.providerId === pin.providerId} />
-          </MarkerWrapper>
-        ))}
+        {mapMarkerItems.map((item) => {
+          if (item.kind === "single") {
+            const pin = item.pin;
+            const isSel = selectedPin?.providerId === pin.providerId;
+            return (
+              <MarkerWrapper
+                key={pin.providerId}
+                coordinate={{ latitude: pin.latitude, longitude: pin.longitude }}
+                onPress={() => handleMarkerPress(pin)}
+                tracksViewChanges={false}
+                zIndex={isSel ? 1000 : 1}
+                {...(Platform.OS === "android" ? { style: { elevation: isSel ? 12 : 4 } } : {})}
+              >
+                <PawMarker active={isSel} />
+              </MarkerWrapper>
+            );
+          }
+          const clusterActive = markerItemHasSelectedProvider(item, selectedPin?.providerId);
+          return (
+            <MarkerWrapper
+              key={`cluster-${item.key}`}
+              coordinate={{ latitude: item.latitude, longitude: item.longitude }}
+              onPress={() => openCollocatedChooser(item.pins)}
+              tracksViewChanges={false}
+              zIndex={clusterActive ? 1000 : 1}
+              {...(Platform.OS === "android" ? { style: { elevation: clusterActive ? 12 : 4 } } : {})}
+            >
+              <ClusterPawMarker
+                count={item.pins.length}
+                active={clusterActive}
+                isRTL={isRTL}
+              />
+            </MarkerWrapper>
+          );
+        })}
       </MapViewWrapper>
 
       <SafeAreaView edges={["top"]} style={{ zIndex: 10, marginTop: -8 }}>
@@ -677,7 +879,9 @@ export function ExploreScreen() {
 
       {/* Discover Businesses FAB */}
       <Pressable
-        onPress={() => navigation.navigate("Discover")}
+        onPress={() =>
+          navigation.navigate("Discover", { providerTypeFilter: ProviderType.Business })
+        }
         style={{
           position: "absolute",
           bottom: selectedPin ? 230 : 120,
@@ -766,11 +970,11 @@ export function ExploreScreen() {
                     color={favoriteIds.has(selectedPin.providerId) ? "#e11d48" : colors.textMuted}
                   />
                 </Pressable>
-                {selectedPin.averageRating != null && (
+                {selectedPinRatingLabel != null && (
                   <View className="flex-row items-center gap-1 bg-[#e9e2d1] px-2 py-0.5 rounded-full ml-2">
                     <Ionicons name="star" size={14} color="#1e1c11" />
                     <Text className="text-xs font-bold text-[#1e1c11]">
-                      {selectedPin.averageRating.toFixed(1)}
+                      {selectedPinRatingLabel}
                     </Text>
                   </View>
                 )}
@@ -837,6 +1041,288 @@ export function ExploreScreen() {
           </View>
         </View>
       )}
+
+      <Modal
+        visible={collocatedChooserPins != null && collocatedChooserPins.length > 0}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setCollocatedChooserPins(null)}
+      >
+        <View style={{ flex: 1, justifyContent: "flex-end" }}>
+          <Pressable
+            style={[StyleSheet.absoluteFillObject, { backgroundColor: colors.overlay }]}
+            onPress={() => setCollocatedChooserPins(null)}
+            accessibilityRole="button"
+            accessibilityLabel={t("cancel")}
+          />
+          <View
+            style={[
+              styles.collocatedSheet,
+              {
+                backgroundColor: colors.surface,
+                paddingBottom: Math.max(insets.bottom, 20),
+                shadowColor: "#000",
+                shadowOffset: { width: 0, height: -4 },
+                shadowOpacity: 0.12,
+                shadowRadius: 12,
+                elevation: 16,
+              },
+            ]}
+          >
+            <View
+              style={{
+                width: 40,
+                height: 4,
+                backgroundColor: colors.border,
+                borderRadius: 2,
+                alignSelf: "center",
+                marginBottom: 14,
+              }}
+            />
+            <View
+              style={{
+                flexDirection: isRTL ? "row-reverse" : "row",
+                alignItems: "flex-start",
+                justifyContent: "space-between",
+                gap: 12,
+                marginBottom: 6,
+              }}
+            >
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <Text
+                  style={{
+                    fontSize: 18,
+                    fontWeight: "800",
+                    color: colors.text,
+                    textAlign: isRTL ? "right" : "left",
+                  }}
+                >
+                  {t("mapCollocatedProvidersTitle")}
+                </Text>
+                <Text
+                  style={{
+                    fontSize: 13,
+                    color: colors.textSecondary,
+                    textAlign: isRTL ? "right" : "left",
+                    marginTop: 4,
+                  }}
+                >
+                  {t("mapCollocatedProvidersHint")}
+                </Text>
+              </View>
+              <Pressable
+                onPress={() => setCollocatedChooserPins(null)}
+                hitSlop={12}
+                accessibilityRole="button"
+                accessibilityLabel={t("cancel")}
+                style={({ pressed }) => ({
+                  padding: 4,
+                  opacity: pressed ? 0.65 : 1,
+                })}
+              >
+                <Ionicons name="close" size={26} color={colors.textMuted} />
+              </Pressable>
+            </View>
+            <FlatList
+              data={collocatedChooserPins ?? []}
+              keyExtractor={(p) => p.providerId}
+              keyboardShouldPersistTaps="handled"
+              style={{ maxHeight: 380 }}
+              contentContainerStyle={{ paddingTop: 8, paddingBottom: 4 }}
+              renderItem={({ item: pin }) => {
+                const servicesLine = pin.services?.trim();
+                const servicesDisplay =
+                  servicesLine || t("mapCollocatedServicesPlaceholder");
+                const rate =
+                  typeof pin.minRate === "number" && Number.isFinite(pin.minRate)
+                    ? pin.minRate
+                    : 0;
+                const collocatedRatingLabel = formatMapPinRating(pin.averageRating);
+
+                const openProfile = () => {
+                  setCollocatedChooserPins(null);
+                  navigation.navigate("ProviderProfile", {
+                    providerId: pin.providerId,
+                    requestedDate: filterDate || undefined,
+                    requestedTime: filterTime || undefined,
+                  });
+                };
+
+                return (
+                  <Pressable
+                    onPress={() => pickFromCollocatedList(pin)}
+                    accessibilityRole="button"
+                    accessibilityLabel={pin.name}
+                    style={({ pressed }) => ({
+                      opacity: pressed ? 0.96 : 1,
+                      marginBottom: 12,
+                    })}
+                  >
+                    <View
+                      className="p-4 rounded-xl flex-row items-center gap-4"
+                      style={[
+                        styles.sitterCard,
+                        {
+                          backgroundColor: colors.surface,
+                          shadowColor: colors.shadow,
+                          flexDirection: isRTL ? "row-reverse" : "row",
+                        },
+                      ]}
+                    >
+                      <Pressable
+                        className="relative active:opacity-80"
+                        onPress={openProfile}
+                      >
+                        <AvatarImage uri={pin.profileImageUrl} />
+                        {pin.isEmergencyService && (
+                          <View
+                            className="absolute -bottom-1 -right-1 rounded-full border-2 p-0.5"
+                            style={{
+                              backgroundColor: "#dc2626",
+                              borderColor: colors.surface,
+                            }}
+                          >
+                            <Ionicons name="medkit" size={12} color="#fff" />
+                          </View>
+                        )}
+                      </Pressable>
+
+                      <View className="flex-1" style={{ minWidth: 0 }}>
+                        <View className="flex-row justify-between items-start">
+                          <Text
+                            className="text-lg font-bold"
+                            numberOfLines={1}
+                            style={{
+                              flex: 1,
+                              color: colors.text,
+                              textAlign: isRTL ? "right" : "left",
+                            }}
+                          >
+                            {pin.name}
+                          </Text>
+                          <Pressable
+                            onPress={() => toggleFavorite(pin.providerId)}
+                            hitSlop={8}
+                            className="ml-2"
+                          >
+                            <Ionicons
+                              name={
+                                favoriteIds.has(pin.providerId)
+                                  ? "heart"
+                                  : "heart-outline"
+                              }
+                              size={22}
+                              color={
+                                favoriteIds.has(pin.providerId)
+                                  ? "#e11d48"
+                                  : colors.textMuted
+                              }
+                            />
+                          </Pressable>
+                          {collocatedRatingLabel != null && (
+                            <View className="flex-row items-center gap-1 bg-[#e9e2d1] px-2 py-0.5 rounded-full ml-2">
+                              <Ionicons name="star" size={14} color="#1e1c11" />
+                              <Text className="text-xs font-bold text-[#1e1c11]">
+                                {collocatedRatingLabel}
+                              </Text>
+                            </View>
+                          )}
+                        </View>
+
+                        <Text
+                          className="text-sm font-medium mt-0.5"
+                          numberOfLines={2}
+                          style={{
+                            color: servicesLine
+                              ? colors.textSecondary
+                              : colors.textMuted,
+                            textAlign: isRTL ? "right" : "left",
+                            fontStyle: servicesLine ? "normal" : "italic",
+                            minHeight: 40,
+                          }}
+                        >
+                          {servicesDisplay}
+                        </Text>
+
+                        {pin.reviewCount > 0 && (
+                          <Text
+                            className="text-xs mt-0.5"
+                            style={{
+                              color: colors.textMuted,
+                              textAlign: isRTL ? "right" : "left",
+                            }}
+                          >
+                            {pin.reviewCount} {t("reviews")}
+                          </Text>
+                        )}
+
+                        <View
+                          className="mt-1.5 flex-row items-center justify-between"
+                          style={{
+                            flexDirection: isRTL ? "row-reverse" : "row",
+                          }}
+                        >
+                          <View className="flex-row items-baseline">
+                            <Text
+                              className="text-xl font-bold"
+                              style={{ color: colors.text }}
+                            >
+                              ₪{rate}
+                            </Text>
+                            <Text
+                              className="text-xs font-medium ml-1"
+                              style={{ color: colors.textSecondary }}
+                            >
+                              {t("perHour")}
+                            </Text>
+                          </View>
+
+                          <View className="flex-row items-center gap-2">
+                            {pin.whatsAppNumber ? (
+                              <Pressable
+                                onPress={() => {
+                                  setCollocatedChooserPins(null);
+                                  handleWhatsApp(pin);
+                                }}
+                                className="bg-[#25d366] w-8 h-8 rounded-full items-center justify-center active:opacity-90"
+                              >
+                                <Ionicons
+                                  name="logo-whatsapp"
+                                  size={18}
+                                  color="#fff"
+                                />
+                              </Pressable>
+                            ) : null}
+                            <Pressable
+                              className="px-4 py-1.5 rounded-full active:opacity-90"
+                              style={{
+                                backgroundColor: colors.text,
+                                shadowColor: colors.text,
+                                shadowOffset: { width: 0, height: 2 },
+                                shadowOpacity: 0.2,
+                                shadowRadius: 8,
+                                elevation: 4,
+                              }}
+                              onPress={openProfile}
+                            >
+                              <Text
+                                className="text-sm font-bold"
+                                style={{ color: colors.textInverse }}
+                              >
+                                {t("viewProfile")}
+                              </Text>
+                            </Pressable>
+                          </View>
+                        </View>
+                      </View>
+                    </View>
+                  </Pressable>
+                );
+              }}
+            />
+          </View>
+        </View>
+      </Modal>
 
       {/* ═══════════ FILTER PANEL MODAL ═══════════ */}
       <Modal
@@ -1179,11 +1665,17 @@ const styles = StyleSheet.create({
     paddingTop: 16,
     maxHeight: "75%",
   },
+  collocatedSheet: {
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    maxHeight: "62%",
+  },
   userDotOuter: {
     width: 22,
     height: 22,
     borderRadius: 11,
-    backgroundColor: "rgba(60,130,246,0.2)",
     alignItems: "center",
     justifyContent: "center",
   },
@@ -1191,7 +1683,6 @@ const styles = StyleSheet.create({
     width: 12,
     height: 12,
     borderRadius: 6,
-    backgroundColor: "#3b82f6",
     borderWidth: 2,
     borderColor: "#fff",
   },

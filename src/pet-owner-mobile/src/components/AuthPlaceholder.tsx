@@ -44,7 +44,7 @@ export function AuthPlaceholder({
 
       <Pressable
         className="w-full h-14 rounded-2xl items-center justify-center active:opacity-90"
-        style={{ backgroundColor: colors.primary }}
+        style={{ backgroundColor: colors.brand }}
         onPress={() => navigation.navigate("Login")}
       >
         <Text className="text-base font-bold" style={{ color: colors.primaryText }}>

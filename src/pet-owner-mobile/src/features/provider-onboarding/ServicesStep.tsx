@@ -3,7 +3,9 @@ import { Ionicons } from "@expo/vector-icons";
 import { useFormContext } from "react-hook-form";
 import { useTranslation } from "../../i18n";
 import { useTheme } from "../../theme/ThemeContext";
-import { SERVICES } from "./constants";
+import { servicesForOnboarding } from "./constants";
+import { FieldLabel } from "./FieldLabel";
+import { DogSizeCapacityFields } from "./DogSizeCapacityFields";
 import type { OnboardingFormValues } from "./schemas";
 
 export function ServicesStep() {
@@ -11,6 +13,8 @@ export function ServicesStep() {
   const { colors } = useTheme();
   const { watch, setValue } = useFormContext<OnboardingFormValues>();
   const services = watch("services");
+  const providerType = watch("providerType");
+  const serviceDefs = servicesForOnboarding(providerType);
 
   const toggle = (key: string) => {
     const current = services[key];
@@ -36,9 +40,10 @@ export function ServicesStep() {
         }}
       >
         {t("servicesAndPricing")}
+        <Text style={{ color: colors.danger }}> *</Text>
       </Text>
 
-      {SERVICES.map((svc) => {
+      {serviceDefs.map((svc) => {
         const key = String(svc.serviceType);
         const state = services[key];
         if (!state) return null;
@@ -86,14 +91,15 @@ export function ServicesStep() {
             </Pressable>
 
             {state.enabled && (
-              <View
-                style={{
-                  flexDirection: isRTL ? "row-reverse" : "row",
-                  alignItems: "center",
-                  marginTop: 12,
-                  gap: 8,
-                }}
-              >
+              <View style={{ marginTop: 12 }}>
+                <FieldLabel text={t("priceLabel")} isRTL={isRTL} required variant="small" />
+                <View
+                  style={{
+                    flexDirection: isRTL ? "row-reverse" : "row",
+                    alignItems: "center",
+                    gap: 8,
+                  }}
+                >
                 <Text style={{ fontSize: 13, fontWeight: "600", color: colors.text }}>₪</Text>
                 <TextInput
                   value={state.rate}
@@ -116,10 +122,13 @@ export function ServicesStep() {
                 />
                 <Text style={{ fontSize: 12, color: colors.textSecondary }}>{t(svc.unitKey)}</Text>
               </View>
+              </View>
             )}
           </View>
         );
       })}
+
+      <DogSizeCapacityFields />
     </ScrollView>
   );
 }

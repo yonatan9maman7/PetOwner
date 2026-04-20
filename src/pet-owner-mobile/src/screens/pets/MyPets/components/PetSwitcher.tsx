@@ -3,7 +3,7 @@ import { Ionicons } from "@expo/vector-icons";
 import type { FlatList } from "react-native";
 import type { RefObject } from "react";
 import type { PetDto } from "../../../../types/api";
-import { speciesEmoji } from "../constants";
+import { getSpeciesEmoji } from "../constants";
 
 interface PetSwitcherProps {
   pets: PetDto[];
@@ -63,7 +63,7 @@ export function PetSwitcher({
               color: i === activeIndex ? "#fff" : textSecondary,
             }}
           >
-            {speciesEmoji[p.species] ?? "🐾"} {p.name}
+            {getSpeciesEmoji(p.species)} {p.name}
           </Text>
         </Pressable>
       ))}

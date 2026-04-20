@@ -14,7 +14,7 @@ export function LanguageToggle() {
       <Pressable
         onPress={() => setLanguage(lang)}
         className="px-3.5 py-1.5 rounded-full"
-        style={active ? { backgroundColor: colors.primary } : undefined}
+        style={active ? { backgroundColor: colors.brand } : undefined}
       >
         <Text
           className="text-xs font-bold"

@@ -20,7 +20,8 @@ import { useTranslation, type TranslationKey } from "../../i18n";
 import { useTheme } from "../../theme/ThemeContext";
 import { providerApi } from "../../api/client";
 import { CityAutocompleteInput } from "../../components/shared/CityAutocompleteInput";
-import type { AvailabilitySlotDto } from "../../types/api";
+import { DogSizeCapacityEditor, toggleDogSize } from "../../features/provider-onboarding/DogSizeCapacityFields";
+import type { AvailabilitySlotDto, DogSize } from "../../types/api";
 
 const NAVY = "#001a5a";
 const DEFAULT_LAT = 32.0809;
@@ -786,6 +787,8 @@ export function ProviderEditScreen() {
   const [editingSlot, setEditingSlot] = useState<{ slotId: string; field: "start" | "end" } | null>(null);
   const [visibleOnMap, setVisibleOnMap] = useState(false);
   const [togglingMapVisibility, setTogglingMapVisibility] = useState(false);
+  const [acceptedDogSizes, setAcceptedDogSizes] = useState<DogSize[]>([]);
+  const [maxDogsCapacity, setMaxDogsCapacity] = useState("");
 
   useEffect(() => {
     let active = true;
@@ -808,6 +811,10 @@ export function ProviderEditScreen() {
         setApartmentNumber(profile.apartmentNumber || "");
         setLatitude(profile.latitude || DEFAULT_LAT);
         setLongitude(profile.longitude || DEFAULT_LNG);
+        setAcceptedDogSizes(profile.acceptedDogSizes ?? []);
+        setMaxDogsCapacity(
+          profile.maxDogsCapacity != null ? String(profile.maxDogsCapacity) : "",
+        );
 
         const loaded = buildInitialServiceStates();
         for (const rate of profile.serviceRates) {
@@ -974,6 +981,21 @@ export function ProviderEditScreen() {
         };
       });
 
+      const needsDogPrefs = !!serviceStates[0]?.enabled || !!serviceStates[2]?.enabled;
+      if (needsDogPrefs) {
+        if (acceptedDogSizes.length === 0) {
+          Alert.alert(t("errorTitle"), t("acceptedSizesRequired"));
+          setSaving(false);
+          return;
+        }
+        const cap = Number(maxDogsCapacity);
+        if (!maxDogsCapacity.trim() || isNaN(cap) || cap < 1) {
+          Alert.alert(t("errorTitle"), t("maxCapacityInvalid"));
+          setSaving(false);
+          return;
+        }
+      }
+
       if (isNewProvider) {
         const firstService = selectedServices[0];
         await providerApi.apply({
@@ -988,7 +1010,10 @@ export function ProviderEditScreen() {
           phoneNumber,
           isEmergencyService: false,
           description: bio || t("bioPlaceholder"),
+          bio: bio.trim() || undefined,
           selectedServices,
+          acceptedDogSizes: needsDogPrefs ? acceptedDogSizes : [],
+          maxDogsCapacity: needsDogPrefs ? Number(maxDogsCapacity) : null,
         });
         setProviderStatus("Pending");
         const msg = t("applicationSubmitted");
@@ -1004,6 +1029,8 @@ export function ProviderEditScreen() {
           latitude,
           longitude,
           acceptsOffHoursRequests: urgentAvailable,
+          acceptedDogSizes: needsDogPrefs ? acceptedDogSizes : [],
+          maxDogsCapacity: needsDogPrefs ? Number(maxDogsCapacity) : null,
         });
 
         for (const id of deletedSlotIds) {
@@ -1329,6 +1356,16 @@ export function ProviderEditScreen() {
                     t={t}
                   />
                 ))}
+                {(serviceStates[0]?.enabled || serviceStates[2]?.enabled) && (
+                  <DogSizeCapacityEditor
+                    selected={acceptedDogSizes}
+                    onToggleSize={(id) =>
+                      setAcceptedDogSizes((prev) => toggleDogSize(prev, id))
+                    }
+                    maxCapacity={maxDogsCapacity}
+                    onMaxCapacityChange={setMaxDogsCapacity}
+                  />
+                )}
               </View>
 
               {/* ── Bio ── */}

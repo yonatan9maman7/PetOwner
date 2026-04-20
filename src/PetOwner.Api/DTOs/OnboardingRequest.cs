@@ -17,19 +17,6 @@ public record ServiceRateDto(
     List<ServicePackageDto>? Packages = null
 );
 
-public record ProviderOnboardingRequest(
-    List<ServiceRateDto> SelectedServices,
-    string Bio,
-    [Required] double Latitude,
-    [Required] double Longitude,
-    [Required] string City,
-    [Required] string Street,
-    [Required] string BuildingNumber,
-    string? ApartmentNumber,
-    [Required] string ReferenceName,
-    [Required] string ReferenceContact
-);
-
 public record ProviderApplicationRequest
 {
     [Required]
@@ -59,8 +46,9 @@ public record ProviderApplicationRequest
     [Required]
     public double Longitude { get; init; }
 
-    [Required, Phone, MaxLength(20)]
-    public string PhoneNumber { get; init; } = null!;
+    /// <summary>When omitted, the account phone from the user profile is used.</summary>
+    [Phone, MaxLength(20)]
+    public string? PhoneNumber { get; init; }
 
     [Phone, MaxLength(20)]
     public string? WhatsAppNumber { get; init; }
@@ -76,6 +64,10 @@ public record ProviderApplicationRequest
     [Required, MaxLength(2000)]
     public string Description { get; init; } = null!;
 
+    /// <summary>Public-facing bio. When omitted, <see cref="Description"/> is copied after apply.</summary>
+    [MaxLength(4000)]
+    public string? Bio { get; init; }
+
     [MaxLength(500)]
     public string? ImageUrl { get; init; }
 
@@ -86,9 +78,16 @@ public record ProviderApplicationRequest
 
     [MaxLength(200)]
     public string? ReferenceContact { get; init; }
+
+    public List<DogSize> AcceptedDogSizes { get; init; } = [];
+
+    public int? MaxDogsCapacity { get; init; }
 }
 
-public record ProviderApplicationResponse(string Message, Guid ApplicationId);
+public record ProviderApplicationResponse(
+    string Message,
+    Guid ApplicationId,
+    string? NewAccessToken = null);
 
 public record ProviderMeResponse(
     string Status,
@@ -114,7 +113,9 @@ public record ProviderMeResponse(
     string? WhatsAppNumber,
     string? WebsiteUrl,
     string? OpeningHours,
-    bool IsEmergencyService
+    bool IsEmergencyService,
+    List<DogSize> AcceptedDogSizes,
+    int? MaxDogsCapacity
 );
 
 public record GenerateBioRequest(string UserNotes);
@@ -132,5 +133,6 @@ public record UpdateProfileDto(
     string Street,
     string BuildingNumber,
     string? ApartmentNumber,
-    bool? AcceptsOffHoursRequests
-);
+    bool? AcceptsOffHoursRequests,
+    List<DogSize>? AcceptedDogSizes = null,
+    int? MaxDogsCapacity = null);

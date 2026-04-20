@@ -57,6 +57,8 @@ const ISRAELI_CITIES: CityEntry[] = [
 
 export interface CityAutocompleteInputProps {
   label: string;
+  /** When true, shows a red asterisk after the label (mandatory field). */
+  required?: boolean;
   value: string;
   onChangeText: (city: string) => void;
   /**
@@ -69,6 +71,7 @@ export interface CityAutocompleteInputProps {
 
 export function CityAutocompleteInput({
   label,
+  required,
   value,
   onChangeText,
   onCitySelect,
@@ -142,6 +145,7 @@ export function CityAutocompleteInput({
         }}
       >
         {label}
+        {required ? <Text style={{ color: colors.danger }}> *</Text> : null}
       </Text>
 
       {/* Input row */}

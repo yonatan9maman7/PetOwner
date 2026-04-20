@@ -14,7 +14,7 @@ import {
 } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
-import { useNavigation } from "@react-navigation/native";
+import { useNavigation, useRoute, type RouteProp } from "@react-navigation/native";
 import Animated, {
   FadeInDown,
   FadeOut,
@@ -23,7 +23,7 @@ import Animated, {
 import { useTranslation, type TranslationKey } from "../../i18n";
 import { useTheme, type ThemeColors } from "../../theme/ThemeContext";
 import { mapApi } from "../../api/client";
-import type { MapPinDto, ProviderType } from "../../types/api";
+import { ProviderType, type MapPinDto, type MapSearchFilters } from "../../types/api";
 
 /* ─── Category chip definitions ─── */
 
@@ -37,6 +37,16 @@ interface CategoryChip {
 const STATIC_CHIPS: CategoryChip[] = [
   { id: "all", labelKey: "chipAll", icon: "apps", label: "" },
 ];
+
+type DiscoverNavParams = { providerTypeFilter?: ProviderType };
+
+/** Normalize pin type (API JSON may use camelCase or PascalCase). */
+function mapPinProviderType(p: MapPinDto): ProviderType {
+  const anyPin = p as MapPinDto & { ProviderType?: string };
+  const raw = String(anyPin.providerType ?? anyPin.ProviderType ?? "");
+  if (raw === ProviderType.Business) return ProviderType.Business;
+  return ProviderType.Individual;
+}
 
 /* Provider type → gradient colors */
 const PROVIDER_GRADIENTS: [string, string][] = [
@@ -110,6 +120,8 @@ function FloatingRatingBadge({ rating }: { rating?: number }) {
 
 export function DiscoverScreen() {
   const navigation = useNavigation<any>();
+  const route = useRoute<RouteProp<{ Discover: DiscoverNavParams | undefined }, "Discover">>();
+  const providerTypeFilter = route.params?.providerTypeFilter;
   const { colors } = useTheme();
   const { t, isRTL, rtlText, rtlInput } = useTranslation();
   const insets = useSafeAreaInsets();
@@ -124,21 +136,46 @@ export function DiscoverScreen() {
   const [loading, setLoading] = useState(true);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  /* ─── Load service types + initial providers ─── */
+  const buildFilters = useCallback(
+    (search?: string): MapSearchFilters | undefined => {
+      const f: MapSearchFilters = {};
+      const q = search?.trim();
+      if (q) f.searchTerm = q;
+      if (providerTypeFilter != null) f.providerType = providerTypeFilter;
+      if (Object.keys(f).length === 0) return undefined;
+      return f;
+    },
+    [providerTypeFilter],
+  );
+
+  const loadProviders = useCallback(
+    (search?: string) => {
+      setLoading(true);
+      mapApi
+        .fetchPins(buildFilters(search))
+        .then((pins) => {
+          if (providerTypeFilter === ProviderType.Business) {
+            return pins.filter((p) => mapPinProviderType(p) === ProviderType.Business);
+          }
+          if (providerTypeFilter === ProviderType.Individual) {
+            return pins.filter((p) => mapPinProviderType(p) === ProviderType.Individual);
+          }
+          return pins;
+        })
+        .then(setProviders)
+        .catch(() => setProviders([]))
+        .finally(() => setLoading(false));
+    },
+    [buildFilters, providerTypeFilter],
+  );
+
   useEffect(() => {
     mapApi.getServiceTypes().then(setServiceTypes).catch(() => {});
-    loadProviders();
   }, []);
 
-  const loadProviders = useCallback((search?: string) => {
-    setLoading(true);
-    mapApi
-      .fetchPins(search?.trim() ? { searchTerm: search.trim() } : undefined)
-      .then((pins) => pins.filter((p) => p.providerType === ("Business" as ProviderType)))
-      .then(setProviders)
-      .catch(() => setProviders([]))
-      .finally(() => setLoading(false));
-  }, []);
+  useEffect(() => {
+    loadProviders("");
+  }, [loadProviders]);
 
   /* ─── Category chips (All + dynamic from API) ─── */
   const chips: CategoryChip[] = useMemo(() => {

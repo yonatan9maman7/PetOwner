@@ -16,6 +16,7 @@ import { useAuthStore } from "../../store/authStore";
 import { authApi } from "../../api/client";
 import { useTranslation } from "../../i18n";
 import { useTheme } from "../../theme/ThemeContext";
+import * as biometricService from "../../services/biometricService";
 
 export function ChangePasswordScreen() {
   const navigation = useNavigation<any>();
@@ -38,6 +39,10 @@ export function ChangePasswordScreen() {
     setSending(true);
     try {
       await authApi.forgotPassword(emailToUse);
+      // The user is about to change their password via the email link.
+      // Wipe stored biometric credentials so the next login doesn't silently
+      // try the old password. The user can re-enable biometrics afterwards.
+      biometricService.disable().catch(() => {});
       setSent(true);
     } catch {
       Alert.alert(t("errorTitle"), t("genericError"));
@@ -177,7 +182,7 @@ export function ChangePasswordScreen() {
                   color: colors.textSecondary,
                   textAlign: "center",
                   lineHeight: 22,
-                  marginBottom: 24,
+                  marginBottom: 16,
                 }}
               >
                 {t("changePasswordDesc")}
@@ -233,23 +238,35 @@ export function ChangePasswordScreen() {
                 />
               )}
 
+              <View
+                className="rounded-2xl border px-4 py-3.5 mb-4 self-stretch"
+                style={{
+                  borderColor: colors.border,
+                  backgroundColor: colors.surfaceSecondary,
+                }}
+              >
+                <Text
+                  className="text-sm leading-5 font-semibold"
+                  style={{
+                    color: colors.text,
+                    textAlign: isRTL ? "right" : "left",
+                  }}
+                >
+                  {t("changePasswordEmailHint")}
+                </Text>
+              </View>
+
               <TouchableOpacity
                 onPress={handleSend}
                 disabled={sending || !emailToUse}
                 activeOpacity={0.7}
+                className="rounded-2xl self-stretch flex-row items-center justify-center gap-2 py-4"
                 style={{
-                  backgroundColor: !emailToUse ? colors.textMuted : colors.text,
-                  paddingVertical: 16,
-                  borderRadius: 14,
-                  alignSelf: "stretch",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  flexDirection: "row",
-                  gap: 8,
+                  backgroundColor: !emailToUse ? colors.textMuted : colors.primary,
                   opacity: sending ? 0.7 : 1,
                   shadowColor: colors.text,
                   shadowOffset: { width: 0, height: 4 },
-                  shadowOpacity: 0.2,
+                  shadowOpacity: 0.15,
                   shadowRadius: 10,
                   elevation: 4,
                 }}
@@ -259,7 +276,7 @@ export function ChangePasswordScreen() {
                 ) : (
                   <>
                     <Ionicons name="send" size={16} color={colors.textInverse} />
-                    <Text style={{ color: colors.textInverse, fontWeight: "700", fontSize: 16 }}>
+                    <Text className="font-bold text-base" style={{ color: colors.textInverse }}>
                       {t("sendResetLink")}
                     </Text>
                   </>

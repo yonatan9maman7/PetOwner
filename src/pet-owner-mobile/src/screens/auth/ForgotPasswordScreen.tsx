@@ -86,7 +86,7 @@ export function ForgotPasswordScreen() {
           <View className="items-center mb-8">
             <View
               className="w-14 h-14 rounded-2xl items-center justify-center mb-4"
-              style={{ backgroundColor: colors.primary }}
+              style={{ backgroundColor: colors.brand }}
             >
               <Ionicons name="mail" size={24} color={colors.textInverse} />
             </View>
@@ -149,7 +149,7 @@ export function ForgotPasswordScreen() {
           {/* ── Send Reset Button ── */}
           <Pressable
             className="h-14 rounded-xl items-center justify-center active:opacity-90"
-            style={{ backgroundColor: colors.primary }}
+            style={{ backgroundColor: colors.brand }}
             onPress={handleForgotPassword}
             disabled={loading}
           >

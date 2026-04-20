@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import {
   View,
   Text,
@@ -18,6 +18,7 @@ import { bookingsApi } from "../../api/client";
 import type { ProviderPublicProfileDto } from "../../types/api";
 import { SmartCalendarPicker } from "../../components/shared/SmartCalendarPicker";
 import { TimeSlotSelector } from "../../components/shared/TimeSlotSelector";
+import { usePetsStore } from "../../store/petsStore";
 
 const SERVICE_TYPE_NAMES: Record<number, string> = {
   0: "Dog Walking",
@@ -27,6 +28,8 @@ const SERVICE_TYPE_NAMES: Record<number, string> = {
   4: "Training",
   5: "Insurance",
   6: "Pet Store",
+  7: "House Sitting",
+  8: "Doggy Day Care",
 };
 
 const PRICING_UNIT_LABELS: Record<number, string> = {
@@ -109,7 +112,17 @@ export function BookingScreen() {
   const prefillDate = (route.params?.requestedDate as string | undefined) ?? "";
   const prefillTime = (route.params?.requestedTime as string | undefined) ?? "";
   const { colors } = useTheme();
-  const { t, isRTL, rtlText } = useTranslation();
+  const { t, isRTL, rtlText, rtlStyle } = useTranslation();
+
+  const pets = usePetsStore((s) => s.pets);
+  const petsLoading = usePetsStore((s) => s.loading);
+
+  useEffect(() => {
+    void usePetsStore.getState().fetchPets();
+  }, []);
+
+  const showPetsLoading = petsLoading && pets.length === 0;
+  const hasPets = pets.length > 0;
 
   const [selectedRateIdx, setSelectedRateIdx] = useState<number | null>(null);
   const [startDate, setStartDate] = useState(prefillDate);
@@ -223,6 +236,42 @@ export function BookingScreen() {
         <View style={{ width: 24 }} />
       </View>
 
+      {showPetsLoading ? (
+        <View className="flex-1 items-center justify-center p-6">
+          <ActivityIndicator size="large" color={colors.primary} />
+        </View>
+      ) : !hasPets ? (
+        <View className="flex-1 items-center justify-center p-6">
+          <Text className="text-5xl mb-4">🐾</Text>
+          <Text
+            className="text-xl font-bold text-center mb-3 px-2"
+            style={[{ color: colors.text }, rtlStyle]}
+          >
+            {t("noPetsForBookingTitle")}
+          </Text>
+          <Text
+            className="text-sm text-center mb-8 leading-5 px-2"
+            style={[{ color: colors.textMuted }, rtlStyle]}
+          >
+            {t("noPetsForBookingDesc")}
+          </Text>
+          <Pressable
+            onPress={() =>
+              navigation.navigate("MyPets", { screen: "AddPet" })
+            }
+            className="rounded-2xl px-10 py-4 self-stretch max-w-sm items-center justify-center"
+            style={{ backgroundColor: colors.primary }}
+          >
+            <Text
+              className="text-base font-bold"
+              style={{ color: "#fff", ...rtlStyle }}
+            >
+              {t("addPetNow")}
+            </Text>
+          </Pressable>
+        </View>
+      ) : (
+        <>
       <ScrollView
         className="flex-1"
         contentContainerStyle={{ padding: 20, paddingBottom: 120 }}
@@ -524,6 +573,8 @@ export function BookingScreen() {
           )}
         </Pressable>
       </View>
+        </>
+      )}
     </SafeAreaView>
   );
 }

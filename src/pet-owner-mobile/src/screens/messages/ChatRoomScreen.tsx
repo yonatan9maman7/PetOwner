@@ -9,6 +9,7 @@ import {
   Platform,
   BackHandler,
   Keyboard,
+  Alert,
 } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -84,7 +85,12 @@ export function ChatRoomScreen() {
     const content = text.trim();
     if (!content) return;
     setText("");
-    await sendMessage(otherUserId, content);
+    try {
+      await sendMessage(otherUserId, content);
+    } catch {
+      setText(content);
+      Alert.alert(t("genericErrorTitle"), t("genericErrorDesc"));
+    }
   };
 
   const renderMessage = ({ item }: { item: ChatMessageDto }) => {

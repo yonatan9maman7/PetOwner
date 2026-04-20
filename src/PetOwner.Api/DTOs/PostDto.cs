@@ -23,12 +23,19 @@ public record PostDto(
     string? Category = null
 );
 
-public record CreateCommentDto(string Content);
+public record CreateCommentDto(string Content, Guid? ParentCommentId = null);
+
+public record EditCommentDto(string Content);
 
 public record CommentDto(
     Guid Id,
+    Guid? ParentCommentId,
     Guid UserId,
     string UserName,
     string Content,
-    DateTime CreatedAt
+    DateTime CreatedAt,
+    DateTime? EditedAt,
+    int LikeCount,
+    bool LikedByMe,
+    IReadOnlyList<CommentDto> Replies
 );

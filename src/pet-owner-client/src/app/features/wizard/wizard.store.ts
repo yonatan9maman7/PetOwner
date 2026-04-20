@@ -2,10 +2,9 @@ import { computed, inject, Injectable, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { tap } from 'rxjs';
 import { AuthService } from '../../services/auth.service';
-import { ProviderOnboardingResponse } from '../../services/provider.service';
+import { ProviderApplicationResponse } from '../../services/provider.service';
 import {
   MagicBio,
-  OnboardingApiPayload,
   OnboardingPayload,
   PRICING_UNIT_INT,
   SERVICE_TYPE_INT,
@@ -155,24 +154,38 @@ export class WizardStore {
     const snap = this.formSnapshot();
     const a = snap.structuredAddress;
 
-    const payload: OnboardingApiPayload = {
-      selectedServices: snap.selectedServices.map(s => ({
-        serviceType: SERVICE_TYPE_INT[s.serviceType],
-        rate: Number(s.rate),
-        pricingUnit: PRICING_UNIT_INT[s.pricingUnit],
-      })),
-      bio: snap.bio.generatedBio || snap.bio.userNotes,
-      latitude: snap.latitude,
-      longitude: snap.longitude,
+    const first = snap.selectedServices[0];
+    const bioText = (snap.bio.generatedBio || snap.bio.userNotes || '').trim();
+
+    const payload = {
+      type: 0,
+      serviceType: first ? SERVICE_TYPE_INT[first.serviceType] : 0,
       city: a.city.trim(),
       street: a.street.trim(),
       buildingNumber: a.buildingNumber.trim(),
       apartmentNumber: a.apartmentNumber.trim() || null,
+      latitude: snap.latitude,
+      longitude: snap.longitude,
+      phoneNumber: null as string | null,
+      whatsAppNumber: null as string | null,
+      websiteUrl: null as string | null,
+      openingHours: null as string | null,
+      isEmergencyService: false,
+      description: bioText || '—',
+      bio: bioText || null,
+      imageUrl: null as string | null,
+      selectedServices: snap.selectedServices.map((s) => ({
+        serviceType: SERVICE_TYPE_INT[s.serviceType],
+        rate: Number(s.rate),
+        pricingUnit: PRICING_UNIT_INT[s.pricingUnit],
+      })),
       referenceName: snap.verification.referenceName.trim(),
       referenceContact: snap.verification.referenceContact.trim(),
+      acceptedDogSizes: [] as number[],
+      maxDogsCapacity: null as number | null,
     };
 
-    return this.http.post<ProviderOnboardingResponse>('/api/providers/onboarding', payload).pipe(
+    return this.http.post<ProviderApplicationResponse>('/api/providers/apply', payload).pipe(
       tap((res) => {
         if (res.newAccessToken) {
           this.auth.updateToken(res.newAccessToken);

@@ -37,9 +37,10 @@ export interface UpdateProfilePayload {
   acceptsOffHoursRequests?: boolean;
 }
 
-/** Response from POST /api/providers/onboarding */
-export interface ProviderOnboardingResponse {
+/** Response from POST /api/providers/apply */
+export interface ProviderApplicationResponse {
   message: string;
+  applicationId: string;
   /** Present on success so the client can refresh JWT claims (e.g. Role → Provider). */
   newAccessToken?: string;
 }

@@ -28,6 +28,10 @@ public class Pet
     public DateTime? LostAt { get; set; }
     public string? ContactPhone { get; set; }
     public Guid? CommunityPostId { get; set; }
+    // Playdate Pals fields
+    public DogSize? DogSize { get; set; }
+    public string TagsCsv { get; set; } = "";
+    public SterilizationStatus Sterilization { get; set; } = SterilizationStatus.Unknown;
 
     public User User { get; set; } = null!;
     public ICollection<MedicalRecord> MedicalRecords { get; set; } = new List<MedicalRecord>();

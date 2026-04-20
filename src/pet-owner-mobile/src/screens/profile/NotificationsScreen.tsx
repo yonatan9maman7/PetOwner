@@ -78,6 +78,7 @@ export function NotificationsScreen() {
           navigation.navigate("MyBookings", { tab: "incoming" });
           break;
         case "BookingConfirmed":
+        case "BookingCompleted":
         case "RequestCompleted":
         case "RequestCancelled":
         case "RequestAccepted":

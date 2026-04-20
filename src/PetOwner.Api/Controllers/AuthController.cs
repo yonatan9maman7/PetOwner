@@ -2,6 +2,7 @@ using System.Security.Claims;
 using System.Security.Cryptography;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using PetOwner.Api.DTOs;
 using PetOwner.Api.Services;
@@ -34,6 +35,7 @@ public class AuthController : ControllerBase
         _logger = logger;
     }
 
+    [EnableRateLimiting("AuthPolicy")]
     [HttpPost("register")]
     public async Task<IActionResult> Register([FromBody] RegisterDto dto)
     {
@@ -76,6 +78,7 @@ public class AuthController : ControllerBase
         return Ok(new { token, userId = user.Id });
     }
 
+    [EnableRateLimiting("AuthPolicy")]
     [HttpPost("login")]
     public async Task<IActionResult> Login([FromBody] LoginDto dto)
     {
@@ -92,6 +95,7 @@ public class AuthController : ControllerBase
         return Ok(new { token, userId = user.Id });
     }
 
+    [EnableRateLimiting("AuthPolicy")]
     [HttpPost("forgot-password")]
     public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordDto dto)
     {
@@ -182,24 +186,5 @@ public class AuthController : ControllerBase
         return Ok(new { token, userId = user.Id });
     }
 
-    [HttpPost("promote-admin")]
-    public async Task<IActionResult> PromoteToAdmin([FromBody] PromoteAdminDto dto)
-    {
-        if (dto.Secret != "petowner-bootstrap-2026")
-            return Unauthorized(new { message = "Invalid secret." });
-
-        var user = await _db.Users.FirstOrDefaultAsync(u => u.Name == dto.UserName);
-        if (user is null)
-            return NotFound(new { message = "User not found." });
-
-        user.Role = "Admin";
-        await _db.SaveChangesAsync();
-
-        var token = _tokenService.GenerateAccessToken(user);
-        return Ok(new { message = $"{user.Name} is now Admin.", token, userId = user.Id, role = user.Role });
-    }
-
     private static string NormalizeEmail(string email) => email.Trim().ToLowerInvariant();
 }
-
-public record PromoteAdminDto(string UserName, string Secret);

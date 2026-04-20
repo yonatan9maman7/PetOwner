@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   View,
   Text,
@@ -19,6 +19,7 @@ import { LanguageToggle } from "../../components/LanguageToggle";
 import { BrandedAppHeader } from "../../components/BrandedAppHeader";
 import { authApi } from "../../api/client";
 import { useTheme } from "../../theme/ThemeContext";
+import * as biometricService from "../../services/biometricService";
 
 /* ─── LoginScreen (root) ─────────────────────────────────────────── */
 
@@ -67,12 +68,74 @@ function LoginForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [bioLoading, setBioLoading] = useState(false);
   const [secureEntry, setSecureEntry] = useState(true);
+  const [bioEnabled, setBioEnabled] = useState(false);
+  const [bioTypeLabel, setBioTypeLabel] = useState<biometricService.BiometricTypeLabel>("generic");
+  const [autoPromptDone, setAutoPromptDone] = useState(false);
+
+  const emailRef = useRef<TextInput>(null);
   const navigation = useNavigation<any>();
   const setAuth = useAuthStore((s) => s.setAuth);
   const { t, isHebrew, rtlText, rtlStyle, rtlRow, rtlInput, alignCls } =
     useTranslation();
   const { colors } = useTheme();
+
+  /* ── Check biometric availability on mount ── */
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const [sup, en, label] = await Promise.all([
+        biometricService.isSupported(),
+        biometricService.isEnabled(),
+        biometricService.getSupportedTypeLabel(),
+      ]);
+      if (cancelled) return;
+      const available = sup && en;
+      setBioEnabled(available);
+      setBioTypeLabel(label);
+      if (available) {
+        // Slight delay so the form is visible before the system prompt appears.
+        setTimeout(() => runBiometricLogin(label), 400);
+        setAutoPromptDone(true);
+      }
+    })();
+    return () => { cancelled = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  /* ── Biometric login helper ── */
+  const runBiometricLogin = async (label?: biometricService.BiometricTypeLabel) => {
+    const effectiveLabel = label ?? bioTypeLabel;
+    const promptMessage =
+      effectiveLabel === "faceId"
+        ? t("biometricLoginButton")
+        : t("biometricFingerprintButton");
+
+    setBioLoading(true);
+    try {
+      const creds = await biometricService.authenticateAndGetCredentials(promptMessage);
+      if (!creds) {
+        // User cancelled — silently return to form.
+        return;
+      }
+      const data = await authApi.login(creds);
+      await setAuth(data.token, data.userId);
+      navigation.navigate("Explore");
+    } catch (err: any) {
+      if (err?.response?.status === 401) {
+        // Stored password is stale (changed elsewhere) — wipe and fall back.
+        await biometricService.disable();
+        setBioEnabled(false);
+        Alert.alert(t("errorTitle"), t("biometricFailedFallback"));
+        emailRef.current?.focus();
+      } else {
+        Alert.alert(t("errorTitle"), t("loginError"));
+      }
+    } finally {
+      setBioLoading(false);
+    }
+  };
 
   const handleLogin = async () => {
     if (!email.trim() || !password.trim()) {
@@ -94,6 +157,13 @@ function LoginForm() {
   };
 
   const labelCls = `text-xs font-bold mb-2 px-1 ${alignCls} ${!isHebrew ? "uppercase tracking-widest" : ""}`;
+
+  const bioButtonLabel =
+    bioTypeLabel === "faceId"
+      ? t("biometricLoginButton")
+      : t("biometricFingerprintButton");
+
+  const bioIcon = bioTypeLabel === "faceId" ? "scan-circle-outline" : "finger-print";
 
   return (
     <SafeAreaView className="flex-1" edges={["top"]} style={{ marginTop: -8, backgroundColor: colors.surface }}>
@@ -158,6 +228,7 @@ function LoginForm() {
             >
               <Ionicons name="mail-outline" size={20} color={colors.textSecondary} />
               <TextInput
+                ref={emailRef}
                 style={[
                   rtlInput,
                   {
@@ -239,7 +310,7 @@ function LoginForm() {
             hitSlop={8}
             onPress={() => navigation.navigate("ForgotPasswordScreen")}
           >
-            <Text className="text-xs font-bold" style={{ color: colors.primary }}>
+            <Text className="text-xs font-bold" style={{ color: colors.brand }}>
               {t("forgotPassword")}
             </Text>
           </Pressable>
@@ -247,7 +318,7 @@ function LoginForm() {
           {/* ── Sign-In Button ── */}
           <Pressable
             className="h-14 rounded-xl items-center justify-center active:opacity-90"
-            style={{ backgroundColor: colors.primary }}
+            style={{ backgroundColor: colors.brand }}
             onPress={handleLogin}
             disabled={loading}
           >
@@ -259,6 +330,56 @@ function LoginForm() {
               </Text>
             )}
           </Pressable>
+
+          {/* ── Biometric Button (shown only when enabled and supported) ── */}
+          {bioEnabled && (
+            <View style={{ marginTop: 12, alignItems: "center" }}>
+              <Pressable
+                onPress={() => runBiometricLogin()}
+                disabled={bioLoading}
+                style={({ pressed }) => ({
+                  flexDirection: isHebrew ? "row-reverse" : "row",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 8,
+                  height: 52,
+                  borderRadius: 12,
+                  paddingHorizontal: 20,
+                  width: "100%",
+                  backgroundColor: pressed ? colors.inputBg : colors.surfaceSecondary,
+                  borderWidth: 1,
+                  borderColor: colors.border,
+                })}
+              >
+                {bioLoading ? (
+                  <ActivityIndicator size="small" color={colors.brand} />
+                ) : (
+                  <>
+                    <Ionicons name={bioIcon as any} size={22} color={colors.brand} />
+                    <Text style={{ fontSize: 15, fontWeight: "600", color: colors.brand }}>
+                      {bioButtonLabel}
+                    </Text>
+                  </>
+                )}
+              </Pressable>
+
+              {/* "Use password instead" link — appears when auto-prompted */}
+              {autoPromptDone && (
+                <Pressable
+                  onPress={() => {
+                    setAutoPromptDone(false);
+                    emailRef.current?.focus();
+                  }}
+                  hitSlop={8}
+                  style={{ marginTop: 10 }}
+                >
+                  <Text style={{ fontSize: 13, color: colors.textSecondary }}>
+                    {t("usePasswordInstead")}
+                  </Text>
+                </Pressable>
+              )}
+            </View>
+          )}
 
           {/* ── Divider ── */}
           <View className="flex-row items-center my-6">

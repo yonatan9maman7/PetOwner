@@ -1,5 +1,7 @@
-import axios from "axios";
+import axios, { type AxiosError, type InternalAxiosRequestConfig } from "axios";
+import { Alert } from "react-native";
 import { useAuthStore } from "../store/authStore";
+import { translate } from "../i18n";
 import { API_BASE_URL } from "../config/server";
 import type {
   LoginDto,
@@ -58,6 +60,10 @@ import type {
   CreateContactInquiryRequest,
   ContactInquiryAdminDto,
   FavoriteProviderDto,
+  OwnerStatsDto,
+  ProviderBookingStatsDto,
+  EarningsSparklineDto,
+  StatRange,
 } from "../types/api";
 
 const apiClient = axios.create({
@@ -74,11 +80,28 @@ apiClient.interceptors.request.use((config) => {
   return config;
 });
 
+function requestHadBearerToken(config: InternalAxiosRequestConfig | undefined): boolean {
+  if (!config?.headers) return false;
+  const h = config.headers;
+  const auth =
+    typeof (h as { get?: (name: string) => unknown }).get === "function"
+      ? (h as { get: (name: string) => unknown }).get("Authorization")
+      : (h as { Authorization?: unknown }).Authorization;
+  return typeof auth === "string" && auth.startsWith("Bearer ");
+}
+
 apiClient.interceptors.response.use(
   (response) => response,
-  async (error) => {
+  async (error: AxiosError) => {
     if (error.response?.status === 401) {
-      await useAuthStore.getState().logout();
+      // Login/register return 401 without a session — do not treat as session expiry.
+      if (requestHadBearerToken(error.config)) {
+        await useAuthStore.getState().logout();
+        Alert.alert(
+          translate("sessionExpiredTitle"),
+          translate("sessionExpiredDesc"),
+        );
+      }
     }
     return Promise.reject(error);
   },
@@ -201,6 +224,51 @@ export const providerApi = {
     apiClient
       .get<EarningsTransactionDto[]>("/providers/me/earnings/transactions")
       .then((r) => r.data),
+
+  /** Booking-based stats for the My Stats dashboard (kept separate from legacy ServiceRequest stats). */
+  getBookingStats: (range: StatRange = "all") =>
+    apiClient
+      .get<ProviderBookingStatsDto>("/providers/me/booking-stats", {
+        params: { range },
+      })
+      .then((r) => r.data),
+
+  /** Weekly earnings buckets for the sparkline chart. */
+  getEarningsSparkline: (weeks = 12) =>
+    apiClient
+      .get<EarningsSparklineDto>("/providers/me/earnings/sparkline", {
+        params: { weeks },
+      })
+      .then((r) => r.data),
+
+  /**
+   * Fetch CSV text. The caller writes it to a temporary file and hands it to expo-sharing.
+   * Using `responseType: "text"` keeps RN happy (no Blob parsing needed).
+   */
+  exportBookingStatsCsv: () =>
+    apiClient
+      .get<string>("/providers/me/booking-stats/export.csv", {
+        responseType: "text",
+        transformResponse: [(data) => data],
+      })
+      .then((r) => r.data),
+};
+
+export const usersApi = {
+  /** Owner-side stats dashboard. */
+  getStats: (range: StatRange = "all") =>
+    apiClient
+      .get<OwnerStatsDto>("/users/me/stats", { params: { range } })
+      .then((r) => r.data),
+
+  /** Owner-side CSV of paid bookings. */
+  exportStatsCsv: () =>
+    apiClient
+      .get<string>("/users/me/stats/export.csv", {
+        responseType: "text",
+        transformResponse: [(data) => data],
+      })
+      .then((r) => r.data),
 };
 
 export const triageApi = {
@@ -241,6 +309,19 @@ export const postsApi = {
   addComment: (postId: string, data: CreateCommentDto) =>
     apiClient
       .post<CommentDto>(`/posts/${postId}/comments`, data)
+      .then((r) => r.data),
+  editComment: (commentId: string, content: string) =>
+    apiClient
+      .patch<{ id: string; content: string; editedAt: string }>(
+        `/posts/comments/${commentId}`,
+        { content },
+      )
+      .then((r) => r.data),
+  deleteComment: (commentId: string) =>
+    apiClient.delete(`/posts/comments/${commentId}`),
+  toggleCommentLike: (commentId: string) =>
+    apiClient
+      .post<{ liked: boolean; likeCount: number }>(`/posts/comments/${commentId}/like`)
       .then((r) => r.data),
 };
 
@@ -351,6 +432,24 @@ export const notificationsApi = {
     apiClient.post("/notifications/read-all").then((r) => r.data),
   remove: (id: string) =>
     apiClient.delete(`/notifications/${id}`).then((r) => r.data),
+
+  /** Fetch the user's per-category notification preferences from the backend. */
+  getPrefs: () =>
+    apiClient
+      .get<Record<string, boolean>>("/users/notification-prefs")
+      .then((r) => r.data),
+
+  /** Persist updated preferences to the backend. */
+  updatePrefs: (data: Record<string, boolean>) =>
+    apiClient.put("/users/notification-prefs", data),
+
+  /** Register (upsert) an Expo push token for the current user's device. */
+  registerPushToken: (token: string, platform: "ios" | "android") =>
+    apiClient.post("/users/push-token", { token, platform }),
+
+  /** Remove a push token on logout or when the master push toggle is turned off. */
+  removePushToken: (token: string) =>
+    apiClient.delete("/users/push-token", { data: { token } }),
 };
 
 export const filesApi = {
@@ -401,11 +500,14 @@ export const bookingsApi = {
     apiClient.get<BookingDto>(`/bookings/${id}`).then((r) => r.data),
   confirm: (id: string) =>
     apiClient.put(`/bookings/${id}/confirm`).then((r) => r.data),
+  complete: (id: string) =>
+    apiClient.put(`/bookings/${id}/complete`).then((r) => r.data),
   cancel: (id: string) =>
     apiClient.put(`/bookings/${id}/cancel`).then((r) => r.data),
 };
 
-export const petHealthApi = {
+/** Pet health: vaccinations, weight, vaccine status, and medical vault (`/pets/{id}/medical-records`). */
+export const medicalApi = {
   getWeightHistory: (petId: string) =>
     apiClient
       .get<WeightLogDto[]>(`/pets/${petId}/weight-history`)
@@ -435,7 +537,7 @@ export const petHealthApi = {
       .catch((error: unknown) => {
         const ax = error as { response?: { data?: unknown }; message?: string };
         console.error(
-          "[petHealthApi.addVaccination] error.response?.data:",
+          "[medicalApi.addVaccination] error.response?.data:",
           ax.response?.data,
           "| status:",
           (ax as { response?: { status?: number } }).response?.status,
@@ -468,6 +570,9 @@ export const petHealthApi = {
       .then((r) => r.data),
 };
 
+/** @deprecated Use `medicalApi` */
+export const petHealthApi = medicalApi;
+
 export const favoritesApi = {
   getAll: () =>
     apiClient
@@ -488,3 +593,58 @@ export const favoritesApi = {
 };
 
 export default apiClient;
+
+// ─── Playdate Pals ────────────────────────────────────────────────────────────
+
+import type {
+  PlaydatePrefsDto,
+  UpdatePlaydatePrefsDto,
+  PalDto,
+  PlaydateRequestDto,
+  PlaydateRequestResponse,
+  LiveBeaconDto,
+  CreateLiveBeaconDto,
+  PlaydateEventDto,
+  PlaydateEventDetailDto,
+  CreatePlaydateEventDto,
+  RsvpDto,
+  PlaydateCommentDto,
+} from "../types/api";
+
+export const palsApi = {
+  getMyPrefs: () =>
+    apiClient.get<PlaydatePrefsDto>("/pals/me/prefs").then((r) => r.data),
+  updateMyPrefs: (data: UpdatePlaydatePrefsDto) =>
+    apiClient.put<PlaydatePrefsDto>("/pals/me/prefs", data).then((r) => r.data),
+  getNearby: (params?: { radiusKm?: number; species?: string; size?: string }) =>
+    apiClient.get<PalDto[]>("/pals/nearby", { params }).then((r) => r.data),
+  sendPlaydateRequest: (otherUserId: string, data: PlaydateRequestDto) =>
+    apiClient
+      .post<PlaydateRequestResponse>(`/pals/${otherUserId}/playdate-request`, data)
+      .then((r) => r.data),
+  startBeacon: (data: CreateLiveBeaconDto) =>
+    apiClient.post<LiveBeaconDto>("/pals/beacons", data).then((r) => r.data),
+  getActiveBeacons: (params?: { radiusKm?: number; species?: string }) =>
+    apiClient.get<LiveBeaconDto[]>("/pals/beacons/active", { params }).then((r) => r.data),
+  endBeacon: (id: string) => apiClient.delete(`/pals/beacons/${id}`),
+};
+
+export const playdatesApi = {
+  list: (params?: { radiusKm?: number; from?: string; to?: string }) =>
+    apiClient.get<PlaydateEventDto[]>("/playdates", { params }).then((r) => r.data),
+  getById: (id: string) =>
+    apiClient.get<PlaydateEventDetailDto>(`/playdates/${id}`).then((r) => r.data),
+  create: (data: CreatePlaydateEventDto) =>
+    apiClient.post<PlaydateEventDto>("/playdates", data).then((r) => r.data),
+  rsvp: (id: string, data: RsvpDto) =>
+    apiClient.post(`/playdates/${id}/rsvp`, data),
+  cancel: (id: string, reason?: string) =>
+    apiClient.delete(`/playdates/${id}`, { data: { reason } }),
+  getComments: (id: string) =>
+    apiClient.get<PlaydateCommentDto[]>(`/playdates/${id}/comments`).then((r) => r.data),
+  addComment: (id: string, content: string) =>
+    apiClient.post<PlaydateCommentDto>(`/playdates/${id}/comments`, { content }).then((r) => r.data),
+  deleteComment: (commentId: string) =>
+    apiClient.delete(`/playdates/comments/${commentId}`),
+};
+

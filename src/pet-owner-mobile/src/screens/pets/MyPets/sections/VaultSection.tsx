@@ -14,7 +14,7 @@ import * as DocumentPicker from "expo-document-picker";
 import * as ImagePicker from "expo-image-picker";
 import { useTranslation } from "../../../../i18n";
 import { useTheme } from "../../../../theme/ThemeContext";
-import { petHealthApi, filesApi } from "../../../../api/client";
+import { medicalApi, filesApi } from "../../../../api/client";
 import { DatePickerField } from "../../../../components/DatePickerField";
 import { ListSkeleton } from "../../../../components/shared/ListSkeleton";
 import type { MedicalRecordDto } from "../../../../types/api";
@@ -39,7 +39,7 @@ export function VaultSection({ petId, reloadNonce = 0 }: { petId: string; reload
 
   const load = useCallback(async () => {
     try {
-      setRecords(await petHealthApi.getMedicalRecords(petId));
+      setRecords(await medicalApi.getMedicalRecords(petId));
     } catch {}
   }, [petId]);
 
@@ -106,7 +106,7 @@ export function VaultSection({ petId, reloadNonce = 0 }: { petId: string; reload
     if (!formTitle.trim() || !formDate.trim()) return;
     setSaving(true);
     try {
-      await petHealthApi.addMedicalRecord(petId, {
+      await medicalApi.addMedicalRecord(petId, {
         type: formType,
         title: formTitle.trim(),
         description: formDesc.trim() || undefined,
@@ -124,14 +124,24 @@ export function VaultSection({ petId, reloadNonce = 0 }: { petId: string; reload
 
   const deleteRecord = async (recordId: string) => {
     try {
-      await petHealthApi.deleteMedicalRecord(petId, recordId);
+      await medicalApi.deleteMedicalRecord(petId, recordId);
       await load();
     } catch {}
   };
 
   if (loading) {
     return (
-      <View style={{ paddingHorizontal: 20, paddingTop: 16 }}>
+      <View style={{ paddingHorizontal: 20, paddingTop: 16, gap: 8 }}>
+        <Text
+          style={{
+            fontSize: 12,
+            lineHeight: 17,
+            color: colors.textMuted,
+            textAlign: isRTL ? "right" : "left",
+          }}
+        >
+          {t("medicalEditHint")}
+        </Text>
         <ListSkeleton rows={3} variant="row" />
       </View>
     );
@@ -139,6 +149,17 @@ export function VaultSection({ petId, reloadNonce = 0 }: { petId: string; reload
 
   return (
     <View style={{ padding: 20, gap: 10 }}>
+      <Text
+        style={{
+          fontSize: 12,
+          lineHeight: 17,
+          color: colors.textMuted,
+          textAlign: isRTL ? "right" : "left",
+          marginBottom: 2,
+        }}
+      >
+        {t("medicalEditHint")}
+      </Text>
       {records.length === 0 && !showForm && (
         <View style={{ padding: 24, alignItems: "center" }}>
           <View

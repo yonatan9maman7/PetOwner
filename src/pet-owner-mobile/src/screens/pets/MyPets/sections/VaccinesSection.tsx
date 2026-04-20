@@ -13,7 +13,7 @@ import * as DocumentPicker from "expo-document-picker";
 import * as ImagePicker from "expo-image-picker";
 import { useTranslation, type TranslationKey } from "../../../../i18n";
 import { useTheme } from "../../../../theme/ThemeContext";
-import { petHealthApi, filesApi } from "../../../../api/client";
+import { medicalApi, filesApi } from "../../../../api/client";
 import { DatePickerField } from "../../../../components/DatePickerField";
 import { ListSkeleton } from "../../../../components/shared/ListSkeleton";
 import {
@@ -94,7 +94,7 @@ export function VaccinesSection({ petId, reloadNonce = 0 }: { petId: string; rel
 
   const load = useCallback(async () => {
     try {
-      const [s, v] = await Promise.all([petHealthApi.getVaccineStatus(petId), petHealthApi.getVaccinations(petId)]);
+      const [s, v] = await Promise.all([medicalApi.getVaccineStatus(petId), medicalApi.getVaccinations(petId)]);
       setStatuses(s);
       setVaccinations(v);
     } catch {}
@@ -179,7 +179,7 @@ export function VaccinesSection({ petId, reloadNonce = 0 }: { petId: string; rel
       const notesTrim = formNotes.trim();
 
       if (editingVacId) {
-        await petHealthApi.updateVaccination(petId, editingVacId, {
+        await medicalApi.updateVaccination(petId, editingVacId, {
           vaccineName: VaccineNameApiValue[formName],
           dateAdministered,
           nextDueDate: nextTrim || null,
@@ -194,7 +194,7 @@ export function VaccinesSection({ petId, reloadNonce = 0 }: { petId: string; rel
         if (nextTrim) payload.nextDueDate = nextTrim;
         if (notesTrim) payload.notes = notesTrim;
         if (formDocUrl) payload.documentUrl = formDocUrl;
-        await petHealthApi.addVaccination(petId, payload);
+        await medicalApi.addVaccination(petId, payload);
       }
       resetForm();
       await load();
@@ -218,7 +218,7 @@ export function VaccinesSection({ petId, reloadNonce = 0 }: { petId: string; rel
     const vac = vaccinations.find((v) => sameVaccineName(v.vaccineName, vaccineName));
     if (!vac) return;
     try {
-      await petHealthApi.deleteVaccination(petId, vac.id);
+      await medicalApi.deleteVaccination(petId, vac.id);
       await load();
     } catch {}
   };
