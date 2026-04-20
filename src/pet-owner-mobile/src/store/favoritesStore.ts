@@ -36,7 +36,9 @@ export const useFavoritesStore = create<FavoritesState>((set, get) => ({
       const data = await favoritesApi.getAll();
       set({
         providers: data,
-        ids: new Set(data.map((p) => p.userId)),
+        ids: new Set(
+          data.map((p) => p.providerId ?? p.userId).filter(Boolean),
+        ),
         loading: false,
       });
     } catch {

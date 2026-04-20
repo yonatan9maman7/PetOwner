@@ -14,6 +14,7 @@ import {
   Keyboard,
   Alert,
   FlatList,
+  InteractionManager,
 } from "react-native";
 import axios from "axios";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
@@ -46,6 +47,27 @@ const TEL_AVIV = {
   latitudeDelta: 0.035,
   longitudeDelta: 0.035,
 };
+
+/** iOS MapKit often passes transient/invalid regions during gestures; guard all map math. */
+function isValidMapRegion(region: {
+  latitude?: unknown;
+  longitude?: unknown;
+  latitudeDelta?: unknown;
+  longitudeDelta?: unknown;
+}): boolean {
+  const lat = Number(region.latitude);
+  const lng = Number(region.longitude);
+  const dLat = Number(region.latitudeDelta);
+  const dLng = Number(region.longitudeDelta);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return false;
+  if (lat < -90 || lat > 90 || lng < -180 || lng > 180) return false;
+  if (!Number.isFinite(dLat) || !Number.isFinite(dLng)) return false;
+  if (dLat <= 0 || dLng <= 0) return false;
+  return true;
+}
+
+const MAP_VIEWPORT_DEBOUNCE_MS = Platform.OS === "ios" ? 720 : 500;
+const PROGRAMMATIC_MAP_MOVE_SUPPRESS_MS = Platform.OS === "ios" ? 1100 : 850;
 
 const DISTANCE_OPTIONS = [
   { value: null, labelKey: "anyDistance" as const },
@@ -310,6 +332,10 @@ export function ExploreScreen() {
     dLat: number;
     dLng: number;
   } | null>(null);
+  /** Skip viewport pin refresh while `animateToRegion` runs (avoids iOS churn / crashes). */
+  const suppressViewportFetchRef = useRef(false);
+  /** Invalidates stale debounced callbacks when the user pans again before the timer fires. */
+  const regionChangeSeqRef = useRef(0);
 
   /* Service types from API */
   const [serviceTypes, setServiceTypes] = useState<string[]>([]);
@@ -389,7 +415,8 @@ export function ExploreScreen() {
       f.latitude = userLat;
       f.longitude = userLng;
     } else {
-      const region = mapRegionRef.current;
+      const raw = mapRegionRef.current;
+      const region = isValidMapRegion(raw) ? raw : TEL_AVIV;
       const latDelta = region.latitudeDelta / 2;
       const lngDelta = region.longitudeDelta / 2;
       // Distance from map center to a corner of the visible region, with extra padding so
@@ -460,6 +487,20 @@ export function ExploreScreen() {
     loadPins();
   }, []);
 
+  useEffect(() => {
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+      if (moveDebounceRef.current) clearTimeout(moveDebounceRef.current);
+    };
+  }, []);
+
+  const beginProgrammaticMapMove = useCallback(() => {
+    suppressViewportFetchRef.current = true;
+    setTimeout(() => {
+      suppressViewportFetchRef.current = false;
+    }, PROGRAMMATIC_MAP_MOVE_SUPPRESS_MS);
+  }, []);
+
   /* ─── Focus on a specific provider (e.g. from ProviderProfileScreen Navigate button) ─── */
   useEffect(() => {
     const focusProviderId = route.params?.focusProviderId as string | undefined;
@@ -469,6 +510,7 @@ export function ExploreScreen() {
       const pin = pinsToSearch.find((p) => p.providerId === focusProviderId);
       if (pin) {
         setSelectedPin(pin);
+        beginProgrammaticMapMove();
         mapRef.current?.animateToRegion?.(
           {
             latitude: pin.latitude,
@@ -504,7 +546,7 @@ export function ExploreScreen() {
           if (gen === pinsFetchGenRef.current) setLoading(false);
         });
     }
-  }, [route.params?.focusProviderId, t]);
+  }, [route.params?.focusProviderId, t, beginProgrammaticMapMove]);
 
   /* ─── Service pill toggle (same as web) ─── */
   const toggleServiceFilter = useCallback(
@@ -542,18 +584,27 @@ export function ExploreScreen() {
   /* ─── Map region change (viewport refresh) ─── */
   const handleRegionChange = useCallback(
     (region: any) => {
-      mapRegionRef.current = region;
+      if (isValidMapRegion(region)) {
+        mapRegionRef.current = region;
+      }
+      const seq = ++regionChangeSeqRef.current;
       if (moveDebounceRef.current) clearTimeout(moveDebounceRef.current);
       moveDebounceRef.current = setTimeout(() => {
+        if (seq !== regionChangeSeqRef.current) return;
+        if (suppressViewportFetchRef.current) return;
         const r = mapRegionRef.current;
+        if (!isValidMapRegion(r)) return;
+
         const prev = lastSilentFetchRegionRef.current;
+        const latSpan = Math.max(r.latitudeDelta, 1e-9);
+        const lngSpan = Math.max(r.longitudeDelta, 1e-9);
         if (prev) {
           const smallMove =
-            Math.abs(prev.lat - r.latitude) < r.latitudeDelta * 0.04 &&
-            Math.abs(prev.lng - r.longitude) < r.longitudeDelta * 0.04;
+            Math.abs(prev.lat - r.latitude) < latSpan * 0.04 &&
+            Math.abs(prev.lng - r.longitude) < lngSpan * 0.04;
           const smallZoom =
-            Math.abs(prev.dLat - r.latitudeDelta) < r.latitudeDelta * 0.12 &&
-            Math.abs(prev.dLng - r.longitudeDelta) < r.longitudeDelta * 0.12;
+            Math.abs(prev.dLat - r.latitudeDelta) < latSpan * 0.12 &&
+            Math.abs(prev.dLng - r.longitudeDelta) < lngSpan * 0.12;
           if (smallMove && smallZoom) return;
         }
         lastSilentFetchRegionRef.current = {
@@ -562,9 +613,14 @@ export function ExploreScreen() {
           dLat: r.latitudeDelta,
           dLng: r.longitudeDelta,
         };
-        setCollocatedChooserPins(null);
-        loadPinsRef.current({ silent: true });
-      }, 500);
+
+        InteractionManager.runAfterInteractions(() => {
+          if (seq !== regionChangeSeqRef.current) return;
+          if (suppressViewportFetchRef.current) return;
+          setCollocatedChooserPins(null);
+          loadPinsRef.current({ silent: true });
+        });
+      }, MAP_VIEWPORT_DEBOUNCE_MS);
     },
     [],
   );
@@ -837,6 +893,7 @@ export function ExploreScreen() {
             const { latitude, longitude } = loc.coords;
             setUserLat(latitude);
             setUserLng(longitude);
+            beginProgrammaticMapMove();
             mapRef.current?.animateToRegion?.({
               latitude,
               longitude,

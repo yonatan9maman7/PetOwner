@@ -68,6 +68,8 @@ public class FavoritesController : ControllerBase
             .Select(f => new
             {
                 f.ProviderProfile.UserId,
+                // Explicit id for clients (same as UserId); matches map pins / profile routes.
+                ProviderId = f.ProviderProfile.UserId,
                 f.ProviderProfile.User.Name,
                 f.ProviderProfile.ProfileImageUrl,
                 f.ProviderProfile.AverageRating,

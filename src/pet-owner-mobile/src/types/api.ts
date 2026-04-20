@@ -880,6 +880,8 @@ export interface BookingDto {
 
 export interface FavoriteProviderDto {
   userId: string;
+  /** Same identity as userId; sent explicitly by the API for navigation symmetry with map/profile DTOs. */
+  providerId?: string;
   name: string;
   profileImageUrl?: string;
   averageRating: number;

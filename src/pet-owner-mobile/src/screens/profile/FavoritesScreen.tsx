@@ -6,9 +6,9 @@ import {
   Image,
   RefreshControl,
   StyleSheet,
+  FlatList,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { FlashList } from "@shopify/flash-list";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import { useTranslation } from "../../i18n";
@@ -78,15 +78,23 @@ export function FavoritesScreen() {
     setRefreshing(false);
   }, [fetchProviders]);
 
+  const openProvider = useCallback(
+    (item: FavoriteProviderDto) => {
+      const providerId = item.providerId ?? item.userId;
+      if (!providerId) return;
+      navigation.push("ProviderProfile", { providerId });
+    },
+    [navigation],
+  );
+
   const renderItem = useCallback(
     ({ item }: { item: FavoriteProviderDto }) => {
-      const isFav = favoriteIds.has(item.userId);
+      const rowId = item.providerId ?? item.userId;
+      const isFav = favoriteIds.has(rowId);
 
       return (
         <Pressable
-          onPress={() =>
-            navigation.navigate("ProviderProfile", { providerId: item.userId })
-          }
+          onPress={() => openProvider(item)}
           style={({ pressed }) => [
             styles.card,
             pressed && { opacity: 0.85 },
@@ -103,7 +111,7 @@ export function FavoritesScreen() {
                 {item.name}
               </Text>
               <Pressable
-                onPress={() => toggleFavorite(item.userId)}
+                onPress={() => toggleFavorite(rowId)}
                 hitSlop={10}
               >
                 <Ionicons
@@ -176,7 +184,7 @@ export function FavoritesScreen() {
         </Pressable>
       );
     },
-    [colors, favoriteIds, isRTL, navigation, rtlText, styles, t, toggleFavorite],
+    [colors, favoriteIds, isRTL, openProvider, rtlText, styles, t, toggleFavorite],
   );
 
   return (
@@ -208,12 +216,14 @@ export function FavoritesScreen() {
           <InlineError message={t("favoritesError")} onRetry={fetchProviders} />
         </View>
       ) : (
-        <FlashList
+        <FlatList
           data={providers}
-          keyExtractor={(item) => item.userId}
+          keyExtractor={(item) => item.providerId ?? item.userId}
           renderItem={renderItem}
+          style={{ flex: 1 }}
           contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 40 }}
           ItemSeparatorComponent={() => <View style={{ height: 12 }} />}
+          keyboardShouldPersistTaps="handled"
           ListEmptyComponent={
             <ListEmptyState
               icon="heart-outline"
