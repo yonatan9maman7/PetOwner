@@ -42,6 +42,7 @@ import { BrandedAppHeader } from "../../components/BrandedAppHeader";
 import { usePetsStore } from "../../store/petsStore";
 import { PetSpecies } from "../../types/api";
 import type { CreatePetRequest, UpdatePetRequest } from "../../types/api";
+import { isIsraeliBusinessPhoneValid } from "../../features/provider-onboarding/phoneUtils";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
@@ -324,6 +325,11 @@ export function AddPetScreen() {
         return;
       }
     }
+    const trimmedVetPhone = vetPhone.trim();
+    if (trimmedVetPhone && !isIsraeliBusinessPhoneValid(trimmedVetPhone)) {
+      Alert.alert(t("errorTitle"), t("validationPhoneInvalidBusiness"));
+      return;
+    }
     setSaving(true);
     try {
       let breedValue: string | undefined;
@@ -365,7 +371,7 @@ export function AddPetScreen() {
         feedingSchedule: feedingSchedule.trim() || undefined,
         microchipNumber: getMicrochipFormValues("microchipNumber").trim() || undefined,
         vetName: vetName.trim() || undefined,
-        vetPhone: vetPhone.trim() || undefined,
+        vetPhone: trimmedVetPhone || undefined,
       };
 
       if (isEdit) {

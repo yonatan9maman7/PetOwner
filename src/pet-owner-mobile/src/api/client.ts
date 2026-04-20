@@ -272,9 +272,12 @@ export const usersApi = {
 };
 
 export const triageApi = {
+  /** Base64 payloads + Gemini can exceed the default 15s client timeout on slow networks. */
   assess: (data: TeletriageRequestDto) =>
     apiClient
-      .post<TeletriageResponseDto>("/teletriage/assess", data)
+      .post<TeletriageResponseDto>("/teletriage/assess", data, {
+        timeout: 60_000,
+      })
       .then((r) => r.data),
   getHistory: (petId: string) =>
     apiClient

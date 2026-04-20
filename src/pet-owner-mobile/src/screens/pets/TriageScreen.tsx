@@ -21,6 +21,11 @@ import {
   useFocusEffect,
 } from "@react-navigation/native";
 import * as ImagePicker from "expo-image-picker";
+import {
+  manipulateAsync,
+  SaveFormat,
+  type Action,
+} from "expo-image-manipulator";
 import * as Location from "expo-location";
 import { useTranslation } from "../../i18n";
 import { useTheme } from "../../theme/ThemeContext";
@@ -34,6 +39,51 @@ import type {
   NearbyVetDto,
   TriageSeverity,
 } from "../../types/api";
+
+/** Keeps Base64 small for mobile networks while staying sharp enough for triage. */
+const TRIAGE_IMAGE_MAX_EDGE = 1024;
+const TRIAGE_IMAGE_QUALITY = 0.45;
+
+const TRIAGE_IMAGE_PICKER_OPTIONS: ImagePicker.ImagePickerOptions = {
+  mediaTypes: ImagePicker.MediaTypeOptions.Images,
+  allowsEditing: true,
+  quality: TRIAGE_IMAGE_QUALITY,
+  base64: false,
+};
+
+async function prepareTriageImageForUpload(
+  localUri: string,
+): Promise<{ uri: string; base64: string }> {
+  const { width, height } = await new Promise<{ width: number; height: number }>(
+    (resolve, reject) => {
+      Image.getSize(
+        localUri,
+        (w, h) => resolve({ width: w, height: h }),
+        reject,
+      );
+    },
+  );
+
+  const actions: Action[] = [];
+  if (width >= height) {
+    if (width > TRIAGE_IMAGE_MAX_EDGE) {
+      actions.push({ resize: { width: TRIAGE_IMAGE_MAX_EDGE } });
+    }
+  } else if (height > TRIAGE_IMAGE_MAX_EDGE) {
+    actions.push({ resize: { height: TRIAGE_IMAGE_MAX_EDGE } });
+  }
+
+  const result = await manipulateAsync(localUri, actions, {
+    compress: TRIAGE_IMAGE_QUALITY,
+    format: SaveFormat.JPEG,
+    base64: true,
+  });
+
+  if (!result.base64) {
+    throw new Error("Missing base64 in manipulate result");
+  }
+  return { uri: result.uri, base64: result.base64 };
+}
 
 const SEVERITY_COLOR: Record<TriageSeverity, string> = {
   Low: "#10b981",
@@ -79,6 +129,7 @@ export function TriageScreen() {
   const [symptomInput, setSymptomInput] = useState("");
   const [imageUri, setImageUri] = useState<string | null>(null);
   const [imageBase64, setImageBase64] = useState<string | null>(null);
+  const [triageImageProcessing, setTriageImageProcessing] = useState(false);
   const [assessing, setAssessing] = useState(false);
 
   /* Nearby vets */
@@ -211,19 +262,52 @@ export function TriageScreen() {
     fetchNearbyVets("High", true);
   }, [sosEmergencyMode, userLocation, fetchNearbyVets]);
 
-  /* ─── Image picker ─── */
+  /* ─── Image: camera vs library + compress/resize ─── */
 
-  const pickImage = async () => {
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      quality: 0.7,
-      base64: true,
-    });
-    if (!result.canceled && result.assets[0]) {
-      setImageUri(result.assets[0].uri);
-      setImageBase64(result.assets[0].base64 ?? null);
+  const applyPickedAssetUri = async (assetUri: string) => {
+    setTriageImageProcessing(true);
+    try {
+      const { uri, base64 } = await prepareTriageImageForUpload(assetUri);
+      setImageUri(uri);
+      setImageBase64(base64);
+    } catch {
+      Alert.alert(t("errorTitle"), t("genericErrorDesc"));
+    } finally {
+      setTriageImageProcessing(false);
     }
+  };
+
+  const pickFromCamera = async () => {
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+    if (status !== "granted") {
+      Alert.alert(t("errorTitle"), t("triagePhotoPermissionDenied"));
+      return;
+    }
+    const result = await ImagePicker.launchCameraAsync(TRIAGE_IMAGE_PICKER_OPTIONS);
+    if (result.canceled || !result.assets?.[0]) return;
+    await applyPickedAssetUri(result.assets[0].uri);
+  };
+
+  const pickFromLibrary = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== "granted") {
+      Alert.alert(t("errorTitle"), t("triagePhotoPermissionDenied"));
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync(
+      TRIAGE_IMAGE_PICKER_OPTIONS,
+    );
+    if (result.canceled || !result.assets?.[0]) return;
+    await applyPickedAssetUri(result.assets[0].uri);
+  };
+
+  const showPhotoSourcePicker = () => {
+    if (assessing || triageImageProcessing) return;
+    Alert.alert(t("triagePhotoSourceTitle"), t("triagePhotoSourceMessage"), [
+      { text: t("cancel"), style: "cancel" },
+      { text: t("triageTakePhoto"), onPress: () => void pickFromCamera() },
+      { text: t("triageChooseGallery"), onPress: () => void pickFromLibrary() },
+    ]);
   };
 
   /* ─── Submit symptoms ─── */
@@ -231,15 +315,19 @@ export function TriageScreen() {
   const handleSubmit = async () => {
     if (!selectedPetId || !symptomInput.trim()) return;
 
+    const capturedImageUri = imageUri;
+    const capturedImageBase64 = imageBase64;
+
     const userMsg: UserMessage = {
       role: "user",
       text: symptomInput.trim(),
-      imageUri: imageUri ?? undefined,
+      imageUri: capturedImageUri ?? undefined,
       timestamp: new Date(),
     };
     setMessages((prev) => [...prev, userMsg]);
     setSymptomInput("");
     setImageUri(null);
+    setImageBase64(null);
     setAssessing(true);
     setNearbyVets([]);
 
@@ -249,9 +337,8 @@ export function TriageScreen() {
       const data = await triageApi.assess({
         petId: selectedPetId,
         symptoms: userMsg.text,
-        imageBase64: imageBase64 ?? undefined,
+        imageBase64: capturedImageBase64 ?? undefined,
       });
-      setImageBase64(null);
       const assistantMsg: AssistantMessage = {
         role: "assistant",
         assessment: data,
@@ -932,7 +1019,7 @@ export function TriageScreen() {
                 ),
               )}
 
-              {/* Typing indicator */}
+              {/* AI analyzing */}
               {assessing && (
                 <View
                   style={{
@@ -940,38 +1027,33 @@ export function TriageScreen() {
                     backgroundColor: colors.surface,
                     borderRadius: 16,
                     paddingHorizontal: 16,
-                    paddingVertical: 12,
-                    flexDirection: "row",
-                    gap: 6,
+                    paddingVertical: 14,
+                    flexDirection: isRTL ? "row-reverse" : "row",
+                    alignItems: "center",
+                    gap: 12,
+                    maxWidth: "92%",
+                    borderWidth: 1,
+                    borderColor: colors.borderLight,
+                    shadowColor: colors.shadow,
+                    shadowOffset: { width: 0, height: 1 },
+                    shadowOpacity: 0.06,
+                    shadowRadius: 4,
+                    elevation: 2,
                   }}
                 >
-                  <View
+                  <ActivityIndicator size="small" color={colors.primary} />
+                  <Text
                     style={{
-                      width: 8,
-                      height: 8,
-                      borderRadius: 4,
-                      backgroundColor: colors.primary,
-                      opacity: 0.4,
+                      ...rtlText,
+                      flex: 1,
+                      fontSize: 14,
+                      color: colors.textSecondary,
+                      fontWeight: "600",
+                      lineHeight: 20,
                     }}
-                  />
-                  <View
-                    style={{
-                      width: 8,
-                      height: 8,
-                      borderRadius: 4,
-                      backgroundColor: colors.primary,
-                      opacity: 0.6,
-                    }}
-                  />
-                  <View
-                    style={{
-                      width: 8,
-                      height: 8,
-                      borderRadius: 4,
-                      backgroundColor: colors.primary,
-                      opacity: 0.8,
-                    }}
-                  />
+                  >
+                    {t("triageAnalyzing")}
+                  </Text>
                 </View>
               )}
 
@@ -1062,9 +1144,10 @@ export function TriageScreen() {
                     gap: 8,
                   }}
                 >
-                  {/* Image attach */}
+                  {/* Image attach: camera vs gallery */}
                   <Pressable
-                    onPress={pickImage}
+                    onPress={showPhotoSourcePicker}
+                    disabled={assessing || triageImageProcessing}
                     style={{
                       width: 40,
                       height: 40,
@@ -1072,9 +1155,18 @@ export function TriageScreen() {
                       backgroundColor: colors.surfaceSecondary,
                       alignItems: "center",
                       justifyContent: "center",
+                      opacity: assessing || triageImageProcessing ? 0.45 : 1,
                     }}
                   >
-                    <Ionicons name="camera-outline" size={20} color={colors.textSecondary} />
+                    {triageImageProcessing ? (
+                      <ActivityIndicator size="small" color={colors.textSecondary} />
+                    ) : (
+                      <Ionicons
+                        name="images-outline"
+                        size={20}
+                        color={colors.textSecondary}
+                      />
+                    )}
                   </Pressable>
 
                   {/* Text input */}
@@ -1100,19 +1192,26 @@ export function TriageScreen() {
                       value={symptomInput}
                       onChangeText={setSymptomInput}
                       multiline
+                      editable={!assessing && !triageImageProcessing}
                     />
                   </View>
 
                   {/* Send */}
                   <Pressable
                     onPress={handleSubmit}
-                    disabled={assessing || !symptomInput.trim()}
+                    disabled={
+                      assessing ||
+                      triageImageProcessing ||
+                      !symptomInput.trim()
+                    }
                     style={{
                       width: 40,
                       height: 40,
                       borderRadius: 12,
                       backgroundColor:
-                        symptomInput.trim() && !assessing
+                        symptomInput.trim() &&
+                        !assessing &&
+                        !triageImageProcessing
                           ? colors.primary
                           : colors.border,
                       alignItems: "center",
@@ -1125,7 +1224,11 @@ export function TriageScreen() {
                       <Ionicons
                         name={isRTL ? "arrow-back" : "arrow-forward"}
                         size={18}
-                        color={symptomInput.trim() ? "#fff" : colors.textMuted}
+                        color={
+                          symptomInput.trim() && !triageImageProcessing
+                            ? "#fff"
+                            : colors.textMuted
+                        }
                       />
                     )}
                   </Pressable>
