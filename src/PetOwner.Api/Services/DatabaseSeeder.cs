@@ -124,8 +124,8 @@ public class DatabaseSeeder
             var id = Guid.NewGuid();
             var seed = Guid.NewGuid().ToString("N")[..8];
 
-            var assignedServices = faker.Random.Shuffle(allServiceTypes)
-                .Take(faker.Random.Int(1, allServiceTypes.Length))
+            var assignedServices = faker.Random.Shuffle(DemoSeedServiceTypes)
+                .Take(faker.Random.Int(1, DemoSeedServiceTypes.Length))
                 .ToArray();
 
             var providerServices = assignedServices
@@ -241,7 +241,7 @@ public class DatabaseSeeder
             for (var b = 0; b < numBookings; b++)
             {
                 var provider = faker.PickRandom(providerUsers);
-                var serviceType = faker.PickRandom<ServiceType>();
+                var serviceType = faker.PickRandom(DemoSeedServiceTypes);
                 var daysAgo = faker.Random.Int(5, 45);
 
                 bookings.Add(new Booking
