@@ -3,7 +3,8 @@
  * Beta/release builds should always set `EXPO_PUBLIC_API_URL` in `.env` / EAS secrets.
  * Fallback exists only so local `expo start` runs without env; it is not localhost.
  */
-const REMOTE_URL = "http://jonathanmaman-001-site1.ltempurl.com";
+/** Default API host when `EXPO_PUBLIC_API_URL` is unset (HTTPS origin only; `/api` and `/hubs/*` are appended in this file). */
+const REMOTE_URL = "https://petowner-production.up.railway.app";
 
 const fromEnv = process.env.EXPO_PUBLIC_API_URL?.trim();
 export const SERVER_ROOT_URL =

@@ -48,6 +48,13 @@ public class DatabaseSeeder
         (ServiceType.PetStore, "Pet Store", PricingUnit.PerVisit, 20, 200),
     ];
 
+    /// <summary>
+    /// Service types that have a row in <see cref="ServiceDefinitions"/> / <see cref="ServiceRateDefinitions"/>.
+    /// Do not use <see cref="Enum.GetValues{TEnum}"/> here: extra enum members (e.g. HouseSitting) map to the same ServiceId in
+    /// <see cref="ServiceIdFor"/> and violate the composite PK (ProviderId, ServiceId) on <see cref="ProviderService"/>.
+    /// </summary>
+    private static readonly ServiceType[] DemoSeedServiceTypes = ServiceRateDefinitions.Select(d => d.Type).ToArray();
+
     private static readonly string[] IsraeliCities = ["Tel Aviv"];
 
     private static readonly string[] DogBreeds =
@@ -83,7 +90,6 @@ public class DatabaseSeeder
         var fakerEn = faker;
         var serviceIds = await EnsureServicesExistAsync();
         var passwordHash = BCrypt.Net.BCrypt.HashPassword(SeedPassword);
-        var allServiceTypes = Enum.GetValues<ServiceType>();
 
         // Tel Aviv bounding box
         const double centralMinLat = 32.0400, centralMaxLat = 32.1200;
