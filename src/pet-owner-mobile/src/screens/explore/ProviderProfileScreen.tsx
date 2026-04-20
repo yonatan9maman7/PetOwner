@@ -11,6 +11,9 @@ import {
   Platform,
   Share,
   StyleSheet,
+  Modal,
+  TextInput,
+  KeyboardAvoidingView,
 } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
@@ -26,6 +29,11 @@ import { useFavoritesStore } from "../../store/favoritesStore";
 import { useTheme } from "../../theme/ThemeContext";
 import { mapApi } from "../../api/client";
 import type { DogSize, ProviderPublicProfileDto } from "../../types/api";
+import { ProviderType } from "../../types/api";
+import { useReviewsStore } from "../../store/reviewsStore";
+import { StarRatingInput } from "./components/StarRatingInput";
+import { InlineError } from "../../components/shared";
+import { formInputStyle } from "../pets/MyPets/helpers";
 import {
   DOG_ICON_SIZES,
   DOG_SIZE_LABEL_KEYS,
@@ -198,8 +206,82 @@ export function ProviderProfileScreen() {
   const toggleFavorite = useFavoritesStore((s) => s.toggle);
   const isFav = favoriteIds.has(providerId);
 
+  const submitDirectReview = useReviewsStore((s) => s.submitDirectReview);
+  const submittingDirect = useReviewsStore((s) => s.submitting);
+  const directSubmitError = useReviewsStore((s) => s.submitError);
+  const clearSubmitError = useReviewsStore((s) => s.clearSubmitError);
+
   const [profile, setProfile] = useState<ProviderPublicProfileDto | null>(null);
   const [loading, setLoading] = useState(true);
+  const [directReviewOpen, setDirectReviewOpen] = useState(false);
+  const [directRating, setDirectRating] = useState(0);
+  const [directComment, setDirectComment] = useState("");
+  const [directFieldError, setDirectFieldError] = useState<string | null>(null);
+
+  const openDirectReviewModal = useCallback(() => {
+    clearSubmitError();
+    setDirectFieldError(null);
+    setDirectRating(0);
+    setDirectComment("");
+    setDirectReviewOpen(true);
+  }, [clearSubmitError]);
+
+  const closeDirectReviewModal = useCallback(() => {
+    setDirectReviewOpen(false);
+  }, []);
+
+  const handleSubmitDirectReview = useCallback(async () => {
+    if (!profile) return;
+    setDirectFieldError(null);
+    clearSubmitError();
+    if (directRating < 1) {
+      setDirectFieldError(t("reviewValidationRating"));
+      return;
+    }
+    const c = directComment.trim();
+    if (c.length < 10) {
+      setDirectFieldError(t("reviewValidationComment"));
+      return;
+    }
+    if (c.length > 1000) {
+      setDirectFieldError(t("reviewValidationCommentMax"));
+      return;
+    }
+    const dto = await submitDirectReview(
+      {
+        revieweeId: profile.providerId,
+        rating: directRating,
+        comment: c,
+      },
+      profile.providerId,
+    );
+    if (!dto) return;
+    setProfile((prev) => {
+      if (!prev) return prev;
+      const rc = prev.reviewCount + 1;
+      const newAvg =
+        prev.averageRating != null && prev.reviewCount > 0
+          ? Math.round(
+              ((prev.averageRating * prev.reviewCount + dto.rating) / rc) * 10,
+            ) / 10
+          : dto.rating;
+      return {
+        ...prev,
+        recentReviews: [dto, ...prev.recentReviews].slice(0, 3),
+        reviewCount: rc,
+        averageRating: newAvg,
+      };
+    });
+    setDirectReviewOpen(false);
+    Alert.alert(t("reviewSubmitSuccess"), t("reviewSubmitSuccessMessage"));
+  }, [
+    profile,
+    directRating,
+    directComment,
+    submitDirectReview,
+    clearSubmitError,
+    t,
+  ]);
 
   useEffect(() => {
     if (!isLoggedIn) {
@@ -656,19 +738,30 @@ export function ProviderProfileScreen() {
               title={`${t("reviews")} (${profile.reviewCount})`}
               right={
                 profile.providerId !== currentUserId ? (
-                  <Pressable
-                    onPress={() =>
-                      navigation.navigate("WriteReview", {
-                        providerId: profile.providerId,
-                        providerName: profile.name,
-                      })
-                    }
-                    style={[s.writeReviewBtn, { backgroundColor: colors.surfaceSecondary }]}
-                  >
-                    <Text style={[s.writeReviewBtnText, { color: colors.text }]}>
-                      {t("leaveReview")}
-                    </Text>
-                  </Pressable>
+                  profile.providerType === ProviderType.Business ? (
+                    <Pressable
+                      onPress={openDirectReviewModal}
+                      style={[s.writeReviewBtn, { backgroundColor: colors.surfaceSecondary }]}
+                    >
+                      <Text style={[s.writeReviewBtnText, { color: colors.text }]}>
+                        {t("writeReviewTitle")}
+                      </Text>
+                    </Pressable>
+                  ) : (
+                    <Pressable
+                      onPress={() =>
+                        navigation.navigate("WriteReview", {
+                          providerId: profile.providerId,
+                          providerName: profile.name,
+                        })
+                      }
+                      style={[s.writeReviewBtn, { backgroundColor: colors.surfaceSecondary }]}
+                    >
+                      <Text style={[s.writeReviewBtnText, { color: colors.text }]}>
+                        {t("leaveReview")}
+                      </Text>
+                    </Pressable>
+                  )
                 ) : undefined
               }
             />
@@ -754,6 +847,88 @@ export function ProviderProfileScreen() {
         })()}
         </View>
       )}
+
+      <Modal
+        visible={directReviewOpen}
+        animationType="fade"
+        transparent
+        onRequestClose={closeDirectReviewModal}
+      >
+        <KeyboardAvoidingView
+          style={s.modalOverlay}
+          behavior={Platform.OS === "ios" ? "padding" : undefined}
+        >
+          <Pressable style={s.modalBackdrop} onPress={closeDirectReviewModal}>
+            <View style={[s.modalCard, { backgroundColor: colors.surface }]}>
+              <View style={[s.modalHeaderRow, isRTL && s.rowReverse]}>
+                <Text style={[s.modalTitle, { color: colors.text }]}>{t("writeReviewTitle")}</Text>
+                <Pressable onPress={closeDirectReviewModal} hitSlop={12} accessibilityRole="button">
+                  <Ionicons name="close" size={24} color={colors.textMuted} />
+                </Pressable>
+              </View>
+              <Text
+                style={[rtlText, { color: colors.textSecondary, fontSize: 14, marginBottom: 16 }]}
+                numberOfLines={2}
+              >
+                {profile.name}
+              </Text>
+
+              {(directFieldError || directSubmitError) ? (
+                <InlineError message={directFieldError ?? directSubmitError ?? ""} />
+              ) : null}
+
+              <Text
+                style={[s.modalLabel, { color: colors.textMuted, textAlign: isRTL ? "right" : "left" }]}
+              >
+                {t("reviewRatingLabel")}
+              </Text>
+              <StarRatingInput
+                value={directRating}
+                onChange={setDirectRating}
+                size={36}
+                isRTL={isRTL}
+                accessibilityLabel={t("reviewRatingLabel")}
+              />
+
+              <Text
+                style={[
+                  s.modalLabel,
+                  { color: colors.textMuted, textAlign: isRTL ? "right" : "left", marginTop: 18 },
+                ]}
+              >
+                {t("reviewCommentLabel")}
+              </Text>
+              <TextInput
+                value={directComment}
+                onChangeText={setDirectComment}
+                placeholder={t("reviewCommentPlaceholder")}
+                placeholderTextColor={colors.textMuted}
+                multiline
+                numberOfLines={5}
+                style={[formInputStyle(isRTL, colors), { minHeight: 120, textAlignVertical: "top" }]}
+              />
+
+              <Pressable
+                onPress={handleSubmitDirectReview}
+                disabled={submittingDirect}
+                style={[
+                  s.modalSubmitBtn,
+                  {
+                    backgroundColor: submittingDirect ? colors.primaryLight : colors.primary,
+                    opacity: submittingDirect ? 0.85 : 1,
+                  },
+                ]}
+              >
+                {submittingDirect ? (
+                  <ActivityIndicator color={colors.primaryText} />
+                ) : (
+                  <Text style={[s.modalSubmitText, { color: colors.primaryText }]}>{t("reviewSubmit")}</Text>
+                )}
+              </Pressable>
+            </View>
+          </Pressable>
+        </KeyboardAvoidingView>
+      </Modal>
     </View>
   );
 }
@@ -1168,5 +1343,48 @@ const s = StyleSheet.create({
   bookNowText: {
     fontSize: 16,
     fontWeight: "700",
+  },
+
+  modalOverlay: {
+    flex: 1,
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.45)",
+    justifyContent: "center",
+    paddingHorizontal: 20,
+  },
+  modalCard: {
+    borderRadius: 20,
+    padding: 22,
+    maxHeight: "90%",
+  },
+  modalHeaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 4,
+    gap: 8,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: "700",
+    flex: 1,
+  },
+  modalLabel: {
+    fontSize: 11,
+    fontWeight: "700",
+    letterSpacing: 0.5,
+    marginBottom: 8,
+  },
+  modalSubmitBtn: {
+    marginTop: 20,
+    paddingVertical: 14,
+    borderRadius: 14,
+    alignItems: "center",
+  },
+  modalSubmitText: {
+    fontWeight: "700",
+    fontSize: 16,
   },
 });

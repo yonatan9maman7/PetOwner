@@ -65,6 +65,78 @@ public class ReviewsController : ControllerBase
         return CreatedAtAction(nameof(GetProviderReviews), new { providerId = booking.ProviderProfileId }, new { review.Id });
     }
 
+    /// <summary>
+    /// Owner-submitted review for a business provider without a completed booking. Not verified.
+    /// </summary>
+    [HttpPost("direct")]
+    public async Task<IActionResult> CreateDirectReview([FromBody] CreateDirectReviewDto request)
+    {
+        var userId = GetUserId();
+
+        if (request.Rating is < 1 or > 5)
+            return BadRequest(new { message = "Rating must be between 1 and 5." });
+
+        if (request.RevieweeId == userId)
+            return BadRequest(new { message = "You cannot review your own profile." });
+
+        var comment = request.Comment.Trim();
+        if (comment.Length is < 10 or > 1000)
+            return BadRequest(new { message = "Comment must be between 10 and 1000 characters." });
+
+        var providerProfile = await _db.ProviderProfiles
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.UserId == request.RevieweeId);
+
+        if (providerProfile is null)
+            return BadRequest(new { message = "Review target is not a provider." });
+
+        if (providerProfile.Type != ProviderType.Business)
+            return BadRequest(new { message = "Direct reviews are only available for business providers." });
+
+        var alreadyReviewed = await _db.Reviews
+            .AnyAsync(r => r.ReviewerId == userId && r.RevieweeId == request.RevieweeId);
+
+        if (alreadyReviewed)
+            return BadRequest(new { message = "You have already reviewed this business." });
+
+        var review = new Review
+        {
+            BookingId = null,
+            ReviewerId = userId,
+            RevieweeId = request.RevieweeId,
+            Rating = request.Rating,
+            Comment = comment,
+            IsVerified = false,
+        };
+
+        _db.Reviews.Add(review);
+        await _db.SaveChangesAsync();
+
+        await RecalculateProviderRating(request.RevieweeId);
+
+        var dto = await _db.Reviews
+            .AsNoTracking()
+            .Where(r => r.Id == review.Id)
+            .Select(r => new ReviewDto(
+                r.Id,
+                r.ServiceRequestId,
+                r.BookingId,
+                r.ReviewerId,
+                r.Reviewer.Name,
+                r.Reviewer.ProviderProfile != null ? r.Reviewer.ProviderProfile.ProfileImageUrl : null,
+                r.RevieweeId,
+                r.Rating,
+                r.Comment,
+                r.IsVerified,
+                r.CommunicationRating,
+                r.ReliabilityRating,
+                r.PhotoUrl,
+                r.CreatedAt))
+            .FirstAsync();
+
+        return CreatedAtAction(nameof(GetProviderReviews), new { providerId = request.RevieweeId }, dto);
+    }
+
     [HttpGet("provider/{providerId:guid}")]
     [AllowAnonymous]
     public async Task<IActionResult> GetProviderReviews(Guid providerId)

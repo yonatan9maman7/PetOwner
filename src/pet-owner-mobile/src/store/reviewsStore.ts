@@ -1,6 +1,10 @@
 import { create } from "zustand";
 import { reviewsApi } from "../api/reviewsApi";
-import type { CreateBookingReviewRequest, ReviewDto } from "../types/api";
+import type {
+  CreateBookingReviewRequest,
+  CreateDirectReviewRequest,
+  ReviewDto,
+} from "../types/api";
 import { useAuthStore } from "./authStore";
 
 type ProviderBucket = {
@@ -23,6 +27,10 @@ interface ReviewsState {
     payload: CreateBookingReviewRequest,
     providerId: string,
   ) => Promise<boolean>;
+  submitDirectReview: (
+    payload: CreateDirectReviewRequest,
+    providerId: string,
+  ) => Promise<ReviewDto | null>;
   clearProvider: (providerId: string) => void;
   clearSubmitError: () => void;
 }
@@ -117,6 +125,35 @@ export const useReviewsStore = create<ReviewsState>((set, get) => ({
         (e instanceof Error ? e.message : "Failed to submit review");
       set({ submitting: false, submitError: String(msg) });
       return false;
+    }
+  },
+
+  submitDirectReview: async (payload, providerId) => {
+    set({ submitting: true, submitError: null });
+    try {
+      const dto = await reviewsApi.createDirectReview(payload);
+      set((s) => {
+        const b = s.byProviderId[providerId] ?? emptyBucket();
+        const exists = b.reviews.some((r) => r.id === dto.id);
+        return {
+          submitting: false,
+          submitError: null,
+          byProviderId: {
+            ...s.byProviderId,
+            [providerId]: {
+              ...b,
+              reviews: exists ? b.reviews : [dto, ...b.reviews],
+            },
+          },
+        };
+      });
+      return dto;
+    } catch (e: unknown) {
+      const msg =
+        (e as { response?: { data?: { message?: string } } })?.response?.data?.message ??
+        (e instanceof Error ? e.message : "Failed to submit review");
+      set({ submitting: false, submitError: String(msg) });
+      return null;
     }
   },
 

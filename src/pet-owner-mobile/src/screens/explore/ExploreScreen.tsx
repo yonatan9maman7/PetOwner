@@ -303,6 +303,13 @@ export function ExploreScreen() {
   const markerJustTappedRef = useRef(false);
   /** Ignore stale map/pin responses when the user pans or zooms faster than the network. */
   const pinsFetchGenRef = useRef(0);
+  /** Last viewport used for a silent (background) pin refresh — avoids duplicate fetches when the map fires near-identical region events. */
+  const lastSilentFetchRegionRef = useRef<{
+    lat: number;
+    lng: number;
+    dLat: number;
+    dLng: number;
+  } | null>(null);
 
   /* Service types from API */
   const [serviceTypes, setServiceTypes] = useState<string[]>([]);
@@ -412,9 +419,10 @@ export function ExploreScreen() {
 
   /* ─── Fetch pins ─── */
   const fetchPins = useCallback(
-    async (filters?: MapSearchFilters) => {
+    async (filters?: MapSearchFilters, options?: { showLoading?: boolean }) => {
+      const showLoading = options?.showLoading !== false;
       const gen = ++pinsFetchGenRef.current;
-      setLoading(true);
+      if (showLoading) setLoading(true);
       try {
         const data = await mapApi.fetchPins(filters);
         if (gen !== pinsFetchGenRef.current) return;
@@ -426,7 +434,7 @@ export function ExploreScreen() {
           Alert.alert(t("genericErrorTitle"), t("genericErrorDesc"));
         }
       } finally {
-        if (gen === pinsFetchGenRef.current) {
+        if (gen === pinsFetchGenRef.current && showLoading) {
           setLoading(false);
         }
       }
@@ -434,9 +442,14 @@ export function ExploreScreen() {
     [t],
   );
 
-  const loadPins = useCallback(() => {
-    fetchPins(buildFilters());
-  }, [fetchPins, buildFilters]);
+  const loadPins = useCallback(
+    (opts?: { silent?: boolean }) => {
+      const silent = opts?.silent ?? false;
+      if (!silent) lastSilentFetchRegionRef.current = null;
+      fetchPins(buildFilters(), { showLoading: !silent });
+    },
+    [fetchPins, buildFilters],
+  );
 
   /* Always-fresh ref so debounced / native callbacks never go stale */
   const loadPinsRef = useRef(loadPins);
@@ -520,7 +533,7 @@ export function ExploreScreen() {
       debounceRef.current = setTimeout(() => {
         setSelectedPin(null);
         setCollocatedChooserPins(null);
-        loadPinsRef.current();
+        loadPinsRef.current({ silent: true });
       }, 500);
     },
     [],
@@ -532,8 +545,25 @@ export function ExploreScreen() {
       mapRegionRef.current = region;
       if (moveDebounceRef.current) clearTimeout(moveDebounceRef.current);
       moveDebounceRef.current = setTimeout(() => {
+        const r = mapRegionRef.current;
+        const prev = lastSilentFetchRegionRef.current;
+        if (prev) {
+          const smallMove =
+            Math.abs(prev.lat - r.latitude) < r.latitudeDelta * 0.04 &&
+            Math.abs(prev.lng - r.longitude) < r.longitudeDelta * 0.04;
+          const smallZoom =
+            Math.abs(prev.dLat - r.latitudeDelta) < r.latitudeDelta * 0.12 &&
+            Math.abs(prev.dLng - r.longitudeDelta) < r.longitudeDelta * 0.12;
+          if (smallMove && smallZoom) return;
+        }
+        lastSilentFetchRegionRef.current = {
+          lat: r.latitude,
+          lng: r.longitude,
+          dLat: r.latitudeDelta,
+          dLng: r.longitudeDelta,
+        };
         setCollocatedChooserPins(null);
-        loadPinsRef.current();
+        loadPinsRef.current({ silent: true });
       }, 500);
     },
     [],

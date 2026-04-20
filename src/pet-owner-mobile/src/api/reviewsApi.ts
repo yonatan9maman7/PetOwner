@@ -1,5 +1,9 @@
 import apiClient from "./client";
-import type { CreateBookingReviewRequest, ReviewDto } from "../types/api";
+import type {
+  CreateBookingReviewRequest,
+  CreateDirectReviewRequest,
+  ReviewDto,
+} from "../types/api";
 
 /**
  * REST: `/api/reviews` (+ `.../provider/{id}`).
@@ -11,4 +15,7 @@ export const reviewsApi = {
 
   createBookingReview: (data: CreateBookingReviewRequest) =>
     apiClient.post<{ id: string }>("/reviews", data).then((r) => r.data),
+
+  createDirectReview: (data: CreateDirectReviewRequest) =>
+    apiClient.post<ReviewDto>("/reviews/direct", data).then((r) => r.data),
 };

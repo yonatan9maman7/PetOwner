@@ -14,6 +14,12 @@ public record CreateBookingReviewDto(
     string Comment
 );
 
+public record CreateDirectReviewDto(
+    Guid RevieweeId,
+    int Rating,
+    string Comment
+);
+
 public record ReviewDto(
     Guid Id,
     Guid? ServiceRequestId,

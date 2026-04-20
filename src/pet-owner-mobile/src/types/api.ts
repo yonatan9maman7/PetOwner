@@ -181,6 +181,13 @@ export interface CreateBookingReviewRequest {
   comment: string;
 }
 
+/** POST /api/reviews/direct — business providers only; no booking. */
+export interface CreateDirectReviewRequest {
+  revieweeId: string;
+  rating: number;
+  comment: string;
+}
+
 export interface ProviderPublicProfileDto {
   providerId: string;
   name: string;

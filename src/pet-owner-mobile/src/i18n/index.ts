@@ -292,7 +292,7 @@ const he = {
   petIsNeutered: "מעוקר/מסורס",
   savePet: "שמירה",
   petAddedSuccessMessage:
-    "הכלב/ה {name} נוסף/ה בהצלחה וכעת ניתן לראות אותו/ה ברשימת החיות שבבעלותך!",
+    "{name} נוסף/ה בהצלחה! כעת ניתן לראות אותו/ה ברשימת החיות שבבעלותך.",
   updatePet: "עדכון חיית מחמד",
   continueStep: "המשך",
   backStep: "חזרה",
