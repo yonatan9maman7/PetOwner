@@ -2,13 +2,14 @@
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 WORKDIR /src
 
-COPY src/PetOwner.Api/PetOwner.Api.csproj src/PetOwner.Api/
-COPY src/PetOwner.Data/PetOwner.Data.csproj src/PetOwner.Data/
-RUN dotnet restore src/PetOwner.Api/PetOwner.Api.csproj
+COPY PetOwner.sln ./
+COPY src/PetOwner.Api/PetOwner.Api.csproj ./src/PetOwner.Api/
+COPY src/PetOwner.Data/PetOwner.Data.csproj ./src/PetOwner.Data/
 
-COPY src/ src/
-WORKDIR /src/PetOwner.Api
-RUN dotnet publish -c Release -o /app/publish --no-restore
+RUN dotnet restore PetOwner.sln
+
+COPY . .
+RUN dotnet publish src/PetOwner.Api/PetOwner.Api.csproj -c Release -o /app/publish
 
 # Runtime stage
 FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS final
