@@ -131,17 +131,16 @@ export function MyStatsScreen() {
   const handleExport = async () => {
     try {
       setExporting(true);
-      const csv =
+      const xlsxBytes =
         tab === "earnings" && providerStats
-          ? await providerApi.exportBookingStatsCsv()
-          : await usersApi.exportStatsCsv();
-
+          ? await providerApi.exportBookingStatsXlsx()
+          : await usersApi.exportStatsXlsx();
       const filename =
-        tab === "earnings" ? "my-earnings.csv" : "my-spending.csv";
+        tab === "earnings" ? "my-earnings.xlsx" : "my-spending.xlsx";
       const file = new File(Paths.cache, filename);
       if (file.exists) file.delete();
       file.create();
-      file.write(csv, { encoding: "utf8" });
+      file.write(xlsxBytes);
 
       const canShare = await Sharing.isAvailableAsync();
       if (!canShare) {
@@ -149,9 +148,10 @@ export function MyStatsScreen() {
         return;
       }
       await Sharing.shareAsync(file.uri, {
-        mimeType: "text/csv",
+        mimeType:
+          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         dialogTitle: t("statsExportCta"),
-        UTI: "public.comma-separated-values-text",
+        UTI: "org.openxmlformats.spreadsheetml.sheet",
       });
     } catch {
       Alert.alert(t("errorTitle"), t("statsExportFailed"));
@@ -329,7 +329,7 @@ export function MyStatsScreen() {
         </ScrollView>
       )}
 
-      {/* Export CSV footer */}
+      {/* Export Excel footer */}
       {!loading && activeStats ? (
         <SafeAreaView
           edges={["bottom"]}

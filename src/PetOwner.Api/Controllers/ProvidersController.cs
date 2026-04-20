@@ -844,40 +844,60 @@ public class ProvidersController : ControllerBase
         var hasProfile = await _db.ProviderProfiles.AnyAsync(p => p.UserId == userId);
         if (!hasProfile) return NotFound(new { message = "Provider profile not found." });
 
-        var rows = await _db.Bookings
-            .AsNoTracking()
-            .Where(b => b.ProviderProfileId == userId && b.PaymentStatus == PaymentStatus.Paid)
-            .OrderByDescending(b => b.CreatedAt)
-            .Select(b => new
-            {
-                b.Id,
-                b.CreatedAt,
-                b.StartDate,
-                b.EndDate,
-                Service = b.Service.ToString(),
-                OwnerName = b.Owner.Name,
-                b.TotalPrice,
-                Status = b.Status.ToString(),
-            })
-            .ToListAsync();
+        var rows = await LoadProviderEarningsExportRowsAsync(userId);
 
         var sb = new StringBuilder();
         sb.AppendLine("BookingId,CreatedAt,StartDate,EndDate,Service,OwnerName,TotalPriceILS,Status");
         foreach (var r in rows)
         {
-            sb.Append(r.Id).Append(',')
+            sb.Append(r.BookingId).Append(',')
               .Append(r.CreatedAt.ToString("o", CultureInfo.InvariantCulture)).Append(',')
               .Append(r.StartDate.ToString("o", CultureInfo.InvariantCulture)).Append(',')
               .Append(r.EndDate.ToString("o", CultureInfo.InvariantCulture)).Append(',')
               .Append(UsersController.CsvEscape(r.Service)).Append(',')
               .Append(UsersController.CsvEscape(r.OwnerName)).Append(',')
-              .Append(r.TotalPrice.ToString(CultureInfo.InvariantCulture)).Append(',')
+              .Append(r.TotalPriceIls.ToString(CultureInfo.InvariantCulture)).Append(',')
               .AppendLine(r.Status);
         }
 
         var bytes = Encoding.UTF8.GetBytes(sb.ToString());
         return File(bytes, "text/csv", $"my-earnings-{DateTime.UtcNow:yyyyMMdd}.csv");
     }
+
+    /// <summary>
+    /// Excel export of the provider's paid bookings (same data as CSV).
+    /// </summary>
+    [Authorize]
+    [HttpGet("me/booking-stats/export.xlsx")]
+    public async Task<IActionResult> ExportBookingStatsXlsx()
+    {
+        var userId = GetUserId();
+        var hasProfile = await _db.ProviderProfiles.AnyAsync(p => p.UserId == userId);
+        if (!hasProfile) return NotFound(new { message = "Provider profile not found." });
+
+        var rows = await LoadProviderEarningsExportRowsAsync(userId);
+        var bytes = StatsExportXlsx.BuildProviderEarningsWorkbook(rows);
+        return File(
+            bytes,
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            $"my-earnings-{DateTime.UtcNow:yyyyMMdd}.xlsx");
+    }
+
+    private async Task<List<StatsExportXlsx.ProviderEarningsExportRow>> LoadProviderEarningsExportRowsAsync(Guid userId) =>
+        await _db.Bookings
+            .AsNoTracking()
+            .Where(b => b.ProviderProfileId == userId && b.PaymentStatus == PaymentStatus.Paid)
+            .OrderByDescending(b => b.CreatedAt)
+            .Select(b => new StatsExportXlsx.ProviderEarningsExportRow(
+                b.Id,
+                b.CreatedAt,
+                b.StartDate,
+                b.EndDate,
+                b.Service.ToString(),
+                b.Owner.Name,
+                b.TotalPrice,
+                b.Status.ToString()))
+            .ToListAsync();
 
     private Guid GetUserId() =>
         Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);

@@ -1,10 +1,12 @@
-import type {
-  PetDto,
-  VaccineStatusDto,
-  WeightLogDto,
-  MedicalRecordDto,
-  TeletriageHistoryDto,
+import {
+  PetSpecies,
+  type PetDto,
+  type VaccineStatusDto,
+  type WeightLogDto,
+  type MedicalRecordDto,
+  type TeletriageHistoryDto,
 } from "../types/api";
+import { getSpeciesEmoji } from "../screens/pets/MyPets/constants";
 
 interface HealthPassportParams {
   pet: PetDto;
@@ -27,9 +29,42 @@ const VACCINE_LABEL: Record<string | number, string> = {
   FeLV: "FeLV", FIV: "FIV", Other: "Other",
 };
 
-const SPECIES_LABEL: Record<number, string> = {
-  0: "Dog", 1: "Cat", 2: "Bird", 3: "Rabbit", 4: "Reptile", 5: "Other",
+/** Matches `PetSpecies` (API: numeric 1–6 or string enum names). */
+const SPECIES_LABEL_EN: Record<number, string> = {
+  [PetSpecies.Dog]: "Dog",
+  [PetSpecies.Cat]: "Cat",
+  [PetSpecies.Bird]: "Bird",
+  [PetSpecies.Rabbit]: "Rabbit",
+  [PetSpecies.Reptile]: "Reptile",
+  [PetSpecies.Other]: "Other",
 };
+
+function speciesLabelForPassport(
+  species: PetSpecies | string | number | undefined | null,
+): string {
+  if (species === undefined || species === null || species === "") return "Pet";
+  if (typeof species === "number") {
+    return SPECIES_LABEL_EN[species] ?? "Pet";
+  }
+  const asNum = Number(species);
+  if (!Number.isNaN(asNum) && SPECIES_LABEL_EN[asNum] !== undefined) {
+    return SPECIES_LABEL_EN[asNum];
+  }
+  const normalized =
+    typeof species === "string"
+      ? species.trim().charAt(0).toUpperCase() +
+        species.trim().slice(1).toLowerCase()
+      : String(species);
+  const byName: Record<string, string> = {
+    Dog: "Dog",
+    Cat: "Cat",
+    Bird: "Bird",
+    Rabbit: "Rabbit",
+    Reptile: "Reptile",
+    Other: "Other",
+  };
+  return byName[normalized] ?? "Pet";
+}
 
 const SEVERITY_COLOR: Record<string, string> = {
   Low: "#16a34a", Medium: "#d97706", High: "#ea580c", Critical: "#dc2626",
@@ -62,10 +97,11 @@ export function generateHealthPassportHtml(params: HealthPassportParams): string
   const dir = isRTL ? "rtl" : "ltr";
   const genDate = new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "long", year: "numeric" });
 
-  const speciesLabel = SPECIES_LABEL[pet.species] ?? "Pet";
+  const speciesLabel = speciesLabelForPassport(pet.species);
+  const speciesEmoji = getSpeciesEmoji(pet.species);
   const petPhotoHtml = pet.imageUrl
     ? `<img src="${esc(pet.imageUrl)}" style="width:96px;height:96px;border-radius:50%;object-fit:cover;border:3px solid #e9d5ff" />`
-    : `<div style="width:96px;height:96px;border-radius:50%;background:#f3e8ff;display:flex;align-items:center;justify-content:center;font-size:40px">${speciesLabel === "Cat" ? "🐈" : speciesLabel === "Bird" ? "🐦" : "🐕"}</div>`;
+    : `<div style="width:96px;height:96px;border-radius:50%;background:#f3e8ff;display:flex;align-items:center;justify-content:center;font-size:40px">${speciesEmoji}</div>`;
 
   const medications = medicalRecords.filter(r => r.type === "Medication");
   const conditions = medicalRecords.filter(r => r.type === "Condition");

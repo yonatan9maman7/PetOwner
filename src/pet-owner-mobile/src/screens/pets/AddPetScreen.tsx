@@ -39,12 +39,17 @@ import {
   serializeAllergies,
 } from "./addPetHelpers";
 import { BrandedAppHeader } from "../../components/BrandedAppHeader";
+import { filesApi } from "../../api/client";
 import { usePetsStore } from "../../store/petsStore";
 import { PetSpecies } from "../../types/api";
 import type { CreatePetRequest, UpdatePetRequest } from "../../types/api";
 import { isIsraeliBusinessPhoneValid } from "../../features/provider-onboarding/phoneUtils";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
+
+function isRemoteImageUri(uri: string): boolean {
+  return /^https?:\/\//i.test(uri);
+}
 
 const speciesCards: { value: PetSpecies; emoji: string; labelKey: string }[] = [
   { value: PetSpecies.Dog, emoji: "🐶", labelKey: "speciesDog" },
@@ -104,6 +109,7 @@ export function AddPetScreen() {
 
   // Step 1
   const [avatarUri, setAvatarUri] = useState<string | null>(null);
+  const [avatarUploading, setAvatarUploading] = useState(false);
   const [name, setName] = useState("");
   const [species, setSpecies] = useState<PetSpecies | null>(null);
   const [breed, setBreed] = useState("");
@@ -289,11 +295,12 @@ export function AddPetScreen() {
   };
 
   const pickImage = async () => {
+    if (saving || avatarUploading) return;
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ["images"],
       allowsEditing: true,
       aspect: [1, 1],
-      quality: 0.8,
+      quality: 0.5,
     });
     if (!result.canceled && result.assets?.[0]) {
       setAvatarUri(result.assets[0].uri);
@@ -346,6 +353,25 @@ export function AddPetScreen() {
         breedValue = breed.trim() || undefined;
       }
 
+      let imageUrl: string | undefined;
+      if (avatarUri) {
+        if (isRemoteImageUri(avatarUri)) {
+          imageUrl = avatarUri;
+        } else {
+          setAvatarUploading(true);
+          try {
+            const { url } = await filesApi.uploadImage(avatarUri, "pets");
+            imageUrl = url;
+            setAvatarUri(url);
+          } catch {
+            Alert.alert(t("errorTitle"), t("genericErrorDesc"));
+            return;
+          } finally {
+            setAvatarUploading(false);
+          }
+        }
+      }
+
       const data: CreatePetRequest = {
         name: name.trim(),
         species: species!,
@@ -372,6 +398,7 @@ export function AddPetScreen() {
         microchipNumber: getMicrochipFormValues("microchipNumber").trim() || undefined,
         vetName: vetName.trim() || undefined,
         vetPhone: trimmedVetPhone || undefined,
+        imageUrl,
       };
 
       if (isEdit) {
@@ -486,6 +513,7 @@ export function AddPetScreen() {
                 <View style={{ alignItems: "center", gap: 12 }}>
                   <Pressable
                     onPress={pickImage}
+                    disabled={saving || avatarUploading}
                     style={{
                       width: 120,
                       height: 120,
@@ -497,6 +525,7 @@ export function AddPetScreen() {
                       alignItems: "center",
                       justifyContent: "center",
                       overflow: "hidden",
+                      opacity: saving || avatarUploading ? 0.85 : 1,
                     }}
                   >
                     {avatarUri ? (
@@ -522,6 +551,18 @@ export function AddPetScreen() {
                           {t("uploadPhoto")}
                         </Text>
                       </>
+                    )}
+                    {avatarUploading && (
+                      <View
+                        style={{
+                          ...StyleSheet.absoluteFillObject,
+                          backgroundColor: "rgba(0,0,0,0.35)",
+                          alignItems: "center",
+                          justifyContent: "center",
+                        }}
+                      >
+                        <ActivityIndicator size="large" color="#fff" />
+                      </View>
                     )}
                   </Pressable>
                   <Text

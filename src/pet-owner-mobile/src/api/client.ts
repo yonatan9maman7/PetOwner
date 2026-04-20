@@ -242,16 +242,14 @@ export const providerApi = {
       .then((r) => r.data),
 
   /**
-   * Fetch CSV text. The caller writes it to a temporary file and hands it to expo-sharing.
-   * Using `responseType: "text"` keeps RN happy (no Blob parsing needed).
+   * Download provider earnings export as native .xlsx from the API.
    */
-  exportBookingStatsCsv: () =>
+  exportBookingStatsXlsx: () =>
     apiClient
-      .get<string>("/providers/me/booking-stats/export.csv", {
-        responseType: "text",
-        transformResponse: [(data) => data],
+      .get<ArrayBuffer>("/providers/me/booking-stats/export.xlsx", {
+        responseType: "arraybuffer",
       })
-      .then((r) => r.data),
+      .then((r) => new Uint8Array(r.data)),
 };
 
 export const usersApi = {
@@ -261,14 +259,13 @@ export const usersApi = {
       .get<OwnerStatsDto>("/users/me/stats", { params: { range } })
       .then((r) => r.data),
 
-  /** Owner-side CSV of paid bookings. */
-  exportStatsCsv: () =>
+  /** Owner-side Excel export of paid bookings. */
+  exportStatsXlsx: () =>
     apiClient
-      .get<string>("/users/me/stats/export.csv", {
-        responseType: "text",
-        transformResponse: [(data) => data],
+      .get<ArrayBuffer>("/users/me/stats/export.xlsx", {
+        responseType: "arraybuffer",
       })
-      .then((r) => r.data),
+      .then((r) => new Uint8Array(r.data)),
 };
 
 export const triageApi = {

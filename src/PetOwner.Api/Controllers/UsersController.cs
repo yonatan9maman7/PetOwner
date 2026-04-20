@@ -221,35 +221,19 @@ public class UsersController : ControllerBase
     public async Task<IActionResult> ExportMyStatsCsv()
     {
         var userId = GetUserId();
-
-        var rows = await _db.Bookings
-            .AsNoTracking()
-            .Where(b => b.OwnerId == userId && b.PaymentStatus == PaymentStatus.Paid)
-            .OrderByDescending(b => b.CreatedAt)
-            .Select(b => new
-            {
-                b.Id,
-                b.CreatedAt,
-                b.StartDate,
-                b.EndDate,
-                Service = b.Service.ToString(),
-                ProviderName = b.ProviderProfile.User.Name,
-                b.TotalPrice,
-                Status = b.Status.ToString(),
-            })
-            .ToListAsync();
+        var rows = await LoadOwnerSpendingExportRowsAsync(userId);
 
         var sb = new StringBuilder();
         sb.AppendLine("BookingId,CreatedAt,StartDate,EndDate,Service,ProviderName,TotalPriceILS,Status");
         foreach (var r in rows)
         {
-            sb.Append(r.Id).Append(',')
+            sb.Append(r.BookingId).Append(',')
               .Append(r.CreatedAt.ToString("o", CultureInfo.InvariantCulture)).Append(',')
               .Append(r.StartDate.ToString("o", CultureInfo.InvariantCulture)).Append(',')
               .Append(r.EndDate.ToString("o", CultureInfo.InvariantCulture)).Append(',')
               .Append(CsvEscape(r.Service)).Append(',')
               .Append(CsvEscape(r.ProviderName)).Append(',')
-              .Append(r.TotalPrice.ToString(CultureInfo.InvariantCulture)).Append(',')
+              .Append(r.TotalPriceIls.ToString(CultureInfo.InvariantCulture)).Append(',')
               .AppendLine(r.Status);
         }
 
@@ -257,7 +241,38 @@ public class UsersController : ControllerBase
         return File(bytes, "text/csv", $"my-spending-{DateTime.UtcNow:yyyyMMdd}.csv");
     }
 
+    /// <summary>
+    /// Owner-side Excel export of paid bookings (same data as CSV; preferred for spreadsheets).
+    /// </summary>
+    [HttpGet("me/stats/export.xlsx")]
+    public async Task<IActionResult> ExportMyStatsXlsx()
+    {
+        var userId = GetUserId();
+        var rows = await LoadOwnerSpendingExportRowsAsync(userId);
+        var bytes = StatsExportXlsx.BuildOwnerSpendingWorkbook(rows);
+        return File(
+            bytes,
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            $"my-spending-{DateTime.UtcNow:yyyyMMdd}.xlsx");
+    }
+
     // ── Helpers ────────────────────────────────────────────────────────────────
+
+    private async Task<List<StatsExportXlsx.OwnerSpendingExportRow>> LoadOwnerSpendingExportRowsAsync(Guid userId) =>
+        await _db.Bookings
+            .AsNoTracking()
+            .Where(b => b.OwnerId == userId && b.PaymentStatus == PaymentStatus.Paid)
+            .OrderByDescending(b => b.CreatedAt)
+            .Select(b => new StatsExportXlsx.OwnerSpendingExportRow(
+                b.Id,
+                b.CreatedAt,
+                b.StartDate,
+                b.EndDate,
+                b.Service.ToString(),
+                b.ProviderProfile.User.Name,
+                b.TotalPrice,
+                b.Status.ToString()))
+            .ToListAsync();
 
     private async Task<UserNotificationPrefs> GetOrCreatePrefsAsync(Guid userId)
     {

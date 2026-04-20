@@ -11,7 +11,10 @@ import {
   ActivityIndicator,
   KeyboardAvoidingView,
   Modal,
+  Image,
+  StyleSheet,
 } from "react-native";
+import * as ImagePicker from "expo-image-picker";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
@@ -26,6 +29,13 @@ import type { AvailabilitySlotDto, DogSize } from "../../types/api";
 const NAVY = "#001a5a";
 const DEFAULT_LAT = 32.0809;
 const DEFAULT_LNG = 34.7749;
+
+const AVATAR_PICKER_OPTIONS: ImagePicker.ImagePickerOptions = {
+  mediaTypes: ["images"],
+  allowsEditing: true,
+  aspect: [1, 1],
+  quality: 0.5,
+};
 
 interface ServiceDef {
   serviceType: number;
@@ -789,6 +799,8 @@ export function ProviderEditScreen() {
   const [togglingMapVisibility, setTogglingMapVisibility] = useState(false);
   const [acceptedDogSizes, setAcceptedDogSizes] = useState<DogSize[]>([]);
   const [maxDogsCapacity, setMaxDogsCapacity] = useState("");
+  const [profileImageUrl, setProfileImageUrl] = useState<string | null>(null);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -801,6 +813,7 @@ export function ProviderEditScreen() {
         if (!active) return;
 
         setProviderStatus(profile.status || "Approved");
+        setProfileImageUrl(profile.profileImageUrl ?? null);
         setVisibleOnMap(!!profile.isAvailableNow);
         setBio(profile.bio || "");
         setUrgentAvailable(profile.acceptsOffHoursRequests);
@@ -877,6 +890,55 @@ export function ProviderEditScreen() {
         packages: prev[serviceType].packages.filter((p) => p.id !== pkgId),
       },
     }));
+  };
+
+  const uploadProviderAvatar = async (localUri: string) => {
+    setUploadingAvatar(true);
+    try {
+      const name = localUri.split("/").pop() ?? "photo.jpg";
+      const match = /\.(\w+)$/.exec(name);
+      const type = match ? `image/${match[1]}` : "image/jpeg";
+      const form = new FormData();
+      form.append("file", { uri: localUri, name, type } as any);
+      const res = await providerApi.uploadImage(form);
+      const url = res.url;
+      setProfileImageUrl(url);
+    } catch {
+      Alert.alert(t("errorTitle"), t("genericErrorDesc"));
+    } finally {
+      setUploadingAvatar(false);
+    }
+  };
+
+  const pickProviderAvatarFromLibrary = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== "granted") {
+      Alert.alert(t("errorTitle"), t("triagePhotoPermissionDenied"));
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync(AVATAR_PICKER_OPTIONS);
+    if (result.canceled || !result.assets?.[0]?.uri) return;
+    await uploadProviderAvatar(result.assets[0].uri);
+  };
+
+  const pickProviderAvatarFromCamera = async () => {
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+    if (status !== "granted") {
+      Alert.alert(t("errorTitle"), t("triagePhotoPermissionDenied"));
+      return;
+    }
+    const result = await ImagePicker.launchCameraAsync(AVATAR_PICKER_OPTIONS);
+    if (result.canceled || !result.assets?.[0]?.uri) return;
+    await uploadProviderAvatar(result.assets[0].uri);
+  };
+
+  const showProviderAvatarPicker = () => {
+    if (uploadingAvatar || saving) return;
+    Alert.alert(t("triagePhotoSourceTitle"), t("triagePhotoSourceMessage"), [
+      { text: t("cancel"), style: "cancel" },
+      { text: t("triageTakePhoto"), onPress: () => void pickProviderAvatarFromCamera() },
+      { text: t("triageChooseGallery"), onPress: () => void pickProviderAvatarFromLibrary() },
+    ]);
   };
 
   const handleGenerateBio = async () => {
@@ -1138,6 +1200,76 @@ export function ProviderEditScreen() {
               keyboardShouldPersistTaps="handled"
               keyboardDismissMode="on-drag"
             >
+              {/* ── Profile photo ── */}
+              <View style={{ alignItems: "center", marginBottom: 24 }}>
+                <Pressable
+                  onPress={showProviderAvatarPicker}
+                  disabled={uploadingAvatar || saving}
+                  style={{
+                    width: 120,
+                    height: 120,
+                    borderRadius: 60,
+                    borderWidth: 2,
+                    borderStyle: "dashed",
+                    borderColor: profileImageUrl ? colors.primary : colors.border,
+                    backgroundColor: colors.surface,
+                    alignItems: "center",
+                    justifyContent: "center",
+                    overflow: "hidden",
+                    opacity: uploadingAvatar || saving ? 0.9 : 1,
+                  }}
+                >
+                  {profileImageUrl ? (
+                    <Image
+                      source={{ uri: profileImageUrl }}
+                      style={{ width: 120, height: 120 }}
+                    />
+                  ) : (
+                    <Ionicons name="person-outline" size={40} color={colors.textMuted} />
+                  )}
+                  {uploadingAvatar && (
+                    <View
+                      style={{
+                        ...StyleSheet.absoluteFillObject,
+                        backgroundColor: "rgba(0,0,0,0.35)",
+                        alignItems: "center",
+                        justifyContent: "center",
+                      }}
+                    >
+                      <ActivityIndicator size="large" color="#fff" />
+                    </View>
+                  )}
+                </Pressable>
+                <Pressable
+                  onPress={showProviderAvatarPicker}
+                  disabled={uploadingAvatar || saving}
+                  style={{ marginTop: 10 }}
+                >
+                  <Text
+                    style={{
+                      fontSize: 14,
+                      fontWeight: "700",
+                      color: colors.primary,
+                    }}
+                  >
+                    {t("changePhoto")}
+                  </Text>
+                </Pressable>
+                <Text
+                  style={[
+                    rtlText,
+                    {
+                      fontSize: 12,
+                      color: colors.textMuted,
+                      marginTop: 4,
+                      textAlign: "center",
+                    },
+                  ]}
+                >
+                  {t("onbTapToUpload")}
+                </Text>
+              </View>
+
               {/* ── Status Banner ── */}
               {providerStatus === "Pending" && (
                 <View
