@@ -5,6 +5,7 @@ WORKDIR /src
 COPY PetOwner.sln ./
 COPY src/PetOwner.Api/PetOwner.Api.csproj ./src/PetOwner.Api/
 COPY src/PetOwner.Data/PetOwner.Data.csproj ./src/PetOwner.Data/
+COPY src/PetOwner.Api.Tests/PetOwner.Api.Tests.csproj ./src/PetOwner.Api.Tests/
 
 RUN dotnet restore PetOwner.sln
 
