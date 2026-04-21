@@ -114,19 +114,16 @@ public class MapService : IMapService
             query = query.Where(l => l.User!.ProviderProfile!.Type == wanted);
         }
 
-        // Avoid string.Join / enum formatting inside EF projection (often fails SQL translation).
-        var rows = await query
+        // Materialize after spatial/basic filters only. Min(Rate) + service lists in the projection
+        // become per-row CASE/EXISTS subqueries and multiply joins; compute those in memory instead.
+        var baseRows = await query
             .Select(l => new
             {
                 l.UserId,
                 Name = l.User!.Name,
                 Latitude = l.GeoLocation!.Y,
                 Longitude = l.GeoLocation.X,
-                MinRate = l.User.ProviderProfile!.ServiceRates.Any()
-                    ? l.User.ProviderProfile.ServiceRates.Min(r => r.Rate)
-                    : 0m,
-                l.User.ProviderProfile.ProfileImageUrl,
-                ServiceKinds = l.User.ProviderProfile.ServiceRates.Select(r => r.Service),
+                l.User.ProviderProfile!.ProfileImageUrl,
                 l.User.ProviderProfile.AverageRating,
                 l.User.ProviderProfile.ReviewCount,
                 l.User.ProviderProfile.AcceptsOffHoursRequests,
@@ -137,21 +134,42 @@ public class MapService : IMapService
             })
             .ToListAsync();
 
-        return rows.Select(r => new MapPinDto(
-            r.UserId,
-            r.Name,
-            r.Latitude,
-            r.Longitude,
-            r.MinRate,
-            r.ProfileImageUrl,
-            string.Join(", ", r.ServiceKinds.OrderBy(s => s).Select(ServiceTypeCatalog.ToDisplayName)),
-            r.AverageRating,
-            r.ReviewCount,
-            r.AcceptsOffHoursRequests,
-            r.Type.ToString(),
-            r.WhatsAppNumber,
-            r.WebsiteUrl,
-            r.IsEmergencyService))
-            .ToList();
+        if (baseRows.Count == 0)
+            return [];
+
+        var providerIds = baseRows.Select(r => r.UserId).Distinct().ToList();
+
+        var rateRows = await _db.ProviderServiceRates
+            .AsNoTracking()
+            .Where(r => providerIds.Contains(r.ProviderProfileId))
+            .Select(r => new { r.ProviderProfileId, r.Service, r.Rate })
+            .ToListAsync();
+
+        var ratesByProvider = rateRows.ToLookup(r => r.ProviderProfileId);
+
+        return baseRows.Select(r =>
+        {
+            var rates = ratesByProvider[r.UserId];
+            var minRate = rates.Any() ? rates.Min(x => x.Rate) : 0m;
+            var services = string.Join(
+                ", ",
+                rates.Select(x => x.Service).Distinct().OrderBy(s => s).Select(ServiceTypeCatalog.ToDisplayName));
+
+            return new MapPinDto(
+                r.UserId,
+                r.Name,
+                r.Latitude,
+                r.Longitude,
+                minRate,
+                r.ProfileImageUrl,
+                services,
+                r.AverageRating,
+                r.ReviewCount,
+                r.AcceptsOffHoursRequests,
+                r.Type.ToString(),
+                r.WhatsAppNumber,
+                r.WebsiteUrl,
+                r.IsEmergencyService);
+        }).ToList();
     }
 }

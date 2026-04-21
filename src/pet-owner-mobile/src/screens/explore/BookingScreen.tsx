@@ -45,6 +45,95 @@ function combineDateAndTime(dateStr: string, timeStr: string): string {
   return `${dateStr}T${timeStr}:00`;
 }
 
+/** Matches backend `PricingUnit` / JSON string names from the API */
+type BillingMode = "perHour" | "perNight" | "flat";
+
+function getBillingMode(rate: any): BillingMode {
+  const raw = rate?.pricingUnit;
+  if (typeof raw === "number" && !Number.isNaN(raw)) {
+    if (raw === 0) return "perHour";
+    if (raw === 1) return "perNight";
+    return "flat";
+  }
+  if (typeof raw === "string") {
+    const s = raw.replace(/\s+/g, "").toLowerCase();
+    if (s === "perhour" || s === "0") return "perHour";
+    if (s === "pernight" || s === "1") return "perNight";
+    return "flat";
+  }
+  const unit = String(rate?.unit ?? "").toLowerCase();
+  if (unit === "hour" || unit === "hours") return "perHour";
+  if (unit === "night" || unit === "nights") return "perNight";
+  return "flat";
+}
+
+/** Calendar nights between local dates; matches server `(end.Date - start.Date).Days` with a minimum of 1 */
+function calendarNightsBetween(start: Date, end: Date): number {
+  const s = new Date(start.getFullYear(), start.getMonth(), start.getDate());
+  const e = new Date(end.getFullYear(), end.getMonth(), end.getDate());
+  const days = Math.round((e.getTime() - s.getTime()) / 86400000);
+  return Math.max(1, days);
+}
+
+function calculateBookingTotal(
+  mode: BillingMode,
+  rate: number,
+  start: Date,
+  end: Date,
+): number {
+  switch (mode) {
+    case "perNight":
+      return rate * calendarNightsBetween(start, end);
+    case "perHour": {
+      const hours = (end.getTime() - start.getTime()) / 3600000;
+      return rate * Math.max(0, hours);
+    }
+    default:
+      return rate;
+  }
+}
+
+/**
+ * Resolves local start/end for the booking window.
+ * If end is before start on the same calendar day, end is moved forward by one day (overnight / next-morning end).
+ */
+function resolveBookingRange(
+  startDate: string,
+  startTime: string,
+  endDate: string,
+  endTime: string,
+): { start: Date; end: Date } | null {
+  if (!startDate || !startTime || !endTime) return null;
+  const resolvedEndDate = endDate || startDate;
+  const start = new Date(combineDateAndTime(startDate, startTime));
+  let end = new Date(combineDateAndTime(resolvedEndDate, endTime));
+  if (isNaN(start.getTime()) || isNaN(end.getTime())) return null;
+  if (end <= start) {
+    end = new Date(end.getTime() + 86400000);
+  }
+  if (end <= start) return null;
+  return { start, end };
+}
+
+/** PetOwner.Data `ServiceType` enum ordinal — used when JSON sends string names */
+function serviceTypeToNumber(rate: any): number {
+  if (typeof rate?.serviceType === "number" && !Number.isNaN(rate.serviceType)) {
+    return rate.serviceType;
+  }
+  const label = rate?.service ?? rate?.serviceType;
+  if (typeof label !== "string") return 0;
+  const lower = label.toLowerCase().trim();
+  const entry = Object.entries(SERVICE_TYPE_NAMES).find(
+    ([, name]) => name.toLowerCase() === lower,
+  );
+  if (entry) return Number(entry[0]);
+  const compact = label.replace(/[\s-]/g, "");
+  const enumHit = Object.entries(SERVICE_TYPE_NAMES).find(
+    ([, name]) => name.replace(/\s+/g, "").toLowerCase() === compact.toLowerCase(),
+  );
+  return enumHit ? Number(enumHit[0]) : 0;
+}
+
 /** Switch to Profile → My Bookings (outgoing) from any stack that hosts `Booking`. */
 function navigateToMyBookingsOutgoing(navigation: { getParent: () => any }) {
   let parent: any = navigation.getParent();
@@ -60,26 +149,6 @@ function navigateToMyBookingsOutgoing(navigation: { getParent: () => any }) {
     parent = parent.getParent?.();
   }
   (navigation as any).navigate("MyBookings", { tab: "outgoing" });
-}
-
-function calculatePrice(
-  pricingUnit: number,
-  rate: number,
-  start: Date,
-  end: Date,
-): number {
-  switch (pricingUnit) {
-    case 1: {
-      const nights = Math.max(1, Math.round((end.getTime() - start.getTime()) / 86400000));
-      return rate * nights;
-    }
-    case 0: {
-      const hours = Math.max(0, (end.getTime() - start.getTime()) / 3600000);
-      return rate * hours;
-    }
-    default:
-      return rate;
-  }
 }
 
 /** Parse "HH:mm" or "HH:mm:ss" → total minutes from midnight */
@@ -151,13 +220,13 @@ export function BookingScreen() {
 
   const estimatedPrice = useMemo(() => {
     if (!selectedRate || !startDate || !startTime) return null;
-    const resolvedEndDate = endDate || startDate;
-    const resolvedEndTime = endTime || startTime;
-    const start = new Date(combineDateAndTime(startDate, startTime));
-    const end = new Date(combineDateAndTime(resolvedEndDate, resolvedEndTime));
-    if (isNaN(start.getTime()) || isNaN(end.getTime()) || end <= start) return null;
-    const pricingUnit = sr?.pricingUnit ?? 0;
-    return calculatePrice(pricingUnit, sr?.rate ?? 0, start, end);
+    const billingMode = getBillingMode(sr);
+    if (billingMode === "perNight" && (!endDate || !endTime)) return null;
+    if (billingMode !== "perNight" && !endTime) return null;
+    const range = resolveBookingRange(startDate, startTime, endDate, endTime);
+    if (!range) return null;
+    const total = calculateBookingTotal(billingMode, sr?.rate ?? 0, range.start, range.end);
+    return total > 0 ? total : null;
   }, [selectedRate, startDate, startTime, endDate, endTime]);
 
   const handleSubmit = async () => {
@@ -174,11 +243,24 @@ export function BookingScreen() {
       Alert.alert(t("errorTitle"), t("timeSlotUnavailable"));
       return;
     }
-    const resolvedEndDate = endDate || startDate;
-    const resolvedEndTime = endTime || startTime;
-    const startISO = combineDateAndTime(startDate, startTime);
-    const endISO = combineDateAndTime(resolvedEndDate, resolvedEndTime);
-    if (new Date(endISO) <= new Date(startISO)) {
+    const billingMode = getBillingMode(sr);
+    if (billingMode === "perNight" && (!endDate || !endTime)) {
+      Alert.alert(t("errorTitle"), t("invalidDates"));
+      return;
+    }
+    if (billingMode !== "perNight" && !endTime) {
+      Alert.alert(t("errorTitle"), t("invalidDates"));
+      return;
+    }
+    const range = resolveBookingRange(startDate, startTime, endDate, endTime);
+    if (!range) {
+      Alert.alert(t("errorTitle"), t("invalidDates"));
+      return;
+    }
+    const startISO = range.start.toISOString();
+    const endISO = range.end.toISOString();
+    const clientTotal = calculateBookingTotal(billingMode, sr?.rate ?? 0, range.start, range.end);
+    if (clientTotal <= 0) {
       Alert.alert(t("errorTitle"), t("invalidDates"));
       return;
     }
@@ -187,11 +269,12 @@ export function BookingScreen() {
     submitLockRef.current = true;
     setSubmitting(true);
     try {
+      // Server recomputes `totalPrice` from the same start/end window and provider rate; keep client range in sync with the estimate above.
       await bookingsApi.create({
         providerId: profile.providerId,
-        serviceType: sr?.serviceType ?? 0,
-        startDate: new Date(startISO).toISOString(),
-        endDate: new Date(endISO).toISOString(),
+        serviceType: serviceTypeToNumber(sr),
+        startDate: startISO,
+        endDate: endISO,
         notes: notes.trim() || undefined,
       });
       Alert.alert(t("bookingSuccess"), t("bookingCreated"), [

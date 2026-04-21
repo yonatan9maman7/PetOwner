@@ -66,7 +66,8 @@ function isValidMapRegion(region: {
   return true;
 }
 
-const MAP_VIEWPORT_DEBOUNCE_MS = Platform.OS === "ios" ? 720 : 500;
+/** Debounce for silent pin refresh after map gestures (reduces GET /map/pins churn while dragging). */
+const MAP_VIEWPORT_DEBOUNCE_MS = 500;
 const PROGRAMMATIC_MAP_MOVE_SUPPRESS_MS = Platform.OS === "ios" ? 1100 : 850;
 /** After this, custom map markers turn off view tracking (Android needs a short true pulse when selection changes). */
 const PROVIDER_MARKERS_TRACKS_OFF_MS = Platform.OS === "android" ? 650 : 420;

@@ -18,7 +18,7 @@ import {
   StyleSheet,
 } from "react-native";
 import ConfettiCannon from "react-native-confetti-cannon";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import * as ImagePicker from "expo-image-picker";
@@ -46,6 +46,8 @@ import type { CreatePetRequest, UpdatePetRequest } from "../../types/api";
 import { isIsraeliBusinessPhoneValid } from "../../features/provider-onboarding/phoneUtils";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
+
+const CELEBRATION_AUTO_NAV_MS = 3000;
 
 function isRemoteImageUri(uri: string): boolean {
   return /^https?:\/\//i.test(uri);
@@ -142,6 +144,7 @@ export function AddPetScreen() {
   const [petAddedCelebration, setPetAddedCelebration] = useState<{
     name: string;
   } | null>(null);
+  const [showCelebrationDismiss, setShowCelebrationDismiss] = useState(false);
   const confettiLeftRef = useRef<InstanceType<typeof ConfettiCannon> | null>(
     null,
   );
@@ -203,12 +206,26 @@ export function AddPetScreen() {
     });
     const navTimer = setTimeout(() => {
       navigation.goBack();
-    }, 2500);
+    }, CELEBRATION_AUTO_NAV_MS);
+    const dismissCtaTimer = setTimeout(() => {
+      setShowCelebrationDismiss(true);
+    }, CELEBRATION_AUTO_NAV_MS);
     return () => {
       cancelAnimationFrame(raf);
       clearTimeout(navTimer);
+      clearTimeout(dismissCtaTimer);
     };
   }, [petAddedCelebration, navigation]);
+
+  const dismissPetCelebration = useCallback(() => {
+    setPetAddedCelebration(null);
+    setShowCelebrationDismiss(false);
+    if (navigation.canGoBack()) {
+      navigation.goBack();
+    } else {
+      navigation.navigate("MyPetsMain");
+    }
+  }, [navigation]);
 
   const animateStep = useCallback(() => {
     fadeAnim.setValue(0);
@@ -408,6 +425,7 @@ export function AddPetScreen() {
         navigation.goBack();
       } else {
         await usePetsStore.getState().addPet(data);
+        setShowCelebrationDismiss(false);
         setPetAddedCelebration({ name: name.trim() });
       }
     } catch (e: unknown) {
@@ -1754,33 +1772,53 @@ export function AddPetScreen() {
         >
           <View style={styles.celebrationRoot} pointerEvents="box-none">
             <View style={[styles.celebrationBackdrop, { backgroundColor: colors.overlay }]} />
-            <View
-              style={[
-                styles.celebrationCard,
-                {
-                  backgroundColor: colors.surface,
-                  shadowColor: colors.shadow,
-                },
-              ]}
-            >
-              <View style={styles.celebrationIconWrap}>
-                <Ionicons name="sparkles" size={28} color={colors.primary} />
+            <View style={styles.celebrationContent} pointerEvents="box-none">
+              <View style={styles.celebrationCardWrap} pointerEvents="box-none">
+                <View
+                  style={[
+                    styles.celebrationCard,
+                    {
+                      backgroundColor: colors.surface,
+                      shadowColor: colors.shadow,
+                    },
+                  ]}
+                >
+                  <View style={styles.celebrationIconWrap}>
+                    <Ionicons name="sparkles" size={28} color={colors.primary} />
+                  </View>
+                  <Text
+                    style={[
+                      styles.celebrationMessage,
+                      {
+                        color: colors.text,
+                        textAlign: "center",
+                        writingDirection: isRTL ? "rtl" : "ltr",
+                      },
+                    ]}
+                  >
+                    {t("petAddedSuccessMessage").replace(
+                      "{name}",
+                      petAddedCelebration.name,
+                    )}
+                  </Text>
+                </View>
               </View>
-              <Text
-                style={[
-                  styles.celebrationMessage,
-                  {
-                    color: colors.text,
-                    textAlign: "center",
-                    writingDirection: isRTL ? "rtl" : "ltr",
-                  },
-                ]}
-              >
-                {t("petAddedSuccessMessage").replace(
-                  "{name}",
-                  petAddedCelebration.name,
-                )}
-              </Text>
+              {showCelebrationDismiss && (
+                <Pressable
+                  onPress={dismissPetCelebration}
+                  style={[
+                    styles.celebrationDismissBtn,
+                    {
+                      backgroundColor: colors.primary,
+                      marginBottom: Math.max(insets.bottom, 12) + 8,
+                    },
+                  ]}
+                >
+                  <Text style={styles.celebrationDismissBtnText}>
+                    {t("petAddedBackToMyPets")}
+                  </Text>
+                </Pressable>
+              )}
             </View>
             <View
               style={StyleSheet.absoluteFill}
@@ -1793,7 +1831,7 @@ export function AddPetScreen() {
                 origin={{ x: SCREEN_WIDTH * 0.12, y: -24 }}
                 autoStart={false}
                 fadeOut
-                fallSpeed={3600}
+                fallSpeed={3250}
                 explosionSpeed={420}
                 colors={[
                   "#7c3aed",
@@ -1810,7 +1848,7 @@ export function AddPetScreen() {
                 origin={{ x: SCREEN_WIDTH * 0.88, y: -24 }}
                 autoStart={false}
                 fadeOut
-                fallSpeed={3600}
+                fallSpeed={3250}
                 explosionSpeed={420}
                 colors={[
                   "#7c3aed",
@@ -1857,11 +1895,30 @@ function fieldLabelStyle(textAlign: "left" | "right", colors: any) {
 const styles = StyleSheet.create({
   celebrationRoot: {
     flex: 1,
-    justifyContent: "center",
     paddingHorizontal: 24,
+  },
+  celebrationContent: {
+    flex: 1,
+    justifyContent: "space-between",
+  },
+  celebrationCardWrap: {
+    flex: 1,
+    justifyContent: "center",
   },
   celebrationBackdrop: {
     ...StyleSheet.absoluteFillObject,
+  },
+  celebrationDismissBtn: {
+    height: 54,
+    borderRadius: 27,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 24,
+  },
+  celebrationDismissBtnText: {
+    fontSize: 16,
+    fontWeight: "800",
+    color: "#fff",
   },
   celebrationCard: {
     borderRadius: 20,

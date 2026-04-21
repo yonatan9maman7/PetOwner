@@ -295,6 +295,7 @@ const he = {
   savePet: "שמירה",
   petAddedSuccessMessage:
     "{name} נוסף/ה בהצלחה! כעת ניתן לראות אותו/ה ברשימת החיות שבבעלותך.",
+  petAddedBackToMyPets: "חזרה לחיות שלי",
   updatePet: "עדכון חיית מחמד",
   continueStep: "המשך",
   backStep: "חזרה",
@@ -1509,6 +1510,7 @@ const en: Record<keyof typeof he, string> = {
   savePet: "Save",
   petAddedSuccessMessage:
     "{name} was added successfully! You can now see them in your pets list.",
+  petAddedBackToMyPets: "Back to My Pets",
   updatePet: "Update Pet",
   continueStep: "Continue",
   backStep: "Back",
