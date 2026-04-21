@@ -11,12 +11,13 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation, useRoute, useFocusEffect } from "@react-navigation/native";
-import axios from "axios";
 import { useTranslation } from "../../i18n";
 import { useTheme } from "../../theme/ThemeContext";
 import { useAuthStore } from "../../store/authStore";
+import { useBookingsStore } from "../../store/bookingsStore";
 import { bookingsApi } from "../../api/client";
 import type { BookingDto } from "../../types/api";
+import { getApiErrorMessage } from "../../utils/apiUtils";
 
 const STATUS_COLORS: Record<string, { bg: string; text: string }> = {
   Pending: { bg: "#fef9c3", text: "#92400e" },
@@ -72,27 +73,24 @@ export function MyBookingsScreen() {
 
   const initialTab = route.params?.tab === "incoming" ? "incoming" : "outgoing";
 
-  const [allBookings, setAllBookings] = useState<BookingDto[]>([]);
-  const [loading, setLoading] = useState(true);
+  const allBookings = useBookingsStore((s) => s.allBookings);
+  const loading = useBookingsStore((s) => s.loading);
+  const fetchMine = useBookingsStore((s) => s.fetchMine);
+  const clearBookingError = useBookingsStore((s) => s.clearError);
   const [refreshing, setRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState<Tab>(initialTab);
 
   const fetchBookings = useCallback(
     async (silent = false) => {
-      if (!silent) setLoading(true);
-      try {
-        const data = await bookingsApi.getMine();
-        setAllBookings(data);
-      } catch (error) {
-        if (!(axios.isAxiosError(error) && error.response?.status === 401)) {
-          Alert.alert(t("genericErrorTitle"), t("genericErrorDesc"));
-        }
-      } finally {
-        setLoading(false);
-        setRefreshing(false);
+      await fetchMine({ silent });
+      const err = useBookingsStore.getState().error;
+      if (err) {
+        Alert.alert(t("genericErrorTitle"), err);
+        clearBookingError();
       }
+      setRefreshing(false);
     },
-    [t],
+    [t, fetchMine, clearBookingError],
   );
 
   useFocusEffect(
@@ -129,8 +127,8 @@ export function MyBookingsScreen() {
             await bookingsApi.cancel(booking.id);
             Alert.alert(t("bookingCancelled"));
             fetchBookings(true);
-          } catch {
-            Alert.alert(t("errorTitle"));
+          } catch (e: unknown) {
+            Alert.alert(t("errorTitle"), getApiErrorMessage(e));
           }
         },
       },
@@ -147,8 +145,8 @@ export function MyBookingsScreen() {
             await bookingsApi.confirm(booking.id);
             Alert.alert(t("bookingConfirmed"));
             fetchBookings(true);
-          } catch {
-            Alert.alert(t("errorTitle"));
+          } catch (e: unknown) {
+            Alert.alert(t("errorTitle"), getApiErrorMessage(e));
           }
         },
       },
@@ -166,8 +164,8 @@ export function MyBookingsScreen() {
             await bookingsApi.cancel(booking.id);
             Alert.alert(t("bookingDeclined"));
             fetchBookings(true);
-          } catch {
-            Alert.alert(t("errorTitle"));
+          } catch (e: unknown) {
+            Alert.alert(t("errorTitle"), getApiErrorMessage(e));
           }
         },
       },
@@ -183,8 +181,8 @@ export function MyBookingsScreen() {
           try {
             await bookingsApi.complete(booking.id);
             fetchBookings(true);
-          } catch {
-            Alert.alert(t("errorTitle"));
+          } catch (e: unknown) {
+            Alert.alert(t("errorTitle"), getApiErrorMessage(e));
           }
         },
       },

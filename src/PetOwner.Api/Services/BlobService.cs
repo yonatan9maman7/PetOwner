@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Models;
 using Azure.Storage.Sas;
@@ -23,12 +24,13 @@ public class BlobService : IBlobService
     }
 
     public async Task<BlobUploadResult> UploadAsync(
-        Stream stream, string originalFileName, string folder, bool generateThumbnail = false)
+        Stream stream, string originalFileName, Guid userId, string folder, bool generateThumbnail = false)
     {
         await _container.CreateIfNotExistsAsync(PublicAccessType.Blob);
 
         var extension = Path.GetExtension(originalFileName).ToLowerInvariant();
-        var blobName = $"{folder}/{Guid.NewGuid():N}{extension}";
+        var safeFolder = SanitizeFolderSegment(folder);
+        var blobName = $"users/{userId:D}/{safeFolder}/{Guid.NewGuid():N}{extension}";
 
         var blobClient = _container.GetBlobClient(blobName);
 
@@ -136,6 +138,21 @@ public class BlobService : IBlobService
         var dir = Path.GetDirectoryName(blobName)?.Replace('\\', '/') ?? "";
         var name = Path.GetFileNameWithoutExtension(blobName);
         return $"{dir}/{name}_thumb.jpg";
+    }
+
+    /// <summary>Single path segment: letters, digits, underscore, hyphen; max 64 chars.</summary>
+    private static string SanitizeFolderSegment(string folder)
+    {
+        if (string.IsNullOrWhiteSpace(folder))
+            return "files";
+
+        var segment = folder.Replace('\\', '/').Split('/').FirstOrDefault()?.Trim() ?? "files";
+        if (segment.Length > 64)
+            segment = segment[..64];
+
+        return Regex.IsMatch(segment, @"^[a-zA-Z0-9_-]+$")
+            ? segment
+            : "files";
     }
 
     private static bool IsImageExtension(string extension) =>

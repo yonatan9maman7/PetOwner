@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
@@ -32,6 +33,8 @@ public class FilesController : ControllerBase
     [HttpPost("upload/image")]
     public async Task<IActionResult> UploadImage(IFormFile file, [FromQuery] string folder = "images")
     {
+        var userId = GetUserId();
+
         if (file is null || file.Length == 0)
             return BadRequest(new { message = "No file provided." });
 
@@ -43,7 +46,7 @@ public class FilesController : ControllerBase
             return BadRequest(new { message = $"File exceeds the {_settings.MaxFileSizeMb}MB limit." });
 
         using var stream = file.OpenReadStream();
-        var result = await _blobService.UploadAsync(stream, file.FileName, folder, generateThumbnail: true);
+        var result = await _blobService.UploadAsync(stream, file.FileName, userId, folder, generateThumbnail: true);
 
         return Ok(new
         {
@@ -57,6 +60,8 @@ public class FilesController : ControllerBase
     [HttpPost("upload/document")]
     public async Task<IActionResult> UploadDocument(IFormFile file, [FromQuery] string folder = "documents")
     {
+        var userId = GetUserId();
+
         if (file is null || file.Length == 0)
             return BadRequest(new { message = "No file provided." });
 
@@ -69,7 +74,7 @@ public class FilesController : ControllerBase
 
         var isImage = AllowedImageExtensions.Contains(extension);
         using var stream = file.OpenReadStream();
-        var result = await _blobService.UploadAsync(stream, file.FileName, folder, generateThumbnail: isImage);
+        var result = await _blobService.UploadAsync(stream, file.FileName, userId, folder, generateThumbnail: isImage);
 
         return Ok(new
         {
@@ -83,21 +88,41 @@ public class FilesController : ControllerBase
     [HttpDelete("{*blobName}")]
     public async Task<IActionResult> Delete(string blobName)
     {
+        var userId = GetUserId();
+
         if (string.IsNullOrWhiteSpace(blobName))
             return BadRequest(new { message = "Blob name is required." });
+
+        if (!BlobBelongsToUser(blobName, userId))
+            return Forbid();
 
         await _blobService.DeleteAsync(blobName);
         return NoContent();
     }
 
     [HttpGet("sas/{*blobName}")]
-    [AllowAnonymous]
     public IActionResult GetSasUrl(string blobName)
     {
+        var userId = GetUserId();
+
         if (string.IsNullOrWhiteSpace(blobName))
             return BadRequest(new { message = "Blob name is required." });
 
+        if (!BlobBelongsToUser(blobName, userId))
+            return Forbid();
+
         var url = _blobService.GetSasUrl(blobName, TimeSpan.FromHours(1));
         return Ok(new { url });
+    }
+
+    private Guid GetUserId() =>
+        Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+
+    /// <summary>Blob paths are <c>users/{userId}/...</c> (hyphenated GUID).</summary>
+    private static bool BlobBelongsToUser(string blobName, Guid userId)
+    {
+        var normalized = blobName.Replace('\\', '/').TrimStart('/');
+        var prefix = $"users/{userId:D}/";
+        return normalized.StartsWith(prefix, StringComparison.OrdinalIgnoreCase);
     }
 }

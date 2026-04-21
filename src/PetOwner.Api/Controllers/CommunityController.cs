@@ -75,27 +75,60 @@ public class CommunityController : ControllerBase
 
         var userId = GetUserId();
 
-        var query = _db.GroupPosts
-            .Where(p => p.GroupId == groupId)
+        var inMemory = IsInMemoryDatabase(_db);
+        var needsGeo = lat.HasValue && lng.HasValue && radiusKm is > 0;
+
+        IQueryable<GroupPost> query = _db.GroupPosts
+            .AsNoTracking()
+            .Where(p => p.GroupId == groupId);
+
+        if (needsGeo && !inMemory)
+        {
+            var lat1 = lat!.Value;
+            var lng1 = lng!.Value;
+            var rKm = radiusKm!.Value;
+
+            // Haversine distance (km) translated to SQL Server — same formula as HaversineKm below.
+            query = query.Where(p =>
+                p.Latitude != null &&
+                p.Longitude != null &&
+                EarthRadiusKm * 2.0 * Math.Atan2(
+                    Math.Sqrt(
+                        Math.Pow(Math.Sin(((p.Latitude!.Value - lat1) * Math.PI / 180.0) / 2.0), 2) +
+                        Math.Cos(lat1 * Math.PI / 180.0) * Math.Cos(p.Latitude!.Value * Math.PI / 180.0) *
+                        Math.Pow(Math.Sin(((p.Longitude!.Value - lng1) * Math.PI / 180.0) / 2.0), 2)),
+                    Math.Sqrt(1.0 - (
+                        Math.Pow(Math.Sin(((p.Latitude!.Value - lat1) * Math.PI / 180.0) / 2.0), 2) +
+                        Math.Cos(lat1 * Math.PI / 180.0) * Math.Cos(p.Latitude!.Value * Math.PI / 180.0) *
+                        Math.Pow(Math.Sin(((p.Longitude!.Value - lng1) * Math.PI / 180.0) / 2.0), 2)))
+                ) <= rKm);
+        }
+
+        query = query
             .Include(p => p.Author)
                 .ThenInclude(u => u.ProviderProfile)
             .Include(p => p.Likes)
             .Include(p => p.Comments);
 
-        List<GroupPost> posts;
+        if (!inMemory)
+            query = query.AsSplitQuery();
 
-        if (lat.HasValue && lng.HasValue && radiusKm is > 0)
+        var posts = await query
+            .OrderByDescending(p => p.CreatedAt)
+            .ToListAsync();
+
+        if (needsGeo && inMemory)
         {
-            var allPosts = await query.OrderByDescending(p => p.CreatedAt).ToListAsync();
-
-            posts = allPosts
-                .Where(p => p.Latitude.HasValue && p.Longitude.HasValue &&
-                            HaversineKm(lat.Value, lng.Value, p.Latitude.Value, p.Longitude.Value) <= radiusKm.Value)
+            var lat1 = lat!.Value;
+            var lng1 = lng!.Value;
+            var rKm = radiusKm!.Value;
+            posts = posts
+                .Where(p =>
+                    p.Latitude.HasValue &&
+                    p.Longitude.HasValue &&
+                    HaversineKm(lat1, lng1, p.Latitude!.Value, p.Longitude!.Value) <= rKm)
+                .OrderByDescending(p => p.CreatedAt)
                 .ToList();
-        }
-        else
-        {
-            posts = await query.OrderByDescending(p => p.CreatedAt).ToListAsync();
         }
 
         var dtos = posts.Select(p => ToPostDto(p, userId)).ToList();
@@ -327,6 +360,9 @@ public class CommunityController : ControllerBase
     }
 
     // ── Helpers ──────────────────────────────────────────────
+
+    private static bool IsInMemoryDatabase(ApplicationDbContext db) =>
+        db.Database.ProviderName?.Contains("InMemory", StringComparison.Ordinal) == true;
 
     private static GroupPostDto ToPostDto(GroupPost p, Guid currentUserId) =>
         new(

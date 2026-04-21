@@ -42,6 +42,8 @@ const he = {
   sessionExpiredDesc: "אנא התחבר מחדש כדי להמשיך.",
   genericErrorTitle: "אופס, משהו השתבש",
   genericErrorDesc: "בדוק את חיבור האינטרנט שלך ונסה שוב.",
+  apiNetworkTimeout:
+    "פג הזמן או אין חיבור לרשת. בדוק את החיבור שלך ונסה שוב.",
   fillAllFields: "נא למלא את כל השדות",
   nameRequired: "נא להזין שם לחיית המחמד",
   speciesRequired: "נא לבחור סוג חיית מחמד",
@@ -1250,6 +1252,8 @@ const en: Record<keyof typeof he, string> = {
   sessionExpiredDesc: "Please log in again to continue.",
   genericErrorTitle: "Oops, something went wrong",
   genericErrorDesc: "Check your internet connection and try again.",
+  apiNetworkTimeout:
+    "Network timeout. Please check your connection and try again.",
   fillAllFields: "Please fill in all fields",
   nameRequired: "Please enter a pet name",
   speciesRequired: "Please select a species",

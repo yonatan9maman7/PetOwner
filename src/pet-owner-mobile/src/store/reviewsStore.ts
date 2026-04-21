@@ -6,6 +6,7 @@ import type {
   ReviewDto,
 } from "../types/api";
 import { useAuthStore } from "./authStore";
+import { getApiErrorMessage } from "../utils/apiUtils";
 
 type ProviderBucket = {
   reviews: ReviewDto[];
@@ -72,7 +73,7 @@ export const useReviewsStore = create<ReviewsState>((set, get) => ({
         },
       }));
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : "Failed to load reviews";
+      const msg = getApiErrorMessage(e);
       set((s) => ({
         byProviderId: {
           ...s.byProviderId,
@@ -87,7 +88,13 @@ export const useReviewsStore = create<ReviewsState>((set, get) => ({
   },
 
   submitBookingReview: async (payload, providerId) => {
-    set({ submitting: true, submitError: null });
+    let started = false;
+    set((s) => {
+      if (s.submitting) return s;
+      started = true;
+      return { ...s, submitting: true, submitError: null };
+    });
+    if (!started) return false;
     try {
       const { id } = await reviewsApi.createBookingReview(payload);
       const user = useAuthStore.getState().user;
@@ -120,16 +127,19 @@ export const useReviewsStore = create<ReviewsState>((set, get) => ({
       });
       return true;
     } catch (e: unknown) {
-      const msg =
-        (e as { response?: { data?: { message?: string } } })?.response?.data?.message ??
-        (e instanceof Error ? e.message : "Failed to submit review");
-      set({ submitting: false, submitError: String(msg) });
+      set({ submitting: false, submitError: getApiErrorMessage(e) });
       return false;
     }
   },
 
   submitDirectReview: async (payload, providerId) => {
-    set({ submitting: true, submitError: null });
+    let started = false;
+    set((s) => {
+      if (s.submitting) return s;
+      started = true;
+      return { ...s, submitting: true, submitError: null };
+    });
+    if (!started) return null;
     try {
       const dto = await reviewsApi.createDirectReview(payload);
       set((s) => {
@@ -149,10 +159,7 @@ export const useReviewsStore = create<ReviewsState>((set, get) => ({
       });
       return dto;
     } catch (e: unknown) {
-      const msg =
-        (e as { response?: { data?: { message?: string } } })?.response?.data?.message ??
-        (e instanceof Error ? e.message : "Failed to submit review");
-      set({ submitting: false, submitError: String(msg) });
+      set({ submitting: false, submitError: getApiErrorMessage(e) });
       return null;
     }
   },

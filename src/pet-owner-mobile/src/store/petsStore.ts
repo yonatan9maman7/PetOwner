@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { petsApi } from "../api/client";
+import { getApiErrorMessage } from "../utils/apiUtils";
 import type {
   PetDto,
   CreatePetRequest,
@@ -30,8 +31,8 @@ export const usePetsStore = create<PetsState>((set, get) => ({
     try {
       const pets = await petsApi.getMyPets();
       set({ pets, loading: false });
-    } catch (e: any) {
-      set({ error: e.message ?? "Failed to fetch pets", loading: false });
+    } catch (e: unknown) {
+      set({ error: getApiErrorMessage(e), loading: false });
     }
   },
 
@@ -40,8 +41,8 @@ export const usePetsStore = create<PetsState>((set, get) => ({
     try {
       const pet = await petsApi.createPet(data);
       set({ pets: [...get().pets, pet], loading: false });
-    } catch (e: any) {
-      set({ error: e.message ?? "Failed to add pet", loading: false });
+    } catch (e: unknown) {
+      set({ error: getApiErrorMessage(e), loading: false });
       throw e;
     }
   },
@@ -54,8 +55,8 @@ export const usePetsStore = create<PetsState>((set, get) => ({
         pets: get().pets.map((p) => (p.id === id ? updated : p)),
         loading: false,
       });
-    } catch (e: any) {
-      set({ error: e.message ?? "Failed to update pet", loading: false });
+    } catch (e: unknown) {
+      set({ error: getApiErrorMessage(e), loading: false });
       throw e;
     }
   },
@@ -68,8 +69,8 @@ export const usePetsStore = create<PetsState>((set, get) => ({
         pets: get().pets.filter((p) => p.id !== id),
         loading: false,
       });
-    } catch (e: any) {
-      set({ error: e.message ?? "Failed to delete pet", loading: false });
+    } catch (e: unknown) {
+      set({ error: getApiErrorMessage(e), loading: false });
     }
   },
 
@@ -81,10 +82,8 @@ export const usePetsStore = create<PetsState>((set, get) => ({
         pets: get().pets.map((p) => (p.id === id ? updated : p)),
         loading: false,
       });
-    } catch (e: any) {
-      const msg =
-        e.response?.data?.message ?? e.message ?? "Failed to report lost";
-      set({ error: msg, loading: false });
+    } catch (e: unknown) {
+      set({ error: getApiErrorMessage(e), loading: false });
     }
   },
 
@@ -96,8 +95,8 @@ export const usePetsStore = create<PetsState>((set, get) => ({
         pets: get().pets.map((p) => (p.id === id ? updated : p)),
         loading: false,
       });
-    } catch (e: any) {
-      set({ error: e.message ?? "Failed to mark found", loading: false });
+    } catch (e: unknown) {
+      set({ error: getApiErrorMessage(e), loading: false });
     }
   },
 

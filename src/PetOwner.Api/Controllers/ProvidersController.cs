@@ -195,6 +195,7 @@ public class ProvidersController : ControllerBase
             newAccessToken));
     }
 
+    [Authorize]
     [HttpPost("generate-bio")]
     public async Task<IActionResult> GenerateBio([FromBody] GenerateBioRequest request)
     {
@@ -449,10 +450,11 @@ public class ProvidersController : ControllerBase
         if (extension is not (".jpg" or ".jpeg" or ".png" or ".gif" or ".webp"))
             return BadRequest(new { message = "Only image files (jpg, png, gif, webp) are allowed." });
 
-        using var stream = file.OpenReadStream();
-        var result = await _blobService.UploadAsync(stream, file.FileName, "profiles", generateThumbnail: true);
-
         var userId = GetUserId();
+
+        using var stream = file.OpenReadStream();
+        var result = await _blobService.UploadAsync(stream, file.FileName, userId, "profiles", generateThumbnail: true);
+
         var profile = await _db.ProviderProfiles.FirstOrDefaultAsync(p => p.UserId == userId);
         if (profile is not null)
         {

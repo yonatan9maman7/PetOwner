@@ -2,6 +2,7 @@ import axios, { type AxiosError, type InternalAxiosRequestConfig } from "axios";
 import { Alert } from "react-native";
 import { useAuthStore } from "../store/authStore";
 import { translate } from "../i18n";
+import { isConnectivityAxiosError } from "../utils/apiUtils";
 import { API_BASE_URL } from "../config/server";
 import type {
   LoginDto,
@@ -102,6 +103,10 @@ apiClient.interceptors.response.use(
           translate("sessionExpiredDesc"),
         );
       }
+    } else if (isConnectivityAxiosError(error)) {
+      (
+        error as AxiosError & { userFriendlyMessage?: string }
+      ).userFriendlyMessage = translate("apiNetworkTimeout");
     }
     return Promise.reject(error);
   },
@@ -463,7 +468,10 @@ export const filesApi = {
       .post<{ url: string; thumbnailUrl: string }>(
         `/files/upload/image?folder=${folder}`,
         form,
-        { headers: { "Content-Type": "multipart/form-data" } },
+        {
+          headers: { "Content-Type": "multipart/form-data" },
+          timeout: 60_000,
+        },
       )
       .then((r) => r.data);
   },
@@ -485,7 +493,10 @@ export const filesApi = {
       .post<{ fileName: string; url: string; thumbnailUrl: string | null; sizeBytes: number }>(
         `/files/upload/document?folder=${folder}`,
         form,
-        { headers: { "Content-Type": "multipart/form-data" } },
+        {
+          headers: { "Content-Type": "multipart/form-data" },
+          timeout: 60_000,
+        },
       )
       .then((r) => r.data);
   },

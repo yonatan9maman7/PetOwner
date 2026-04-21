@@ -118,7 +118,7 @@ public record ProviderMeResponse(
     int? MaxDogsCapacity
 );
 
-public record GenerateBioRequest(string UserNotes);
+public record GenerateBioRequest([property: MaxLength(500)] string UserNotes);
 
 public record GenerateBioResponse(string Bio);
 

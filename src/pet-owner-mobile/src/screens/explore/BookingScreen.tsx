@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import {
   View,
   Text,
@@ -15,6 +15,7 @@ import { useNavigation, useRoute } from "@react-navigation/native";
 import { useTranslation } from "../../i18n";
 import { useTheme } from "../../theme/ThemeContext";
 import { bookingsApi } from "../../api/client";
+import { getApiErrorMessage } from "../../utils/apiUtils";
 import type { ProviderPublicProfileDto } from "../../types/api";
 import { SmartCalendarPicker } from "../../components/shared/SmartCalendarPicker";
 import { TimeSlotSelector } from "../../components/shared/TimeSlotSelector";
@@ -131,6 +132,7 @@ export function BookingScreen() {
   const [endTime, setEndTime] = useState("");
   const [notes, setNotes] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const submitLockRef = useRef(false);
 
   const selectedRate = selectedRateIdx !== null ? profile.serviceRates[selectedRateIdx] : null;
   const sr = selectedRate as any;
@@ -159,6 +161,7 @@ export function BookingScreen() {
   }, [selectedRate, startDate, startTime, endDate, endTime]);
 
   const handleSubmit = async () => {
+    if (submitting) return;
     if (selectedRateIdx === null) {
       Alert.alert(t("errorTitle"), t("selectServiceFirst"));
       return;
@@ -180,6 +183,8 @@ export function BookingScreen() {
       return;
     }
 
+    if (submitLockRef.current) return;
+    submitLockRef.current = true;
     setSubmitting(true);
     try {
       await bookingsApi.create({
@@ -195,10 +200,10 @@ export function BookingScreen() {
           onPress: () => navigateToMyBookingsOutgoing(navigation),
         },
       ]);
-    } catch (err: any) {
-      const msg = err?.response?.data?.message ?? t("errorTitle");
-      Alert.alert(t("errorTitle"), msg);
+    } catch (err: unknown) {
+      Alert.alert(t("errorTitle"), getApiErrorMessage(err));
     } finally {
+      submitLockRef.current = false;
       setSubmitting(false);
     }
   };
