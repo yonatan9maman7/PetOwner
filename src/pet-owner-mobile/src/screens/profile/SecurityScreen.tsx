@@ -200,11 +200,13 @@ function BiometricCard() {
       const status = err?.response?.status;
       if (status === 401) {
         Alert.alert(t("errorTitle"), t("biometricPasswordWrong"));
-      } else if (err?.message === "biometric_cancelled") {
-        // user dismissed the Face ID prompt — no error shown
-      } else {
-        Alert.alert(t("errorTitle"), t("biometricFailed"));
+      } else if (err?.response) {
+        Alert.alert(
+          t("errorTitle"),
+          err.response?.data?.message ?? t("loginError"),
+        );
       }
+      // Biometric / SecureStore failures: biometricService.enable already showed "Biometric Error".
     } finally {
       setToggling(false);
     }

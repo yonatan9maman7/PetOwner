@@ -68,6 +68,10 @@ function isValidMapRegion(region: {
 
 const MAP_VIEWPORT_DEBOUNCE_MS = Platform.OS === "ios" ? 720 : 500;
 const PROGRAMMATIC_MAP_MOVE_SUPPRESS_MS = Platform.OS === "ios" ? 1100 : 850;
+/** After this, custom map markers turn off view tracking (Android needs a short true pulse when selection changes). */
+const PROVIDER_MARKERS_TRACKS_OFF_MS = Platform.OS === "android" ? 650 : 420;
+/** Longer than MAP_VIEWPORT_DEBOUNCE_MS — skip silent refetch right after a marker tap (can fire onRegionChangeComplete). */
+const MARKER_TAP_VIEWPORT_SUPPRESS_MS = MAP_VIEWPORT_DEBOUNCE_MS + 450;
 
 const DISTANCE_OPTIONS = [
   { value: null, labelKey: "anyDistance" as const },
@@ -336,6 +340,14 @@ export function ExploreScreen() {
   const suppressViewportFetchRef = useRef(false);
   /** Invalidates stale debounced callbacks when the user pans again before the timer fires. */
   const regionChangeSeqRef = useRef(0);
+  /** Skip viewport pin refresh briefly after marker/cluster taps (avoids refetch churn and marker glitches). */
+  const suppressViewportFetchAfterMarkerMsRef = useRef(0);
+  /**
+   * Custom Marker children + tracksViewChanges={false} avoids constant redraw cost, but on Android a
+   * selection change can fail to resnapshot sibling markers (they disappear). Pulse true briefly when
+   * selection changes so the native view updates, then return to false.
+   */
+  const [providerMarkersTrackViewChanges, setProviderMarkersTrackViewChanges] = useState(true);
 
   /* Service types from API */
   const [serviceTypes, setServiceTypes] = useState<string[]>([]);
@@ -376,6 +388,15 @@ export function ExploreScreen() {
     if (filterDate && filterTime) count++;
     return count;
   }, [activeServices, filterMinRating, filterMaxRate, filterRadiusKm, filterDate, filterTime]);
+
+  useEffect(() => {
+    setProviderMarkersTrackViewChanges(true);
+    const id = setTimeout(
+      () => setProviderMarkersTrackViewChanges(false),
+      PROVIDER_MARKERS_TRACKS_OFF_MS,
+    );
+    return () => clearTimeout(id);
+  }, [selectedPin?.providerId]);
 
   /* ─── Load service types ─── */
   useEffect(() => {
@@ -456,7 +477,7 @@ export function ExploreScreen() {
         setPins(data);
       } catch (error) {
         if (gen !== pinsFetchGenRef.current) return;
-        setPins([]);
+        // Keep existing pins visible; do not clear the map on transient errors.
         if (!(axios.isAxiosError(error) && error.response?.status === 401)) {
           Alert.alert(t("genericErrorTitle"), t("genericErrorDesc"));
         }
@@ -594,6 +615,7 @@ export function ExploreScreen() {
         if (suppressViewportFetchRef.current) return;
         const r = mapRegionRef.current;
         if (!isValidMapRegion(r)) return;
+        if (Date.now() < suppressViewportFetchAfterMarkerMsRef.current) return;
 
         const prev = lastSilentFetchRegionRef.current;
         const latSpan = Math.max(r.latitudeDelta, 1e-9);
@@ -649,6 +671,7 @@ export function ExploreScreen() {
 
   /* ─── Marker press ─── */
   const handleMarkerPress = useCallback((pin: MapPinDto) => {
+    suppressViewportFetchAfterMarkerMsRef.current = Date.now() + MARKER_TAP_VIEWPORT_SUPPRESS_MS;
     markerJustTappedRef.current = true;
     setTimeout(() => {
       markerJustTappedRef.current = false;
@@ -658,6 +681,7 @@ export function ExploreScreen() {
   }, []);
 
   const openCollocatedChooser = useCallback((clusterPins: MapPinDto[]) => {
+    suppressViewportFetchAfterMarkerMsRef.current = Date.now() + MARKER_TAP_VIEWPORT_SUPPRESS_MS;
     markerJustTappedRef.current = true;
     setTimeout(() => {
       markerJustTappedRef.current = false;
@@ -666,6 +690,7 @@ export function ExploreScreen() {
   }, []);
 
   const pickFromCollocatedList = useCallback((pin: MapPinDto) => {
+    suppressViewportFetchAfterMarkerMsRef.current = Date.now() + MARKER_TAP_VIEWPORT_SUPPRESS_MS;
     markerJustTappedRef.current = true;
     setTimeout(() => {
       markerJustTappedRef.current = false;
@@ -729,9 +754,10 @@ export function ExploreScreen() {
             return (
               <MarkerWrapper
                 key={pin.providerId}
+                identifier={pin.providerId}
                 coordinate={{ latitude: pin.latitude, longitude: pin.longitude }}
                 onPress={() => handleMarkerPress(pin)}
-                tracksViewChanges={false}
+                tracksViewChanges={providerMarkersTrackViewChanges}
                 zIndex={isSel ? 1000 : 1}
                 {...(Platform.OS === "android" ? { style: { elevation: isSel ? 12 : 4 } } : {})}
               >
@@ -743,9 +769,10 @@ export function ExploreScreen() {
           return (
             <MarkerWrapper
               key={`cluster-${item.key}`}
+              identifier={`cluster-${item.key}`}
               coordinate={{ latitude: item.latitude, longitude: item.longitude }}
               onPress={() => openCollocatedChooser(item.pins)}
-              tracksViewChanges={false}
+              tracksViewChanges={providerMarkersTrackViewChanges}
               zIndex={clusterActive ? 1000 : 1}
               {...(Platform.OS === "android" ? { style: { elevation: clusterActive ? 12 : 4 } } : {})}
             >

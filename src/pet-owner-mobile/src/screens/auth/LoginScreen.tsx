@@ -129,9 +129,10 @@ function LoginForm() {
         setBioEnabled(false);
         Alert.alert(t("errorTitle"), t("biometricFailedFallback"));
         emailRef.current?.focus();
-      } else {
+      } else if (err?.response) {
         Alert.alert(t("errorTitle"), t("loginError"));
       }
+      // Unexpected biometric / SecureStore errors: authenticateAndGetCredentials already showed "Biometric Error".
     } finally {
       setBioLoading(false);
     }
