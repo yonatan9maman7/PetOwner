@@ -19,7 +19,7 @@ import {
 import axios from "axios";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
-import { useNavigation, useRoute } from "@react-navigation/native";
+import { useFocusEffect, useNavigation, useRoute } from "@react-navigation/native";
 import * as Location from "expo-location";
 import { MapViewWrapper, MarkerWrapper } from "../../components/MapViewWrapper";
 import {
@@ -66,11 +66,18 @@ function isValidMapRegion(region: {
   return true;
 }
 
+/**
+ * Native MapKit / Google Maps marker `identifier` must be a simple string. Cluster keys look like
+ * "32.08534,34.78180" (comma); commas and other punctuation have been linked to native crashes when
+ * combined with rapid marker updates.
+ */
+function mapMarkerNativeIdentifier(raw: string): string {
+  return raw.replace(/[^a-zA-Z0-9._-]/g, "_");
+}
+
 /** Debounce for silent pin refresh after map gestures (reduces GET /map/pins churn while dragging). */
 const MAP_VIEWPORT_DEBOUNCE_MS = 500;
 const PROGRAMMATIC_MAP_MOVE_SUPPRESS_MS = Platform.OS === "ios" ? 1100 : 850;
-/** After this, custom map markers turn off view tracking (Android needs a short true pulse when selection changes). */
-const PROVIDER_MARKERS_TRACKS_OFF_MS = Platform.OS === "android" ? 650 : 420;
 /** Longer than MAP_VIEWPORT_DEBOUNCE_MS — skip silent refetch right after a marker tap (can fire onRegionChangeComplete). */
 const MARKER_TAP_VIEWPORT_SUPPRESS_MS = MAP_VIEWPORT_DEBOUNCE_MS + 450;
 
@@ -343,12 +350,8 @@ export function ExploreScreen() {
   const regionChangeSeqRef = useRef(0);
   /** Skip viewport pin refresh briefly after marker/cluster taps (avoids refetch churn and marker glitches). */
   const suppressViewportFetchAfterMarkerMsRef = useRef(0);
-  /**
-   * Custom Marker children + tracksViewChanges={false} avoids constant redraw cost, but on Android a
-   * selection change can fail to resnapshot sibling markers (they disappear). Pulse true briefly when
-   * selection changes so the native view updates, then return to false.
-   */
-  const [providerMarkersTrackViewChanges, setProviderMarkersTrackViewChanges] = useState(true);
+  /** Avoid map/pin state updates while this screen is not focused (prevents native crashes from updates off-screen). */
+  const exploreScreenFocusedRef = useRef(true);
 
   /* Service types from API */
   const [serviceTypes, setServiceTypes] = useState<string[]>([]);
@@ -390,14 +393,14 @@ export function ExploreScreen() {
     return count;
   }, [activeServices, filterMinRating, filterMaxRate, filterRadiusKm, filterDate, filterTime]);
 
-  useEffect(() => {
-    setProviderMarkersTrackViewChanges(true);
-    const id = setTimeout(
-      () => setProviderMarkersTrackViewChanges(false),
-      PROVIDER_MARKERS_TRACKS_OFF_MS,
-    );
-    return () => clearTimeout(id);
-  }, [selectedPin?.providerId]);
+  useFocusEffect(
+    useCallback(() => {
+      exploreScreenFocusedRef.current = true;
+      return () => {
+        exploreScreenFocusedRef.current = false;
+      };
+    }, []),
+  );
 
   /* ─── Load service types ─── */
   useEffect(() => {
@@ -475,6 +478,7 @@ export function ExploreScreen() {
       try {
         const data = await mapApi.fetchPins(filters);
         if (gen !== pinsFetchGenRef.current) return;
+        if (!exploreScreenFocusedRef.current) return;
         setPins(data);
       } catch (error) {
         if (gen !== pinsFetchGenRef.current) return;
@@ -555,6 +559,7 @@ export function ExploreScreen() {
         .fetchPins()
         .then((data) => {
           if (gen !== pinsFetchGenRef.current) return;
+          if (!exploreScreenFocusedRef.current) return;
           setPins(data);
           tryFocus(data);
         })
@@ -639,6 +644,7 @@ export function ExploreScreen() {
 
         InteractionManager.runAfterInteractions(() => {
           if (seq !== regionChangeSeqRef.current) return;
+          if (!exploreScreenFocusedRef.current) return;
           if (suppressViewportFetchRef.current) return;
           setCollocatedChooserPins(null);
           loadPinsRef.current({ silent: true });
@@ -755,10 +761,10 @@ export function ExploreScreen() {
             return (
               <MarkerWrapper
                 key={pin.providerId}
-                identifier={pin.providerId}
+                identifier={mapMarkerNativeIdentifier(String(pin.providerId))}
                 coordinate={{ latitude: pin.latitude, longitude: pin.longitude }}
                 onPress={() => handleMarkerPress(pin)}
-                tracksViewChanges={providerMarkersTrackViewChanges}
+                tracksViewChanges={false}
                 zIndex={isSel ? 1000 : 1}
                 {...(Platform.OS === "android" ? { style: { elevation: isSel ? 12 : 4 } } : {})}
               >
@@ -770,10 +776,10 @@ export function ExploreScreen() {
           return (
             <MarkerWrapper
               key={`cluster-${item.key}`}
-              identifier={`cluster-${item.key}`}
+              identifier={mapMarkerNativeIdentifier(`cluster-${item.key}`)}
               coordinate={{ latitude: item.latitude, longitude: item.longitude }}
               onPress={() => openCollocatedChooser(item.pins)}
-              tracksViewChanges={providerMarkersTrackViewChanges}
+              tracksViewChanges={false}
               zIndex={clusterActive ? 1000 : 1}
               {...(Platform.OS === "android" ? { style: { elevation: clusterActive ? 12 : 4 } } : {})}
             >
