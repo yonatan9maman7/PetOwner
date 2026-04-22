@@ -15,18 +15,15 @@ namespace PetOwner.Api.Controllers;
 public class RequestsController : ControllerBase
 {
     private readonly ApplicationDbContext _db;
-    private readonly IPaymentService _paymentService;
     private readonly INotificationService _notifications;
     private readonly ILogger<RequestsController> _logger;
 
     public RequestsController(
         ApplicationDbContext db,
-        IPaymentService paymentService,
         INotificationService notifications,
         ILogger<RequestsController> logger)
     {
         _db = db;
-        _paymentService = paymentService;
         _notifications = notifications;
         _logger = logger;
     }
@@ -197,20 +194,8 @@ public class RequestsController : ControllerBase
         _ = _notifications.CreateAsync(completedRecipient, "RequestCompleted", "Booking Completed",
             "A booking has been marked as completed.", serviceRequest.Id);
 
-        if (serviceRequest.Payment is { Status: "Authorized" })
-        {
-            try
-            {
-                await _paymentService.CapturePaymentIntentAsync(serviceRequest.Payment.StripePaymentIntentId);
-                serviceRequest.Payment.Status = "Captured";
-                serviceRequest.Payment.CapturedAt = DateTime.UtcNow;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Failed to auto-capture payment for booking {BookingId}", id);
-            }
-        }
-
+        // Capture/refund via payment gateway is handled by the Booking/Grow flow (see BookingsController
+        // + /api/webhooks/grow). The legacy ServiceRequest.Payment row is left as-is on completion.
         await _db.SaveChangesAsync();
 
         return Ok(new { serviceRequest.Id, serviceRequest.Status });
@@ -257,35 +242,14 @@ public class RequestsController : ControllerBase
             if (refundPercent > 0)
             {
                 refundAmount = Math.Round(payment.Amount * refundPercent / 100m, 2);
-                var refundSmallestUnit = (long)(refundAmount.Value * 100);
-
-                try
-                {
-                    if (payment.Status == "Authorized")
-                    {
-                        if (refundPercent == 100)
-                        {
-                            await _paymentService.RefundPaymentAsync(payment.StripePaymentIntentId);
-                        }
-                        else
-                        {
-                            await _paymentService.CapturePaymentIntentAsync(payment.StripePaymentIntentId);
-                            await _paymentService.RefundPaymentAsync(payment.StripePaymentIntentId, refundSmallestUnit);
-                        }
-                    }
-                    else
-                    {
-                        await _paymentService.RefundPaymentAsync(payment.StripePaymentIntentId, refundSmallestUnit);
-                    }
-
-                    payment.Status = refundPercent == 100 ? "Refunded" : "PartiallyRefunded";
-                    payment.RefundAmount = refundAmount;
-                    payment.RefundedAt = DateTime.UtcNow;
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "Failed to process refund for cancelled booking {BookingId}", id);
-                }
+                // TODO(Grow refunds): Grow refunds are performed manually via the Grow dashboard today.
+                // Once the Grow refund API is wired, trigger it here using booking.TransactionId.
+                payment.Status = refundPercent == 100 ? "Refunded" : "PartiallyRefunded";
+                payment.RefundAmount = refundAmount;
+                payment.RefundedAt = DateTime.UtcNow;
+                _logger.LogInformation(
+                    "Booking {BookingId} cancelled; refund {Amount} pending manual Grow refund.",
+                    id, refundAmount);
             }
             else
             {

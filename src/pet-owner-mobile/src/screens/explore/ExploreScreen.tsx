@@ -580,6 +580,7 @@ export function ExploreScreen() {
         showsCompass={false}
         toolbarEnabled={false}
         pitchEnabled={false}
+        moveOnMarkerPress={false}
         mapPadding={EXPLORE_MAP_PADDING}
         onRegionChangeComplete={handleRegionChange}
         onPress={handleMapBackgroundPress}

@@ -1,66 +1,131 @@
 import React, { useMemo, memo } from "react";
-import { Platform } from "react-native";
+import { View, StyleSheet, Text, Platform } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { MarkerWrapper } from "../../components/MapViewWrapper";
 import type { MapPinDto } from "../../types/api";
 import type { ExploreMapMarkerItem } from "./mapCollision";
 
-const MARKER_ANCHOR = { x: 0.5, y: 1 } as const;
+/*
+ * Module-level style constants — never allocate new objects inside render/memo callbacks.
+ * This is the single most important factor for preventing MapKit annotation churn on iOS.
+ */
+const S = StyleSheet.create({
+  hitArea: {
+    padding: 10,
+    alignItems: "center",
+  },
+  bubble: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 2,
+    // No shadow on iOS — MapKit already handles z-ordering; shadow props inside a
+    // Marker child are snapshotted into a bitmap; skip them to reduce memory pressure.
+    ...Platform.select({
+      android: { elevation: 4 },
+    }),
+  },
+  bubbleDefault: {
+    backgroundColor: "#ffffff",
+    borderColor: "#e2e2e2",
+  },
+  bubbleActive: {
+    backgroundColor: "#1a1a2e",
+    borderColor: "#ffffff",
+  },
+  arrow: {
+    width: 0,
+    height: 0,
+    marginTop: -1,
+    borderLeftWidth: 6,
+    borderRightWidth: 6,
+    borderTopWidth: 8,
+    borderLeftColor: "transparent",
+    borderRightColor: "transparent",
+  },
+  arrowDefault: {
+    borderTopColor: "#ffffff",
+  },
+  arrowActive: {
+    borderTopColor: "#1a1a2e",
+  },
+  /* Cluster */
+  clusterWrap: {
+    position: "relative",
+    width: 42,
+    height: 42,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  badge: {
+    position: "absolute",
+    top: 0,
+    right: 0,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    paddingHorizontal: 4,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1.5,
+    borderColor: "#ffffff",
+  },
+  badgeDefault: { backgroundColor: "#ef4444" },
+  badgeActive: { backgroundColor: "#6366f1" },
+  badgeText: {
+    fontSize: 10,
+    fontWeight: "800",
+    color: "#ffffff",
+  },
+});
 
-/** iOS: avoid per-marker `zIndex` if possible; selection is distinguishable by image. Android: keep elevation hint. */
-function markerZIndex(
-  isSelectedOrActive: boolean,
-): { zIndex?: number; style?: { elevation: number } } {
-  if (Platform.OS === "ios") {
-    return {};
-  }
-  return {
-    zIndex: isSelectedOrActive ? 1000 : 1,
-    style: { elevation: isSelectedOrActive ? 12 : 4 },
-  };
-}
-
-/** Local assets — native `image` avoids View snapshotting / memory churn from custom marker children. */
-const IMG_PROVIDER = require("../../../assets/map-marker-provider.png");
-const IMG_PROVIDER_SELECTED = require("../../../assets/map-marker-provider-selected.png");
-const IMG_CLUSTER = require("../../../assets/map-marker-cluster.png");
-
-const noop = () => {};
+const ANCHOR_CENTER_BOTTOM = { x: 0.5, y: 1 } as const;
 
 function mapMarkerNativeIdentifier(raw: string): string {
   return raw.replace(/[^a-zA-Z0-9._-]/g, "_");
 }
 
-type SingleProps = {
-  pin: MapPinDto;
-  isSelected: boolean;
-  onPress: () => void;
-};
+const noop = () => {};
 
-/**
- * One provider pin: stable coordinate ref + `image` only (no custom View tree inside Marker).
- */
+/* ─── Single provider marker ────────────────────────────────────────────── */
+
+type SingleProps = { pin: MapPinDto; isSelected: boolean; onPress: () => void };
+
+const PawBubble = memo(function PawBubble({ active }: { active: boolean }) {
+  return (
+    <View style={S.hitArea}>
+      <View style={[S.bubble, active ? S.bubbleActive : S.bubbleDefault]}>
+        <Ionicons
+          name="paw"
+          size={18}
+          color={active ? "#ffffff" : "#1a1a2e"}
+        />
+      </View>
+      <View style={[S.arrow, active ? S.arrowActive : S.arrowDefault]} />
+    </View>
+  );
+});
+
 const ExploreSingleMapMarker = memo(
   function ExploreSingleMapMarker({ pin, isSelected, onPress }: SingleProps) {
     const coordinate = useMemo(
-      () => ({
-        latitude: Number(pin.latitude),
-        longitude: Number(pin.longitude),
-      }),
+      () => ({ latitude: Number(pin.latitude), longitude: Number(pin.longitude) }),
       [pin.latitude, pin.longitude],
     );
-
-    const image = isSelected ? IMG_PROVIDER_SELECTED : IMG_PROVIDER;
-
     return (
       <MarkerWrapper
         identifier={mapMarkerNativeIdentifier(String(pin.providerId))}
         coordinate={coordinate}
-        image={image}
-        anchor={MARKER_ANCHOR}
+        anchor={ANCHOR_CENTER_BOTTOM}
         tracksViewChanges={false}
         onPress={onPress}
-        {...markerZIndex(isSelected)}
-      />
+        zIndex={isSelected ? 1000 : 1}
+        {...(Platform.OS === "android" ? { style: { elevation: isSelected ? 12 : 4 } } : {})}
+      >
+        <PawBubble active={isSelected} />
+      </MarkerWrapper>
     );
   },
   (prev, next) =>
@@ -71,34 +136,54 @@ const ExploreSingleMapMarker = memo(
     prev.onPress === next.onPress,
 );
 
+/* ─── Cluster marker ─────────────────────────────────────────────────────── */
+
 type ClusterProps = {
   item: Extract<ExploreMapMarkerItem, { kind: "cluster" }>;
   isActive: boolean;
   onPress: () => void;
 };
 
+const ClusterBubble = memo(function ClusterBubble({
+  count,
+  active,
+}: {
+  count: number;
+  active: boolean;
+}) {
+  return (
+    <View style={S.hitArea}>
+      <View style={S.clusterWrap}>
+        <View style={[S.bubble, active ? S.bubbleActive : S.bubbleDefault]}>
+          <Ionicons name="paw" size={16} color={active ? "#ffffff" : "#1a1a2e"} />
+        </View>
+        <View style={[S.badge, active ? S.badgeActive : S.badgeDefault]}>
+          <Text style={S.badgeText}>{count > 99 ? "99+" : count}</Text>
+        </View>
+      </View>
+      <View style={[S.arrow, active ? S.arrowActive : S.arrowDefault]} />
+    </View>
+  );
+});
+
 const ExploreClusterMapMarker = memo(
   function ExploreClusterMapMarker({ item, isActive, onPress }: ClusterProps) {
     const coordinate = useMemo(
-      () => ({
-        latitude: item.latitude,
-        longitude: item.longitude,
-      }),
+      () => ({ latitude: item.latitude, longitude: item.longitude }),
       [item.latitude, item.longitude],
     );
-
-    const image = isActive ? IMG_PROVIDER_SELECTED : IMG_CLUSTER;
-
     return (
       <MarkerWrapper
         identifier={mapMarkerNativeIdentifier(`cluster-${item.key}`)}
         coordinate={coordinate}
-        image={image}
-        anchor={MARKER_ANCHOR}
+        anchor={ANCHOR_CENTER_BOTTOM}
         tracksViewChanges={false}
         onPress={onPress}
-        {...markerZIndex(isActive)}
-      />
+        zIndex={isActive ? 1000 : 1}
+        {...(Platform.OS === "android" ? { style: { elevation: isActive ? 12 : 4 } } : {})}
+      >
+        <ClusterBubble count={item.pins.length} active={isActive} />
+      </MarkerWrapper>
     );
   },
   (prev, next) =>
@@ -110,6 +195,8 @@ const ExploreClusterMapMarker = memo(
     prev.onPress === next.onPress,
 );
 
+/* ─── Container ──────────────────────────────────────────────────────────── */
+
 export type ExploreMapMarkersProps = {
   items: ExploreMapMarkerItem[];
   selectedProviderId: string | null | undefined;
@@ -117,10 +204,6 @@ export type ExploreMapMarkersProps = {
   onPressClusterPins: (pins: MapPinDto[]) => void;
 };
 
-/**
- * Renders map markers with stable handlers and image-based markers to limit native churn during pan/zoom.
- * The marker list subtree is a single `useMemo` so React can reuse one element list ref when `items` & selection are stable.
- */
 export const ExploreMapMarkers = memo(
   function ExploreMapMarkers({
     items,
@@ -149,18 +232,17 @@ export const ExploreMapMarkers = memo(
       return m;
     }, [items, onPressClusterPins]);
 
-    const markerSubTree = useMemo(
+    return useMemo(
       () => (
         <>
           {items.map((item) => {
             if (item.kind === "single") {
               const pin = item.pin;
-              const isSel = selectedProviderId === pin.providerId;
               return (
                 <ExploreSingleMapMarker
                   key={pin.providerId}
                   pin={pin}
-                  isSelected={isSel}
+                  isSelected={selectedProviderId === pin.providerId}
                   onPress={providerPressById.get(pin.providerId) ?? noop}
                 />
               );
@@ -181,7 +263,6 @@ export const ExploreMapMarkers = memo(
       ),
       [items, selectedProviderId, providerPressById, clusterPressByKey],
     );
-    return markerSubTree;
   },
   (prev, next) =>
     prev.items === next.items &&

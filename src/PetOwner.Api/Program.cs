@@ -156,9 +156,6 @@ builder.Services.AddScoped<DatabaseSeeder>();
 builder.Services.AddHostedService<BookingExpirationService>();
 builder.Services.AddHostedService<VaccinationReminderService>();
 
-builder.Services.Configure<StripeSettings>(builder.Configuration.GetSection(StripeSettings.SectionName));
-builder.Services.AddScoped<IPaymentService, StripePaymentService>();
-
 builder.Services.Configure<GrowSettings>(builder.Configuration.GetSection(GrowSettings.SectionName));
 builder.Services.AddHttpClient<IGrowPaymentService, GrowPaymentService>(client =>
 {

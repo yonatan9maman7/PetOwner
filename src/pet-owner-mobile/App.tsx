@@ -1,10 +1,15 @@
 import "./global.css";
 import { useEffect, useRef } from "react";
-import { I18nManager, Platform, View } from "react-native";
+import { I18nManager, Platform, View, LogBox } from "react-native";
 import { NavigationContainer, DefaultTheme, DarkTheme } from "@react-navigation/native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { ErrorBoundary } from "react-error-boundary";
+
+// react-native-maps on iOS triggers this warning when MapKit's native gesture
+// recognizer absorbs touches before RN Gesture Handler can count them.
+// It is harmless and has no user-visible effect.
+LogBox.ignoreLogs(["Ended a touch event which was not counted in"]);
 import { StatusBar } from "expo-status-bar";
 import * as Notifications from "expo-notifications";
 import { AppNavigator, navigationRef } from "./src/navigation/AppNavigator";
