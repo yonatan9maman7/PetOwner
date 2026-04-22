@@ -29,6 +29,10 @@ const S = StyleSheet.create({
       android: { elevation: 4 },
     }),
   },
+  bubbleSelected: {
+    backgroundColor: "#1a1a2e",
+    borderColor: "#1a1a2e",
+  },
   arrow: {
     width: 0,
     height: 0,
@@ -39,6 +43,9 @@ const S = StyleSheet.create({
     borderLeftColor: "transparent",
     borderRightColor: "transparent",
     borderTopColor: "#ffffff",
+  },
+  arrowSelected: {
+    borderTopColor: "#1a1a2e",
   },
   clusterWrap: {
     position: "relative",
@@ -75,7 +82,13 @@ const ANCHOR_CENTER_BOTTOM = { x: 0.5, y: 1 } as const;
  * card is the real selection affordance.
  */
 const ANDROID_ELEVATION_STYLE = { elevation: 4 } as const;
+const ANDROID_ELEVATION_STYLE_SELECTED = { elevation: 8 } as const;
 const MARKER_Z_INDEX = 1;
+/**
+ * The selected marker is rendered as a separate overlay annotation (not a prop change on
+ * the base marker), so it gets a higher z-index to sit cleanly on top of the base paw.
+ */
+const SELECTED_MARKER_Z_INDEX = 1000;
 
 function mapMarkerNativeIdentifier(raw: string): string {
   return raw.replace(/[^a-zA-Z0-9._-]/g, "_");
@@ -275,4 +288,69 @@ export const ExploreMapMarkers = memo(
     prev.items === next.items &&
     prev.onPressProviderId === next.onPressProviderId &&
     prev.onPressClusterPins === next.onPressClusterPins,
+);
+
+/* ─── Selected-marker overlay ────────────────────────────────────────────── */
+
+const SelectedPawBubble = memo(function SelectedPawBubble() {
+  return (
+    <View style={S.hitArea}>
+      <View style={[S.bubble, S.bubbleSelected]}>
+        <Ionicons name="paw" size={18} color="#ffffff" />
+      </View>
+      <View style={[S.arrow, S.arrowSelected]} />
+    </View>
+  );
+});
+
+export type ExploreSelectedMarkerOverlayProps = {
+  providerId: string | null;
+  latitude: number | null;
+  longitude: number | null;
+};
+
+/**
+ * Renders a single overlay marker with the "selected" dark paw at the selected pin's
+ * coordinate, on top of the base paw annotation. Base markers never receive a prop
+ * change when the selection flips, so MapKit only sees a clean annotation mount /
+ * unmount — not a property update on an existing annotation (which is the iOS crash
+ * pattern we are avoiding).
+ *
+ * The `key` on the inner <Marker> is the providerId, so switching from pin A to pin B
+ * unmounts A and mounts B; there is no prop diff on the same native view.
+ */
+export const ExploreSelectedMarkerOverlay = memo(
+  function ExploreSelectedMarkerOverlay({
+    providerId,
+    latitude,
+    longitude,
+  }: ExploreSelectedMarkerOverlayProps) {
+    const coordinate = useMemo(
+      () =>
+        providerId != null && latitude != null && longitude != null
+          ? { latitude: Number(latitude), longitude: Number(longitude) }
+          : null,
+      [providerId, latitude, longitude],
+    );
+    if (providerId == null || coordinate == null) return null;
+    return (
+      <MarkerWrapper
+        key={providerId}
+        identifier={mapMarkerNativeIdentifier(`selected-${providerId}`)}
+        coordinate={coordinate}
+        anchor={ANCHOR_CENTER_BOTTOM}
+        tracksViewChanges={false}
+        zIndex={SELECTED_MARKER_Z_INDEX}
+        {...(Platform.OS === "android"
+          ? { style: ANDROID_ELEVATION_STYLE_SELECTED }
+          : {})}
+      >
+        <SelectedPawBubble />
+      </MarkerWrapper>
+    );
+  },
+  (prev, next) =>
+    prev.providerId === next.providerId &&
+    prev.latitude === next.latitude &&
+    prev.longitude === next.longitude,
 );

@@ -36,7 +36,7 @@ import { mapApi } from "../../api/client";
 import { ProviderType, type MapPinDto, type MapSearchFilters } from "../../types/api";
 import { MapViewWrapper, MarkerWrapper } from "../../components/MapViewWrapper";
 import { groupPinsForMapMarkers, sortMarkerItemsStable } from "./mapCollision";
-import { ExploreMapMarkers } from "./ExploreMapMarkers";
+import { ExploreMapMarkers, ExploreSelectedMarkerOverlay } from "./ExploreMapMarkers";
 import {
   EXPLORE_MAP_INITIAL_REGION,
   EXPLORE_MAP_PADDING,
@@ -183,6 +183,12 @@ export function ExploreScreen() {
   const suppressViewportFetchAfterMarkerMsRef = useRef(0);
   /** Avoid map/pin state updates while this screen is not focused (prevents native crashes from updates off-screen). */
   const exploreScreenFocusedRef = useRef(true);
+  /**
+   * Aborts any in-flight `GET /map/pins` call when a new one is issued. Without this, rapid panning
+   * stacks HTTP responses in memory (they can't be GC'd until axios resolves them), which pressures
+   * the native bridge and is a known MapKit crash trigger on Expo Go.
+   */
+  const pinsAbortRef = useRef<AbortController | null>(null);
 
   /* Service types from API */
   const [serviceTypes, setServiceTypes] = useState<string[]>([]);
@@ -344,14 +350,21 @@ export function ExploreScreen() {
     async (filters?: MapSearchFilters, options?: { showLoading?: boolean }) => {
       const showLoading = options?.showLoading !== false;
       const gen = ++pinsFetchGenRef.current;
+
+      // Cancel the previous in-flight request so axios can release its response buffer.
+      pinsAbortRef.current?.abort();
+      const controller = new AbortController();
+      pinsAbortRef.current = controller;
+
       if (showLoading) setLoading(true);
       try {
-        const data = await mapApi.fetchPins(filters);
+        const data = await mapApi.fetchPins(filters, controller.signal);
         if (gen !== pinsFetchGenRef.current) return;
         if (!exploreScreenFocusedRef.current) return;
         commitPins(data);
       } catch (error) {
         if (gen !== pinsFetchGenRef.current) return;
+        if (axios.isCancel(error) || (error as Error)?.name === "CanceledError") return;
         // Keep existing pins visible; do not clear the map on transient errors.
         if (!(axios.isAxiosError(error) && error.response?.status === 401)) {
           Alert.alert(t("genericErrorTitle"), t("genericErrorDesc"));
@@ -387,6 +400,7 @@ export function ExploreScreen() {
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
       if (moveDebounceRef.current) clearTimeout(moveDebounceRef.current);
+      pinsAbortRef.current?.abort();
     };
   }, []);
 
@@ -626,6 +640,17 @@ export function ExploreScreen() {
           items={mapMarkerItems}
           onPressProviderId={onPressProviderMarkerId}
           onPressClusterPins={openCollocatedChooser}
+        />
+        {/*
+         * Overlay marker for the selected pin — rendered AFTER the base marker set so
+         * the dark-paw annotation sits on top. Using a separate <Marker> (instead of
+         * flipping a prop on the base paw) means MapKit only sees a clean
+         * add / remove when selection changes, not a property update mid-gesture.
+         */}
+        <ExploreSelectedMarkerOverlay
+          providerId={selectedPin?.providerId ?? null}
+          latitude={selectedPin?.latitude ?? null}
+          longitude={selectedPin?.longitude ?? null}
         />
       </MapViewWrapper>
 

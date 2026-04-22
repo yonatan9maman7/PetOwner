@@ -138,7 +138,7 @@ export const authApi = {
 };
 
 export const mapApi = {
-  fetchPins: (filters?: MapSearchFilters) => {
+  fetchPins: (filters?: MapSearchFilters, signal?: AbortSignal) => {
     const params: Record<string, string | number | boolean> = {};
     if (filters) {
       for (const [key, value] of Object.entries(filters)) {
@@ -146,7 +146,7 @@ export const mapApi = {
       }
     }
     return apiClient
-      .get<MapPinDto[]>("/map/pins", { params })
+      .get<MapPinDto[]>("/map/pins", { params, signal })
       .then((r) => r.data);
   },
   getServiceTypes: () =>
