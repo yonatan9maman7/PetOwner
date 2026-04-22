@@ -34,9 +34,14 @@ import { DatePickerField } from "../../components/DatePickerField";
 import { TimePickerField } from "../../components/TimePickerField";
 import { mapApi } from "../../api/client";
 import { ProviderType, type MapPinDto, type MapSearchFilters } from "../../types/api";
+import { MapViewWrapper, MarkerWrapper } from "../../components/MapViewWrapper";
 import { groupPinsForMapMarkers, sortMarkerItemsStable } from "./mapCollision";
-import { ExploreMapViewLayer } from "./ExploreMapViewLayer";
-import { EXPLORE_MAP_INITIAL_REGION } from "./exploreMapLayoutConstants";
+import { ExploreMapMarkers } from "./ExploreMapMarkers";
+import {
+  EXPLORE_MAP_INITIAL_REGION,
+  EXPLORE_MAP_PADDING,
+  EXPLORE_USER_MARKER_ANCHOR,
+} from "./exploreMapLayoutConstants";
 
 /** iOS MapKit often passes transient/invalid regions during gestures; guard all map math. */
 function isValidMapRegion(region: {
@@ -550,7 +555,7 @@ export function ExploreScreen() {
     }
   }, []);
 
-  /** Stable: inline map `onPress` and `mapPadding` were new every render and forced MapKit to churn during gestures. */
+  /** Stable callback — inline `onPress` on MapView was a new function every render and forced MapKit churn on iOS. */
   const handleMapBackgroundPress = useCallback(() => {
     Keyboard.dismiss();
     if (!markerJustTappedRef.current) {
@@ -559,29 +564,42 @@ export function ExploreScreen() {
     }
   }, []);
 
-  const userMapPinColor = useMemo(
-    () => (typeof colors.primary === "string" ? colors.primary : String(colors.primary)),
-    [colors.primary],
-  );
-
   const selectedProviderIdForMap = selectedPin?.providerId ?? null;
 
   /* ═════════════════════ RENDER ═════════════════════ */
 
   return (
     <View style={[styles.root, { backgroundColor: colors.background }]}>
-      <ExploreMapViewLayer
-        mapRef={mapRef}
+      {/* MapView must be a direct child of a positioned View — wrapping it in a custom memo component breaks iOS MapKit layout */}
+      <MapViewWrapper
+        ref={mapRef}
+        style={StyleSheet.absoluteFillObject}
         initialRegion={EXPLORE_MAP_INITIAL_REGION}
+        fallbackLabel="Explore Map"
+        showsMyLocationButton={false}
+        showsCompass={false}
+        toolbarEnabled={false}
+        pitchEnabled={false}
+        mapPadding={EXPLORE_MAP_PADDING}
         onRegionChangeComplete={handleRegionChange}
-        onMapPress={handleMapBackgroundPress}
-        userLocationCoordinate={userLocationCoordinate}
-        userPinColor={userMapPinColor}
-        mapMarkerItems={mapMarkerItems}
-        selectedProviderId={selectedProviderIdForMap}
-        onPressProviderId={onPressProviderMarkerId}
-        onPressClusterPins={openCollocatedChooser}
-      />
+        onPress={handleMapBackgroundPress}
+        {...(Platform.OS === "android" && { mapType: "standard" })}
+      >
+        {userLocationCoordinate != null && (
+          <MarkerWrapper
+            coordinate={userLocationCoordinate}
+            anchor={EXPLORE_USER_MARKER_ANCHOR}
+            pinColor={colors.primary as string}
+            tracksViewChanges={false}
+          />
+        )}
+        <ExploreMapMarkers
+          items={mapMarkerItems}
+          selectedProviderId={selectedProviderIdForMap}
+          onPressProviderId={onPressProviderMarkerId}
+          onPressClusterPins={openCollocatedChooser}
+        />
+      </MapViewWrapper>
 
       <SafeAreaView edges={["top"]} style={{ zIndex: 10, marginTop: -8 }}>
         <BrandedAppHeader />
