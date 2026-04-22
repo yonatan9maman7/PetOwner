@@ -54,7 +54,7 @@ public class ApplicationDbContext : DbContext
     {
         base.OnModelCreating(modelBuilder);
 
-        ConfigureUser(modelBuilder);
+        ConfigureUser(modelBuilder, Database.IsSqlServer());
         ConfigureProviderProfile(modelBuilder);
         ConfigureLocation(modelBuilder);
         ConfigureService(modelBuilder);
@@ -88,7 +88,7 @@ public class ApplicationDbContext : DbContext
         ConfigurePlaydateBeacon(modelBuilder);
     }
 
-    private static void ConfigureUser(ModelBuilder modelBuilder)
+    private static void ConfigureUser(ModelBuilder modelBuilder, bool isSqlServer)
     {
         modelBuilder.Entity<User>(entity =>
         {
@@ -98,11 +98,13 @@ public class ApplicationDbContext : DbContext
                 .HasDefaultValueSql("NEWSEQUENTIALID()");
 
             entity.Property(u => u.Phone)
-                .IsRequired()
                 .HasMaxLength(15);
 
-            entity.HasIndex(u => u.Phone)
-                .IsUnique();
+            entity.Property(u => u.GoogleId)
+                .HasMaxLength(200);
+
+            entity.Property(u => u.AppleId)
+                .HasMaxLength(200);
 
             entity.Property(u => u.Email)
                 .IsRequired()
@@ -133,6 +135,17 @@ public class ApplicationDbContext : DbContext
 
             entity.Property(u => u.IsActive)
                 .HasDefaultValue(true);
+
+            if (isSqlServer)
+            {
+                entity.HasIndex(u => u.Phone).IsUnique().HasFilter("[Phone] IS NOT NULL");
+                entity.HasIndex(u => u.GoogleId).IsUnique().HasFilter("[GoogleId] IS NOT NULL");
+                entity.HasIndex(u => u.AppleId).IsUnique().HasFilter("[AppleId] IS NOT NULL");
+            }
+            else
+            {
+                entity.HasIndex(u => u.Phone);
+            }
         });
     }
 

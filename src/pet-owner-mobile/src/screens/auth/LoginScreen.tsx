@@ -13,6 +13,10 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
+import * as AppleAuthentication from "expo-apple-authentication";
+import * as Crypto from "expo-crypto";
+import * as WebBrowser from "expo-web-browser";
+import * as Google from "expo-auth-session/providers/google";
 import { useAuthStore } from "../../store/authStore";
 import { useTranslation } from "../../i18n";
 import { LanguageToggle } from "../../components/LanguageToggle";
@@ -20,6 +24,8 @@ import { BrandedAppHeader } from "../../components/BrandedAppHeader";
 import { authApi } from "../../api/client";
 import { useTheme } from "../../theme/ThemeContext";
 import * as biometricService from "../../services/biometricService";
+
+WebBrowser.maybeCompleteAuthSession();
 
 /* ─── LoginScreen (root) ─────────────────────────────────────────── */
 
@@ -69,10 +75,12 @@ function LoginForm() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [bioLoading, setBioLoading] = useState(false);
+  const [socialLoading, setSocialLoading] = useState(false);
   const [secureEntry, setSecureEntry] = useState(true);
   const [bioEnabled, setBioEnabled] = useState(false);
   const [bioTypeLabel, setBioTypeLabel] = useState<biometricService.BiometricTypeLabel>("generic");
   const [autoPromptDone, setAutoPromptDone] = useState(false);
+  const [appleAvailable, setAppleAvailable] = useState(false);
 
   const emailRef = useRef<TextInput>(null);
   const navigation = useNavigation<any>();
@@ -80,6 +88,12 @@ function LoginForm() {
   const { t, isHebrew, rtlText, rtlStyle, rtlRow, rtlInput, alignCls } =
     useTranslation();
   const { colors } = useTheme();
+
+  const [_googleRequest, googleResponse, promptGoogleAsync] = Google.useAuthRequest({
+    iosClientId: process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID,
+    androidClientId: process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID,
+    webClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID,
+  });
 
   /* ── Check biometric availability on mount ── */
   useEffect(() => {
@@ -103,6 +117,28 @@ function LoginForm() {
     return () => { cancelled = true; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  /* ── Check Apple availability on mount (iOS only) ── */
+  useEffect(() => {
+    if (Platform.OS === "ios") {
+      AppleAuthentication.isAvailableAsync().then(setAppleAvailable).catch(() => {});
+    }
+  }, []);
+
+  /* ── Handle Google auth result ── */
+  useEffect(() => {
+    if (googleResponse?.type === "success") {
+      const idToken = googleResponse.authentication?.idToken;
+      if (!idToken) {
+        Alert.alert(t("errorTitle"), t("socialLoginFailed"));
+        return;
+      }
+      handleSocialLoginToken("Google", idToken);
+    } else if (googleResponse?.type === "error") {
+      Alert.alert(t("errorTitle"), t("socialLoginFailed"));
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [googleResponse]);
 
   /* ── Biometric login helper ── */
   const runBiometricLogin = async (label?: biometricService.BiometricTypeLabel) => {
@@ -155,6 +191,71 @@ function LoginForm() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleSocialLoginToken = async (
+    provider: "Google" | "Apple",
+    idToken: string,
+    options?: { givenName?: string; familyName?: string; rawNonce?: string }
+  ) => {
+    setSocialLoading(true);
+    try {
+      const data = await authApi.socialLogin({
+        provider,
+        idToken,
+        ...options,
+      });
+      await setAuth(data.token, data.userId, data.requiresPhone);
+    } catch (err: any) {
+      if (err.response?.status === 409) {
+        Alert.alert(t("errorTitle"), t("socialLoginEmailExists"));
+      } else {
+        Alert.alert(t("errorTitle"), t("socialLoginFailed"));
+      }
+    } finally {
+      setSocialLoading(false);
+    }
+  };
+
+  const handleAppleSignIn = async () => {
+    try {
+      const rawNonce = Array.from(
+        await Crypto.getRandomBytesAsync(32),
+        (b) => b.toString(16).padStart(2, "0")
+      ).join("");
+      const hashedNonce = await Crypto.digestStringAsync(
+        Crypto.CryptoDigestAlgorithm.SHA256,
+        rawNonce
+      );
+
+      const credential = await AppleAuthentication.signInAsync({
+        requestedScopes: [
+          AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
+          AppleAuthentication.AppleAuthenticationScope.EMAIL,
+        ],
+        nonce: hashedNonce,
+      });
+
+      if (!credential.identityToken) {
+        Alert.alert(t("errorTitle"), t("socialLoginFailed"));
+        return;
+      }
+
+      await handleSocialLoginToken("Apple", credential.identityToken, {
+        givenName: credential.fullName?.givenName ?? undefined,
+        familyName: credential.fullName?.familyName ?? undefined,
+        rawNonce,
+      });
+    } catch (err: any) {
+      if (err.code === "ERR_REQUEST_CANCELED") {
+        return; // silent cancel
+      }
+      Alert.alert(t("errorTitle"), t("socialLoginFailed"));
+    }
+  };
+
+  const handleGoogleSignIn = async () => {
+    await promptGoogleAsync();
   };
 
   const labelCls = `text-xs font-bold mb-2 px-1 ${alignCls} ${!isHebrew ? "uppercase tracking-widest" : ""}`;
@@ -399,23 +500,41 @@ function LoginForm() {
 
           {/* ── Social Login ── */}
           <View className="flex-row gap-4">
+            {appleAvailable && (
+              <Pressable
+                className="flex-1 flex-row items-center justify-center gap-3 h-12 rounded-xl"
+                style={({ pressed }) => ({
+                  backgroundColor: pressed ? colors.inputBg : colors.surfaceSecondary,
+                })}
+                onPress={handleAppleSignIn}
+                disabled={socialLoading}
+              >
+                {socialLoading ? (
+                  <ActivityIndicator size="small" color={colors.text} />
+                ) : (
+                  <>
+                    <Ionicons name="logo-apple" size={20} color={colors.text} />
+                    <Text className="text-sm font-bold" style={{ color: colors.text }}>Apple</Text>
+                  </>
+                )}
+              </Pressable>
+            )}
             <Pressable
               className="flex-1 flex-row items-center justify-center gap-3 h-12 rounded-xl"
               style={({ pressed }) => ({
                 backgroundColor: pressed ? colors.inputBg : colors.surfaceSecondary,
               })}
+              onPress={handleGoogleSignIn}
+              disabled={socialLoading}
             >
-              <Ionicons name="logo-apple" size={20} color={colors.text} />
-              <Text className="text-sm font-bold" style={{ color: colors.text }}>Apple</Text>
-            </Pressable>
-            <Pressable
-              className="flex-1 flex-row items-center justify-center gap-3 h-12 rounded-xl"
-              style={({ pressed }) => ({
-                backgroundColor: pressed ? colors.inputBg : colors.surfaceSecondary,
-              })}
-            >
-              <Ionicons name="logo-google" size={20} color={colors.text} />
-              <Text className="text-sm font-bold" style={{ color: colors.text }}>Google</Text>
+              {socialLoading ? (
+                <ActivityIndicator size="small" color={colors.text} />
+              ) : (
+                <>
+                  <Ionicons name="logo-google" size={20} color={colors.text} />
+                  <Text className="text-sm font-bold" style={{ color: colors.text }}>Google</Text>
+                </>
+              )}
             </Pressable>
           </View>
 

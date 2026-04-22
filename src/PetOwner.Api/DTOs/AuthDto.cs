@@ -34,5 +34,15 @@ public record UpdateUserProfileDto(
 public record UserProfileDto(
     string Name,
     string Email,
-    string Phone
+    string? Phone
 );
+
+public record SocialLoginDto(
+    [Required] string Provider,
+    [Required] string IdToken,
+    string? GivenName,
+    string? FamilyName,
+    string? RawNonce
+);
+
+public record UpdatePhoneDto([Required] string Phone);

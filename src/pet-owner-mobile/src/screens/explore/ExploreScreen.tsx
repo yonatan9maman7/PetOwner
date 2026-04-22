@@ -309,6 +309,36 @@ export function ExploreScreen() {
     userLng,
   ]);
 
+  /**
+   * Commit a new pins list to state only when something actually changed, and only
+   * after any running native gesture has settled. This is the single biggest lever
+   * for MapKit stability: avoids rebuilding the entire annotation set mid-pan and
+   * keeps the `pins` array reference stable when the server returns the same set.
+   */
+  const commitPins = useCallback((incoming: MapPinDto[]) => {
+    const current = pinsRef.current;
+    if (current.length === incoming.length) {
+      let identical = true;
+      for (let i = 0; i < current.length; i++) {
+        const a = current[i];
+        const b = incoming[i];
+        if (
+          a.providerId !== b.providerId ||
+          a.latitude !== b.latitude ||
+          a.longitude !== b.longitude
+        ) {
+          identical = false;
+          break;
+        }
+      }
+      if (identical) return;
+    }
+    InteractionManager.runAfterInteractions(() => {
+      if (!exploreScreenFocusedRef.current) return;
+      setPins(incoming);
+    });
+  }, []);
+
   /* ─── Fetch pins ─── */
   const fetchPins = useCallback(
     async (filters?: MapSearchFilters, options?: { showLoading?: boolean }) => {
@@ -319,7 +349,7 @@ export function ExploreScreen() {
         const data = await mapApi.fetchPins(filters);
         if (gen !== pinsFetchGenRef.current) return;
         if (!exploreScreenFocusedRef.current) return;
-        setPins(data);
+        commitPins(data);
       } catch (error) {
         if (gen !== pinsFetchGenRef.current) return;
         // Keep existing pins visible; do not clear the map on transient errors.
@@ -332,7 +362,7 @@ export function ExploreScreen() {
         }
       }
     },
-    [t],
+    [t, commitPins],
   );
 
   const loadPins = useCallback(
@@ -400,7 +430,7 @@ export function ExploreScreen() {
         .then((data) => {
           if (gen !== pinsFetchGenRef.current) return;
           if (!exploreScreenFocusedRef.current) return;
-          setPins(data);
+          commitPins(data);
           tryFocus(data);
         })
         .catch((error) => {
@@ -413,7 +443,7 @@ export function ExploreScreen() {
           if (gen === pinsFetchGenRef.current) setLoading(false);
         });
     }
-  }, [route.params?.focusProviderId, t, beginProgrammaticMapMove]);
+  }, [route.params?.focusProviderId, t, beginProgrammaticMapMove, commitPins]);
 
   /* ─── Service pill toggle (same as web) ─── */
   const toggleServiceFilter = useCallback(
@@ -564,8 +594,6 @@ export function ExploreScreen() {
     }
   }, []);
 
-  const selectedProviderIdForMap = selectedPin?.providerId ?? null;
-
   /* ═════════════════════ RENDER ═════════════════════ */
 
   return (
@@ -596,7 +624,6 @@ export function ExploreScreen() {
         )}
         <ExploreMapMarkers
           items={mapMarkerItems}
-          selectedProviderId={selectedProviderIdForMap}
           onPressProviderId={onPressProviderMarkerId}
           onPressClusterPins={openCollocatedChooser}
         />

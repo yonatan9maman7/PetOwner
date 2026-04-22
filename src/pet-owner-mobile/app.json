@@ -2,6 +2,7 @@
   "expo": {
     "name": "pet-owner-mobile",
     "slug": "pet-owner-mobile",
+    "scheme": "petowner",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -14,11 +15,17 @@
     },
     "ios": {
       "supportsTablet": true,
+      "bundleIdentifier": "com.petowner.app",
+      "usesAppleSignIn": true,
+      "entitlements": {
+        "com.apple.developer.applesignin": ["Default"]
+      },
       "infoPlist": {
         "NSFaceIDUsageDescription": "Allow PetOwner to use Face ID for fast and secure sign-in."
       }
     },
     "android": {
+      "package": "com.petowner.app",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
@@ -58,7 +65,9 @@
           "sounds": [],
           "mode": "production"
         }
-      ]
+      ],
+      "expo-web-browser",
+      "expo-apple-authentication"
     ]
   }
 }

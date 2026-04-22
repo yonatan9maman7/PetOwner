@@ -151,6 +151,8 @@ builder.Services.AddRateLimiter(options =>
 });
 
 builder.Services.AddSingleton<ITokenService, TokenService>();
+builder.Services.AddSingleton<IGoogleIdTokenValidator, GoogleIdTokenValidator>();
+builder.Services.AddSingleton<IAppleIdTokenValidator, AppleIdTokenValidator>();
 builder.Services.AddScoped<IMapService, MapService>();
 builder.Services.AddScoped<DatabaseSeeder>();
 builder.Services.AddHostedService<BookingExpirationService>();

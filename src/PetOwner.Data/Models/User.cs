@@ -3,11 +3,13 @@ namespace PetOwner.Data.Models;
 public class User
 {
     public Guid Id { get; set; }
-    public string Phone { get; set; } = null!;
+    public string? Phone { get; set; }
     public string Email { get; set; } = null!;
     public string Name { get; set; } = null!;
     public string Role { get; set; } = null!;
-    public string PasswordHash { get; set; } = string.Empty;
+    public string? PasswordHash { get; set; }
+    public string? GoogleId { get; set; }
+    public string? AppleId { get; set; }
     public string PreferredLanguage { get; set; } = "he-IL";
     public DateTime CreatedAt { get; set; }
     public string? ResetPasswordToken { get; set; }

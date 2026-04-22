@@ -76,9 +76,11 @@ interface AuthState {
   userId: string | null;
   user: UserInfo | null;
   isLoggedIn: boolean;
+  requiresPhone: boolean;
   language: Language;
   hydrated: boolean;
-  setAuth: (token: string, userId: string) => Promise<void>;
+  setAuth: (token: string, userId: string, requiresPhone?: boolean) => Promise<void>;
+  clearRequiresPhone: () => Promise<void>;
   logout: () => Promise<void>;
   setLanguage: (lang: Language) => Promise<void>;
   hydrate: () => Promise<void>;
@@ -156,14 +158,22 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   userId: null,
   user: null,
   isLoggedIn: false,
+  requiresPhone: false,
   language: "he",
   hydrated: false,
 
-  setAuth: async (token, userId) => {
+  setAuth: async (token, userId, requiresPhone = false) => {
     await storage.set("auth_token", token);
     await storage.set("user_id", userId);
+    await storage.set("requires_phone", requiresPhone ? "1" : "0");
     const user = decodeUser(token);
-    set({ token, userId, user, isLoggedIn: true });
+    set({ token, userId, user, isLoggedIn: true, requiresPhone });
+    if (!requiresPhone) startHubs();
+  },
+
+  clearRequiresPhone: async () => {
+    await storage.set("requires_phone", "0");
+    set({ requiresPhone: false });
     startHubs();
   },
 
@@ -171,9 +181,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     await stopHubsAsync();
     await storage.remove("auth_token");
     await storage.remove("user_id");
+    await storage.remove("requires_phone");
     // Wipe biometric credentials on explicit logout — security signal.
     import("../services/biometricService").then((m) => m.disable().catch(() => {}));
-    set({ token: null, userId: null, user: null, isLoggedIn: false });
+    set({ token: null, userId: null, user: null, isLoggedIn: false, requiresPhone: false });
   },
 
   setLanguage: async (lang) => {
@@ -183,21 +194,24 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   hydrate: async () => {
-    const [token, userId, lang] = await Promise.all([
+    const [token, userId, lang, persistedRequiresPhone] = await Promise.all([
       storage.get("auth_token"),
       storage.get("user_id"),
       storage.get("app_language"),
+      storage.get("requires_phone"),
     ]);
 
     const expired = token ? isTokenExpired(token) : false;
     if (expired) {
       await storage.remove("auth_token");
       await storage.remove("user_id");
+      await storage.remove("requires_phone");
       set({
         token: null,
         userId: null,
         user: null,
         isLoggedIn: false,
+        requiresPhone: false,
         language: (lang as Language) ?? "he",
         hydrated: true,
       });
@@ -206,15 +220,33 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
     const user = token ? decodeUser(token) : null;
     const loggedIn = !!token;
+
+    // Seed from persisted flag first (works offline)
+    let requiresPhone = persistedRequiresPhone === "1";
+
     set({
       token,
       userId,
       user,
       isLoggedIn: loggedIn,
+      requiresPhone,
       language: (lang as Language) ?? "he",
       hydrated: true,
     });
 
-    if (loggedIn) startHubs();
+    if (loggedIn) {
+      // Refresh phone status from server when online
+      try {
+        const { authApi } = await import("../api/client");
+        const profile = await authApi.getMe();
+        requiresPhone = !profile.phone;
+        await storage.set("requires_phone", requiresPhone ? "1" : "0");
+        set({ requiresPhone });
+      } catch {
+        // Network error or 401 — keep persisted flag; axios interceptor handles 401
+      }
+
+      if (!requiresPhone) startHubs();
+    }
   },
 }));

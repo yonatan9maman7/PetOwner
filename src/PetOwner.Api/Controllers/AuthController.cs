@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using PetOwner.Api.DTOs;
+using PetOwner.Api.Infrastructure;
 using PetOwner.Api.Services;
 using PetOwner.Data;
 using PetOwner.Data.Models;
@@ -19,6 +20,8 @@ public class AuthController : ControllerBase
     private readonly IConfiguration _config;
     private readonly IEmailService _emailService;
     private readonly ITokenService _tokenService;
+    private readonly IGoogleIdTokenValidator _googleValidator;
+    private readonly IAppleIdTokenValidator _appleValidator;
     private readonly ILogger<AuthController> _logger;
 
     public AuthController(
@@ -26,12 +29,16 @@ public class AuthController : ControllerBase
         IConfiguration config,
         IEmailService emailService,
         ITokenService tokenService,
+        IGoogleIdTokenValidator googleValidator,
+        IAppleIdTokenValidator appleValidator,
         ILogger<AuthController> logger)
     {
         _db = db;
         _config = config;
         _emailService = emailService;
         _tokenService = tokenService;
+        _googleValidator = googleValidator;
+        _appleValidator = appleValidator;
         _logger = logger;
     }
 
@@ -85,7 +92,8 @@ public class AuthController : ControllerBase
         var emailNorm = NormalizeEmail(dto.Email);
         var user = await _db.Users.FirstOrDefaultAsync(u => u.Email.ToLower() == emailNorm);
 
-        if (user is null || !BCrypt.Net.BCrypt.Verify(dto.Password, user.PasswordHash))
+        if (user is null || string.IsNullOrEmpty(user.PasswordHash) ||
+            !BCrypt.Net.BCrypt.Verify(dto.Password, user.PasswordHash))
             return Unauthorized(new { message = "Invalid email or password." });
 
         if (!user.IsActive)
@@ -93,6 +101,105 @@ public class AuthController : ControllerBase
 
         var token = _tokenService.GenerateAccessToken(user);
         return Ok(new { token, userId = user.Id });
+    }
+
+    [EnableRateLimiting("AuthPolicy")]
+    [HttpPost("social-login")]
+    public async Task<IActionResult> SocialLogin([FromBody] SocialLoginDto dto)
+    {
+        string? providerUserId = null;
+        string? providerEmail = null;
+        string? providerName = null;
+
+        if (dto.Provider.Equals("Google", StringComparison.OrdinalIgnoreCase))
+        {
+            var claims = await _googleValidator.ValidateAsync(dto.IdToken);
+            if (claims is null)
+                return Unauthorized(new { message = "Invalid social token." });
+
+            providerUserId = claims.Subject;
+            providerEmail = claims.Email;
+            providerName = claims.Name;
+        }
+        else if (dto.Provider.Equals("Apple", StringComparison.OrdinalIgnoreCase))
+        {
+            var claims = await _appleValidator.ValidateAsync(dto.IdToken, dto.RawNonce);
+            if (claims is null)
+                return Unauthorized(new { message = "Invalid social token." });
+
+            providerUserId = claims.Subject;
+            providerEmail = claims.Email;
+        }
+        else
+        {
+            return BadRequest(new { message = "Unsupported provider." });
+        }
+
+        bool isGoogle = dto.Provider.Equals("Google", StringComparison.OrdinalIgnoreCase);
+
+        // Step 1: find by provider ID
+        User? user = isGoogle
+            ? await _db.Users.FirstOrDefaultAsync(u => u.GoogleId == providerUserId)
+            : await _db.Users.FirstOrDefaultAsync(u => u.AppleId == providerUserId);
+
+        if (user is null && !string.IsNullOrEmpty(providerEmail))
+        {
+            // Step 2: find by email
+            var emailNorm = NormalizeEmail(providerEmail);
+            user = await _db.Users.FirstOrDefaultAsync(u => u.Email.ToLower() == emailNorm);
+
+            if (user is not null)
+            {
+                if (!string.IsNullOrEmpty(user.PasswordHash))
+                {
+                    // Password user — do not auto-link
+                    return Conflict(new { message = "Please log in with your password." });
+                }
+
+                // Social-only user: attach this provider
+                if (isGoogle) user.GoogleId = providerUserId;
+                else user.AppleId = providerUserId;
+                await _db.SaveChangesAsync();
+            }
+        }
+
+        if (user is null)
+        {
+            // Step 3: create new user
+            var resolvedName = providerName
+                ?? (dto.GivenName is not null || dto.FamilyName is not null
+                    ? $"{dto.GivenName} {dto.FamilyName}".Trim()
+                    : null)
+                ?? providerEmail?.Split('@')[0]
+                ?? "User";
+
+            var newEmail = !string.IsNullOrEmpty(providerEmail)
+                ? NormalizeEmail(providerEmail)
+                : $"{(isGoogle ? "google" : "apple")}.{providerUserId}@social.petowner.app";
+
+            user = new User
+            {
+                Id = Guid.NewGuid(),
+                Email = newEmail,
+                Name = resolvedName,
+                Role = "Owner",
+                PasswordHash = null,
+                Phone = null,
+                IsActive = true,
+                CreatedAt = DateTime.UtcNow,
+                GoogleId = isGoogle ? providerUserId : null,
+                AppleId = isGoogle ? null : providerUserId
+            };
+
+            _db.Users.Add(user);
+            await _db.SaveChangesAsync();
+        }
+
+        if (!user.IsActive)
+            return Unauthorized(new { message = "Your account has been suspended. Please contact support." });
+
+        var token = _tokenService.GenerateAccessToken(user);
+        return Ok(new { token, userId = user.Id, requiresPhone = user.Phone == null });
     }
 
     [EnableRateLimiting("AuthPolicy")]
@@ -178,12 +285,43 @@ public class AuthController : ControllerBase
 
         user.Name = dto.Name.Trim();
         if (dto.Phone is not null)
-            user.Phone = dto.Phone.Trim();
+        {
+            var phone = dto.Phone.Trim();
+            if (!PhoneValidator.IsValidFormat(phone))
+                return BadRequest(new { message = "Please enter a valid phone number.", code = "INVALID_PHONE" });
+
+            if (await PhoneValidator.IsTakenAsync(_db, phone, userId))
+                return BadRequest(new { message = "Phone already in use.", code = "PHONE_TAKEN" });
+
+            user.Phone = phone;
+        }
 
         await _db.SaveChangesAsync();
 
         var token = _tokenService.GenerateAccessToken(user);
         return Ok(new { token, userId = user.Id });
+    }
+
+    [EnableRateLimiting("AuthPolicy")]
+    [Authorize]
+    [HttpPut("me/phone")]
+    public async Task<IActionResult> UpdatePhone([FromBody] UpdatePhoneDto dto)
+    {
+        var userId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+        var user = await _db.Users.FindAsync(userId);
+        if (user is null) return NotFound();
+
+        var phone = dto.Phone.Trim();
+        if (!PhoneValidator.IsValidFormat(phone))
+            return BadRequest(new { message = "Please enter a valid phone number.", code = "INVALID_PHONE" });
+
+        if (await PhoneValidator.IsTakenAsync(_db, phone, userId))
+            return BadRequest(new { message = "Phone already in use.", code = "PHONE_TAKEN" });
+
+        user.Phone = phone;
+        await _db.SaveChangesAsync();
+
+        return Ok();
     }
 
     private static string NormalizeEmail(string email) => email.Trim().ToLowerInvariant();

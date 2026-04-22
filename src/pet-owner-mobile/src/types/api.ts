@@ -19,6 +19,21 @@ export interface ForgotPasswordDto {
 export interface AuthResponse {
   token: string;
   userId: string;
+  requiresPhone?: boolean;
+}
+
+export interface SocialLoginDto {
+  provider: "Google" | "Apple";
+  idToken: string;
+  givenName?: string;
+  familyName?: string;
+  rawNonce?: string;
+}
+
+export interface SocialLoginResponse {
+  token: string;
+  userId: string;
+  requiresPhone: boolean;
 }
 
 export enum PetSpecies {

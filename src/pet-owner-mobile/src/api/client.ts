@@ -8,6 +8,8 @@ import type {
   LoginDto,
   RegisterDto,
   AuthResponse,
+  SocialLoginDto,
+  SocialLoginResponse,
   MapSearchFilters,
   MapPinDto,
   ProviderPublicProfileDto,
@@ -121,12 +123,18 @@ export const authApi = {
     apiClient.post("/auth/forgot-password", { email }),
   getMe: () =>
     apiClient
-      .get<{ name: string; email: string; phone: string }>("/auth/me")
+      .get<{ name: string; email: string; phone: string | null }>("/auth/me")
       .then((r) => r.data),
   updateProfile: (data: { name: string; phone?: string }) =>
     apiClient
       .put<AuthResponse>("/auth/profile", data)
       .then((r) => r.data),
+  socialLogin: (data: SocialLoginDto) =>
+    apiClient
+      .post<SocialLoginResponse>("/auth/social-login", data)
+      .then((r) => r.data),
+  updatePhone: (phone: string) =>
+    apiClient.put("/auth/me/phone", { phone }),
 };
 
 export const mapApi = {

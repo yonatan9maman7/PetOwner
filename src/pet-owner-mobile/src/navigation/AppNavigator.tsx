@@ -33,6 +33,7 @@ import { CreatePlaydateEventScreen } from "../screens/community/pals/CreatePlayd
 import { LoginScreen } from "../screens/auth/LoginScreen";
 import { RegisterScreen } from "../screens/auth/RegisterScreen";
 import { ForgotPasswordScreen } from "../screens/auth/ForgotPasswordScreen";
+import { CompleteProfileScreen } from "../screens/auth/CompleteProfileScreen";
 import { ProfileScreen } from "../screens/profile/ProfileScreen";
 import { ProviderEditScreen } from "../screens/profile/ProviderEditScreen";
 import { ProviderDashboardScreen } from "../screens/profile/ProviderDashboardScreen";
@@ -141,6 +142,7 @@ const TAB_BAR_HIDDEN = { display: "none" as const };
 
 const Tab = createBottomTabNavigator();
 const AuthStack = createNativeStackNavigator();
+const CompleteProfileStack = createNativeStackNavigator();
 const ExploreStack = createNativeStackNavigator();
 const CommunityStack = createNativeStackNavigator();
 const PetsStack = createNativeStackNavigator();
@@ -251,6 +253,7 @@ function ProfileStackScreen() {
 
 export function AppNavigator() {
   const isLoggedIn = useAuthStore((s) => s.isLoggedIn);
+  const requiresPhone = useAuthStore((s) => s.requiresPhone);
   const unreadCount = useNotificationStore((s) => s.unreadCount);
   const chatUnreadTotal = useChatStore((s) =>
     s.conversations.reduce((acc, c) => acc + Math.max(0, c.unreadCount), 0),
@@ -258,6 +261,23 @@ export function AppNavigator() {
   const { t } = useTranslation();
   const { colors } = useTheme();
   const tabBarStyle = useTabBarStyle();
+
+  // Social login users must complete phone before accessing any tab
+  if (isLoggedIn && requiresPhone) {
+    return (
+      <>
+        <NotificationToast />
+        <CompleteProfileStack.Navigator
+          screenOptions={{ headerShown: false, gestureEnabled: false }}
+        >
+          <CompleteProfileStack.Screen
+            name="CompleteProfile"
+            component={CompleteProfileScreen}
+          />
+        </CompleteProfileStack.Navigator>
+      </>
+    );
+  }
 
   return (
     <>
