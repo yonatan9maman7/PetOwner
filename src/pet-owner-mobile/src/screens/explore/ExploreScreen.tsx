@@ -21,7 +21,6 @@ import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context"
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect, useNavigation, useRoute } from "@react-navigation/native";
 import * as Location from "expo-location";
-import { MapViewWrapper, MarkerWrapper } from "../../components/MapViewWrapper";
 import {
   BrandedAppHeader,
   BRAND_HEADER_HORIZONTAL_PAD,
@@ -35,18 +34,9 @@ import { DatePickerField } from "../../components/DatePickerField";
 import { TimePickerField } from "../../components/TimePickerField";
 import { mapApi } from "../../api/client";
 import { ProviderType, type MapPinDto, type MapSearchFilters } from "../../types/api";
-import {
-  groupPinsForMapMarkers,
-  markerItemHasSelectedProvider,
-  sortMarkerItemsStable,
-} from "./mapCollision";
-
-const TEL_AVIV = {
-  latitude: 32.0853,
-  longitude: 34.7818,
-  latitudeDelta: 0.035,
-  longitudeDelta: 0.035,
-};
+import { groupPinsForMapMarkers, sortMarkerItemsStable } from "./mapCollision";
+import { ExploreMapViewLayer } from "./ExploreMapViewLayer";
+import { EXPLORE_MAP_INITIAL_REGION } from "./exploreMapLayoutConstants";
 
 /** iOS MapKit often passes transient/invalid regions during gestures; guard all map math. */
 function isValidMapRegion(region: {
@@ -64,15 +54,6 @@ function isValidMapRegion(region: {
   if (!Number.isFinite(dLat) || !Number.isFinite(dLng)) return false;
   if (dLat <= 0 || dLng <= 0) return false;
   return true;
-}
-
-/**
- * Native MapKit / Google Maps marker `identifier` must be a simple string. Cluster keys look like
- * "32.08534,34.78180" (comma); commas and other punctuation have been linked to native crashes when
- * combined with rapid marker updates.
- */
-function mapMarkerNativeIdentifier(raw: string): string {
-  return raw.replace(/[^a-zA-Z0-9._-]/g, "_");
 }
 
 /** Debounce for silent pin refresh after map gestures (reduces GET /map/pins churn while dragging). */
@@ -130,163 +111,6 @@ function formatMapPinRating(rating: unknown): string | null {
   return Number.isFinite(n) ? n.toFixed(1) : null;
 }
 
-/* ──────── Paw Marker ──────── */
-
-function PawMarker({ active }: { active?: boolean }) {
-  const { colors } = useTheme();
-  return (
-    <View style={pawMarkerStyles.hitArea}>
-      <View
-        style={[
-          pawMarkerStyles.bubble,
-          active
-            ? {
-                backgroundColor: colors.text,
-                borderColor: colors.surface,
-                shadowColor: colors.text,
-                shadowOffset: { width: 0, height: 4 },
-                shadowOpacity: 0.3,
-                shadowRadius: 8,
-                elevation: 8,
-              }
-            : {
-                backgroundColor: colors.surface,
-                borderColor: colors.borderLight,
-                shadowColor: colors.shadow,
-                shadowOffset: { width: 0, height: 2 },
-                shadowOpacity: 0.12,
-                shadowRadius: 6,
-                elevation: 4,
-              },
-        ]}
-      >
-        <Ionicons name="paw" size={20} color={active ? colors.textInverse : colors.text} />
-      </View>
-      <View
-        style={[
-          pawMarkerStyles.arrow,
-          { borderTopColor: active ? colors.text : colors.surface },
-        ]}
-      />
-    </View>
-  );
-}
-
-const pawMarkerStyles = StyleSheet.create({
-  hitArea: {
-    padding: 12,
-    alignItems: "center",
-  },
-  bubble: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 2,
-  },
-  clusterBubbleWrap: {
-    position: "relative",
-    width: 44,
-    height: 44,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  clusterCountBadge: {
-    position: "absolute",
-    top: 0,
-    minWidth: 20,
-    height: 20,
-    borderRadius: 10,
-    paddingHorizontal: 5,
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 2,
-  },
-  arrow: {
-    width: 0,
-    height: 0,
-    marginTop: -2,
-    borderLeftWidth: 7,
-    borderRightWidth: 7,
-    borderTopWidth: 9,
-    borderLeftColor: "transparent",
-    borderRightColor: "transparent",
-  },
-});
-
-/** Stacked providers at the same coordinates — shows count badge. */
-function ClusterPawMarker({
-  count,
-  active,
-  isRTL,
-}: {
-  count: number;
-  active?: boolean;
-  isRTL: boolean;
-}) {
-  const { colors } = useTheme();
-  const badgeSide = isRTL ? { left: 2 } : { right: 2 };
-  return (
-    <View style={pawMarkerStyles.hitArea}>
-      <View style={pawMarkerStyles.clusterBubbleWrap}>
-        <View
-          style={[
-            pawMarkerStyles.bubble,
-            active
-              ? {
-                  backgroundColor: colors.text,
-                  borderColor: colors.surface,
-                  shadowColor: colors.text,
-                  shadowOffset: { width: 0, height: 4 },
-                  shadowOpacity: 0.3,
-                  shadowRadius: 8,
-                  elevation: 8,
-                }
-              : {
-                  backgroundColor: colors.surface,
-                  borderColor: colors.borderLight,
-                  shadowColor: colors.shadow,
-                  shadowOffset: { width: 0, height: 2 },
-                  shadowOpacity: 0.12,
-                  shadowRadius: 6,
-                  elevation: 4,
-                },
-          ]}
-        >
-          <Ionicons name="paw" size={18} color={active ? colors.textInverse : colors.text} />
-        </View>
-        <View
-          style={[
-            pawMarkerStyles.clusterCountBadge,
-            badgeSide,
-            {
-              backgroundColor: active ? colors.primaryLight : colors.danger,
-              borderColor: colors.surface,
-            },
-          ]}
-        >
-          <Text
-            style={{
-              fontSize: 11,
-              fontWeight: "800",
-              color: active ? colors.text : "#fff",
-            }}
-          >
-            {count > 99 ? "99+" : count}
-          </Text>
-        </View>
-      </View>
-      <View
-        style={[
-          pawMarkerStyles.arrow,
-          { borderTopColor: active ? colors.text : colors.surface },
-        ]}
-      />
-    </View>
-  );
-}
-
 /* ──────── Avatar with SVG fallback ──────── */
 
 function AvatarImage({ uri }: { uri?: string | null }) {
@@ -328,6 +152,8 @@ export function ExploreScreen() {
   const toggleFavorite = useFavoritesStore((s) => s.toggle);
 
   const [pins, setPins] = useState<MapPinDto[]>([]);
+  const pinsRef = useRef<MapPinDto[]>(pins);
+  pinsRef.current = pins;
   const [loading, setLoading] = useState(true);
   const [selectedPin, setSelectedPin] = useState<MapPinDto | null>(null);
   const [collocatedChooserPins, setCollocatedChooserPins] = useState<MapPinDto[] | null>(null);
@@ -371,12 +197,21 @@ export function ExploreScreen() {
   const [userLng, setUserLng] = useState<number | null>(null);
 
   /* Current map region for viewport-based queries */
-  const mapRegionRef = useRef(TEL_AVIV);
+  const mapRegionRef = useRef(EXPLORE_MAP_INITIAL_REGION);
 
   /* ─── Active filter count (badge) ─── */
   const mapMarkerItems = useMemo(
     () => sortMarkerItemsStable(groupPinsForMapMarkers(pins)),
     [pins],
+  );
+
+  /** User location — stable coordinate object so Marker does not get a new `coordinate` ref every render. */
+  const userLocationCoordinate = useMemo(
+    () =>
+      userLat != null && userLng != null
+        ? { latitude: userLat, longitude: userLng }
+        : null,
+    [userLat, userLng],
   );
 
   const selectedPinRatingLabel = selectedPin
@@ -441,7 +276,7 @@ export function ExploreScreen() {
       f.longitude = userLng;
     } else {
       const raw = mapRegionRef.current;
-      const region = isValidMapRegion(raw) ? raw : TEL_AVIV;
+      const region = isValidMapRegion(raw) ? raw : EXPLORE_MAP_INITIAL_REGION;
       const latDelta = region.latitudeDelta / 2;
       const lngDelta = region.longitudeDelta / 2;
       // Distance from map center to a corner of the visible region, with extra padding so
@@ -676,8 +511,10 @@ export function ExploreScreen() {
     setTimeout(() => loadPinsRef.current(), 0);
   }, []);
 
-  /* ─── Marker press ─── */
-  const handleMarkerPress = useCallback((pin: MapPinDto) => {
+  /* ─── Marker press (id-based so marker row callbacks stay stable across re-renders) ─── */
+  const onPressProviderMarkerId = useCallback((providerId: string) => {
+    const pin = pinsRef.current.find((p) => p.providerId === providerId);
+    if (!pin) return;
     suppressViewportFetchAfterMarkerMsRef.current = Date.now() + MARKER_TAP_VIEWPORT_SUPPRESS_MS;
     markerJustTappedRef.current = true;
     setTimeout(() => {
@@ -713,85 +550,38 @@ export function ExploreScreen() {
     }
   }, []);
 
+  /** Stable: inline map `onPress` and `mapPadding` were new every render and forced MapKit to churn during gestures. */
+  const handleMapBackgroundPress = useCallback(() => {
+    Keyboard.dismiss();
+    if (!markerJustTappedRef.current) {
+      setSelectedPin(null);
+      setCollocatedChooserPins(null);
+    }
+  }, []);
+
+  const userMapPinColor = useMemo(
+    () => (typeof colors.primary === "string" ? colors.primary : String(colors.primary)),
+    [colors.primary],
+  );
+
+  const selectedProviderIdForMap = selectedPin?.providerId ?? null;
+
   /* ═════════════════════ RENDER ═════════════════════ */
 
   return (
     <View style={[styles.root, { backgroundColor: colors.background }]}>
-      <MapViewWrapper
-        ref={mapRef}
-        style={StyleSheet.absoluteFillObject}
-        initialRegion={TEL_AVIV}
-        fallbackLabel="Explore Map"
-        showsMyLocationButton={false}
-        showsCompass={false}
-        toolbarEnabled={false}
-        mapPadding={{ top: 0, right: 0, bottom: 110, left: 0 }}
+      <ExploreMapViewLayer
+        mapRef={mapRef}
+        initialRegion={EXPLORE_MAP_INITIAL_REGION}
         onRegionChangeComplete={handleRegionChange}
-        onPress={() => {
-          Keyboard.dismiss();
-          if (!markerJustTappedRef.current) {
-            setSelectedPin(null);
-            setCollocatedChooserPins(null);
-          }
-        }}
-        {...(Platform.OS === "android" && { mapType: "standard" })}
-      >
-        {userLat != null && userLng != null && (
-          <MarkerWrapper
-            coordinate={{ latitude: userLat, longitude: userLng }}
-            anchor={{ x: 0.5, y: 0.5 }}
-            tracksViewChanges={false}
-          >
-            <View
-              style={[
-                styles.userDotOuter,
-                { backgroundColor: `${colors.primary}33` },
-              ]}
-            >
-              <View
-                style={[styles.userDotInner, { backgroundColor: colors.primary }]}
-              />
-            </View>
-          </MarkerWrapper>
-        )}
-        {mapMarkerItems.map((item) => {
-          if (item.kind === "single") {
-            const pin = item.pin;
-            const isSel = selectedPin?.providerId === pin.providerId;
-            return (
-              <MarkerWrapper
-                key={pin.providerId}
-                identifier={mapMarkerNativeIdentifier(String(pin.providerId))}
-                coordinate={{ latitude: pin.latitude, longitude: pin.longitude }}
-                onPress={() => handleMarkerPress(pin)}
-                tracksViewChanges={false}
-                zIndex={isSel ? 1000 : 1}
-                {...(Platform.OS === "android" ? { style: { elevation: isSel ? 12 : 4 } } : {})}
-              >
-                <PawMarker active={isSel} />
-              </MarkerWrapper>
-            );
-          }
-          const clusterActive = markerItemHasSelectedProvider(item, selectedPin?.providerId);
-          return (
-            <MarkerWrapper
-              key={`cluster-${item.key}`}
-              identifier={mapMarkerNativeIdentifier(`cluster-${item.key}`)}
-              coordinate={{ latitude: item.latitude, longitude: item.longitude }}
-              onPress={() => openCollocatedChooser(item.pins)}
-              tracksViewChanges={false}
-              zIndex={clusterActive ? 1000 : 1}
-              {...(Platform.OS === "android" ? { style: { elevation: clusterActive ? 12 : 4 } } : {})}
-            >
-              <ClusterPawMarker
-                count={item.pins.length}
-                active={clusterActive}
-                isRTL={isRTL}
-              />
-            </MarkerWrapper>
-          );
-        })}
-      </MapViewWrapper>
+        onMapPress={handleMapBackgroundPress}
+        userLocationCoordinate={userLocationCoordinate}
+        userPinColor={userMapPinColor}
+        mapMarkerItems={mapMarkerItems}
+        selectedProviderId={selectedProviderIdForMap}
+        onPressProviderId={onPressProviderMarkerId}
+        onPressClusterPins={openCollocatedChooser}
+      />
 
       <SafeAreaView edges={["top"]} style={{ zIndex: 10, marginTop: -8 }}>
         <BrandedAppHeader />
@@ -1792,19 +1582,5 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 12,
     maxHeight: "62%",
-  },
-  userDotOuter: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  userDotInner: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    borderWidth: 2,
-    borderColor: "#fff",
   },
 });

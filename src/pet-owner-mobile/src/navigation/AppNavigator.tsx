@@ -284,6 +284,7 @@ export function AppNavigator() {
         name="Explore"
         component={ExploreStackScreen}
         options={({ route }) => ({
+          tabBarButtonTestID: "tab-explore",
           tabBarLabel: t("tabExplore"),
           tabBarIcon: ({ focused, color }) => (
             <Ionicons
@@ -299,6 +300,7 @@ export function AppNavigator() {
         name="Community"
         component={CommunityStackScreen}
         options={({ route }) => ({
+          tabBarButtonTestID: "tab-community",
           tabBarLabel: t("tabCommunity"),
           tabBarIcon: ({ focused, color }) => (
             <Ionicons
@@ -314,6 +316,7 @@ export function AppNavigator() {
         name="MyPets"
         component={PetsStackScreen}
         options={({ route }) => ({
+          tabBarButtonTestID: "tab-mypets",
           tabBarLabel: t("tabMyPets"),
           tabBarIcon: ({ focused, color }) => (
             <Ionicons
@@ -332,6 +335,7 @@ export function AppNavigator() {
             name="Messages"
             component={MessagesStackScreen}
             options={({ route }) => ({
+              tabBarButtonTestID: "tab-messages",
               tabBarLabel: t("tabMessages"),
               tabBarIcon: ({ focused, color }) => (
                 <Ionicons
@@ -362,6 +366,7 @@ export function AppNavigator() {
             name="Profile"
             component={ProfileStackScreen}
             options={({ route }) => ({
+              tabBarButtonTestID: "tab-profile",
               tabBarLabel: t("tabProfile"),
               tabBarIcon: ({ focused, color }) => (
                 <Ionicons
@@ -389,6 +394,7 @@ export function AppNavigator() {
           name="Login"
           component={AuthStackScreen}
           options={{
+            tabBarButtonTestID: "tab-login",
             tabBarLabel: t("tabLogin"),
             tabBarIcon: ({ focused, color }) => (
               <Ionicons

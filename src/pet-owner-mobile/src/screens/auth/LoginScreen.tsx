@@ -229,6 +229,7 @@ function LoginForm() {
             >
               <Ionicons name="mail-outline" size={20} color={colors.textSecondary} />
               <TextInput
+                testID="login-email-input"
                 ref={emailRef}
                 style={[
                   rtlInput,
@@ -276,6 +277,7 @@ function LoginForm() {
                 color={colors.textSecondary}
               />
               <TextInput
+                testID="login-password-input"
                 style={[
                   rtlInput,
                   {
@@ -318,6 +320,7 @@ function LoginForm() {
 
           {/* ── Sign-In Button ── */}
           <Pressable
+            testID="login-submit-button"
             className="h-14 rounded-xl items-center justify-center active:opacity-90"
             style={{ backgroundColor: colors.brand }}
             onPress={handleLogin}

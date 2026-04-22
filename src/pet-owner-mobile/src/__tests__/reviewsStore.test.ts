@@ -47,6 +47,7 @@ describe("reviewsStore", () => {
 
   it("submitBookingReview sets submitError and returns false on API failure", async () => {
     reviewsApiMock.createBookingReview.mockRejectedValue({
+      isAxiosError: true,
       response: { data: { message: "Booking not found" } },
     });
 

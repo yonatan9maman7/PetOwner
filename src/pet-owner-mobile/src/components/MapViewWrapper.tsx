@@ -32,6 +32,7 @@ export const MapViewWrapper = React.forwardRef<MapView, any>(
   },
 );
 
-export function MarkerWrapper(props: any) {
+/** Memoized so parent re-renders (search UI, etc.) do not always push new props into native Marker. */
+export const MarkerWrapper = React.memo(function MarkerWrapper(props: any) {
   return <Marker {...props} />;
-}
+});
