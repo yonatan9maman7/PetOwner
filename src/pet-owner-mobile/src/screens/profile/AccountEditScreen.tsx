@@ -18,7 +18,7 @@ import { useNavigation } from "@react-navigation/native";
 import * as ImagePicker from "expo-image-picker";
 import { useAuthStore } from "../../store/authStore";
 import { authApi } from "../../api/client";
-import { useTranslation } from "../../i18n";
+import { useTranslation, rowDirectionForAppLayout } from "../../i18n";
 import { useTheme } from "../../theme/ThemeContext";
 
 function InputLabel({ text }: { text: string }) {
@@ -166,7 +166,7 @@ export function AccountEditScreen() {
       {/* Header */}
       <View
         style={{
-          flexDirection: isRTL ? "row-reverse" : "row",
+          flexDirection: rowDirectionForAppLayout(isRTL),
           alignItems: "center",
           paddingHorizontal: 16,
           paddingVertical: 12,
@@ -364,7 +364,7 @@ export function AccountEditScreen() {
                   paddingVertical: 13,
                   borderWidth: 1,
                   borderColor: colors.border,
-                  flexDirection: isRTL ? "row-reverse" : "row",
+                  flexDirection: rowDirectionForAppLayout(isRTL),
                   alignItems: "center",
                   gap: 8,
                 }}

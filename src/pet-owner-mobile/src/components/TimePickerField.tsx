@@ -1,3 +1,4 @@
+import { rowDirectionForAppLayout } from "../i18n";
 import { useState } from "react";
 import { View, Text, Pressable, Platform, Modal } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
@@ -60,7 +61,7 @@ export function TimePickerField({
           borderColor: colors.border,
           paddingHorizontal: 14,
           paddingVertical: 10,
-          flexDirection: isRTL ? "row-reverse" : "row",
+          flexDirection: rowDirectionForAppLayout(isRTL),
           alignItems: "center",
           gap: 8,
         }}
@@ -103,7 +104,7 @@ export function TimePickerField({
           borderColor: colors.border,
           paddingHorizontal: 14,
           paddingVertical: 12,
-          flexDirection: isRTL ? "row-reverse" : "row",
+          flexDirection: rowDirectionForAppLayout(isRTL),
           alignItems: "center",
           gap: 8,
         }}

@@ -15,7 +15,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import * as Clipboard from "expo-clipboard";
 import { useNavigation } from "@react-navigation/native";
-import { useTranslation } from "../../i18n";
+import { useTranslation, rowDirectionForAppLayout } from "../../i18n";
 import { useTheme } from "../../theme/ThemeContext";
 import { useAuthStore } from "../../store/authStore";
 import { supportApi } from "../../api/client";
@@ -119,7 +119,7 @@ function ContactRow({
       onPress={onPress}
       activeOpacity={0.6}
       style={{
-        flexDirection: isRTL ? "row-reverse" : "row",
+        flexDirection: rowDirectionForAppLayout(isRTL),
         alignItems: "center",
         paddingVertical: 14,
         paddingHorizontal: 18,
@@ -307,7 +307,7 @@ export function ContactUsScreen() {
     >
       <View
         style={{
-          flexDirection: isRTL ? "row-reverse" : "row",
+          flexDirection: rowDirectionForAppLayout(isRTL),
           alignItems: "center",
           paddingHorizontal: 16,
           paddingVertical: 12,
@@ -426,7 +426,7 @@ export function ContactUsScreen() {
               </Text>
               <View
                 style={{
-                  flexDirection: isRTL ? "row-reverse" : "row",
+                  flexDirection: rowDirectionForAppLayout(isRTL),
                   flexWrap: "wrap",
                   gap: 8,
                 }}
@@ -599,7 +599,7 @@ export function ContactUsScreen() {
           onPress={() => navigation.navigate("HelpCenter")}
           activeOpacity={0.7}
           style={{
-            flexDirection: isRTL ? "row-reverse" : "row",
+            flexDirection: rowDirectionForAppLayout(isRTL),
             alignItems: "center",
             justifyContent: "center",
             gap: 8,

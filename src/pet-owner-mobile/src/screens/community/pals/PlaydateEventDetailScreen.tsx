@@ -9,7 +9,7 @@ import { useNavigation, useRoute } from "@react-navigation/native";
 import type { PlaydateEventDetailDto, PlaydateCommentDto } from "../../../types/api";
 import { playdatesApi } from "../../../api/client";
 import { useTheme } from "../../../theme/ThemeContext";
-import { useTranslation } from "../../../i18n";
+import { useTranslation, rowDirectionForAppLayout } from "../../../i18n";
 import { useAuthStore } from "../../../store/authStore";
 import { relativeTime, initials } from "./helpers";
 
@@ -87,7 +87,7 @@ export function PlaydateEventDetailScreen() {
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={["top"]}>
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
         {/* Header */}
-        <View style={{ flexDirection: isRTL ? "row-reverse" : "row", alignItems: "center", padding: 16, gap: 12 }}>
+        <View style={{ flexDirection: rowDirectionForAppLayout(isRTL), alignItems: "center", padding: 16, gap: 12 }}>
           <Pressable onPress={() => navigation.goBack()}>
             <Ionicons name={isRTL ? "chevron-forward" : "chevron-back"} size={24} color={colors.text} />
           </Pressable>
@@ -104,13 +104,13 @@ export function PlaydateEventDetailScreen() {
         <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 120 }}>
           {/* Event info */}
           <View style={[styles.infoCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-            <View style={{ flexDirection: isRTL ? "row-reverse" : "row", alignItems: "center", gap: 6, marginBottom: 8 }}>
+            <View style={{ flexDirection: rowDirectionForAppLayout(isRTL), alignItems: "center", gap: 6, marginBottom: 8 }}>
               <Ionicons name="calendar-outline" size={16} color={colors.textMuted} />
               <Text style={{ fontSize: 14, color: colors.textSecondary }}>
                 {scheduledDate.toLocaleDateString()} · {scheduledDate.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
               </Text>
             </View>
-            <View style={{ flexDirection: isRTL ? "row-reverse" : "row", alignItems: "center", gap: 6 }}>
+            <View style={{ flexDirection: rowDirectionForAppLayout(isRTL), alignItems: "center", gap: 6 }}>
               <Ionicons name="location-outline" size={16} color={colors.textMuted} />
               <Text style={{ fontSize: 14, color: colors.textSecondary }}>{event.locationName}</Text>
             </View>
@@ -126,7 +126,7 @@ export function PlaydateEventDetailScreen() {
                 {t("goingCount").replace("{{n}}", String(event.goingCount))}
               </Text>
               {detail.attendees.filter((a) => a.status === "Going").map((a) => (
-                <View key={a.userId} style={{ flexDirection: isRTL ? "row-reverse" : "row", alignItems: "center", gap: 8, marginBottom: 6 }}>
+                <View key={a.userId} style={{ flexDirection: rowDirectionForAppLayout(isRTL), alignItems: "center", gap: 8, marginBottom: 6 }}>
                   <View style={[styles.miniAvatar, { backgroundColor: colors.text }]}>
                     <Text style={{ color: colors.textInverse, fontSize: 11, fontWeight: "700" }}>{initials(a.userName)}</Text>
                   </View>
@@ -142,12 +142,12 @@ export function PlaydateEventDetailScreen() {
             {t("eventComments")}
           </Text>
           {comments.map((c) => (
-            <View key={c.id} style={{ flexDirection: isRTL ? "row-reverse" : "row", gap: 8, marginBottom: 12 }}>
+            <View key={c.id} style={{ flexDirection: rowDirectionForAppLayout(isRTL), gap: 8, marginBottom: 12 }}>
               <View style={[styles.miniAvatar, { backgroundColor: colors.textMuted }]}>
                 <Text style={{ color: colors.textInverse, fontSize: 11, fontWeight: "700" }}>{initials(c.userName)}</Text>
               </View>
               <View style={{ flex: 1 }}>
-                <View style={{ flexDirection: isRTL ? "row-reverse" : "row", alignItems: "center", gap: 6 }}>
+                <View style={{ flexDirection: rowDirectionForAppLayout(isRTL), alignItems: "center", gap: 6 }}>
                   <Text style={{ fontSize: 13, fontWeight: "700", color: colors.text }}>{c.userName}</Text>
                   <Text style={{ fontSize: 11, color: colors.textMuted }}>{relativeTime(c.createdAt)}</Text>
                 </View>

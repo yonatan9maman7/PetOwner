@@ -9,7 +9,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
-import { useTranslation, type TranslationKey } from "../../i18n";
+import { useTranslation, type TranslationKey, rowDirectionForAppLayout } from "../../i18n";
 import { useTheme } from "../../theme/ThemeContext";
 
 /** Kept in sync with app.json / Account settings footer */
@@ -161,7 +161,7 @@ function QuickRow({
       onPress={onPress}
       activeOpacity={0.6}
       style={{
-        flexDirection: isRTL ? "row-reverse" : "row",
+        flexDirection: rowDirectionForAppLayout(isRTL),
         alignItems: "center",
         paddingVertical: 14,
         paddingHorizontal: 18,
@@ -236,7 +236,7 @@ function FaqItem({
         accessibilityRole="button"
         accessibilityState={{ expanded: isOpen }}
         style={{
-          flexDirection: isRTL ? "row-reverse" : "row",
+          flexDirection: rowDirectionForAppLayout(isRTL),
           alignItems: "flex-start",
           paddingVertical: 14,
           paddingHorizontal: 18,
@@ -298,7 +298,7 @@ export function HelpCenterScreen() {
     >
       <View
         style={{
-          flexDirection: isRTL ? "row-reverse" : "row",
+          flexDirection: rowDirectionForAppLayout(isRTL),
           alignItems: "center",
           paddingHorizontal: 16,
           paddingVertical: 12,

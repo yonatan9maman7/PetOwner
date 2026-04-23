@@ -1,6 +1,6 @@
 import { View, Text, Pressable } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { useTranslation } from "../../../../i18n";
+import { useTranslation, rowDirectionForAppLayout } from "../../../../i18n";
 
 interface EmergencyStripProps {
   onPress: () => void;
@@ -13,7 +13,7 @@ export function EmergencyStrip({ onPress }: EmergencyStripProps) {
     <Pressable
       onPress={onPress}
       style={{
-        flexDirection: isRTL ? "row-reverse" : "row",
+        flexDirection: rowDirectionForAppLayout(isRTL),
         alignItems: "center",
         marginHorizontal: 20,
         marginTop: 14,

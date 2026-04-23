@@ -11,11 +11,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import { useNotificationStore } from "../../store/notificationStore";
-import {
-  resolveNotificationApiText,
-  useTranslation,
-  type TranslationKey,
-} from "../../i18n";
+import { resolveNotificationApiText, useTranslation, type TranslationKey, rowDirectionForAppLayout } from "../../i18n";
 import { useTheme } from "../../theme/ThemeContext";
 import type { NotificationDto } from "../../types/api";
 import { parseUtcTimestamp } from "../../utils/parseUtcTimestamp";
@@ -94,7 +90,7 @@ export function NotificationsScreen() {
       {/* Header */}
       <View
         style={{
-          flexDirection: isRTL ? "row-reverse" : "row",
+          flexDirection: rowDirectionForAppLayout(isRTL),
           alignItems: "center",
           justifyContent: "space-between",
           paddingHorizontal: 20,
@@ -177,7 +173,7 @@ export function NotificationsScreen() {
             <Pressable
               onPress={() => handlePress(item)}
               style={{
-                flexDirection: isRTL ? "row-reverse" : "row",
+                flexDirection: rowDirectionForAppLayout(isRTL),
                 alignItems: "flex-start",
                 paddingHorizontal: 20,
                 paddingVertical: 14,
@@ -200,7 +196,7 @@ export function NotificationsScreen() {
               <View style={{ flex: 1 }}>
                 <View
                   style={{
-                    flexDirection: isRTL ? "row-reverse" : "row",
+                    flexDirection: rowDirectionForAppLayout(isRTL),
                     alignItems: "center",
                     justifyContent: "space-between",
                     marginBottom: 2,
@@ -220,7 +216,7 @@ export function NotificationsScreen() {
                   </Text>
                   <View
                     style={{
-                      flexDirection: isRTL ? "row-reverse" : "row",
+                      flexDirection: rowDirectionForAppLayout(isRTL),
                       alignItems: "center",
                       gap: 6,
                     }}

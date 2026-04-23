@@ -16,7 +16,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import axios from "axios";
 import { adminApi } from "../../api/client";
-import { useTranslation } from "../../i18n";
+import { useTranslation, rowDirectionForAppLayout } from "../../i18n";
 import { useTheme } from "../../theme/ThemeContext";
 import type {
   AdminStatsDto,
@@ -411,7 +411,7 @@ export function AdminDashboardScreen() {
       {/* ─── Header ─── */}
       <View
         style={{
-          flexDirection: isRTL ? "row-reverse" : "row",
+          flexDirection: rowDirectionForAppLayout(isRTL),
           alignItems: "center",
           justifyContent: "space-between",
           paddingHorizontal: 20,
@@ -447,7 +447,7 @@ export function AdminDashboardScreen() {
             alignItems: "center",
             height: 52,
             gap: 8,
-            flexDirection: isRTL ? "row-reverse" : "row",
+            flexDirection: rowDirectionForAppLayout(isRTL),
           }}
         >
           {tabs.map((tab) => {
@@ -457,7 +457,7 @@ export function AdminDashboardScreen() {
                 key={tab.key}
                 onPress={() => setActiveTab(tab.key)}
                 style={{
-                  flexDirection: isRTL ? "row-reverse" : "row",
+                  flexDirection: rowDirectionForAppLayout(isRTL),
                   alignItems: "center",
                   gap: 6,
                   height: 36,
@@ -632,7 +632,7 @@ export function AdminDashboardScreen() {
             backgroundColor: colors.primary,
             borderRadius: 16,
             padding: 20,
-            flexDirection: isRTL ? "row-reverse" : "row",
+            flexDirection: rowDirectionForAppLayout(isRTL),
             alignItems: "center",
             gap: 14,
             marginBottom: 4,
@@ -750,7 +750,7 @@ export function AdminDashboardScreen() {
                 onPress={item.fn}
                 disabled={actionLoading === item.key}
                 style={{
-                  flexDirection: isRTL ? "row-reverse" : "row",
+                  flexDirection: rowDirectionForAppLayout(isRTL),
                   alignItems: "center",
                   gap: 12,
                   backgroundColor: colors.surface,
@@ -799,7 +799,7 @@ export function AdminDashboardScreen() {
         <View style={{ paddingHorizontal: 16, paddingBottom: 8 }}>
           <View
             style={{
-              flexDirection: isRTL ? "row-reverse" : "row",
+              flexDirection: rowDirectionForAppLayout(isRTL),
               alignItems: "center",
               backgroundColor: colors.surface,
               borderRadius: 12,
@@ -876,7 +876,7 @@ export function AdminDashboardScreen() {
         {/* Top row: avatar + info + badges */}
         <View
           style={{
-            flexDirection: isRTL ? "row-reverse" : "row",
+            flexDirection: rowDirectionForAppLayout(isRTL),
             alignItems: "center",
             gap: 10,
           }}
@@ -896,7 +896,7 @@ export function AdminDashboardScreen() {
           <View style={{ flex: 1 }}>
             <View
               style={{
-                flexDirection: isRTL ? "row-reverse" : "row",
+                flexDirection: rowDirectionForAppLayout(isRTL),
                 alignItems: "center",
                 justifyContent: "space-between",
               }}
@@ -915,7 +915,7 @@ export function AdminDashboardScreen() {
               </Text>
               <View
                 style={{
-                  flexDirection: isRTL ? "row-reverse" : "row",
+                  flexDirection: rowDirectionForAppLayout(isRTL),
                   gap: 4,
                   marginStart: 8,
                 }}
@@ -945,7 +945,7 @@ export function AdminDashboardScreen() {
         {/* Info row */}
         <View
           style={{
-            flexDirection: isRTL ? "row-reverse" : "row",
+            flexDirection: rowDirectionForAppLayout(isRTL),
             alignItems: "center",
             gap: 12,
             marginTop: 8,
@@ -955,7 +955,7 @@ export function AdminDashboardScreen() {
           {user.phone ? (
             <View
               style={{
-                flexDirection: isRTL ? "row-reverse" : "row",
+                flexDirection: rowDirectionForAppLayout(isRTL),
                 alignItems: "center",
                 gap: 3,
               }}
@@ -968,7 +968,7 @@ export function AdminDashboardScreen() {
           ) : null}
           <View
             style={{
-              flexDirection: isRTL ? "row-reverse" : "row",
+              flexDirection: rowDirectionForAppLayout(isRTL),
               alignItems: "center",
               gap: 3,
             }}
@@ -1000,7 +1000,7 @@ export function AdminDashboardScreen() {
         ) : (
           <View
             style={{
-              flexDirection: isRTL ? "row-reverse" : "row",
+              flexDirection: rowDirectionForAppLayout(isRTL),
               flexWrap: "wrap",
               gap: 6,
               marginTop: 10,
@@ -1077,7 +1077,7 @@ export function AdminDashboardScreen() {
         <View style={{ paddingHorizontal: 16, paddingBottom: 8 }}>
           <View
             style={{
-              flexDirection: isRTL ? "row-reverse" : "row",
+              flexDirection: rowDirectionForAppLayout(isRTL),
               alignItems: "center",
               backgroundColor: colors.surface,
               borderRadius: 12,
@@ -1299,7 +1299,7 @@ export function AdminDashboardScreen() {
             setExpandedProvider(isExpanded ? null : provider.userId)
           }
           style={{
-            flexDirection: isRTL ? "row-reverse" : "row",
+            flexDirection: rowDirectionForAppLayout(isRTL),
             alignItems: "center",
             padding: 14,
             gap: 12,
@@ -1349,7 +1349,7 @@ export function AdminDashboardScreen() {
           </View>
           <View
             style={{
-              flexDirection: isRTL ? "row-reverse" : "row",
+              flexDirection: rowDirectionForAppLayout(isRTL),
               flexWrap: "wrap",
               gap: 4,
               maxWidth: 120,
@@ -1530,7 +1530,7 @@ export function AdminDashboardScreen() {
         <View style={{ padding: 14, gap: 8 }}>
           <View
             style={{
-              flexDirection: isRTL ? "row-reverse" : "row",
+              flexDirection: rowDirectionForAppLayout(isRTL),
               alignItems: "center",
               gap: 8,
             }}
@@ -1573,7 +1573,7 @@ export function AdminDashboardScreen() {
             </Text>
           </View>
 
-          <View style={{ flexDirection: isRTL ? "row-reverse" : "row", gap: 6, alignItems: "center" }}>
+          <View style={{ flexDirection: rowDirectionForAppLayout(isRTL), gap: 6, alignItems: "center" }}>
             <Ionicons name="person-outline" size={14} color={colors.textMuted} />
             <Text
               style={{
@@ -1665,7 +1665,7 @@ export function AdminDashboardScreen() {
     return (
       <View
         style={{
-          flexDirection: isRTL ? "row-reverse" : "row",
+          flexDirection: rowDirectionForAppLayout(isRTL),
           alignItems: "center",
           gap: 8,
         }}
@@ -1706,7 +1706,7 @@ export function AdminDashboardScreen() {
       <Pressable
         onPress={onPress}
         style={{
-          flexDirection: isRTL ? "row-reverse" : "row",
+          flexDirection: rowDirectionForAppLayout(isRTL),
           alignItems: "center",
           gap: 4,
           backgroundColor: color + "12",

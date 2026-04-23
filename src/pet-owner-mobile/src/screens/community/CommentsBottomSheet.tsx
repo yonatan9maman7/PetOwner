@@ -15,7 +15,7 @@ import {
 import { FlashList } from "@shopify/flash-list";
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../../theme/ThemeContext";
-import { useTranslation } from "../../i18n";
+import { useTranslation, rowDirectionForAppLayout } from "../../i18n";
 import { useAuthStore } from "../../store/authStore";
 import { postsApi } from "../../api/client";
 import type { CommentDto } from "../../types/api";
@@ -278,7 +278,7 @@ export function CommentsBottomSheet({
         {/* Bubble */}
         <View style={{ flex: 1 }}>
           {/* Header */}
-          <View style={[{ flexDirection: isRTL ? "row-reverse" : "row", alignItems: "center", gap: 6, flexWrap: "wrap" }]}>
+          <View style={[{ flexDirection: rowDirectionForAppLayout(isRTL), alignItems: "center", gap: 6, flexWrap: "wrap" }]}>
             <Text style={[styles.commentAuthor, rtlText]}>{comment.userName}</Text>
             {comment.editedAt && (
               <Text style={styles.editedLabel}>· {t("edited")}</Text>
@@ -296,7 +296,7 @@ export function CommentsBottomSheet({
                 multiline
                 autoFocus
               />
-              <View style={{ flexDirection: isRTL ? "row-reverse" : "row", gap: 8 }}>
+              <View style={{ flexDirection: rowDirectionForAppLayout(isRTL), gap: 8 }}>
                 <Pressable onPress={() => setEditingId(null)}>
                   <Text style={{ color: colors.textMuted, fontSize: 13, fontWeight: "600" }}>{t("cancel")}</Text>
                 </Pressable>

@@ -17,7 +17,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import * as Location from "expo-location";
 import Animated, { FadeInDown, FadeIn } from "react-native-reanimated";
-import { useTranslation } from "../../i18n";
+import { useTranslation, rowDirectionForAppLayout } from "../../i18n";
 import { useTheme, type ThemeColors } from "../../theme/ThemeContext";
 import { triageApi } from "../../api/client";
 import type { NearbyVetDto } from "../../types/api";
@@ -145,7 +145,7 @@ export function EmergencyVetsScreen() {
           onPress={() => goToProfile(item.providerId)}
         >
           {/* Top row: avatar + info */}
-          <View style={[styles.cardRow, isRTL && styles.rowReverse]}>
+          <View style={[styles.cardRow, { flexDirection: rowDirectionForAppLayout(isRTL) }]}>
             <VetAvatar uri={item.profileImageUrl} colors={colors} />
             <View style={{ flex: 1 }}>
               <Text style={[styles.vetName, rtlText]} numberOfLines={1}>
@@ -156,15 +156,15 @@ export function EmergencyVetsScreen() {
                   {item.address}
                 </Text>
               ) : null}
-              <View style={[styles.metaRow, isRTL && styles.rowReverse]}>
-                <View style={[styles.distancePill, isRTL && styles.rowReverse]}>
+              <View style={[styles.metaRow, { flexDirection: rowDirectionForAppLayout(isRTL) }]}>
+                <View style={[styles.distancePill, { flexDirection: rowDirectionForAppLayout(isRTL) }]}>
                   <Ionicons name="location" size={13} color={colors.primary} />
                   <Text style={styles.distanceText}>
                     {item.distanceKm.toFixed(1)} {t("kmAway")}
                   </Text>
                 </View>
                 {item.averageRating > 0 && (
-                  <View style={[styles.ratingPill, isRTL && styles.rowReverse]}>
+                  <View style={[styles.ratingPill, { flexDirection: rowDirectionForAppLayout(isRTL) }]}>
                     <Ionicons name="star" size={12} color="#f59e0b" />
                     <Text style={styles.ratingText}>
                       {item.averageRating.toFixed(1)}
@@ -176,7 +176,7 @@ export function EmergencyVetsScreen() {
           </View>
 
           {/* Action row */}
-          <View style={[styles.actionRow, isRTL && styles.rowReverse]}>
+          <View style={[styles.actionRow, { flexDirection: rowDirectionForAppLayout(isRTL) }]}>
             {item.phone ? (
               <Pressable
                 style={[styles.actionBtn, { backgroundColor: colors.success + "18" }]}
@@ -217,7 +217,7 @@ export function EmergencyVetsScreen() {
 
   const ListFooter = useMemo(
     () => (
-      <Pressable onPress={goToTriage} style={[styles.triageLink, isRTL && styles.rowReverse]}>
+      <Pressable onPress={goToTriage} style={[styles.triageLink, { flexDirection: rowDirectionForAppLayout(isRTL) }]}>
         <Ionicons name="chatbubble-ellipses-outline" size={18} color={colors.primary} />
         <Text style={[styles.triageLinkText, { color: colors.primary }]}>
           {t("aiSymptomCheck")}
@@ -250,7 +250,7 @@ export function EmergencyVetsScreen() {
     <SafeAreaView edges={["top"]} style={[styles.safe, { backgroundColor: colors.background }]}>
       {/* Header */}
       <Animated.View entering={FadeIn.duration(300)} style={styles.header}>
-        <View style={[styles.headerInner, isRTL && styles.rowReverse]}>
+        <View style={[styles.headerInner, { flexDirection: rowDirectionForAppLayout(isRTL) }]}>
           <Pressable
             onPress={() => navigation.goBack()}
             style={styles.backBtn}
@@ -390,7 +390,6 @@ function createStyles(colors: ThemeColors) {
       alignItems: "center",
       justifyContent: "center",
     },
-    rowReverse: { flexDirection: "row-reverse" },
     center: {
       flex: 1,
       alignItems: "center",

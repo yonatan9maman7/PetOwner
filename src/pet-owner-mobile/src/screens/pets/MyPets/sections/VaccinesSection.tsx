@@ -11,7 +11,7 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import * as DocumentPicker from "expo-document-picker";
 import * as ImagePicker from "expo-image-picker";
-import { useTranslation, type TranslationKey } from "../../../../i18n";
+import { useTranslation, type TranslationKey, rowDirectionForAppLayout } from "../../../../i18n";
 import { useTheme } from "../../../../theme/ThemeContext";
 import { medicalApi, filesApi } from "../../../../api/client";
 import { DatePickerField } from "../../../../components/DatePickerField";
@@ -265,7 +265,7 @@ export function VaccinesSection({ petId, reloadNonce = 0 }: { petId: string; rel
                 <View
                   key={vacKey}
                   style={{
-                    flexDirection: isRTL ? "row-reverse" : "row",
+                    flexDirection: rowDirectionForAppLayout(isRTL),
                     alignItems: "center",
                     backgroundColor: colors.surface,
                     padding: 14,
@@ -361,7 +361,7 @@ export function VaccinesSection({ petId, reloadNonce = 0 }: { petId: string; rel
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={{
               gap: 8,
-              flexDirection: isRTL ? "row-reverse" : "row",
+              flexDirection: rowDirectionForAppLayout(isRTL),
             }}
           >
             {VACCINE_NAME_OPTIONS.map((name) => (
@@ -415,7 +415,7 @@ export function VaccinesSection({ petId, reloadNonce = 0 }: { petId: string; rel
             onPress={pickVaccineDoc}
             disabled={docUploading}
             style={{
-              flexDirection: isRTL ? "row-reverse" : "row",
+              flexDirection: rowDirectionForAppLayout(isRTL),
               alignItems: "center",
               gap: 8,
               paddingVertical: 10,
@@ -487,7 +487,7 @@ export function VaccinesSection({ petId, reloadNonce = 0 }: { petId: string; rel
             setShowForm(true);
           }}
           style={{
-            flexDirection: isRTL ? "row-reverse" : "row",
+            flexDirection: rowDirectionForAppLayout(isRTL),
             alignItems: "center",
             justifyContent: "center",
             gap: 8,

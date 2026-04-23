@@ -11,7 +11,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation, useRoute, useFocusEffect } from "@react-navigation/native";
-import { useTranslation } from "../../i18n";
+import { useTranslation, rowDirectionForAppLayout } from "../../i18n";
 import { useTheme } from "../../theme/ThemeContext";
 import { useAuthStore } from "../../store/authStore";
 import { useBookingsStore } from "../../store/bookingsStore";
@@ -223,7 +223,7 @@ export function MyBookingsScreen() {
       >
         <View
           style={{
-            flexDirection: isRTL ? "row-reverse" : "row",
+            flexDirection: rowDirectionForAppLayout(isRTL),
             justifyContent: "space-between",
             alignItems: "center",
             marginBottom: 10,
@@ -256,7 +256,7 @@ export function MyBookingsScreen() {
 
         <View
           style={{
-            flexDirection: isRTL ? "row-reverse" : "row",
+            flexDirection: rowDirectionForAppLayout(isRTL),
             alignItems: "center",
             gap: 6,
             marginBottom: 6,
@@ -280,7 +280,7 @@ export function MyBookingsScreen() {
 
         <View
           style={{
-            flexDirection: isRTL ? "row-reverse" : "row",
+            flexDirection: rowDirectionForAppLayout(isRTL),
             alignItems: "center",
             gap: 6,
             marginBottom: 6,
@@ -299,7 +299,7 @@ export function MyBookingsScreen() {
 
         <View
           style={{
-            flexDirection: isRTL ? "row-reverse" : "row",
+            flexDirection: rowDirectionForAppLayout(isRTL),
             justifyContent: "space-between",
             alignItems: "center",
             marginTop: 8,
@@ -410,7 +410,7 @@ export function MyBookingsScreen() {
       >
         <View
           style={{
-            flexDirection: isRTL ? "row-reverse" : "row",
+            flexDirection: rowDirectionForAppLayout(isRTL),
             justifyContent: "space-between",
             alignItems: "center",
             marginBottom: 10,
@@ -453,7 +453,7 @@ export function MyBookingsScreen() {
 
         <View
           style={{
-            flexDirection: isRTL ? "row-reverse" : "row",
+            flexDirection: rowDirectionForAppLayout(isRTL),
             alignItems: "center",
             gap: 6,
             marginBottom: 6,
@@ -477,7 +477,7 @@ export function MyBookingsScreen() {
 
         <View
           style={{
-            flexDirection: isRTL ? "row-reverse" : "row",
+            flexDirection: rowDirectionForAppLayout(isRTL),
             alignItems: "center",
             gap: 6,
             marginBottom: 6,
@@ -497,7 +497,7 @@ export function MyBookingsScreen() {
         {item.ownerPhone ? (
           <View
             style={{
-              flexDirection: isRTL ? "row-reverse" : "row",
+              flexDirection: rowDirectionForAppLayout(isRTL),
               alignItems: "center",
               gap: 6,
               marginBottom: 6,
@@ -512,7 +512,7 @@ export function MyBookingsScreen() {
 
         <View
           style={{
-            flexDirection: isRTL ? "row-reverse" : "row",
+            flexDirection: rowDirectionForAppLayout(isRTL),
             justifyContent: "space-between",
             alignItems: "center",
             marginTop: 8,
@@ -527,7 +527,7 @@ export function MyBookingsScreen() {
           {isPending && (
             <View
               style={{
-                flexDirection: isRTL ? "row-reverse" : "row",
+                flexDirection: rowDirectionForAppLayout(isRTL),
                 gap: 8,
               }}
             >
@@ -615,7 +615,7 @@ export function MyBookingsScreen() {
       {/* Header */}
       <View
         style={{
-          flexDirection: isRTL ? "row-reverse" : "row",
+          flexDirection: rowDirectionForAppLayout(isRTL),
           alignItems: "center",
           paddingHorizontal: 20,
           paddingVertical: 14,
@@ -653,7 +653,7 @@ export function MyBookingsScreen() {
       {showTabs && (
         <View
           style={{
-            flexDirection: isRTL ? "row-reverse" : "row",
+            flexDirection: rowDirectionForAppLayout(isRTL),
             paddingHorizontal: 20,
             paddingTop: 12,
             paddingBottom: 4,

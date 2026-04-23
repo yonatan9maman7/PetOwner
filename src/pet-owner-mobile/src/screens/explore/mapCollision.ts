@@ -16,12 +16,18 @@ function isFiniteCoord(lat: unknown, lng: unknown): boolean {
   return Number.isFinite(la) && Number.isFinite(lo);
 }
 
-/** ~1 m precision so providers in the same building usually share one group. */
+/**
+ * ~11 m bucket so neighbors at the same address (apartment building, plaza, office
+ * block) cluster into a single paw with a count badge; tapping the cluster opens the
+ * collocated-chooser modal. Precision of 4 decimal places ≈ 11 m at the equator,
+ * which matches the real-world "same address" intuition without over-clustering
+ * nearby but distinct businesses.
+ */
 export function groupPinsForMapMarkers(pins: MapPinDto[]): ExploreMapMarkerItem[] {
   const buckets = new Map<string, MapPinDto[]>();
   for (const p of pins) {
     if (!isFiniteCoord(p.latitude, p.longitude)) continue;
-    const key = `${Number(p.latitude).toFixed(5)},${Number(p.longitude).toFixed(5)}`;
+    const key = `${Number(p.latitude).toFixed(4)},${Number(p.longitude).toFixed(4)}`;
     const list = buckets.get(key);
     if (list) list.push(p);
     else buckets.set(key, [p]);

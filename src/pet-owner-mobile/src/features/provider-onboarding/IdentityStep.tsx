@@ -12,7 +12,7 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { useFormContext } from "react-hook-form";
 import * as ImagePicker from "expo-image-picker";
-import { useTranslation } from "../../i18n";
+import { useTranslation, rowDirectionForAppLayout } from "../../i18n";
 import { useTheme } from "../../theme/ThemeContext";
 import { filesApi, providerApi } from "../../api/client";
 import { AddressMapModal } from "./AddressMapModal";
@@ -92,7 +92,7 @@ export function IdentityStep() {
       {/* Provider Type */}
       <View>
         <FieldLabel text={t("onbProviderType")} isRTL={isRTL} />
-        <View style={{ flexDirection: isRTL ? "row-reverse" : "row", gap: 10 }}>
+        <View style={{ flexDirection: rowDirectionForAppLayout(isRTL), gap: 10 }}>
           <TypeChip
             label={t("onbIndividual")}
             active={providerType === 0}
@@ -196,7 +196,7 @@ export function IdentityStep() {
           onPress={handleGenerateBio}
           disabled={!aiNotes.trim() || generatingBio}
           style={{
-            flexDirection: isRTL ? "row-reverse" : "row",
+            flexDirection: rowDirectionForAppLayout(isRTL),
             alignItems: "center",
             justifyContent: "center",
             gap: 8,
@@ -292,7 +292,7 @@ export function IdentityStep() {
         <Pressable
           onPress={() => setShowMap(true)}
           style={{
-            flexDirection: isRTL ? "row-reverse" : "row",
+            flexDirection: rowDirectionForAppLayout(isRTL),
             alignItems: "center",
             backgroundColor: colors.surface,
             borderRadius: 14,

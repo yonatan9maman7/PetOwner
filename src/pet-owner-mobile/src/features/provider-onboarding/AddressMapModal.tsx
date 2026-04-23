@@ -3,7 +3,7 @@ import { View, Text, TextInput, Pressable, ScrollView, Modal } from "react-nativ
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { MapViewWrapper, MarkerWrapper } from "../../components/MapViewWrapper";
-import { useTranslation } from "../../i18n";
+import { useTranslation, rowDirectionForAppLayout } from "../../i18n";
 import { useTheme } from "../../theme/ThemeContext";
 import { DEFAULT_LAT, DEFAULT_LNG } from "./constants";
 import { CityAutocompleteInput } from "../../components/shared/CityAutocompleteInput";
@@ -81,7 +81,7 @@ export function AddressMapModal({ visible, onClose, onConfirm, initial }: Props)
         >
           <View
             style={{
-              flexDirection: isRTL ? "row-reverse" : "row",
+              flexDirection: rowDirectionForAppLayout(isRTL),
               alignItems: "center",
               paddingHorizontal: 16,
               paddingVertical: 12,

@@ -28,7 +28,7 @@ import {
 import { useAuthStore } from "../../store/authStore";
 import { usePetsStore } from "../../store/petsStore";
 import { filesApi } from "../../api/client";
-import { useTranslation } from "../../i18n";
+import { useTranslation, rowDirectionForAppLayout } from "../../i18n";
 import { useTheme } from "../../theme/ThemeContext";
 import { PetSpecies } from "../../types/api";
 import type { PetDto } from "../../types/api";
@@ -279,7 +279,7 @@ export function ReportLostScreen() {
       >
         <View
           style={{
-            flexDirection: isRTL ? "row-reverse" : "row",
+            flexDirection: rowDirectionForAppLayout(isRTL),
             alignItems: "center",
             paddingHorizontal: 20,
             paddingVertical: 14,
@@ -350,7 +350,7 @@ export function ReportLostScreen() {
         {/* ── Header ── */}
         <View
           style={{
-            flexDirection: isRTL ? "row-reverse" : "row",
+            flexDirection: rowDirectionForAppLayout(isRTL),
             alignItems: "center",
             paddingHorizontal: 20,
             height: 56,
@@ -409,7 +409,7 @@ export function ReportLostScreen() {
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={{
                 gap: 10,
-                flexDirection: isRTL ? "row-reverse" : "row",
+                flexDirection: rowDirectionForAppLayout(isRTL),
                 paddingBottom: 8,
               }}
             >
@@ -478,7 +478,7 @@ export function ReportLostScreen() {
             <View style={{ position: "relative", zIndex: 50 }}>
               <View
                 style={{
-                  flexDirection: isRTL ? "row-reverse" : "row",
+                  flexDirection: rowDirectionForAppLayout(isRTL),
                   alignItems: "center",
                   backgroundColor: colors.surface,
                   borderRadius: 12,
@@ -548,7 +548,7 @@ export function ReportLostScreen() {
                         onPress={() => pickSuggestion(item)}
                         activeOpacity={0.7}
                         style={{
-                          flexDirection: isRTL ? "row-reverse" : "row",
+                          flexDirection: rowDirectionForAppLayout(isRTL),
                           alignItems: "center",
                           gap: 10,
                           paddingHorizontal: 14,
@@ -700,7 +700,7 @@ export function ReportLostScreen() {
             {imageUri ? (
               <View
                 style={{
-                  flexDirection: isRTL ? "row-reverse" : "row",
+                  flexDirection: rowDirectionForAppLayout(isRTL),
                   alignItems: "center",
                   gap: 12,
                 }}
@@ -712,7 +712,7 @@ export function ReportLostScreen() {
                 <Pressable
                   onPress={() => setImageUri(null)}
                   style={{
-                    flexDirection: isRTL ? "row-reverse" : "row",
+                    flexDirection: rowDirectionForAppLayout(isRTL),
                     alignItems: "center",
                     gap: 6,
                   }}
@@ -727,7 +727,7 @@ export function ReportLostScreen() {
               <Pressable
                 onPress={pickImage}
                 style={{
-                  flexDirection: isRTL ? "row-reverse" : "row",
+                  flexDirection: rowDirectionForAppLayout(isRTL),
                   alignItems: "center",
                   gap: 10,
                   backgroundColor: colors.surface,

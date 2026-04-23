@@ -14,7 +14,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import { useAuthStore } from "../../store/authStore";
 import { authApi } from "../../api/client";
-import { useTranslation } from "../../i18n";
+import { useTranslation, rowDirectionForAppLayout } from "../../i18n";
 import { useTheme } from "../../theme/ThemeContext";
 import * as biometricService from "../../services/biometricService";
 
@@ -59,7 +59,7 @@ export function ChangePasswordScreen() {
         {/* Header */}
         <View
           style={{
-            flexDirection: isRTL ? "row-reverse" : "row",
+            flexDirection: rowDirectionForAppLayout(isRTL),
             alignItems: "center",
             paddingHorizontal: 16,
             paddingVertical: 12,
@@ -191,7 +191,7 @@ export function ChangePasswordScreen() {
               {maskedEmail ? (
                 <View
                   style={{
-                    flexDirection: isRTL ? "row-reverse" : "row",
+                    flexDirection: rowDirectionForAppLayout(isRTL),
                     alignItems: "center",
                     gap: 10,
                     backgroundColor: colors.surface,

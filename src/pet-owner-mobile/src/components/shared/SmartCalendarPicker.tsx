@@ -4,7 +4,7 @@ import { Calendar } from "react-native-calendars";
 import type { DateData, MarkedDates } from "react-native-calendars/src/types";
 import type { PublicAvailabilitySlotDto } from "../../types/api";
 import { useTheme } from "../../theme/ThemeContext";
-import { useTranslation } from "../../i18n";
+import { useTranslation, rowDirectionForAppLayout } from "../../i18n";
 
 interface Props {
   /** Provider's availability slots from ProviderPublicProfileDto.availabilitySlots */
@@ -159,7 +159,7 @@ export function SmartCalendarPicker({ availabilitySlots, selectedDate, onDateSel
             paddingHorizontal: 16,
             paddingVertical: 10,
             backgroundColor: colors.surfaceSecondary,
-            flexDirection: isRTL ? "row-reverse" : "row",
+            flexDirection: rowDirectionForAppLayout(isRTL),
             flexWrap: "wrap",
             gap: 6,
           }}

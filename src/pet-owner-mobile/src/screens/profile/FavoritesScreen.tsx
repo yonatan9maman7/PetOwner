@@ -11,7 +11,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
-import { useTranslation } from "../../i18n";
+import { useTranslation, rowDirectionForAppLayout } from "../../i18n";
 import { useTheme, type ThemeColors } from "../../theme/ThemeContext";
 import { useFavoritesStore } from "../../store/favoritesStore";
 import { ListSkeleton, ListEmptyState, InlineError } from "../../components/shared";
@@ -103,7 +103,7 @@ export function FavoritesScreen() {
           <ProviderAvatar uri={item.profileImageUrl} />
 
           <View style={s.cardBody}>
-            <View style={[s.nameRow, isRTL && s.rowReverse]}>
+            <View style={[s.nameRow, { flexDirection: rowDirectionForAppLayout(isRTL) }]}>
               <Text
                 style={[styles.name, rtlText, { flex: 1 }]}
                 numberOfLines={1}
@@ -129,9 +129,9 @@ export function FavoritesScreen() {
               {item.services}
             </Text>
 
-            <View style={[s.metaRow, isRTL && s.rowReverse]}>
+            <View style={[s.metaRow, { flexDirection: rowDirectionForAppLayout(isRTL) }]}>
               {item.averageRating > 0 && (
-                <View style={[s.ratingPill, isRTL && s.rowReverse]}>
+                <View style={[s.ratingPill, { flexDirection: rowDirectionForAppLayout(isRTL) }]}>
                   <Ionicons name="star" size={13} color="#F59E0B" />
                   <Text style={styles.rating}>
                     {item.averageRating.toFixed(1)}
@@ -142,7 +142,7 @@ export function FavoritesScreen() {
                 </View>
               )}
 
-              <View style={[s.pricePill, isRTL && s.rowReverse]}>
+              <View style={[s.pricePill, { flexDirection: rowDirectionForAppLayout(isRTL) }]}>
                 <Text style={styles.price}>₪{item.minRate}</Text>
               </View>
 
@@ -193,7 +193,7 @@ export function FavoritesScreen() {
       style={[s.safe, { backgroundColor: colors.background }]}
     >
       {/* Header */}
-      <View style={[s.header, isRTL && s.rowReverse]}>
+      <View style={[s.header, { flexDirection: rowDirectionForAppLayout(isRTL) }]}>
         <Pressable
           onPress={() => navigation.goBack()}
           hitSlop={12}
@@ -356,9 +356,6 @@ const s = StyleSheet.create({
     width: 6,
     height: 6,
     borderRadius: 3,
-  },
-  rowReverse: {
-    flexDirection: "row-reverse",
   },
   errorWrap: {
     paddingHorizontal: 20,

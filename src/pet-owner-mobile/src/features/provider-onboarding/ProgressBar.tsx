@@ -1,5 +1,5 @@
 import { View, Text } from "react-native";
-import { useTranslation, type TranslationKey } from "../../i18n";
+import { useTranslation, type TranslationKey, rowDirectionForAppLayout } from "../../i18n";
 import { useTheme } from "../../theme/ThemeContext";
 
 const STEP_LABELS: Record<number, TranslationKey> = {
@@ -24,7 +24,7 @@ export function ProgressBar({ currentIndex, steps }: Props) {
     <View style={{ paddingHorizontal: 24, paddingTop: 12, paddingBottom: 8 }}>
       <View
         style={{
-          flexDirection: isRTL ? "row-reverse" : "row",
+          flexDirection: rowDirectionForAppLayout(isRTL),
           alignItems: "center",
           gap: 6,
         }}

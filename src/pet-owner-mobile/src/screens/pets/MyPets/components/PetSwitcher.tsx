@@ -1,3 +1,4 @@
+import { rowDirectionForAppLayout } from "../../../../i18n";
 import { View, Text, Pressable, ScrollView } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import type { FlatList } from "react-native";
@@ -33,7 +34,7 @@ export function PetSwitcher({
       horizontal
       showsHorizontalScrollIndicator={false}
       contentContainerStyle={{
-        flexDirection: isRTL ? "row-reverse" : "row",
+        flexDirection: rowDirectionForAppLayout(isRTL),
         justifyContent: pets.length <= 2 ? "center" : undefined,
         flexGrow: pets.length <= 2 ? 1 : undefined,
         gap: 8,

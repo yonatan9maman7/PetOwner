@@ -3,7 +3,7 @@ import { View, Text, Pressable, ScrollView, KeyboardAvoidingView, Platform } fro
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useTranslation, type TranslationKey } from "../../../../i18n";
+import { useTranslation, type TranslationKey, rowDirectionForAppLayout } from "../../../../i18n";
 import { useTheme } from "../../../../theme/ThemeContext";
 import type { PetDto } from "../../../../types/api";
 import { getSpeciesEmoji, TILE_CONFIG, SECTION_SCROLL_TAB_BAR_CLEARANCE } from "../constants";
@@ -58,7 +58,7 @@ export function SectionShell({
         >
           <View
             style={{
-              flexDirection: isRTL ? "row-reverse" : "row",
+              flexDirection: rowDirectionForAppLayout(isRTL),
               alignItems: "center",
               paddingHorizontal: 20,
               paddingTop: 12,
@@ -107,7 +107,7 @@ export function SectionShell({
             </Text>
             <View
               style={{
-                flexDirection: isRTL ? "row-reverse" : "row",
+                flexDirection: rowDirectionForAppLayout(isRTL),
                 alignItems: "center",
                 gap: 6,
                 marginTop: 6,
@@ -133,7 +133,7 @@ export function SectionShell({
 
         <View
           style={{
-            flexDirection: isRTL ? "row-reverse" : "row",
+            flexDirection: rowDirectionForAppLayout(isRTL),
             justifyContent: "flex-end",
             paddingHorizontal: 16,
             paddingVertical: 8,

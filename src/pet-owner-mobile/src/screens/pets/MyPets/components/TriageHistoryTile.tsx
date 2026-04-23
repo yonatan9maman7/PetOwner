@@ -1,6 +1,6 @@
 import { View, Text, Pressable } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { useTranslation } from "../../../../i18n";
+import { useTranslation, rowDirectionForAppLayout } from "../../../../i18n";
 
 interface TriageHistoryTileProps {
   onPress: () => void;
@@ -31,7 +31,7 @@ export function TriageHistoryTile({ onPress, disabled }: TriageHistoryTileProps)
         style={{
           paddingVertical: 18,
           paddingHorizontal: 20,
-          flexDirection: isRTL ? "row-reverse" : "row",
+          flexDirection: rowDirectionForAppLayout(isRTL),
           alignItems: "center",
           gap: 14,
           opacity: disabled ? 0.5 : 1,

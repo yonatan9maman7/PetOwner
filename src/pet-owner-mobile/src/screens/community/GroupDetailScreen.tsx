@@ -12,7 +12,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation, useRoute, useFocusEffect } from "@react-navigation/native";
 import { useAuthStore } from "../../store/authStore";
-import { useTranslation } from "../../i18n";
+import { useTranslation, rowDirectionForAppLayout } from "../../i18n";
 import { useTheme } from "../../theme/ThemeContext";
 import { communityApi } from "../../api/client";
 import type {
@@ -379,7 +379,7 @@ export function GroupDetailScreen() {
       >
         <View
           style={{
-            flexDirection: isRTL ? "row-reverse" : "row",
+            flexDirection: rowDirectionForAppLayout(isRTL),
             alignItems: "center",
             gap: 14,
           }}
@@ -458,7 +458,7 @@ export function GroupDetailScreen() {
             />
             <View
               style={{
-                flexDirection: isRTL ? "row-reverse" : "row",
+                flexDirection: rowDirectionForAppLayout(isRTL),
                 justifyContent: "flex-end",
                 alignItems: "center",
                 gap: 12,
@@ -507,7 +507,7 @@ export function GroupDetailScreen() {
           <Pressable
             onPress={() => setComposerOpen(true)}
             style={{
-              flexDirection: isRTL ? "row-reverse" : "row",
+              flexDirection: rowDirectionForAppLayout(isRTL),
               alignItems: "center",
               gap: 12,
             }}
@@ -545,7 +545,7 @@ export function GroupDetailScreen() {
       {/* Header */}
       <View
         style={{
-          flexDirection: isRTL ? "row-reverse" : "row",
+          flexDirection: rowDirectionForAppLayout(isRTL),
           alignItems: "center",
           height: 56,
           paddingHorizontal: 20,

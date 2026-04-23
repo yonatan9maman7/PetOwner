@@ -14,7 +14,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import * as Notifications from "expo-notifications";
-import { useTranslation } from "../../i18n";
+import { useTranslation, rowDirectionForAppLayout } from "../../i18n";
 import { useTheme } from "../../theme/ThemeContext";
 import {
   useNotificationPrefsStore,
@@ -160,7 +160,7 @@ export function NotificationSettingsScreen() {
       {/* Header */}
       <View
         style={{
-          flexDirection: isRTL ? "row-reverse" : "row",
+          flexDirection: rowDirectionForAppLayout(isRTL),
           alignItems: "center",
           justifyContent: "space-between",
           paddingHorizontal: 20,
@@ -203,7 +203,7 @@ export function NotificationSettingsScreen() {
               borderRadius: 12,
               padding: 16,
               marginBottom: 16,
-              flexDirection: isRTL ? "row-reverse" : "row",
+              flexDirection: rowDirectionForAppLayout(isRTL),
               alignItems: "flex-start",
               gap: 12,
             }}
@@ -254,7 +254,7 @@ export function NotificationSettingsScreen() {
             <View
               key={pref.key}
               style={{
-                flexDirection: isRTL ? "row-reverse" : "row",
+                flexDirection: rowDirectionForAppLayout(isRTL),
                 alignItems: "center",
                 paddingHorizontal: 20,
                 paddingVertical: 16,

@@ -1,7 +1,7 @@
 import { View, Text, TextInput, Pressable, ScrollView, Switch } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useFormContext } from "react-hook-form";
-import { useTranslation } from "../../i18n";
+import { useTranslation, rowDirectionForAppLayout } from "../../i18n";
 import { useTheme } from "../../theme/ThemeContext";
 import { servicesForOnboarding } from "./constants";
 import { FieldLabel } from "./FieldLabel";
@@ -62,7 +62,7 @@ export function ServicesStep() {
             <Pressable
               onPress={() => toggle(key)}
               style={{
-                flexDirection: isRTL ? "row-reverse" : "row",
+                flexDirection: rowDirectionForAppLayout(isRTL),
                 alignItems: "center",
                 gap: 12,
               }}
@@ -95,7 +95,7 @@ export function ServicesStep() {
                 <FieldLabel text={t("priceLabel")} isRTL={isRTL} required variant="small" />
                 <View
                   style={{
-                    flexDirection: isRTL ? "row-reverse" : "row",
+                    flexDirection: rowDirectionForAppLayout(isRTL),
                     alignItems: "center",
                     gap: 8,
                   }}

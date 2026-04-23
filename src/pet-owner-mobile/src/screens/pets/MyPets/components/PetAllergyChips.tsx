@@ -1,6 +1,6 @@
 import { View, Text } from "react-native";
 import type { PetDto } from "../../../../types/api";
-import { useTranslation, type TranslationKey } from "../../../../i18n";
+import { useTranslation, type TranslationKey, rowDirectionForAppLayout } from "../../../../i18n";
 import { ALLERGY_LABEL_I18N } from "../../addPetHelpers";
 
 interface PetAllergyChipsProps {
@@ -36,7 +36,7 @@ export function PetAllergyChips({ pet, isRTL, surfaceColor, borderLight }: PetAl
         borderTopColor: borderLight,
         paddingHorizontal: 20,
         paddingVertical: 10,
-        flexDirection: isRTL ? "row-reverse" : "row",
+        flexDirection: rowDirectionForAppLayout(isRTL),
         flexWrap: "wrap",
         gap: 6,
       }}

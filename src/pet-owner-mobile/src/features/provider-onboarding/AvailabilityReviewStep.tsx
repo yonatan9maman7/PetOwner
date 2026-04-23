@@ -11,7 +11,7 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useFormContext } from "react-hook-form";
-import { useTranslation } from "../../i18n";
+import { useTranslation, rowDirectionForAppLayout } from "../../i18n";
 import { useTheme } from "../../theme/ThemeContext";
 import { servicesForOnboarding, DAY_FULL_KEYS } from "./constants";
 import { FieldLabel } from "./FieldLabel";
@@ -136,7 +136,7 @@ export function AvailabilityReviewStep() {
               key={preset.labelKey}
               onPress={() => setValue("availabilitySlots", [...preset.slots])}
               style={{
-                flexDirection: isRTL ? "row-reverse" : "row",
+                flexDirection: rowDirectionForAppLayout(isRTL),
                 alignItems: "center",
                 gap: 10,
                 backgroundColor: isActive ? colors.primaryLight : colors.surface,
@@ -177,7 +177,7 @@ export function AvailabilityReviewStep() {
                 borderColor: colors.border,
               }}
             >
-              <View style={{ flexDirection: isRTL ? "row-reverse" : "row", alignItems: "flex-start", gap: 10 }}>
+              <View style={{ flexDirection: rowDirectionForAppLayout(isRTL), alignItems: "flex-start", gap: 10 }}>
                 <Text
                   style={{
                     width: 108,
@@ -195,7 +195,7 @@ export function AvailabilityReviewStep() {
                   {daySlots.length === 0 ? (
                     <View
                       style={{
-                        flexDirection: isRTL ? "row-reverse" : "row",
+                        flexDirection: rowDirectionForAppLayout(isRTL),
                         alignItems: "center",
                         justifyContent: "space-between",
                         flexWrap: "wrap",
@@ -206,7 +206,7 @@ export function AvailabilityReviewStep() {
                       <Pressable
                         onPress={() => addShiftForDay(dayIdx)}
                         style={{
-                          flexDirection: isRTL ? "row-reverse" : "row",
+                          flexDirection: rowDirectionForAppLayout(isRTL),
                           alignItems: "center",
                           gap: 4,
                           paddingVertical: 6,
@@ -225,7 +225,7 @@ export function AvailabilityReviewStep() {
                         <View
                           key={`${slotIdx}-${rowIdx}`}
                           style={{
-                            flexDirection: isRTL ? "row-reverse" : "row",
+                            flexDirection: rowDirectionForAppLayout(isRTL),
                             alignItems: "center",
                             flexWrap: "wrap",
                             gap: 8,
@@ -242,7 +242,7 @@ export function AvailabilityReviewStep() {
                               onPress={() => addShiftForDay(dayIdx)}
                               hitSlop={8}
                               style={{
-                                flexDirection: isRTL ? "row-reverse" : "row",
+                                flexDirection: rowDirectionForAppLayout(isRTL),
                                 alignItems: "center",
                                 padding: 4,
                               }}
@@ -293,7 +293,7 @@ export function AvailabilityReviewStep() {
 
       <View
         style={{
-          flexDirection: isRTL ? "row-reverse" : "row",
+          flexDirection: rowDirectionForAppLayout(isRTL),
           alignItems: "center",
           backgroundColor: colors.surface,
           borderRadius: 14,
@@ -325,7 +325,7 @@ export function AvailabilityReviewStep() {
             borderRadius: 10,
             padding: 12,
             marginBottom: 12,
-            flexDirection: isRTL ? "row-reverse" : "row",
+            flexDirection: rowDirectionForAppLayout(isRTL),
             alignItems: "flex-start",
             gap: 8,
           }}
@@ -416,7 +416,7 @@ export function AvailabilityReviewStep() {
 function SummaryRow({ label, value, isRTL }: { label: string; value: string; isRTL: boolean }) {
   const { colors } = useTheme();
   return (
-    <View style={{ flexDirection: isRTL ? "row-reverse" : "row", paddingVertical: 3, gap: 8 }}>
+    <View style={{ flexDirection: rowDirectionForAppLayout(isRTL), paddingVertical: 3, gap: 8 }}>
       <Text style={{ fontSize: 13, fontWeight: "600", color: colors.textSecondary }}>{label}:</Text>
       <Text style={{ fontSize: 13, color: colors.text, flex: 1, textAlign: isRTL ? "right" : "left" }}>{value}</Text>
     </View>
@@ -548,7 +548,7 @@ function CompactTimeChip({
                 paddingBottom: 28,
               }}
             >
-              <View style={{ flexDirection: isRTL ? "row-reverse" : "row", justifyContent: "flex-end", padding: 12 }}>
+              <View style={{ flexDirection: rowDirectionForAppLayout(isRTL), justifyContent: "flex-end", padding: 12 }}>
                 <Pressable
                   onPress={() => {
                     onChange(toHHMM(draft));
@@ -591,4 +591,5 @@ function CompactTimeChip({
     </>
   );
 }
+
 

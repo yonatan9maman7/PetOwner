@@ -18,7 +18,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import { useAuthStore } from "../../store/authStore";
-import { useTranslation } from "../../i18n";
+import { useTranslation, rowDirectionForAppLayout } from "../../i18n";
 import { useTheme } from "../../theme/ThemeContext";
 import { AuthPlaceholder } from "../../components/AuthPlaceholder";
 import { BrandedAppHeader } from "../../components/BrandedAppHeader";
@@ -435,7 +435,7 @@ export function CommunityScreen() {
   const renderTopTabs = () => (
     <View
       style={{
-        flexDirection: isRTL ? "row-reverse" : "row",
+        flexDirection: rowDirectionForAppLayout(isRTL),
         paddingHorizontal: 16,
         paddingTop: 14,
         paddingBottom: 6,
@@ -482,7 +482,7 @@ export function CommunityScreen() {
       <View
         style={[
           styles.pillsRow,
-          { flexDirection: isRTL ? "row-reverse" : "row" },
+          { flexDirection: rowDirectionForAppLayout(isRTL) },
         ]}
       >
         {(["global", "lost_and_found"] as Channel[]).map((ch) => {
@@ -527,7 +527,7 @@ export function CommunityScreen() {
             {/* Image picker row */}
             <View
               style={{
-                flexDirection: isRTL ? "row-reverse" : "row",
+                flexDirection: rowDirectionForAppLayout(isRTL),
                 alignItems: "center",
                 gap: 8,
                 marginTop: 10,
@@ -588,7 +588,7 @@ export function CommunityScreen() {
             <View
               style={[
                 styles.composerActions,
-                { flexDirection: isRTL ? "row-reverse" : "row" },
+                { flexDirection: rowDirectionForAppLayout(isRTL) },
               ]}
             >
               <Pressable
@@ -684,7 +684,7 @@ export function CommunityScreen() {
     >
       <View
         style={{
-          flexDirection: isRTL ? "row-reverse" : "row",
+          flexDirection: rowDirectionForAppLayout(isRTL),
           alignItems: "center",
           gap: 14,
         }}
@@ -728,7 +728,7 @@ export function CommunityScreen() {
           ) : null}
           <View
             style={{
-              flexDirection: isRTL ? "row-reverse" : "row",
+              flexDirection: rowDirectionForAppLayout(isRTL),
               alignItems: "center",
               gap: 6,
               marginTop: 6,
@@ -855,7 +855,7 @@ export function CommunityScreen() {
             bottom: 100,
             right: isRTL ? undefined : 20,
             left: isRTL ? 20 : undefined,
-            flexDirection: isRTL ? "row-reverse" : "row",
+            flexDirection: rowDirectionForAppLayout(isRTL),
             alignItems: "center",
             gap: 8,
             backgroundColor: colors.text,
@@ -1017,7 +1017,7 @@ export function CommunityScreen() {
 
             <View
               style={{
-                flexDirection: isRTL ? "row-reverse" : "row",
+                flexDirection: rowDirectionForAppLayout(isRTL),
                 justifyContent: "flex-end",
                 gap: 12,
                 marginTop: 4,

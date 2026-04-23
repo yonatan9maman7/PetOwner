@@ -5,7 +5,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
 import { useAuthStore } from "../../../store/authStore";
 import { useMyPetsUiStore } from "../../../store/myPetsUiStore";
-import { useTranslation } from "../../../i18n";
+import { useTranslation, rowDirectionForAppLayout } from "../../../i18n";
 import { usePetsStore } from "../../../store/petsStore";
 import { medicalApi, triageApi } from "../../../api/client";
 import * as Print from "expo-print";
@@ -185,7 +185,7 @@ export function MyPetsScreen() {
             <Pressable
               onPress={() => navigation.navigate("AddPet")}
               style={{
-                flexDirection: isRTL ? "row-reverse" : "row",
+                flexDirection: rowDirectionForAppLayout(isRTL),
                 alignItems: "center",
                 justifyContent: "center",
                 gap: 8,

@@ -25,7 +25,7 @@ import {
   BrandedAppHeader,
   BRAND_HEADER_HORIZONTAL_PAD,
 } from "../../components/BrandedAppHeader";
-import { useTranslation } from "../../i18n";
+import { useTranslation, rowDirectionForAppLayout } from "../../i18n";
 import { useAuthStore } from "../../store/authStore";
 import { usePetsStore } from "../../store/petsStore";
 import { useFavoritesStore } from "../../store/favoritesStore";
@@ -34,9 +34,15 @@ import { DatePickerField } from "../../components/DatePickerField";
 import { TimePickerField } from "../../components/TimePickerField";
 import { mapApi } from "../../api/client";
 import { ProviderType, type MapPinDto, type MapSearchFilters } from "../../types/api";
-import { MapViewWrapper, MarkerWrapper } from "../../components/MapViewWrapper";
+import { MapViewWrapper, MarkerWrapper, CircleWrapper } from "../../components/MapViewWrapper";
 import { groupPinsForMapMarkers, sortMarkerItemsStable } from "./mapCollision";
-import { ExploreMapMarkers, ExploreSelectedMarkerOverlay } from "./ExploreMapMarkers";
+import {
+  ExploreMapMarkers,
+  ExploreSelectedMarkerOverlay,
+  OFFSCREEN_COORDINATE,
+  type MarkerPoolSlot,
+} from "./ExploreMapMarkers";
+import { mapDiag } from "./exploreMapDiag";
 import {
   EXPLORE_MAP_INITIAL_REGION,
   EXPLORE_MAP_PADDING,
@@ -206,17 +212,99 @@ export function ExploreScreen() {
   /* User location */
   const [userLat, setUserLat] = useState<number | null>(null);
   const [userLng, setUserLng] = useState<number | null>(null);
+  /** Prevent the map from auto-centering more than once per session. */
+  const hasAutocenteredRef = useRef(false);
+  /** True while the locate-me button is waiting for a GPS fix. */
+  const [locating, setLocating] = useState(false);
+  /**
+   * Enforces a minimum interval between consecutive `setPins` calls. MapKit needs time
+   * to fully commit one annotation batch before the next removeAnnotation/addAnnotation
+   * set arrives — without this gap, accumulated state corruption crashes the map after
+   * several rapid panning-induced refetches. 800ms matches MapKit's internal animation
+   * budget for annotation layout passes.
+   */
+  const lastPinsAppliedAtRef = useRef(0);
+  /** High watermark for the marker object pool — pool size only grows, never shrinks. */
+  const poolHighWaterRef = useRef(0);
+  /**
+   * Previous rendered location — only update state when the user moves ≥ 10 m.
+   * GPS jitter (sub-metre drifts every 5 s) would otherwise cause the user-dot
+   * Marker and accuracy Circle to receive new props on every watchPositionAsync
+   * tick, creating concurrent overlay + annotation updates that crash MapKit.
+   */
+  const prevUserLatRef = useRef<number | null>(null);
+  const prevUserLngRef = useRef<number | null>(null);
 
   /* Current map region for viewport-based queries */
   const mapRegionRef = useRef(EXPLORE_MAP_INITIAL_REGION);
 
-  /* ─── Active filter count (badge) ─── */
-  const mapMarkerItems = useMemo(
-    () => sortMarkerItemsStable(groupPinsForMapMarkers(pins)),
-    [pins],
-  );
+  /* ─── Marker object pool (RecyclerView / view-recycling pattern) ─── */
+  const markerPool: MarkerPoolSlot[] = useMemo(() => {
+    const items = sortMarkerItemsStable(groupPinsForMapMarkers(pins));
 
-  /** User location — stable coordinate object so Marker does not get a new `coordinate` ref every render. */
+    let singles = 0;
+    let clusters = 0;
+    let clusterPinsTotal = 0;
+    for (const it of items) {
+      if (it.kind === "single") singles++;
+      else { clusters++; clusterPinsTotal += it.pins.length; }
+    }
+    mapDiag("markerItems.rebuild", {
+      pins: pins.length,
+      total: items.length,
+      singles,
+      clusters,
+      clusterPinsTotal,
+    });
+
+    if (items.length > poolHighWaterRef.current) {
+      poolHighWaterRef.current = items.length;
+    }
+    const poolSize = poolHighWaterRef.current;
+
+    const pool: MarkerPoolSlot[] = [];
+    for (let i = 0; i < poolSize; i++) {
+      if (i < items.length) {
+        const item = items[i];
+        if (item.kind === "single") {
+          pool.push({
+            kind: "single",
+            coordinate: {
+              latitude: Number(item.pin.latitude),
+              longitude: Number(item.pin.longitude),
+            },
+            providerId: item.pin.providerId,
+            clusterKey: null,
+            clusterCount: 0,
+            clusterPins: null,
+          });
+        } else {
+          pool.push({
+            kind: "cluster",
+            coordinate: { latitude: item.latitude, longitude: item.longitude },
+            providerId: null,
+            clusterKey: item.key,
+            clusterCount: item.pins.length,
+            clusterPins: item.pins,
+          });
+        }
+      } else {
+        pool.push({
+          kind: "offscreen",
+          coordinate: OFFSCREEN_COORDINATE,
+          providerId: null,
+          clusterKey: null,
+          clusterCount: 0,
+          clusterPins: null,
+        });
+      }
+    }
+    return pool;
+  }, [pins]);
+
+
+
+  /** Stable coordinate object — new reference only when user actually moves ≥ 10 m. */
   const userLocationCoordinate = useMemo(
     () =>
       userLat != null && userLng != null
@@ -242,11 +330,21 @@ export function ExploreScreen() {
   useFocusEffect(
     useCallback(() => {
       exploreScreenFocusedRef.current = true;
+      mapDiag("screen.focus");
       return () => {
         exploreScreenFocusedRef.current = false;
+        mapDiag("screen.blur");
       };
     }, []),
   );
+
+  useEffect(() => {
+    mapDiag("selection.change", {
+      providerId: selectedPin?.providerId ?? null,
+      lat: selectedPin?.latitude,
+      lng: selectedPin?.longitude,
+    });
+  }, [selectedPin]);
 
   /* ─── Load service types ─── */
   useEffect(() => {
@@ -255,16 +353,57 @@ export function ExploreScreen() {
 
   /* ─── Request location ─── */
   useEffect(() => {
+    let sub: Location.LocationSubscription | null = null;
     (async () => {
       try {
         const { status } = await Location.requestForegroundPermissionsAsync();
-        if (status === "granted") {
-          const loc = await Location.getCurrentPositionAsync({});
-          setUserLat(loc.coords.latitude);
-          setUserLng(loc.coords.longitude);
-        }
+        if (status !== "granted") return;
+
+        // Subscribe to position updates so the blue dot + circle stay live.
+        sub = await Location.watchPositionAsync(
+          {
+            accuracy: Location.Accuracy.Balanced,
+            timeInterval: 5000,
+            distanceInterval: 10,
+          },
+          (loc) => {
+            const { latitude, longitude } = loc.coords;
+            // Only update state (and therefore re-render the dot/circle) when the
+            // user physically moves ≥ 10 m. GPS jitter while stationary produces
+            // sub-metre coordinate changes on every 5 s tick; those tiny updates
+            // would push new props to the CircleWrapper and dot MarkerWrapper,
+            // potentially conflicting with concurrent annotation batch operations.
+            const pLat = prevUserLatRef.current;
+            const pLng = prevUserLngRef.current;
+            const MIN_MOVE = 0.00009; // ~10 m in decimal degrees
+            if (
+              pLat != null &&
+              pLng != null &&
+              Math.abs(latitude - pLat) < MIN_MOVE &&
+              Math.abs(longitude - pLng) < MIN_MOVE
+            ) {
+              return; // stationary — skip state update
+            }
+            prevUserLatRef.current = latitude;
+            prevUserLngRef.current = longitude;
+            setUserLat(latitude);
+            setUserLng(longitude);
+
+            // Auto-center once on the first real fix.
+            if (!hasAutocenteredRef.current) {
+              hasAutocenteredRef.current = true;
+              beginProgrammaticMapMove();
+              mapRef.current?.animateToRegion?.(
+                { latitude, longitude, latitudeDelta: 0.02, longitudeDelta: 0.02 },
+                700,
+              );
+            }
+          },
+        );
       } catch {}
     })();
+    return () => { sub?.remove(); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   /* ─── Build filters ─── */
@@ -321,29 +460,71 @@ export function ExploreScreen() {
    * for MapKit stability: avoids rebuilding the entire annotation set mid-pan and
    * keeps the `pins` array reference stable when the server returns the same set.
    */
-  const commitPins = useCallback((incoming: MapPinDto[]) => {
-    const current = pinsRef.current;
-    if (current.length === incoming.length) {
-      let identical = true;
-      for (let i = 0; i < current.length; i++) {
-        const a = current[i];
-        const b = incoming[i];
-        if (
-          a.providerId !== b.providerId ||
-          a.latitude !== b.latitude ||
-          a.longitude !== b.longitude
-        ) {
-          identical = false;
-          break;
-        }
-      }
-      if (identical) return;
-    }
-    InteractionManager.runAfterInteractions(() => {
-      if (!exploreScreenFocusedRef.current) return;
-      setPins(incoming);
+  /**
+   * Quantizes incoming pin coordinates so sub-meter float drift between fetches does
+   * not invalidate base-marker memo equality. Precision ≈ 1m — well below anything
+   * visible on screen at any zoom level. This keeps the React reference graph stable
+   * so MapKit does not receive coordinate prop updates for already-mounted annotations.
+   */
+  const normalizePins = useCallback((incoming: MapPinDto[]): MapPinDto[] => {
+    return incoming.map((p) => {
+      const lat = Math.round(Number(p.latitude) * 1e5) / 1e5;
+      const lng = Math.round(Number(p.longitude) * 1e5) / 1e5;
+      if (lat === p.latitude && lng === p.longitude) return p;
+      return { ...p, latitude: lat, longitude: lng };
     });
   }, []);
+
+  /**
+   * Commit a new pin set to state. With the object-pool architecture, `setPins`
+   * never triggers `removeAnnotation` — the pool memo maps active pins to slots
+   * 0..N-1 and parks unused slots at OFFSCREEN_COORDINATE. MapKit only sees
+   * coordinate prop updates on already-mounted annotations, which is safe at
+   * any time, including mid-gesture.
+   *
+   * No staging, no deferral, no rate-limiting needed. The only guard is
+   * `InteractionManager.runAfterInteractions` to batch the React commit after
+   * the current gesture frame completes.
+   */
+  const commitPins = useCallback(
+    (rawIncoming: MapPinDto[]) => {
+      const incoming = normalizePins(rawIncoming);
+      const current = pinsRef.current;
+
+      if (current.length === incoming.length) {
+        let identical = true;
+        for (let i = 0; i < current.length; i++) {
+          const a = current[i];
+          const b = incoming[i];
+          if (
+            a.providerId !== b.providerId ||
+            a.latitude !== b.latitude ||
+            a.longitude !== b.longitude
+          ) {
+            identical = false;
+            break;
+          }
+        }
+        if (identical) {
+          mapDiag("commitPins.skip-identical", { count: incoming.length });
+          return;
+        }
+      }
+
+      mapDiag("commitPins.queue", { from: current.length, to: incoming.length });
+
+      InteractionManager.runAfterInteractions(() => {
+        if (!exploreScreenFocusedRef.current) {
+          mapDiag("commitPins.drop-unfocused", { to: incoming.length });
+          return;
+        }
+        lastPinsAppliedAtRef.current = Date.now();
+        mapDiag("commitPins.apply", { count: incoming.length });
+        setPins(incoming);
+      });
+    },
+    [normalizePins],
+  );
 
   /* ─── Fetch pins ─── */
   const fetchPins = useCallback(
@@ -352,19 +533,38 @@ export function ExploreScreen() {
       const gen = ++pinsFetchGenRef.current;
 
       // Cancel the previous in-flight request so axios can release its response buffer.
+      const wasAborted = pinsAbortRef.current != null;
       pinsAbortRef.current?.abort();
       const controller = new AbortController();
       pinsAbortRef.current = controller;
 
+      mapDiag("fetchPins.start", { gen, showLoading, aborted_previous: wasAborted, filters });
+      const startedAt = Date.now();
       if (showLoading) setLoading(true);
       try {
         const data = await mapApi.fetchPins(filters, controller.signal);
-        if (gen !== pinsFetchGenRef.current) return;
-        if (!exploreScreenFocusedRef.current) return;
+        const dur = Date.now() - startedAt;
+        if (gen !== pinsFetchGenRef.current) {
+          mapDiag("fetchPins.stale-gen", { gen, cur: pinsFetchGenRef.current, dur, count: data.length });
+          return;
+        }
+        if (!exploreScreenFocusedRef.current) {
+          mapDiag("fetchPins.unfocused", { gen, dur, count: data.length });
+          return;
+        }
+        mapDiag("fetchPins.ok", { gen, dur, count: data.length });
         commitPins(data);
       } catch (error) {
-        if (gen !== pinsFetchGenRef.current) return;
-        if (axios.isCancel(error) || (error as Error)?.name === "CanceledError") return;
+        const dur = Date.now() - startedAt;
+        if (gen !== pinsFetchGenRef.current) {
+          mapDiag("fetchPins.err-stale", { gen, dur });
+          return;
+        }
+        if (axios.isCancel(error) || (error as Error)?.name === "CanceledError") {
+          mapDiag("fetchPins.cancel", { gen, dur });
+          return;
+        }
+        mapDiag("fetchPins.error", { gen, dur, msg: (error as Error)?.message });
         // Keep existing pins visible; do not clear the map on transient errors.
         if (!(axios.isAxiosError(error) && error.response?.status === 401)) {
           Alert.alert(t("genericErrorTitle"), t("genericErrorDesc"));
@@ -499,13 +699,32 @@ export function ExploreScreen() {
         mapRegionRef.current = region;
       }
       const seq = ++regionChangeSeqRef.current;
+      mapDiag("region.change", {
+        seq,
+        lat: Number(region?.latitude)?.toFixed?.(4),
+        lng: Number(region?.longitude)?.toFixed?.(4),
+        dLat: Number(region?.latitudeDelta)?.toFixed?.(4),
+        dLng: Number(region?.longitudeDelta)?.toFixed?.(4),
+      });
       if (moveDebounceRef.current) clearTimeout(moveDebounceRef.current);
       moveDebounceRef.current = setTimeout(() => {
-        if (seq !== regionChangeSeqRef.current) return;
-        if (suppressViewportFetchRef.current) return;
+        if (seq !== regionChangeSeqRef.current) {
+          mapDiag("region.debounce.stale", { seq });
+          return;
+        }
+        if (suppressViewportFetchRef.current) {
+          mapDiag("region.debounce.suppressed-programmatic", { seq });
+          return;
+        }
         const r = mapRegionRef.current;
-        if (!isValidMapRegion(r)) return;
-        if (Date.now() < suppressViewportFetchAfterMarkerMsRef.current) return;
+        if (!isValidMapRegion(r)) {
+          mapDiag("region.debounce.invalid-region", { seq });
+          return;
+        }
+        if (Date.now() < suppressViewportFetchAfterMarkerMsRef.current) {
+          mapDiag("region.debounce.suppressed-marker-tap", { seq });
+          return;
+        }
 
         const prev = lastSilentFetchRegionRef.current;
         const latSpan = Math.max(r.latitudeDelta, 1e-9);
@@ -517,7 +736,10 @@ export function ExploreScreen() {
           const smallZoom =
             Math.abs(prev.dLat - r.latitudeDelta) < latSpan * 0.12 &&
             Math.abs(prev.dLng - r.longitudeDelta) < lngSpan * 0.12;
-          if (smallMove && smallZoom) return;
+          if (smallMove && smallZoom) {
+            mapDiag("region.debounce.suppressed-small-move", { seq });
+            return;
+          }
         }
         lastSilentFetchRegionRef.current = {
           lat: r.latitude,
@@ -526,10 +748,20 @@ export function ExploreScreen() {
           dLng: r.longitudeDelta,
         };
 
+        mapDiag("region.debounce.fire-refetch", { seq });
         InteractionManager.runAfterInteractions(() => {
-          if (seq !== regionChangeSeqRef.current) return;
-          if (!exploreScreenFocusedRef.current) return;
-          if (suppressViewportFetchRef.current) return;
+          if (seq !== regionChangeSeqRef.current) {
+            mapDiag("region.refetch.stale", { seq });
+            return;
+          }
+          if (!exploreScreenFocusedRef.current) {
+            mapDiag("region.refetch.unfocused", { seq });
+            return;
+          }
+          if (suppressViewportFetchRef.current) {
+            mapDiag("region.refetch.suppressed", { seq });
+            return;
+          }
           setCollocatedChooserPins(null);
           loadPinsRef.current({ silent: true });
         });
@@ -562,9 +794,14 @@ export function ExploreScreen() {
 
   /* ─── Marker press (id-based so marker row callbacks stay stable across re-renders) ─── */
   const onPressProviderMarkerId = useCallback((providerId: string) => {
+    mapDiag("marker.press", { providerId });
     const pin = pinsRef.current.find((p) => p.providerId === providerId);
-    if (!pin) return;
-    suppressViewportFetchAfterMarkerMsRef.current = Date.now() + MARKER_TAP_VIEWPORT_SUPPRESS_MS;
+    if (!pin) {
+      mapDiag("marker.press.miss", { providerId });
+      return;
+    }
+    suppressViewportFetchAfterMarkerMsRef.current =
+      Date.now() + MARKER_TAP_VIEWPORT_SUPPRESS_MS;
     markerJustTappedRef.current = true;
     setTimeout(() => {
       markerJustTappedRef.current = false;
@@ -574,6 +811,7 @@ export function ExploreScreen() {
   }, []);
 
   const openCollocatedChooser = useCallback((clusterPins: MapPinDto[]) => {
+    mapDiag("cluster.press", { count: clusterPins.length });
     suppressViewportFetchAfterMarkerMsRef.current = Date.now() + MARKER_TAP_VIEWPORT_SUPPRESS_MS;
     markerJustTappedRef.current = true;
     setTimeout(() => {
@@ -629,15 +867,35 @@ export function ExploreScreen() {
         {...(Platform.OS === "android" && { mapType: "standard" })}
       >
         {userLocationCoordinate != null && (
-          <MarkerWrapper
-            coordinate={userLocationCoordinate}
-            anchor={EXPLORE_USER_MARKER_ANCHOR}
-            pinColor={colors.primary as string}
-            tracksViewChanges={false}
-          />
+          <>
+            {/*
+             * Fixed-radius accuracy halo — 80 m constant, never changes.
+             * A constant radius means CircleWrapper never receives new props while
+             * the user is stationary, eliminating the concurrent overlay+annotation
+             * update that was causing crashes with the variable accuracy radius.
+             */}
+            <CircleWrapper
+              center={userLocationCoordinate}
+              radius={80}
+              strokeColor="rgba(66,133,244,0.30)"
+              fillColor="rgba(66,133,244,0.12)"
+              strokeWidth={1.5}
+            />
+            {/* Blue dot — updates only when user moves ≥ 10 m (see prevUserLatRef gate) */}
+            <MarkerWrapper
+              coordinate={userLocationCoordinate}
+              anchor={EXPLORE_USER_MARKER_ANCHOR}
+              tracksViewChanges={false}
+              zIndex={500}
+            >
+              <View style={styles.userDotOuter}>
+                <View style={styles.userDotInner} />
+              </View>
+            </MarkerWrapper>
+          </>
         )}
         <ExploreMapMarkers
-          items={mapMarkerItems}
+          pool={markerPool}
           onPressProviderId={onPressProviderMarkerId}
           onPressClusterPins={openCollocatedChooser}
         />
@@ -720,7 +978,7 @@ export function ExploreScreen() {
               contentContainerStyle={{
                 paddingTop: 10,
                 gap: 6,
-                flexDirection: isRTL ? "row-reverse" : "row",
+                flexDirection: rowDirectionForAppLayout(isRTL),
               }}
             >
               {[...activeServices].map((svc) => (
@@ -781,21 +1039,34 @@ export function ExploreScreen() {
       {/* My Location button */}
       <Pressable
         onPress={async () => {
+          // If we already have a cached position, center immediately.
+          if (userLat != null && userLng != null) {
+            beginProgrammaticMapMove();
+            mapRef.current?.animateToRegion?.(
+              { latitude: userLat, longitude: userLng, latitudeDelta: 0.015, longitudeDelta: 0.015 },
+              600,
+            );
+            return;
+          }
+          // No cached position yet — request one and show a spinner.
           try {
+            setLocating(true);
             const { status } = await Location.requestForegroundPermissionsAsync();
             if (status !== "granted") return;
-            const loc = await Location.getCurrentPositionAsync({});
+            const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
             const { latitude, longitude } = loc.coords;
             setUserLat(latitude);
             setUserLng(longitude);
+            hasAutocenteredRef.current = true;
             beginProgrammaticMapMove();
-            mapRef.current?.animateToRegion?.({
-              latitude,
-              longitude,
-              latitudeDelta: 0.015,
-              longitudeDelta: 0.015,
-            }, 600);
-          } catch {}
+            mapRef.current?.animateToRegion?.(
+              { latitude, longitude, latitudeDelta: 0.015, longitudeDelta: 0.015 },
+              600,
+            );
+          } catch {
+          } finally {
+            setLocating(false);
+          }
         }}
         style={{
           position: "absolute",
@@ -815,7 +1086,10 @@ export function ExploreScreen() {
           elevation: 6,
         }}
       >
-        <Ionicons name="navigate" size={22} color={colors.text} />
+        {locating
+          ? <ActivityIndicator size="small" color={colors.primary as string} />
+          : <Ionicons name="navigate" size={22} color={userLat != null ? colors.primary as string : colors.text} />
+        }
       </Pressable>
 
       {/* Report Lost Pet button */}
@@ -838,7 +1112,7 @@ export function ExploreScreen() {
           bottom: selectedPin ? 230 : 120,
           alignSelf: isRTL ? "flex-start" : "flex-end",
           ...(isRTL ? { left: 20 } : { right: 20 }),
-          flexDirection: isRTL ? "row-reverse" : "row",
+          flexDirection: rowDirectionForAppLayout(isRTL),
           alignItems: "center",
           gap: 8,
           backgroundColor: "#dc2626",
@@ -1063,7 +1337,7 @@ export function ExploreScreen() {
             />
             <View
               style={{
-                flexDirection: isRTL ? "row-reverse" : "row",
+                flexDirection: rowDirectionForAppLayout(isRTL),
                 alignItems: "flex-start",
                 justifyContent: "space-between",
                 gap: 12,
@@ -1147,7 +1421,7 @@ export function ExploreScreen() {
                         {
                           backgroundColor: colors.surface,
                           shadowColor: colors.shadow,
-                          flexDirection: isRTL ? "row-reverse" : "row",
+                          flexDirection: rowDirectionForAppLayout(isRTL),
                         },
                       ]}
                     >
@@ -1241,7 +1515,7 @@ export function ExploreScreen() {
                         <View
                           className="mt-1.5 flex-row items-center justify-between"
                           style={{
-                            flexDirection: isRTL ? "row-reverse" : "row",
+                            flexDirection: rowDirectionForAppLayout(isRTL),
                           }}
                         >
                           <View className="flex-row items-baseline">
@@ -1333,7 +1607,7 @@ export function ExploreScreen() {
             {/* Title row */}
             <View
               style={{
-                flexDirection: isRTL ? "row-reverse" : "row",
+                flexDirection: rowDirectionForAppLayout(isRTL),
                 justifyContent: "space-between",
                 alignItems: "center",
                 marginBottom: 20,
@@ -1372,7 +1646,7 @@ export function ExploreScreen() {
                 </Text>
                 <View
                   style={{
-                    flexDirection: isRTL ? "row-reverse" : "row",
+                    flexDirection: rowDirectionForAppLayout(isRTL),
                     flexWrap: "wrap",
                     gap: 8,
                   }}
@@ -1419,7 +1693,7 @@ export function ExploreScreen() {
                 </Text>
                 <View
                   style={{
-                    flexDirection: isRTL ? "row-reverse" : "row",
+                    flexDirection: rowDirectionForAppLayout(isRTL),
                     gap: 8,
                   }}
                 >
@@ -1493,7 +1767,7 @@ export function ExploreScreen() {
                 </Text>
                 <View
                   style={{
-                    flexDirection: isRTL ? "row-reverse" : "row",
+                    flexDirection: rowDirectionForAppLayout(isRTL),
                     flexWrap: "wrap",
                     gap: 8,
                   }}
@@ -1524,7 +1798,7 @@ export function ExploreScreen() {
                 </Text>
                 <View
                   style={{
-                    flexDirection: isRTL ? "row-reverse" : "row",
+                    flexDirection: rowDirectionForAppLayout(isRTL),
                     gap: 10,
                   }}
                 >
@@ -1653,5 +1927,34 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 12,
     maxHeight: "62%",
+  },
+  /**
+   * IMPORTANT: No shadow* props here. On iOS with tracksViewChanges={false}
+   * (which this <Marker> uses), the native bitmap snapshot is captured from
+   * the CALayer ONCE and then reused for every render. CoreAnimation shadows
+   * live outside the snapshotted bounds, so when the snapshot is captured
+   * during an unlucky frame the result is effectively empty — and MapKit
+   * falls back to rendering its default red balloon pin at that coordinate.
+   * This is the "weird red pin" that appeared in the bug screenshot.
+   * A border ring gives the same visual prominence without leaving the
+   * snapshot rect, so the dot always rasterizes correctly.
+   */
+  userDotOuter: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: "#ffffff",
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 2,
+    borderColor: "#ffffff",
+  },
+  userDotInner: {
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    backgroundColor: "#4285F4",
+    borderWidth: 1,
+    borderColor: "rgba(0,0,0,0.08)",
   },
 });

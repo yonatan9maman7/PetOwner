@@ -4,7 +4,7 @@ import { useNavigation } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
 import type { PalDto } from "../../../types/api";
 import { useTheme } from "../../../theme/ThemeContext";
-import { useTranslation } from "../../../i18n";
+import { useTranslation, rowDirectionForAppLayout } from "../../../i18n";
 import { PetTagChips } from "./PetTagChips";
 import { initials, formatDistance } from "./helpers";
 
@@ -23,13 +23,13 @@ export function PalCard({ pal }: Props) {
       style={[styles.card, { backgroundColor: colors.surface, shadowColor: colors.shadow, borderColor: colors.border }]}
     >
       {/* Header row */}
-      <View style={{ flexDirection: isRTL ? "row-reverse" : "row", alignItems: "center", gap: 12 }}>
+      <View style={{ flexDirection: rowDirectionForAppLayout(isRTL), alignItems: "center", gap: 12 }}>
         <View style={[styles.avatar, { backgroundColor: colors.text }]}>
           <Text style={[styles.avatarText, { color: colors.textInverse }]}>{initials(pal.name)}</Text>
         </View>
         <View style={{ flex: 1 }}>
           <Text style={[styles.name, { color: colors.text, textAlign: isRTL ? "right" : "left" }]}>{pal.name}</Text>
-          <View style={{ flexDirection: isRTL ? "row-reverse" : "row", alignItems: "center", gap: 4, marginTop: 2 }}>
+          <View style={{ flexDirection: rowDirectionForAppLayout(isRTL), alignItems: "center", gap: 4, marginTop: 2 }}>
             <Ionicons name="location-outline" size={12} color={colors.textMuted} />
             <Text style={{ fontSize: 12, color: colors.textMuted }}>{formatDistance(pal.distanceKm, isRTL)}</Text>
             {pal.city ? <Text style={{ fontSize: 12, color: colors.textMuted }}>· {pal.city}</Text> : null}
@@ -46,7 +46,7 @@ export function PalCard({ pal }: Props) {
       {/* Pets */}
       {pal.pets.map((pet) => (
         <View key={pet.id} style={{ marginTop: 12 }}>
-          <View style={{ flexDirection: isRTL ? "row-reverse" : "row", alignItems: "center", gap: 8 }}>
+          <View style={{ flexDirection: rowDirectionForAppLayout(isRTL), alignItems: "center", gap: 8 }}>
             {pet.imageUrl ? (
               <Image source={{ uri: pet.imageUrl }} style={styles.petThumb} />
             ) : (

@@ -23,7 +23,7 @@ import {
   useRoute,
   CommonActions,
 } from "@react-navigation/native";
-import { useTranslation } from "../../i18n";
+import { useTranslation, rowDirectionForAppLayout } from "../../i18n";
 import { useAuthStore } from "../../store/authStore";
 import { useFavoritesStore } from "../../store/favoritesStore";
 import { useTheme } from "../../theme/ThemeContext";
@@ -469,7 +469,7 @@ export function ProviderProfileScreen() {
           </Text>
 
           {/* Rating + availability row */}
-          <View style={[s.metaRow, isRTL && s.rowReverse]}>
+          <View style={[s.metaRow, { flexDirection: rowDirectionForAppLayout(isRTL) }]}>
             {profile.averageRating != null && (
               <View style={s.ratingPill}>
                 <Ionicons name="star" size={14} color="#F59E0B" />
@@ -555,7 +555,7 @@ export function ProviderProfileScreen() {
                       key={day}
                       style={[
                         s.hoursRow,
-                        isRTL && s.rowReverse,
+                        { flexDirection: rowDirectionForAppLayout(isRTL) },
                         { borderTopColor: colors.borderLight },
                       ]}
                     >
@@ -605,7 +605,7 @@ export function ProviderProfileScreen() {
                 </Text>
               )}
               {profile.services.length > 0 && (
-                <View style={[s.tagsWrap, isRTL && s.rowReverse]}>
+                <View style={[s.tagsWrap, { flexDirection: rowDirectionForAppLayout(isRTL) }]}>
                   {profile.services.map((svc, i) => (
                     <View
                       key={i}
@@ -639,7 +639,7 @@ export function ProviderProfileScreen() {
                   horizontal
                   showsHorizontalScrollIndicator={false}
                   contentContainerStyle={{
-                    flexDirection: isRTL ? "row-reverse" : "row",
+                    flexDirection: rowDirectionForAppLayout(isRTL),
                     gap: 12,
                     paddingVertical: 4,
                   }}
@@ -710,7 +710,7 @@ export function ProviderProfileScreen() {
                     key={idx}
                     style={[
                       s.rateRow,
-                      isRTL && s.rowReverse,
+                      { flexDirection: rowDirectionForAppLayout(isRTL) },
                       {
                         borderTopWidth: idx > 0 ? 1 : 0,
                         borderTopColor: colors.borderLight,
@@ -860,7 +860,7 @@ export function ProviderProfileScreen() {
         >
           <Pressable style={s.modalBackdrop} onPress={closeDirectReviewModal}>
             <View style={[s.modalCard, { backgroundColor: colors.surface }]}>
-              <View style={[s.modalHeaderRow, isRTL && s.rowReverse]}>
+              <View style={[s.modalHeaderRow, { flexDirection: rowDirectionForAppLayout(isRTL) }]}>
                 <Text style={[s.modalTitle, { color: colors.text }]}>{t("writeReviewTitle")}</Text>
                 <Pressable onPress={closeDirectReviewModal} hitSlop={12} accessibilityRole="button">
                   <Ionicons name="close" size={24} color={colors.textMuted} />
@@ -1099,7 +1099,6 @@ const s = StyleSheet.create({
     marginTop: 10,
     marginBottom: 4,
   },
-  rowReverse: { flexDirection: "row-reverse" },
   ratingPill: {
     flexDirection: "row",
     alignItems: "center",

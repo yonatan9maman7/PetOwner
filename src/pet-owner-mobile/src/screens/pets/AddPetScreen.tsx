@@ -24,7 +24,7 @@ import { useNavigation, useRoute } from "@react-navigation/native";
 import * as ImagePicker from "expo-image-picker";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useTranslation } from "../../i18n";
+import { useTranslation, rowDirectionForAppLayout } from "../../i18n";
 import { useTheme } from "../../theme/ThemeContext";
 import {
   createAddPetMicrochipSchema,
@@ -87,6 +87,7 @@ export function AddPetScreen() {
   const isEdit = !!petId;
   const { t, isRTL, isHebrew, language } = useTranslation();
   const { colors } = useTheme();
+  const insets = useSafeAreaInsets();
 
   const microchipSchema = useMemo(
     () =>
@@ -634,7 +635,7 @@ export function AddPetScreen() {
                   </Text>
                   <View
                     style={{
-                      flexDirection: isRTL ? "row-reverse" : "row",
+                      flexDirection: rowDirectionForAppLayout(isRTL),
                       justifyContent: "space-between",
                       gap: 8,
                     }}
@@ -727,7 +728,7 @@ export function AddPetScreen() {
                         style={[
                           inputStyle(isRTL, colors),
                           {
-                            flexDirection: isRTL ? "row-reverse" : "row",
+                            flexDirection: rowDirectionForAppLayout(isRTL),
                             alignItems: "center",
                             justifyContent: "space-between",
                           },
@@ -819,7 +820,7 @@ export function AddPetScreen() {
                 {/* Age & Weight row */}
                 <View
                   style={{
-                    flexDirection: isRTL ? "row-reverse" : "row",
+                    flexDirection: rowDirectionForAppLayout(isRTL),
                     gap: 12,
                   }}
                 >
@@ -860,7 +861,7 @@ export function AddPetScreen() {
                     </Text>
                     <View
                       style={{
-                        flexDirection: isRTL ? "row-reverse" : "row",
+                        flexDirection: rowDirectionForAppLayout(isRTL),
                         gap: 8,
                         alignItems: "center",
                       }}
@@ -917,7 +918,7 @@ export function AddPetScreen() {
                 {/* Neutered Toggle Card */}
                 <View
                   style={{
-                    flexDirection: isRTL ? "row-reverse" : "row",
+                    flexDirection: rowDirectionForAppLayout(isRTL),
                     alignItems: "center",
                     justifyContent: "space-between",
                     backgroundColor: colors.surfaceSecondary,
@@ -1041,7 +1042,7 @@ export function AddPetScreen() {
                       </Text>
                       <View
                         style={{
-                          flexDirection: isRTL ? "row-reverse" : "row",
+                          flexDirection: rowDirectionForAppLayout(isRTL),
                           flexWrap: "wrap",
                           gap: 8,
                         }}
@@ -1232,7 +1233,7 @@ export function AddPetScreen() {
                 {/* Step indicator */}
                 <View
                   style={{
-                    flexDirection: isRTL ? "row-reverse" : "row",
+                    flexDirection: rowDirectionForAppLayout(isRTL),
                     justifyContent: "space-between",
                     alignItems: "center",
                     marginBottom: 4,
@@ -1271,7 +1272,7 @@ export function AddPetScreen() {
                     borderRightWidth: isRTL ? 4 : 0,
                     borderLeftColor: "#506356",
                     borderRightColor: "#506356",
-                    flexDirection: isRTL ? "row-reverse" : "row",
+                    flexDirection: rowDirectionForAppLayout(isRTL),
                     gap: 14,
                     alignItems: "flex-start",
                   }}
@@ -1300,7 +1301,7 @@ export function AddPetScreen() {
                 <View style={{ gap: 6 }}>
                   <View
                     style={{
-                      flexDirection: isRTL ? "row-reverse" : "row",
+                      flexDirection: rowDirectionForAppLayout(isRTL),
                       alignItems: "center",
                       gap: 10,
                       marginBottom: 10,
@@ -1420,7 +1421,7 @@ export function AddPetScreen() {
                 <View style={{ gap: 6 }}>
                   <View
                     style={{
-                      flexDirection: isRTL ? "row-reverse" : "row",
+                      flexDirection: rowDirectionForAppLayout(isRTL),
                       alignItems: "center",
                       gap: 10,
                       marginBottom: 10,
@@ -1496,7 +1497,7 @@ export function AddPetScreen() {
                   <Pressable
                     onPress={handleDelete}
                     style={{
-                      flexDirection: isRTL ? "row-reverse" : "row",
+                      flexDirection: rowDirectionForAppLayout(isRTL),
                       alignItems: "center",
                       justifyContent: "center",
                       gap: 8,
@@ -1537,7 +1538,7 @@ export function AddPetScreen() {
         >
           <View
             style={{
-              flexDirection: isRTL ? "row-reverse" : "row",
+              flexDirection: rowDirectionForAppLayout(isRTL),
               gap: 12,
               alignItems: "center",
             }}
@@ -1551,7 +1552,7 @@ export function AddPetScreen() {
                   height: 54,
                   borderRadius: 27,
                   backgroundColor: colors.primary,
-                  flexDirection: isRTL ? "row-reverse" : "row",
+                  flexDirection: rowDirectionForAppLayout(isRTL),
                   alignItems: "center",
                   justifyContent: "center",
                   gap: 10,
@@ -1639,7 +1640,7 @@ export function AddPetScreen() {
                   disabled={saving}
                   style={{
                     flex: 2,
-                    flexDirection: isRTL ? "row-reverse" : "row",
+                    flexDirection: rowDirectionForAppLayout(isRTL),
                     paddingVertical: 16,
                     borderRadius: 16,
                     backgroundColor: colors.primary,
@@ -1727,7 +1728,7 @@ export function AddPetScreen() {
                     setShowBreedPicker(false);
                   }}
                   style={{
-                    flexDirection: isRTL ? "row-reverse" : "row",
+                    flexDirection: rowDirectionForAppLayout(isRTL),
                     alignItems: "center",
                     justifyContent: "space-between",
                     paddingHorizontal: 24,

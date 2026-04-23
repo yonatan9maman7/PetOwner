@@ -19,7 +19,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import { MapViewWrapper, MarkerWrapper } from "../../components/MapViewWrapper";
-import { useTranslation, type TranslationKey } from "../../i18n";
+import { useTranslation, type TranslationKey, rowDirectionForAppLayout } from "../../i18n";
 import { useTheme } from "../../theme/ThemeContext";
 import { providerApi } from "../../api/client";
 import { CityAutocompleteInput } from "../../components/shared/CityAutocompleteInput";
@@ -579,7 +579,7 @@ function AddressMapModal({
         >
           <View
             style={{
-              flexDirection: isRTL ? "row-reverse" : "row",
+              flexDirection: rowDirectionForAppLayout(isRTL),
               alignItems: "center",
               paddingHorizontal: 16,
               paddingVertical: 12,
@@ -1163,7 +1163,7 @@ export function ProviderEditScreen() {
       >
         <View
           style={{
-            flexDirection: isRTL ? "row-reverse" : "row",
+            flexDirection: rowDirectionForAppLayout(isRTL),
             alignItems: "center",
             justifyContent: "space-between",
             paddingHorizontal: 24,
@@ -1278,7 +1278,7 @@ export function ProviderEditScreen() {
                     borderRadius: 12,
                     padding: 14,
                     marginBottom: 16,
-                    flexDirection: isRTL ? "row-reverse" : "row",
+                    flexDirection: rowDirectionForAppLayout(isRTL),
                     alignItems: "center",
                     gap: 10,
                     borderWidth: 1,
@@ -1305,7 +1305,7 @@ export function ProviderEditScreen() {
                 >
                   <View
                     style={{
-                      flexDirection: isRTL ? "row-reverse" : "row",
+                      flexDirection: rowDirectionForAppLayout(isRTL),
                       alignItems: "center",
                       gap: 12,
                     }}
@@ -1438,7 +1438,7 @@ export function ProviderEditScreen() {
                 <View style={{ padding: 14, alignItems: "center", gap: 8 }}>
                   <View
                     style={{
-                      flexDirection: isRTL ? "row-reverse" : "row",
+                      flexDirection: rowDirectionForAppLayout(isRTL),
                       alignItems: "center",
                       gap: 6,
                     }}

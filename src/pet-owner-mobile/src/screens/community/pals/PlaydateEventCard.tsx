@@ -5,7 +5,7 @@ import { Ionicons } from "@expo/vector-icons";
 import type { PlaydateEventDto } from "../../../types/api";
 import { playdatesApi } from "../../../api/client";
 import { useTheme } from "../../../theme/ThemeContext";
-import { useTranslation } from "../../../i18n";
+import { useTranslation, rowDirectionForAppLayout } from "../../../i18n";
 
 interface Props {
   event: PlaydateEventDto;
@@ -55,14 +55,14 @@ export function PlaydateEventCard({ event, onRsvpChange }: Props) {
 
       <Text style={{ fontSize: 16, fontWeight: "800", color: colors.text, textAlign: isRTL ? "right" : "left" }}>{event.title}</Text>
 
-      <View style={{ flexDirection: isRTL ? "row-reverse" : "row", alignItems: "center", gap: 6, marginTop: 6 }}>
+      <View style={{ flexDirection: rowDirectionForAppLayout(isRTL), alignItems: "center", gap: 6, marginTop: 6 }}>
         <Ionicons name="calendar-outline" size={14} color={colors.textMuted} />
         <Text style={{ fontSize: 13, color: colors.textMuted }}>
           {scheduledDate.toLocaleDateString()} · {scheduledDate.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
         </Text>
       </View>
 
-      <View style={{ flexDirection: isRTL ? "row-reverse" : "row", alignItems: "center", gap: 6, marginTop: 4 }}>
+      <View style={{ flexDirection: rowDirectionForAppLayout(isRTL), alignItems: "center", gap: 6, marginTop: 4 }}>
         <Ionicons name="location-outline" size={14} color={colors.textMuted} />
         <Text style={{ fontSize: 13, color: colors.textMuted }}>{event.locationName}</Text>
         {event.distanceKm != null && (
@@ -70,7 +70,7 @@ export function PlaydateEventCard({ event, onRsvpChange }: Props) {
         )}
       </View>
 
-      <View style={{ flexDirection: isRTL ? "row-reverse" : "row", alignItems: "center", gap: 6, marginTop: 4 }}>
+      <View style={{ flexDirection: rowDirectionForAppLayout(isRTL), alignItems: "center", gap: 6, marginTop: 4 }}>
         <Text style={{ fontSize: 12, color: colors.textMuted }}>
           {t("goingCount").replace("{{n}}", String(goingCount))}
           {event.maybeCount > 0 ? ` · ${t("maybeCount").replace("{{n}}", String(event.maybeCount))}` : ""}
@@ -78,7 +78,7 @@ export function PlaydateEventCard({ event, onRsvpChange }: Props) {
       </View>
 
       {!event.isCancelled && (
-        <View style={{ flexDirection: isRTL ? "row-reverse" : "row", gap: 8, marginTop: 12 }}>
+        <View style={{ flexDirection: rowDirectionForAppLayout(isRTL), gap: 8, marginTop: 12 }}>
           {(["Going", "Maybe", "NotGoing"] as const).map((s) => {
             const active = myRsvp === s;
             const label = s === "Going" ? t("rsvpGoing") : s === "Maybe" ? t("rsvpMaybe") : t("rsvpCantGo");

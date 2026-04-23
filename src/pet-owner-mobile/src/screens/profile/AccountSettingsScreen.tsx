@@ -4,7 +4,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import { useAuthStore } from "../../store/authStore";
-import { useTranslation } from "../../i18n";
+import { useTranslation, rowDirectionForAppLayout } from "../../i18n";
 import { useTheme } from "../../theme/ThemeContext";
 import type { ThemePreference } from "../../store/themeStore";
 
@@ -62,7 +62,7 @@ function SettingsRow({
       onPress={disabled ? undefined : onPress}
       activeOpacity={disabled ? 1 : 0.6}
       style={{
-        flexDirection: isRTL ? "row-reverse" : "row",
+        flexDirection: rowDirectionForAppLayout(isRTL),
         alignItems: "center",
         paddingVertical: 14,
         paddingHorizontal: 18,
@@ -217,7 +217,7 @@ function DarkModePicker({
                   onClose();
                 }}
                 style={{
-                  flexDirection: isRTL ? "row-reverse" : "row",
+                  flexDirection: rowDirectionForAppLayout(isRTL),
                   alignItems: "center",
                   paddingVertical: 14,
                   paddingHorizontal: 16,
@@ -360,7 +360,7 @@ export function AccountSettingsScreen() {
       {/* ── Header bar ── */}
       <View
         style={{
-          flexDirection: isRTL ? "row-reverse" : "row",
+          flexDirection: rowDirectionForAppLayout(isRTL),
           alignItems: "center",
           paddingHorizontal: 16,
           paddingVertical: 12,

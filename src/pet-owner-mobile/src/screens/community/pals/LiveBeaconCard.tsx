@@ -4,7 +4,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import type { LiveBeaconDto } from "../../../types/api";
 import { useTheme } from "../../../theme/ThemeContext";
-import { useTranslation } from "../../../i18n";
+import { useTranslation, rowDirectionForAppLayout } from "../../../i18n";
 import { PetTagChips } from "./PetTagChips";
 import { initials, formatRemaining, formatDistance } from "./helpers";
 
@@ -29,7 +29,7 @@ export function LiveBeaconCard({ beacon }: Props) {
       style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border, shadowColor: colors.shadow }]}
     >
       {/* Live badge + countdown */}
-      <View style={{ flexDirection: isRTL ? "row-reverse" : "row", alignItems: "center", gap: 8, marginBottom: 8 }}>
+      <View style={{ flexDirection: rowDirectionForAppLayout(isRTL), alignItems: "center", gap: 8, marginBottom: 8 }}>
         <View style={[styles.liveDot, { backgroundColor: remaining.urgent ? "#dc2626" : "#16a34a" }]} />
         <Text style={{ fontSize: 12, fontWeight: "700", color: remaining.urgent ? "#dc2626" : "#16a34a" }}>
           {remaining.label}
@@ -40,7 +40,7 @@ export function LiveBeaconCard({ beacon }: Props) {
       </View>
 
       {/* Host info */}
-      <View style={{ flexDirection: isRTL ? "row-reverse" : "row", alignItems: "center", gap: 10 }}>
+      <View style={{ flexDirection: rowDirectionForAppLayout(isRTL), alignItems: "center", gap: 10 }}>
         <View style={[styles.avatar, { backgroundColor: colors.text }]}>
           <Text style={{ color: colors.textInverse, fontSize: 14, fontWeight: "700" }}>{initials(beacon.hostUserName)}</Text>
         </View>
@@ -48,7 +48,7 @@ export function LiveBeaconCard({ beacon }: Props) {
           <Text style={{ fontSize: 15, fontWeight: "700", color: colors.text, textAlign: isRTL ? "right" : "left" }}>
             {beacon.hostUserName}
           </Text>
-          <View style={{ flexDirection: isRTL ? "row-reverse" : "row", alignItems: "center", gap: 4 }}>
+          <View style={{ flexDirection: rowDirectionForAppLayout(isRTL), alignItems: "center", gap: 4 }}>
             <Ionicons name="location-outline" size={12} color={colors.textMuted} />
             <Text style={{ fontSize: 12, color: colors.textMuted }}>{beacon.placeName}</Text>
           </View>

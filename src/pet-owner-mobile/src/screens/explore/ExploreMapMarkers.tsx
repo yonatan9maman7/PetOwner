@@ -1,30 +1,44 @@
-import React, { useMemo, useRef, memo } from "react";
+import React, { useCallback, useEffect, useRef, useState, memo, useMemo } from "react";
 import { View, StyleSheet, Text, Platform } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { MarkerWrapper } from "../../components/MapViewWrapper";
 import type { MapPinDto } from "../../types/api";
-import type { ExploreMapMarkerItem } from "./mapCollision";
+import { mapDiag } from "./exploreMapDiag";
 
-/*
- * Module-level style constants — never allocate new objects inside render/memo callbacks.
- * This is the single most important factor for preventing MapKit annotation churn on iOS.
+/* ── Constants ──────────────────────────────────────────────────────────── */
+
+/**
+ * Coordinate used for recycled (inactive) pool slots. The marker is always
+ * mounted in the native map but parked at the South Pole where no user will
+ * ever scroll. This avoids `removeAnnotation` entirely.
  */
+export const OFFSCREEN_COORDINATE = { latitude: -90, longitude: 0 } as const;
+
+const ANCHOR_CENTER_BOTTOM = { x: 0.5, y: 1 } as const;
+const MARKER_Z_INDEX = 1;
+const SELECTED_MARKER_Z_INDEX = 1000;
+
+/* ── Styles ─────────────────────────────────────────────────────────────── */
+
 const S = StyleSheet.create({
-  hitArea: {
-    padding: 10,
+  markerRoot: {
+    width: 64,
+    minHeight: 70,
     alignItems: "center",
+    backgroundColor: "transparent",
+    overflow: "visible",
+    paddingTop: 6,
+    paddingBottom: 4,
   },
   bubble: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 2,
     backgroundColor: "#ffffff",
     borderColor: "#e2e2e2",
-    // No shadow on iOS — the whole marker becomes a native bitmap (tracksViewChanges=false);
-    // shadow props bloat the snapshot without visible benefit after rasterization.
     ...Platform.select({
       android: { elevation: 4 },
     }),
@@ -32,6 +46,9 @@ const S = StyleSheet.create({
   bubbleSelected: {
     backgroundColor: "#1a1a2e",
     borderColor: "#1a1a2e",
+    ...Platform.select({
+      android: { elevation: 8 },
+    }),
   },
   arrow: {
     width: 0,
@@ -47,10 +64,19 @@ const S = StyleSheet.create({
   arrowSelected: {
     borderTopColor: "#1a1a2e",
   },
+  markerRootCluster: {
+    width: 68,
+    minHeight: 74,
+    alignItems: "center",
+    backgroundColor: "transparent",
+    overflow: "visible",
+    paddingTop: 6,
+    paddingBottom: 4,
+  },
   clusterWrap: {
     position: "relative",
-    width: 42,
-    height: 42,
+    width: 44,
+    height: 44,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -75,34 +101,25 @@ const S = StyleSheet.create({
   },
 });
 
-const ANCHOR_CENTER_BOTTOM = { x: 0.5, y: 1 } as const;
-/**
- * Constant z-index on iOS: changing this per-marker when selection flips is one of the
- * top reasons MapKit crashes during gesture recognition. Keep it constant; the bottom
- * card is the real selection affordance.
- */
-const ANDROID_ELEVATION_STYLE = { elevation: 4 } as const;
-const ANDROID_ELEVATION_STYLE_SELECTED = { elevation: 8 } as const;
-const MARKER_Z_INDEX = 1;
-/**
- * The selected marker is rendered as a separate overlay annotation (not a prop change on
- * the base marker), so it gets a higher z-index to sit cleanly on top of the base paw.
- */
-const SELECTED_MARKER_Z_INDEX = 1000;
+/* ── Pool slot type ─────────────────────────────────────────────────────── */
 
-function mapMarkerNativeIdentifier(raw: string): string {
-  return raw.replace(/[^a-zA-Z0-9._-]/g, "_");
-}
+export type MarkerPoolSlot = {
+  kind: "single" | "cluster" | "offscreen";
+  coordinate: { latitude: number; longitude: number };
+  providerId: string | null;
+  clusterKey: string | null;
+  clusterCount: number;
+  clusterPins: MapPinDto[] | null;
+};
 
-const noop = () => {};
-
-/* ─── Single provider marker ────────────────────────────────────────────── */
-
-type SingleProps = { pin: MapPinDto; onPress: () => void };
+/* ── Visual bubbles (static, memo'd) ────────────────────────────────────── */
 
 const PawBubble = memo(function PawBubble() {
   return (
-    <View style={S.hitArea}>
+    <View
+      style={S.markerRoot}
+      {...(Platform.OS === "android" ? { collapsable: false } : {})}
+    >
       <View style={S.bubble}>
         <Ionicons name="paw" size={18} color="#1a1a2e" />
       </View>
@@ -111,43 +128,12 @@ const PawBubble = memo(function PawBubble() {
   );
 });
 
-const ExploreSingleMapMarker = memo(
-  function ExploreSingleMapMarker({ pin, onPress }: SingleProps) {
-    const coordinate = useMemo(
-      () => ({ latitude: Number(pin.latitude), longitude: Number(pin.longitude) }),
-      [pin.latitude, pin.longitude],
-    );
-    return (
-      <MarkerWrapper
-        identifier={mapMarkerNativeIdentifier(String(pin.providerId))}
-        coordinate={coordinate}
-        anchor={ANCHOR_CENTER_BOTTOM}
-        tracksViewChanges={false}
-        onPress={onPress}
-        zIndex={MARKER_Z_INDEX}
-        {...(Platform.OS === "android" ? { style: ANDROID_ELEVATION_STYLE } : {})}
-      >
-        <PawBubble />
-      </MarkerWrapper>
-    );
-  },
-  (prev, next) =>
-    prev.pin.providerId === next.pin.providerId &&
-    prev.pin.latitude === next.pin.latitude &&
-    prev.pin.longitude === next.pin.longitude &&
-    prev.onPress === next.onPress,
-);
-
-/* ─── Cluster marker ─────────────────────────────────────────────────────── */
-
-type ClusterProps = {
-  item: Extract<ExploreMapMarkerItem, { kind: "cluster" }>;
-  onPress: () => void;
-};
-
 const ClusterBubble = memo(function ClusterBubble({ count }: { count: number }) {
   return (
-    <View style={S.hitArea}>
+    <View
+      style={S.markerRootCluster}
+      {...(Platform.OS === "android" ? { collapsable: false } : {})}
+    >
       <View style={S.clusterWrap}>
         <View style={S.bubble}>
           <Ionicons name="paw" size={16} color="#1a1a2e" />
@@ -161,140 +147,12 @@ const ClusterBubble = memo(function ClusterBubble({ count }: { count: number }) 
   );
 });
 
-const ExploreClusterMapMarker = memo(
-  function ExploreClusterMapMarker({ item, onPress }: ClusterProps) {
-    const coordinate = useMemo(
-      () => ({ latitude: item.latitude, longitude: item.longitude }),
-      [item.latitude, item.longitude],
-    );
-    return (
-      <MarkerWrapper
-        identifier={mapMarkerNativeIdentifier(`cluster-${item.key}`)}
-        coordinate={coordinate}
-        anchor={ANCHOR_CENTER_BOTTOM}
-        tracksViewChanges={false}
-        onPress={onPress}
-        zIndex={MARKER_Z_INDEX}
-        {...(Platform.OS === "android" ? { style: ANDROID_ELEVATION_STYLE } : {})}
-      >
-        <ClusterBubble count={item.pins.length} />
-      </MarkerWrapper>
-    );
-  },
-  (prev, next) =>
-    prev.item.key === next.item.key &&
-    prev.item.latitude === next.item.latitude &&
-    prev.item.longitude === next.item.longitude &&
-    prev.item.pins === next.item.pins &&
-    prev.onPress === next.onPress,
-);
-
-/* ─── Container ──────────────────────────────────────────────────────────── */
-
-export type ExploreMapMarkersProps = {
-  items: ExploreMapMarkerItem[];
-  onPressProviderId: (providerId: string) => void;
-  onPressClusterPins: (pins: MapPinDto[]) => void;
-};
-
-export const ExploreMapMarkers = memo(
-  function ExploreMapMarkers({
-    items,
-    onPressProviderId,
-    onPressClusterPins,
-  }: ExploreMapMarkersProps) {
-    /**
-     * Persistent closure caches across renders so the `onPress` prop passed to each
-     * <Marker> is referentially stable even when the `items` list churns. Without
-     * this, every pan-triggered refetch rebuilt every marker's onPress closure,
-     * which broke the `memo` equality and caused MapKit to rewrite annotations.
-     */
-    const providerPressCacheRef = useRef(new Map<string, () => void>());
-    const clusterPressCacheRef = useRef(new Map<string, () => void>());
-    const onPressProviderIdRef = useRef(onPressProviderId);
-    const onPressClusterPinsRef = useRef(onPressClusterPins);
-    onPressProviderIdRef.current = onPressProviderId;
-    onPressClusterPinsRef.current = onPressClusterPins;
-
-    const { providerPressById, clusterPressByKey } = useMemo(() => {
-      const providerCache = providerPressCacheRef.current;
-      const clusterCache = clusterPressCacheRef.current;
-      const seenProviderIds = new Set<string>();
-      const seenClusterKeys = new Set<string>();
-
-      for (const it of items) {
-        if (it.kind === "single") {
-          const id = it.pin.providerId;
-          seenProviderIds.add(id);
-          if (!providerCache.has(id)) {
-            providerCache.set(id, () => onPressProviderIdRef.current(id));
-          }
-        } else {
-          const key = it.key;
-          seenClusterKeys.add(key);
-          if (!clusterCache.has(key)) {
-            // Capture the latest pins[] snapshot at tap time, not at cache-creation time.
-            clusterCache.set(key, () => {
-              const fresh = items.find(
-                (x) => x.kind === "cluster" && x.key === key,
-              );
-              if (fresh && fresh.kind === "cluster") {
-                onPressClusterPinsRef.current(fresh.pins);
-              }
-            });
-          }
-        }
-      }
-
-      // Drop stale entries — prevents unbounded growth across long sessions.
-      for (const k of providerCache.keys()) {
-        if (!seenProviderIds.has(k)) providerCache.delete(k);
-      }
-      for (const k of clusterCache.keys()) {
-        if (!seenClusterKeys.has(k)) clusterCache.delete(k);
-      }
-
-      return { providerPressById: providerCache, clusterPressByKey: clusterCache };
-    }, [items]);
-
-    return useMemo(
-      () => (
-        <>
-          {items.map((item) => {
-            if (item.kind === "single") {
-              const pin = item.pin;
-              return (
-                <ExploreSingleMapMarker
-                  key={pin.providerId}
-                  pin={pin}
-                  onPress={providerPressById.get(pin.providerId) ?? noop}
-                />
-              );
-            }
-            return (
-              <ExploreClusterMapMarker
-                key={`cluster-${item.key}`}
-                item={item}
-                onPress={clusterPressByKey.get(item.key) ?? noop}
-              />
-            );
-          })}
-        </>
-      ),
-      [items, providerPressById, clusterPressByKey],
-    );
-  },
-  (prev, next) =>
-    prev.items === next.items &&
-    prev.onPressProviderId === next.onPressProviderId &&
-    prev.onPressClusterPins === next.onPressClusterPins,
-);
-
-/* ─── Selected-marker overlay ────────────────────────────────────────────── */
-
 const SelectedPawBubble = memo(function SelectedPawBubble() {
   return (
-    <View style={S.hitArea}>
+    <View
+      style={S.markerRoot}
+      {...(Platform.OS === "android" ? { collapsable: false } : {})}
+    >
       <View style={[S.bubble, S.bubbleSelected]}>
         <Ionicons name="paw" size={18} color="#ffffff" />
       </View>
@@ -303,6 +161,146 @@ const SelectedPawBubble = memo(function SelectedPawBubble() {
   );
 });
 
+/* ── Pooled marker (never unmounts — RecyclerView pattern) ──────────────── */
+
+type PooledMarkerProps = {
+  slot: MarkerPoolSlot;
+  index: number;
+  onPressProviderId: (id: string) => void;
+  onPressClusterPins: (pins: MapPinDto[]) => void;
+};
+
+/**
+ * A single recycled marker slot. Keyed by array index so React never
+ * unmounts it — only prop updates flow to the native Marker. When the slot
+ * is inactive the coordinate is OFFSCREEN_COORDINATE (-90, 0).
+ *
+ * Both "single" and "offscreen" slots render <PawBubble /> so that the
+ * bitmap snapshot is valid for the common offscreen→single transition
+ * without needing a re-snapshot. Only cluster visuals differ.
+ */
+const PooledMarker = memo(
+  function PooledMarker({
+    slot,
+    index,
+    onPressProviderId,
+    onPressClusterPins,
+  }: PooledMarkerProps) {
+    /*
+     * tracksViewChanges gates when MapKit re-snapshots the CALayer bitmap.
+     * Mount:  true  → captures the Ionicons paw glyph after async font load.
+     * +300ms: false → freezes the bitmap, zero per-frame overhead.
+     *
+     * Visual key tracks the current visual state. When it changes (e.g.
+     * single↔cluster or cluster count change), we re-enable briefly.
+     * offscreen↔single does NOT need a re-snapshot: both render PawBubble.
+     */
+    const visualKey = slot.kind === "cluster" ? `c${slot.clusterCount}` : "paw";
+    const prevVisualKeyRef = useRef(visualKey);
+    const [tracksViewChanges, setTracksViewChanges] = useState(true);
+
+    useEffect(() => {
+      if (visualKey !== prevVisualKeyRef.current) {
+        prevVisualKeyRef.current = visualKey;
+        setTracksViewChanges(true);
+      }
+    }, [visualKey]);
+
+    useEffect(() => {
+      if (!tracksViewChanges) return;
+      const t = setTimeout(() => setTracksViewChanges(false), 300);
+      return () => clearTimeout(t);
+    }, [tracksViewChanges]);
+
+    /* Stable onPress — reads current slot data from ref at tap time. */
+    const slotRef = useRef(slot);
+    slotRef.current = slot;
+
+    const handlePress = useCallback(() => {
+      const s = slotRef.current;
+      if (s.kind === "single" && s.providerId) {
+        onPressProviderId(s.providerId);
+      } else if (s.kind === "cluster" && s.clusterPins) {
+        onPressClusterPins(s.clusterPins);
+      }
+    }, [onPressProviderId, onPressClusterPins]);
+
+    return (
+      <MarkerWrapper
+        identifier={`pool-${index}`}
+        coordinate={slot.coordinate}
+        anchor={ANCHOR_CENTER_BOTTOM}
+        tracksViewChanges={tracksViewChanges}
+        onPress={handlePress}
+        zIndex={MARKER_Z_INDEX}
+      >
+        {slot.kind === "cluster" ? (
+          <ClusterBubble count={slot.clusterCount} />
+        ) : (
+          <PawBubble />
+        )}
+      </MarkerWrapper>
+    );
+  },
+  (prev, next) => {
+    if (prev.slot.kind !== next.slot.kind) return false;
+    if (prev.slot.kind === "offscreen" && next.slot.kind === "offscreen") return true;
+    if (prev.slot.providerId !== next.slot.providerId) return false;
+    if (prev.slot.clusterKey !== next.slot.clusterKey) return false;
+    if (prev.slot.clusterCount !== next.slot.clusterCount) return false;
+    const dLat = Math.abs(
+      prev.slot.coordinate.latitude - next.slot.coordinate.latitude,
+    );
+    const dLng = Math.abs(
+      prev.slot.coordinate.longitude - next.slot.coordinate.longitude,
+    );
+    if (dLat >= 1e-5 || dLng >= 1e-5) return false;
+    if (prev.onPressProviderId !== next.onPressProviderId) return false;
+    if (prev.onPressClusterPins !== next.onPressClusterPins) return false;
+    return true;
+  },
+);
+
+/* ── Container ──────────────────────────────────────────────────────────── */
+
+export type ExploreMapMarkersProps = {
+  pool: MarkerPoolSlot[];
+  onPressProviderId: (providerId: string) => void;
+  onPressClusterPins: (pins: MapPinDto[]) => void;
+};
+
+export const ExploreMapMarkers = memo(
+  function ExploreMapMarkers({
+    pool,
+    onPressProviderId,
+    onPressClusterPins,
+  }: ExploreMapMarkersProps) {
+    let active = 0;
+    for (const s of pool) if (s.kind !== "offscreen") active++;
+    mapDiag("markers.render", { poolSize: pool.length, active });
+
+    return (
+      <>
+        {pool.map((slot, index) => (
+          <PooledMarker
+            key={index}
+            slot={slot}
+            index={index}
+            onPressProviderId={onPressProviderId}
+            onPressClusterPins={onPressClusterPins}
+          />
+        ))}
+      </>
+    );
+  },
+  (prev, next) =>
+    prev.pool === next.pool &&
+    prev.onPressProviderId === next.onPressProviderId &&
+    prev.onPressClusterPins === next.onPressClusterPins,
+);
+
+/* ── Selected-marker overlay (always mounted, coordinate-hidden) ─────── */
+
 export type ExploreSelectedMarkerOverlayProps = {
   providerId: string | null;
   latitude: number | null;
@@ -310,14 +308,10 @@ export type ExploreSelectedMarkerOverlayProps = {
 };
 
 /**
- * Renders a single overlay marker with the "selected" dark paw at the selected pin's
- * coordinate, on top of the base paw annotation. Base markers never receive a prop
- * change when the selection flips, so MapKit only sees a clean annotation mount /
- * unmount — not a property update on an existing annotation (which is the iOS crash
- * pattern we are avoiding).
- *
- * The `key` on the inner <Marker> is the providerId, so switching from pin A to pin B
- * unmounts A and mounts B; there is no prop diff on the same native view.
+ * Persistent overlay marker for the selected pin's dark-paw visual.
+ * Always mounted — never calls addAnnotation/removeAnnotation. When no
+ * pin is selected the marker parks at OFFSCREEN_COORDINATE. When a pin
+ * is selected it moves to the pin's coordinate via a native prop update.
  */
 export const ExploreSelectedMarkerOverlay = memo(
   function ExploreSelectedMarkerOverlay({
@@ -325,25 +319,43 @@ export const ExploreSelectedMarkerOverlay = memo(
     latitude,
     longitude,
   }: ExploreSelectedMarkerOverlayProps) {
+    const isActive = providerId != null && latitude != null && longitude != null;
+
     const coordinate = useMemo(
       () =>
-        providerId != null && latitude != null && longitude != null
+        isActive
           ? { latitude: Number(latitude), longitude: Number(longitude) }
-          : null,
-      [providerId, latitude, longitude],
+          : OFFSCREEN_COORDINATE,
+      [isActive, latitude, longitude],
     );
-    if (providerId == null || coordinate == null) return null;
+
+    const [tracksViewChanges, setTracksViewChanges] = useState(true);
+
+    useEffect(() => {
+      if (isActive) setTracksViewChanges(true);
+    }, [isActive]);
+
+    useEffect(() => {
+      if (!tracksViewChanges) return;
+      const t = setTimeout(() => setTracksViewChanges(false), 200);
+      return () => clearTimeout(t);
+    }, [tracksViewChanges]);
+
+    useEffect(() => {
+      if (isActive) {
+        mapDiag("overlay.activate", { providerId });
+      } else {
+        mapDiag("overlay.deactivate");
+      }
+    }, [isActive, providerId]);
+
     return (
       <MarkerWrapper
-        key={providerId}
-        identifier={mapMarkerNativeIdentifier(`selected-${providerId}`)}
+        identifier="selected-overlay"
         coordinate={coordinate}
         anchor={ANCHOR_CENTER_BOTTOM}
-        tracksViewChanges={false}
+        tracksViewChanges={tracksViewChanges}
         zIndex={SELECTED_MARKER_Z_INDEX}
-        {...(Platform.OS === "android"
-          ? { style: ANDROID_ELEVATION_STYLE_SELECTED }
-          : {})}
       >
         <SelectedPawBubble />
       </MarkerWrapper>

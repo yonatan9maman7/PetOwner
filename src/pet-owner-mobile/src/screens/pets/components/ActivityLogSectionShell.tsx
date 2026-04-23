@@ -3,7 +3,7 @@ import { View, Text, Pressable, KeyboardAvoidingView, Platform } from "react-nat
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
-import { useTranslation } from "../../../i18n";
+import { useTranslation, rowDirectionForAppLayout } from "../../../i18n";
 import { useTheme } from "../../../theme/ThemeContext";
 import type { PetDto } from "../../../types/api";
 import { getSpeciesEmoji } from "../MyPets/constants";
@@ -44,7 +44,7 @@ export function ActivityLogSectionShell({ pet, onBack, children }: ActivityLogSe
         >
           <View
             className="items-center px-5 pt-3"
-            style={{ flexDirection: isRTL ? "row-reverse" : "row", gap: 12 }}
+            style={{ flexDirection: rowDirectionForAppLayout(isRTL), gap: 12 }}
           >
             <Pressable
               onPress={onBack}
@@ -68,7 +68,7 @@ export function ActivityLogSectionShell({ pet, onBack, children }: ActivityLogSe
               <View
                 className="mt-1.5 flex-row items-center gap-1.5 rounded-[10px] px-3 py-1"
                 style={{
-                  flexDirection: isRTL ? "row-reverse" : "row",
+                  flexDirection: rowDirectionForAppLayout(isRTL),
                   backgroundColor: "rgba(255,255,255,0.2)",
                 }}
               >

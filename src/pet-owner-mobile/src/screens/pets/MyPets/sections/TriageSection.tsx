@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { View, Text } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { useTranslation } from "../../../../i18n";
+import { useTranslation, rowDirectionForAppLayout } from "../../../../i18n";
 import { useTheme } from "../../../../theme/ThemeContext";
 import { triageApi } from "../../../../api/client";
 import { ListSkeleton } from "../../../../components/shared/ListSkeleton";
@@ -70,7 +70,7 @@ export function TriageSection({ petId, reloadNonce = 0 }: { petId: string; reloa
               elevation: 1,
             }}
           >
-            <View style={{ flexDirection: isRTL ? "row-reverse" : "row", alignItems: "center", gap: 8, marginBottom: 10 }}>
+            <View style={{ flexDirection: rowDirectionForAppLayout(isRTL), alignItems: "center", gap: 8, marginBottom: 10 }}>
               <View
                 style={{
                   width: 10,

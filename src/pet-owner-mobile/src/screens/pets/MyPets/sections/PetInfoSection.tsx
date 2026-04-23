@@ -1,6 +1,6 @@
 import { View, Text, Pressable, Linking } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { useTranslation } from "../../../../i18n";
+import { useTranslation, rowDirectionForAppLayout } from "../../../../i18n";
 import { useTheme } from "../../../../theme/ThemeContext";
 import type { PetDto } from "../../../../types/api";
 
@@ -33,7 +33,7 @@ function InfoCard({
     >
       <View
         style={{
-          flexDirection: isRTL ? "row-reverse" : "row",
+          flexDirection: rowDirectionForAppLayout(isRTL),
           alignItems: "center",
           gap: 8,
           marginBottom: 8,
@@ -119,7 +119,7 @@ export function PetInfoSection({ pet }: { pet: PetDto }) {
       {pet.isNeutered && (
         <View
           style={{
-            flexDirection: isRTL ? "row-reverse" : "row",
+            flexDirection: rowDirectionForAppLayout(isRTL),
             alignItems: "center",
             gap: 10,
             backgroundColor: "#ecfdf5",
@@ -146,7 +146,7 @@ export function PetInfoSection({ pet }: { pet: PetDto }) {
         >
           <View
             style={{
-              flexDirection: isRTL ? "row-reverse" : "row",
+              flexDirection: rowDirectionForAppLayout(isRTL),
               alignItems: "center",
               gap: 10,
             }}

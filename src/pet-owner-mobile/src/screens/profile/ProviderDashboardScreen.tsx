@@ -9,7 +9,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation, useFocusEffect } from "@react-navigation/native";
-import { useTranslation } from "../../i18n";
+import { useTranslation, rowDirectionForAppLayout } from "../../i18n";
 import { useTheme } from "../../theme/ThemeContext";
 import { useProviderDashboardStore } from "../../store/providerDashboardStore";
 import { ListSkeleton, ListEmptyState, InlineError } from "../../components/shared";
@@ -140,7 +140,7 @@ function TodayRow({ item, isRTL, rtlText }: { item: TodayScheduleDto; isRTL: boo
         borderColor: colors.borderLight,
       }}
     >
-      <View style={{ flexDirection: isRTL ? "row-reverse" : "row", justifyContent: "space-between", alignItems: "center" }}>
+      <View style={{ flexDirection: rowDirectionForAppLayout(isRTL), justifyContent: "space-between", alignItems: "center" }}>
         <Text style={[{ flex: 1, fontWeight: "700", color: colors.text }, rtlText]} numberOfLines={1}>
           {item.timeSlot}
         </Text>
@@ -166,7 +166,7 @@ function UpcomingRow({ item, isRTL, rtlText }: { item: UpcomingBookingDto; isRTL
         borderColor: colors.borderLight,
       }}
     >
-      <View style={{ flexDirection: isRTL ? "row-reverse" : "row", justifyContent: "space-between", alignItems: "flex-start" }}>
+      <View style={{ flexDirection: rowDirectionForAppLayout(isRTL), justifyContent: "space-between", alignItems: "flex-start" }}>
         <View style={{ flex: 1 }}>
           <Text style={[{ fontSize: 15, fontWeight: "700", color: colors.text }, rtlText]} numberOfLines={2}>
             {item.petOwnerName}
@@ -198,7 +198,7 @@ function TransactionRow({ item, isRTL, rtlText }: { item: EarningsTransactionDto
   return (
     <View
       className="py-3 border-b"
-      style={{ borderBottomColor: colors.borderLight, flexDirection: isRTL ? "row-reverse" : "row", alignItems: "center", gap: 10 }}
+      style={{ borderBottomColor: colors.borderLight, flexDirection: rowDirectionForAppLayout(isRTL), alignItems: "center", gap: 10 }}
     >
       <View style={{ flex: 1 }}>
         <Text style={[{ fontWeight: "600", color: colors.text }, rtlText]} numberOfLines={1}>
@@ -253,7 +253,7 @@ export function ProviderDashboardScreen() {
     <SafeAreaView className="flex-1" edges={["top"]} style={{ marginTop: -8, backgroundColor: colors.background }}>
       <View
         style={{
-          flexDirection: isRTL ? "row-reverse" : "row",
+          flexDirection: rowDirectionForAppLayout(isRTL),
           alignItems: "center",
           paddingHorizontal: 16,
           paddingVertical: 12,
@@ -302,7 +302,7 @@ export function ProviderDashboardScreen() {
 
         {stats ? (
           <>
-            <View style={{ flexDirection: isRTL ? "row-reverse" : "row", flexWrap: "wrap", gap: 10, marginBottom: 12 }}>
+            <View style={{ flexDirection: rowDirectionForAppLayout(isRTL), flexWrap: "wrap", gap: 10, marginBottom: 12 }}>
               <StatCard
                 icon="cash-outline"
                 label={t("providerTotalEarnings")}
@@ -332,7 +332,7 @@ export function ProviderDashboardScreen() {
 
             <View
               className="flex-row flex-wrap gap-2 mb-6"
-              style={{ flexDirection: isRTL ? "row-reverse" : "row", alignItems: "center" }}
+              style={{ flexDirection: rowDirectionForAppLayout(isRTL), alignItems: "center" }}
             >
               <View className="px-3 py-1.5 rounded-full" style={{ backgroundColor: colors.primaryLight }}>
                 <Text className="text-xs font-bold" style={{ color: colors.primary }}>
@@ -386,7 +386,7 @@ export function ProviderDashboardScreen() {
                   borderColor: colors.borderLight,
                 }}
               >
-                <View style={{ flexDirection: isRTL ? "row-reverse" : "row", justifyContent: "space-between", gap: 8 }}>
+                <View style={{ flexDirection: rowDirectionForAppLayout(isRTL), justifyContent: "space-between", gap: 8 }}>
                   <View style={{ flex: 1, alignItems: "center" }}>
                     <Text style={{ fontSize: 12, color: colors.textMuted, fontWeight: "600" }}>{t("providerNetEarnings")}</Text>
                     <Text style={{ fontSize: 18, fontWeight: "800", color: colors.text, marginTop: 4 }}>

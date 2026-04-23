@@ -1,7 +1,7 @@
 import { View, Text, Pressable, ScrollView, TextInput } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useController, useFormContext } from "react-hook-form";
-import { useTranslation } from "../../i18n";
+import { useTranslation, rowDirectionForAppLayout } from "../../i18n";
 import { useTheme } from "../../theme/ThemeContext";
 import type { DogSize } from "../../types/api";
 import {
@@ -48,7 +48,7 @@ export function DogSizeCapacityEditor({
         horizontal
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={{
-          flexDirection: isRTL ? "row-reverse" : "row",
+          flexDirection: rowDirectionForAppLayout(isRTL),
           gap: 10,
           paddingVertical: 4,
         }}

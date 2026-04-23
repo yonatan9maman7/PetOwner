@@ -27,7 +27,7 @@ import {
   type Action,
 } from "expo-image-manipulator";
 import * as Location from "expo-location";
-import { useTranslation } from "../../i18n";
+import { useTranslation, rowDirectionForAppLayout } from "../../i18n";
 import { useTheme } from "../../theme/ThemeContext";
 import { triageApi, petsApi } from "../../api/client";
 import { getSpeciesEmoji } from "./MyPets/constants";
@@ -408,7 +408,7 @@ export function TriageScreen() {
       <SafeAreaView style={{ flex: 1, backgroundColor: colors.surface, marginTop: -8 }} edges={["top"]}>
         <View
           style={{
-            flexDirection: isRTL ? "row-reverse" : "row",
+            flexDirection: rowDirectionForAppLayout(isRTL),
             alignItems: "center",
             paddingHorizontal: 20,
             paddingVertical: 14,
@@ -513,7 +513,7 @@ export function TriageScreen() {
               paddingVertical: 10,
               borderBottomWidth: 1,
               borderBottomColor: "#fecaca",
-              flexDirection: isRTL ? "row-reverse" : "row",
+              flexDirection: rowDirectionForAppLayout(isRTL),
               alignItems: "center",
               gap: 10,
             }}
@@ -537,7 +537,7 @@ export function TriageScreen() {
         {/* ─── Header ─── */}
         <View
           style={{
-            flexDirection: isRTL ? "row-reverse" : "row",
+            flexDirection: rowDirectionForAppLayout(isRTL),
             alignItems: "center",
             paddingHorizontal: 20,
             paddingVertical: 12,
@@ -672,7 +672,7 @@ export function TriageScreen() {
                       {/* Top row */}
                       <View
                         style={{
-                          flexDirection: isRTL ? "row-reverse" : "row",
+                          flexDirection: rowDirectionForAppLayout(isRTL),
                           alignItems: "center",
                           marginBottom: 6,
                           gap: 6,
@@ -816,7 +816,7 @@ export function TriageScreen() {
                           <Pressable
                             onPress={() => openHistoryItem(item)}
                             style={{
-                              flexDirection: isRTL ? "row-reverse" : "row",
+                              flexDirection: rowDirectionForAppLayout(isRTL),
                               alignItems: "center",
                               gap: 6,
                               marginTop: 4,
@@ -872,7 +872,7 @@ export function TriageScreen() {
                   gap: 8,
                   paddingHorizontal: 16,
                   paddingVertical: 10,
-                  flexDirection: isRTL ? "row-reverse" : "row",
+                  flexDirection: rowDirectionForAppLayout(isRTL),
                 }}
               >
                 {pets.map((pet) => {
@@ -888,7 +888,7 @@ export function TriageScreen() {
                         }
                       }}
                       style={{
-                        flexDirection: isRTL ? "row-reverse" : "row",
+                        flexDirection: rowDirectionForAppLayout(isRTL),
                         alignItems: "center",
                         gap: 6,
                         paddingHorizontal: 14,
@@ -934,7 +934,7 @@ export function TriageScreen() {
               {/* Disclaimer — always visible */}
               <View
                 style={{
-                  flexDirection: isRTL ? "row-reverse" : "row",
+                  flexDirection: rowDirectionForAppLayout(isRTL),
                   alignItems: "flex-start",
                   backgroundColor: "#fef9c3",
                   borderRadius: 12,
@@ -1028,7 +1028,7 @@ export function TriageScreen() {
                     borderRadius: 16,
                     paddingHorizontal: 16,
                     paddingVertical: 14,
-                    flexDirection: isRTL ? "row-reverse" : "row",
+                    flexDirection: rowDirectionForAppLayout(isRTL),
                     alignItems: "center",
                     gap: 12,
                     maxWidth: "92%",
@@ -1064,7 +1064,7 @@ export function TriageScreen() {
                     backgroundColor: "#ecfdf5",
                     borderRadius: 14,
                     padding: 14,
-                    flexDirection: isRTL ? "row-reverse" : "row",
+                    flexDirection: rowDirectionForAppLayout(isRTL),
                     alignItems: "center",
                     gap: 10,
                   }}
@@ -1113,7 +1113,7 @@ export function TriageScreen() {
                 {imageUri && (
                   <View
                     style={{
-                      flexDirection: isRTL ? "row-reverse" : "row",
+                      flexDirection: rowDirectionForAppLayout(isRTL),
                       alignItems: "center",
                       marginBottom: 8,
                       gap: 8,
@@ -1139,7 +1139,7 @@ export function TriageScreen() {
 
                 <View
                   style={{
-                    flexDirection: isRTL ? "row-reverse" : "row",
+                    flexDirection: rowDirectionForAppLayout(isRTL),
                     alignItems: "flex-end",
                     gap: 8,
                   }}
@@ -1334,7 +1334,7 @@ export function TriageScreen() {
           {/* Severity header */}
           <View
             style={{
-              flexDirection: isRTL ? "row-reverse" : "row",
+              flexDirection: rowDirectionForAppLayout(isRTL),
               alignItems: "center",
               backgroundColor: sevColor + "15",
               paddingHorizontal: 14,
@@ -1406,7 +1406,7 @@ export function TriageScreen() {
             {/* Consult a vet */}
             <View
               style={{
-                flexDirection: isRTL ? "row-reverse" : "row",
+                flexDirection: rowDirectionForAppLayout(isRTL),
                 alignItems: "center",
                 gap: 6,
                 marginTop: 2,
@@ -1432,7 +1432,7 @@ export function TriageScreen() {
           {/* Footer */}
           <View
             style={{
-              flexDirection: isRTL ? "row-reverse" : "row",
+              flexDirection: rowDirectionForAppLayout(isRTL),
               justifyContent: "space-between",
               alignItems: "center",
               paddingHorizontal: 14,
@@ -1469,7 +1469,7 @@ export function TriageScreen() {
           >
             <View
               style={{
-                flexDirection: isRTL ? "row-reverse" : "row",
+                flexDirection: rowDirectionForAppLayout(isRTL),
                 alignItems: "center",
                 gap: 8,
               }}
@@ -1489,7 +1489,7 @@ export function TriageScreen() {
             </View>
             <View
               style={{
-                flexDirection: isRTL ? "row-reverse" : "row",
+                flexDirection: rowDirectionForAppLayout(isRTL),
                 gap: 8,
               }}
             >
@@ -1497,7 +1497,7 @@ export function TriageScreen() {
                 onPress={() => Linking.openURL("tel:911")}
                 style={{
                   flex: 1,
-                  flexDirection: isRTL ? "row-reverse" : "row",
+                  flexDirection: rowDirectionForAppLayout(isRTL),
                   alignItems: "center",
                   justifyContent: "center",
                   gap: 6,
@@ -1521,7 +1521,7 @@ export function TriageScreen() {
                 }
                 style={{
                   flex: 1,
-                  flexDirection: isRTL ? "row-reverse" : "row",
+                  flexDirection: rowDirectionForAppLayout(isRTL),
                   alignItems: "center",
                   justifyContent: "center",
                   gap: 6,
@@ -1570,7 +1570,7 @@ export function TriageScreen() {
           backgroundColor: colors.surface,
           borderRadius: 14,
           padding: 12,
-          flexDirection: isRTL ? "row-reverse" : "row",
+          flexDirection: rowDirectionForAppLayout(isRTL),
           gap: 12,
           shadowColor: colors.shadow,
           shadowOffset: { width: 0, height: 1 },
@@ -1616,7 +1616,7 @@ export function TriageScreen() {
 
           <View
             style={{
-              flexDirection: isRTL ? "row-reverse" : "row",
+              flexDirection: rowDirectionForAppLayout(isRTL),
               alignItems: "center",
               gap: 6,
               marginTop: 2,
@@ -1657,7 +1657,7 @@ export function TriageScreen() {
           {/* Actions */}
           <View
             style={{
-              flexDirection: isRTL ? "row-reverse" : "row",
+              flexDirection: rowDirectionForAppLayout(isRTL),
               gap: 8,
               marginTop: 8,
             }}
@@ -1666,7 +1666,7 @@ export function TriageScreen() {
               <Pressable
                 onPress={() => Linking.openURL(`tel:${vet.phone}`)}
                 style={{
-                  flexDirection: isRTL ? "row-reverse" : "row",
+                  flexDirection: rowDirectionForAppLayout(isRTL),
                   alignItems: "center",
                   gap: 4,
                   backgroundColor: colors.primaryLight,
@@ -1692,7 +1692,7 @@ export function TriageScreen() {
                 openInMaps(vet.latitude, vet.longitude, vet.name)
               }
               style={{
-                flexDirection: isRTL ? "row-reverse" : "row",
+                flexDirection: rowDirectionForAppLayout(isRTL),
                 alignItems: "center",
                 gap: 4,
                 backgroundColor: "#ecfdf5",

@@ -12,7 +12,7 @@ import { Ionicons } from "@expo/vector-icons";
 import QRCode from "qrcode";
 import { SvgXml } from "react-native-svg";
 import { medicalApi } from "../api/client";
-import { useTranslation } from "../i18n";
+import { useTranslation, rowDirectionForAppLayout } from "../i18n";
 import { useTheme } from "../theme/ThemeContext";
 import type { HealthPassportShareDto } from "../types/api";
 
@@ -143,7 +143,7 @@ export function ShareHealthPassportModal({ petId, visible, onClose }: Props) {
                 {data.url}
               </Text>
 
-              <View style={{ flexDirection: isRTL ? "row-reverse" : "row", gap: 12, width: "100%" }}>
+              <View style={{ flexDirection: rowDirectionForAppLayout(isRTL), gap: 12, width: "100%" }}>
                 <Pressable
                   onPress={handleCopy}
                   style={{

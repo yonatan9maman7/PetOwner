@@ -3,7 +3,7 @@ import { View, Text, Pressable, ActivityIndicator, RefreshControl } from "react-
 import { FlashList } from "@shopify/flash-list";
 import { useRoute, useNavigation, useFocusEffect } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
-import { useTranslation } from "../../i18n";
+import { useTranslation, rowDirectionForAppLayout } from "../../i18n";
 import { useTheme } from "../../theme/ThemeContext";
 import { usePetsStore } from "../../store/petsStore";
 import { useActivitiesStore } from "../../store/activitiesStore";
@@ -73,7 +73,7 @@ function ActivityRow({
     <View
       className="mx-4 mb-2 flex-row items-center gap-3 rounded-2xl border px-3.5 py-3.5"
       style={{
-        flexDirection: isRTL ? "row-reverse" : "row",
+        flexDirection: rowDirectionForAppLayout(isRTL),
         backgroundColor: colors.surface,
         borderColor: colors.borderLight,
       }}
@@ -183,7 +183,7 @@ export function ActivityLogScreen() {
             borderColor: colors.borderLight,
           }}
         >
-          <View className="mb-2 flex-row items-center justify-between" style={{ flexDirection: isRTL ? "row-reverse" : "row" }}>
+          <View className="mb-2 flex-row items-center justify-between" style={{ flexDirection: rowDirectionForAppLayout(isRTL) }}>
             <Text className="text-base font-extrabold" style={{ color: colors.text }}>
               {t("activitySummarySection")}
             </Text>
@@ -224,7 +224,7 @@ export function ActivityLogScreen() {
 
         <View
           className="mx-4 mt-4 flex-row justify-between gap-2"
-          style={{ flexDirection: isRTL ? "row-reverse" : "row" }}
+          style={{ flexDirection: rowDirectionForAppLayout(isRTL) }}
         >
           <Pressable
             accessibilityLabel={t("activityQuickWalkA11y")}

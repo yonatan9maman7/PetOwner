@@ -1,3 +1,4 @@
+import { I18nManager, Platform } from "react-native";
 import { useAuthStore } from "../store/authStore";
 
 export type Language = "he" | "en";
@@ -2485,6 +2486,24 @@ export function resolveNotificationApiText(
   return s;
 }
 
+/**
+ * When `I18nManager.isRTL` is in sync with the in-app language (`forceRTL` etc.),
+ * Android applies native flex mirroring; a plain `isHebrew ? "row-reverse" : "row"`
+ * would double-mirror. iOS is unchanged here so we keep the previous LTR/RTL split.
+ */
+export function rowDirectionForAppLayout(
+  appWantsRTL: boolean | undefined | null,
+): "row" | "row-reverse" {
+  const rtl = appWantsRTL === true;
+  if (Platform.OS !== "android") {
+    return rtl ? "row-reverse" : "row";
+  }
+  if (I18nManager.isRTL) {
+    return rtl ? "row" : "row-reverse";
+  }
+  return rtl ? "row-reverse" : "row";
+}
+
 export function useTranslation() {
   const language = useAuthStore((s) => s.language);
   const isHebrew = language === "he";
@@ -2494,6 +2513,14 @@ export function useTranslation() {
     language,
     isHebrew,
     isRTL: isHebrew,
+    /** `alignSelf` for secondary actions (e.g. forgot password): EN left, HE right, correct physical edge when native RTL matches app. */
+    trailingFormLinkAlign: {
+      alignSelf: (isHebrew
+        ? (I18nManager.isRTL ? "flex-start" : "flex-end")
+        : I18nManager.isRTL
+          ? "flex-end"
+          : "flex-start") as "flex-start" | "flex-end",
+    },
     /** Apply to Text with explicit start-aligned text (labels, headings). */
     rtlText: {
       textAlign: (isHebrew ? "right" : "left") as "right" | "left",
@@ -2505,9 +2532,7 @@ export function useTranslation() {
     },
     /** Apply to flex-row containers (input rows) so icons flip sides. */
     rtlRow: {
-      flexDirection: (isHebrew ? "row-reverse" : "row") as
-        | "row"
-        | "row-reverse",
+      flexDirection: rowDirectionForAppLayout(isHebrew),
     },
     /** Apply to TextInput for correct cursor/text alignment. */
     rtlInput: {

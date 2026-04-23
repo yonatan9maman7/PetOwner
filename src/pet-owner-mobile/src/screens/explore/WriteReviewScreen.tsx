@@ -16,7 +16,7 @@ import { useNavigation, useRoute, CommonActions } from "@react-navigation/native
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { useTranslation, type TranslationKey } from "../../i18n";
+import { useTranslation, type TranslationKey, rowDirectionForAppLayout } from "../../i18n";
 import { useTheme } from "../../theme/ThemeContext";
 import { useAuthStore } from "../../store/authStore";
 import { useReviewsStore } from "../../store/reviewsStore";
@@ -159,7 +159,7 @@ export function WriteReviewScreen() {
     <SafeAreaView className="flex-1" edges={["top"]} style={{ marginTop: -8, backgroundColor: colors.background }}>
       <View
         style={{
-          flexDirection: isRTL ? "row-reverse" : "row",
+          flexDirection: rowDirectionForAppLayout(isRTL),
           alignItems: "center",
           paddingHorizontal: 20,
           paddingVertical: 14,

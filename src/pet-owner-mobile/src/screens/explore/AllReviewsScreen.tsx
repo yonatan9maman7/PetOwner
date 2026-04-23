@@ -9,7 +9,7 @@ import { FlashList } from "@shopify/flash-list";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation, useRoute } from "@react-navigation/native";
-import { useTranslation } from "../../i18n";
+import { useTranslation, rowDirectionForAppLayout } from "../../i18n";
 import { useTheme } from "../../theme/ThemeContext";
 import { useReviewsStore } from "../../store/reviewsStore";
 import type { ReviewDto } from "../../types/api";
@@ -17,6 +17,7 @@ import { ListSkeleton, ListEmptyState, InlineError } from "../../components/shar
 import { ReviewCard } from "./components/ReviewCard";
 
 const STAR_COLOR = "#f59e0b";
+const EMPTY_REVIEWS: ReviewDto[] = [];
 
 function useRatingDistribution(reviews: ReviewDto[]) {
   return useMemo(() => {
@@ -38,7 +39,7 @@ export function AllReviewsScreen() {
   const { colors } = useTheme();
   const { t, isRTL, rtlText } = useTranslation();
 
-  const reviews = useReviewsStore((s) => s.byProviderId[providerId]?.reviews ?? []);
+  const reviews = useReviewsStore((s) => s.byProviderId[providerId]?.reviews ?? EMPTY_REVIEWS);
   const loading = useReviewsStore((s) => s.byProviderId[providerId]?.loading ?? true);
   const error = useReviewsStore((s) => s.byProviderId[providerId]?.error ?? null);
   const fetchProviderReviews = useReviewsStore((s) => s.fetchProviderReviews);
@@ -89,7 +90,7 @@ export function AllReviewsScreen() {
           >
             <View
               className="flex-row items-center gap-3"
-              style={{ flexDirection: isRTL ? "row-reverse" : "row" }}
+              style={{ flexDirection: rowDirectionForAppLayout(isRTL) }}
             >
               {average != null ? (
                 <>
@@ -123,7 +124,7 @@ export function AllReviewsScreen() {
                   <View
                     key={star}
                     className="flex-row items-center gap-2 mb-2"
-                    style={{ flexDirection: isRTL ? "row-reverse" : "row" }}
+                    style={{ flexDirection: rowDirectionForAppLayout(isRTL) }}
                   >
                     <Text className="text-xs font-semibold w-6" style={{ color: colors.textSecondary }}>
                       {star}
@@ -182,7 +183,7 @@ export function AllReviewsScreen() {
     <SafeAreaView className="flex-1" edges={["top"]} style={{ marginTop: -8, backgroundColor: colors.background }}>
       <View
         style={{
-          flexDirection: isRTL ? "row-reverse" : "row",
+          flexDirection: rowDirectionForAppLayout(isRTL),
           alignItems: "center",
           paddingHorizontal: 20,
           paddingVertical: 14,

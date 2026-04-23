@@ -15,7 +15,7 @@ import { WebView } from "react-native-webview";
 import type { WebViewNavigation } from "react-native-webview";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect, useNavigation, useRoute } from "@react-navigation/native";
-import { useTranslation } from "../../i18n";
+import { useTranslation, rowDirectionForAppLayout } from "../../i18n";
 import { useTheme } from "../../theme/ThemeContext";
 import { bookingsApi } from "../../api/client";
 import { InlineError } from "../../components/shared/InlineError";
@@ -154,7 +154,7 @@ export function PaymentCheckoutScreen() {
       >
         <View
           style={{
-            flexDirection: isRTL ? "row-reverse" : "row",
+            flexDirection: rowDirectionForAppLayout(isRTL),
             alignItems: "center",
             paddingHorizontal: 20,
             paddingVertical: 14,
@@ -204,7 +204,7 @@ export function PaymentCheckoutScreen() {
     >
       <View
         style={{
-          flexDirection: isRTL ? "row-reverse" : "row",
+          flexDirection: rowDirectionForAppLayout(isRTL),
           alignItems: "center",
           paddingHorizontal: 20,
           paddingVertical: 14,

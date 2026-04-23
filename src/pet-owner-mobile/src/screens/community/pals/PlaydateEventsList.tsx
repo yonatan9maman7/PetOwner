@@ -6,7 +6,7 @@ import { useNavigation } from "@react-navigation/native";
 import type { PlaydateEventDto } from "../../../types/api";
 import { playdatesApi } from "../../../api/client";
 import { useTheme } from "../../../theme/ThemeContext";
-import { useTranslation } from "../../../i18n";
+import { useTranslation, rowDirectionForAppLayout } from "../../../i18n";
 import { PlaydateEventCard } from "./PlaydateEventCard";
 import { ListEmptyState } from "../../../components/shared";
 
@@ -54,7 +54,7 @@ export function PlaydateEventsList() {
       {/* Create event FAB */}
       <Pressable
         onPress={() => navigation.navigate("CreatePlaydateEvent")}
-        style={[styles.fab, { backgroundColor: colors.text, flexDirection: isRTL ? "row-reverse" : "row" }]}
+        style={[styles.fab, { backgroundColor: colors.text, flexDirection: rowDirectionForAppLayout(isRTL) }]}
       >
         <Ionicons name="add" size={20} color={colors.textInverse} />
         <Text style={{ color: colors.textInverse, fontSize: 14, fontWeight: "700" }}>{t("createEvent")}</Text>

@@ -15,7 +15,7 @@ import { useForm, Controller, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Ionicons } from "@expo/vector-icons";
-import { useTranslation } from "../../../i18n";
+import { useTranslation, rowDirectionForAppLayout } from "../../../i18n";
 import { useTheme } from "../../../theme/ThemeContext";
 import { DatePickerField } from "../../../components/DatePickerField";
 import { useActivitiesStore } from "../../../store/activitiesStore";
@@ -154,7 +154,7 @@ export function AddActivityModal({
           >
           <View
             className="mb-3 flex-row items-center justify-between"
-            style={{ flexDirection: isRTL ? "row-reverse" : "row" }}
+            style={{ flexDirection: rowDirectionForAppLayout(isRTL) }}
           >
             <Text className="flex-1 text-lg font-extrabold" style={{ color: colors.text, textAlign: isRTL ? "right" : "left" }}>
               {t("activityAddTitle")}
@@ -246,7 +246,7 @@ export function AddActivityModal({
           </ScrollView>
 
           {/* Button row — pinned below the scroll area, always visible */}
-          <View className="mt-3 flex-row gap-3 pb-8" style={{ flexDirection: isRTL ? "row-reverse" : "row" }}>
+          <View className="mt-3 flex-row gap-3 pb-8" style={{ flexDirection: rowDirectionForAppLayout(isRTL) }}>
             <Pressable
               onPress={onClose}
               className="flex-1 items-center rounded-xl py-3.5"

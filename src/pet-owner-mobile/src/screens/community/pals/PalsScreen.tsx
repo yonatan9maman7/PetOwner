@@ -5,7 +5,7 @@ import { Ionicons } from "@expo/vector-icons";
 import type { PlaydatePrefsDto } from "../../../types/api";
 import { palsApi } from "../../../api/client";
 import { useTheme } from "../../../theme/ThemeContext";
-import { useTranslation } from "../../../i18n";
+import { useTranslation, rowDirectionForAppLayout } from "../../../i18n";
 import { NearbyPalsList } from "./NearbyPalsList";
 import { LiveBeaconsList } from "./LiveBeaconsList";
 import { PlaydateEventsList } from "./PlaydateEventsList";
@@ -81,7 +81,7 @@ export function PalsScreen() {
   return (
     <View style={{ flex: 1 }}>
       {/* Segmented control */}
-      <View style={[styles.segmented, { backgroundColor: colors.surfaceSecondary, flexDirection: isRTL ? "row-reverse" : "row" }]}>
+      <View style={[styles.segmented, { backgroundColor: colors.surfaceSecondary, flexDirection: rowDirectionForAppLayout(isRTL) }]}>
         {SUB_TABS.map(({ key, label }) => {
           const active = subTab === key;
           return (

@@ -1,3 +1,4 @@
+import { rowDirectionForAppLayout } from "../../i18n";
 import { useState, useCallback } from "react";
 import {
   View,
@@ -151,7 +152,7 @@ export function CityAutocompleteInput({
       {/* Input row */}
       <View
         style={{
-          flexDirection: isRTL ? "row-reverse" : "row",
+          flexDirection: rowDirectionForAppLayout(isRTL),
           alignItems: "center",
           backgroundColor: colors.surface,
           borderRadius: 12,
@@ -210,7 +211,7 @@ export function CityAutocompleteInput({
               key={city.en}
               onPress={() => handleSelectCity(city)}
               style={({ pressed }) => ({
-                flexDirection: isRTL ? "row-reverse" : "row",
+                flexDirection: rowDirectionForAppLayout(isRTL),
                 alignItems: "center",
                 paddingHorizontal: 14,
                 paddingVertical: 11,

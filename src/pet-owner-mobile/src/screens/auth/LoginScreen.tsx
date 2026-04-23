@@ -85,7 +85,7 @@ function LoginForm() {
   const emailRef = useRef<TextInput>(null);
   const navigation = useNavigation<any>();
   const setAuth = useAuthStore((s) => s.setAuth);
-  const { t, isHebrew, rtlText, rtlStyle, rtlRow, rtlInput, alignCls } =
+  const { t, isHebrew, rtlText, rtlStyle, rtlRow, rtlInput, alignCls, trailingFormLinkAlign } =
     useTranslation();
   const { colors } = useTheme();
 
@@ -410,7 +410,8 @@ function LoginForm() {
 
           {/* ── Forgot Password Link ── */}
           <Pressable
-            className={`mb-6 ${isHebrew ? "self-end" : "self-start"}`}
+            className="mb-6"
+            style={trailingFormLinkAlign}
             hitSlop={8}
             onPress={() => navigation.navigate("ForgotPasswordScreen")}
           >
@@ -443,7 +444,7 @@ function LoginForm() {
                 onPress={() => runBiometricLogin()}
                 disabled={bioLoading}
                 style={({ pressed }) => ({
-                  flexDirection: isHebrew ? "row-reverse" : "row",
+                  ...rtlRow,
                   alignItems: "center",
                   justifyContent: "center",
                   gap: 8,
@@ -502,8 +503,9 @@ function LoginForm() {
           <View className="flex-row gap-4">
             {appleAvailable && (
               <Pressable
-                className="flex-1 flex-row items-center justify-center gap-3 h-12 rounded-xl"
+                className="flex-1 items-center justify-center gap-3 h-12 rounded-xl"
                 style={({ pressed }) => ({
+                  ...rtlRow,
                   backgroundColor: pressed ? colors.inputBg : colors.surfaceSecondary,
                 })}
                 onPress={handleAppleSignIn}
@@ -520,8 +522,9 @@ function LoginForm() {
               </Pressable>
             )}
             <Pressable
-              className="flex-1 flex-row items-center justify-center gap-3 h-12 rounded-xl"
+              className="flex-1 items-center justify-center gap-3 h-12 rounded-xl"
               style={({ pressed }) => ({
+                ...rtlRow,
                 backgroundColor: pressed ? colors.inputBg : colors.surfaceSecondary,
               })}
               onPress={handleGoogleSignIn}

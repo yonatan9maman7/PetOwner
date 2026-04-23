@@ -5,7 +5,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import { useForm, FormProvider } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useTranslation } from "../../i18n";
+import { useTranslation, rowDirectionForAppLayout } from "../../i18n";
 import { useTheme } from "../../theme/ThemeContext";
 import { providerApi } from "../../api/client";
 import { useAuthStore } from "../../store/authStore";
@@ -152,7 +152,7 @@ export function ProviderOnboardingScreen() {
         >
           <View
             style={{
-              flexDirection: isRTL ? "row-reverse" : "row",
+              flexDirection: rowDirectionForAppLayout(isRTL),
               alignItems: "center",
               paddingHorizontal: 16,
               paddingVertical: 12,
@@ -183,7 +183,7 @@ export function ProviderOnboardingScreen() {
         {/* Bottom Navigation */}
         <View
           style={{
-            flexDirection: isRTL ? "row-reverse" : "row",
+            flexDirection: rowDirectionForAppLayout(isRTL),
             gap: 12,
             paddingHorizontal: 20,
             paddingVertical: 14,

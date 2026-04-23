@@ -9,7 +9,7 @@ import { useNavigation, useRoute } from "@react-navigation/native";
 import type { PalDto } from "../../../types/api";
 import { palsApi } from "../../../api/client";
 import { useTheme } from "../../../theme/ThemeContext";
-import { useTranslation } from "../../../i18n";
+import { useTranslation, rowDirectionForAppLayout } from "../../../i18n";
 import { PetTagChips } from "./PetTagChips";
 import { initials, formatDistance } from "./helpers";
 
@@ -100,7 +100,7 @@ export function PalProfileScreen() {
         {/* Pets */}
         {pal.pets.map((pet) => (
           <View key={pet.id} style={[styles.petCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-            <View style={{ flexDirection: isRTL ? "row-reverse" : "row", gap: 12, alignItems: "center" }}>
+            <View style={{ flexDirection: rowDirectionForAppLayout(isRTL), gap: 12, alignItems: "center" }}>
               {pet.imageUrl ? (
                 <Image source={{ uri: pet.imageUrl }} style={styles.petImage} />
               ) : (

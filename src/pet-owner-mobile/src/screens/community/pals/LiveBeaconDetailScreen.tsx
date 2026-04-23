@@ -9,7 +9,7 @@ import { useNavigation, useRoute } from "@react-navigation/native";
 import type { LiveBeaconDto } from "../../../types/api";
 import { palsApi } from "../../../api/client";
 import { useTheme } from "../../../theme/ThemeContext";
-import { useTranslation } from "../../../i18n";
+import { useTranslation, rowDirectionForAppLayout } from "../../../i18n";
 import { useAuthStore } from "../../../store/authStore";
 import { PetTagChips } from "./PetTagChips";
 import { initials, formatRemaining, formatDistance } from "./helpers";
@@ -107,7 +107,7 @@ export function LiveBeaconDetailScreen() {
 
       <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 120 }}>
         {/* Live badge */}
-        <View style={{ flexDirection: isRTL ? "row-reverse" : "row", alignItems: "center", gap: 8, marginBottom: 16 }}>
+        <View style={{ flexDirection: rowDirectionForAppLayout(isRTL), alignItems: "center", gap: 8, marginBottom: 16 }}>
           <View style={[styles.liveDot, { backgroundColor: remaining.urgent ? "#dc2626" : "#16a34a" }]} />
           <Text style={{ fontSize: 14, fontWeight: "700", color: remaining.urgent ? "#dc2626" : "#16a34a" }}>
             {remaining.label}
@@ -116,7 +116,7 @@ export function LiveBeaconDetailScreen() {
         </View>
 
         {/* Host */}
-        <View style={{ flexDirection: isRTL ? "row-reverse" : "row", alignItems: "center", gap: 12, marginBottom: 16 }}>
+        <View style={{ flexDirection: rowDirectionForAppLayout(isRTL), alignItems: "center", gap: 12, marginBottom: 16 }}>
           <View style={[styles.avatar, { backgroundColor: colors.text }]}>
             <Text style={{ color: colors.textInverse, fontSize: 18, fontWeight: "700" }}>{initials(beacon.hostUserName)}</Text>
           </View>

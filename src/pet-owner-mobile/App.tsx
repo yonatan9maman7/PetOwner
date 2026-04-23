@@ -1,6 +1,6 @@
 import "./global.css";
 import { useEffect, useRef } from "react";
-import { I18nManager, Platform, View, LogBox } from "react-native";
+import { DevSettings, I18nManager, Platform, View, LogBox } from "react-native";
 import { NavigationContainer, DefaultTheme, DarkTheme } from "@react-navigation/native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
@@ -93,6 +93,10 @@ export default function App() {
         import("expo-updates").then((Updates) =>
           Updates.reloadAsync().catch(() => {}),
         );
+      } else if (Platform.OS === "android") {
+        // `forceRTL` on Android is only fully applied after restart; in dev a reload syncs
+        // `I18nManager.isRTL` with the in-app language (without this, LTR/RTL can appear inverted).
+        DevSettings.reload();
       }
     }
   }, [authHydrated, language]);

@@ -17,7 +17,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import { useAuthStore } from "../../store/authStore";
 import { authApi } from "../../api/client";
-import { useTranslation } from "../../i18n";
+import { useTranslation, rowDirectionForAppLayout } from "../../i18n";
 import { useTheme } from "../../theme/ThemeContext";
 import * as biometricService from "../../services/biometricService";
 
@@ -71,7 +71,7 @@ function PasswordConfirmModal({
 
           <View
             style={{
-              flexDirection: isRTL ? "row-reverse" : "row",
+              flexDirection: rowDirectionForAppLayout(isRTL),
               alignItems: "center",
               backgroundColor: colors.inputBg,
               borderRadius: 12,
@@ -106,7 +106,7 @@ function PasswordConfirmModal({
             </Pressable>
           </View>
 
-          <View style={{ flexDirection: isRTL ? "row-reverse" : "row", gap: 12 }}>
+          <View style={{ flexDirection: rowDirectionForAppLayout(isRTL), gap: 12 }}>
             <TouchableOpacity
               onPress={onCancel}
               style={{
@@ -253,7 +253,7 @@ function BiometricCard() {
       >
         <View
           style={{
-            flexDirection: isRTL ? "row-reverse" : "row",
+            flexDirection: rowDirectionForAppLayout(isRTL),
             alignItems: "center",
             gap: 12,
           }}
@@ -339,7 +339,7 @@ export function SecurityScreen() {
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background, marginTop: -8 }} edges={["top"]}>
       <View
         style={{
-          flexDirection: isRTL ? "row-reverse" : "row",
+          flexDirection: rowDirectionForAppLayout(isRTL),
           alignItems: "center",
           paddingHorizontal: 16,
           paddingVertical: 12,
@@ -389,7 +389,7 @@ export function SecurityScreen() {
         >
           <View
             style={{
-              flexDirection: isRTL ? "row-reverse" : "row",
+              flexDirection: rowDirectionForAppLayout(isRTL),
               alignItems: "center",
               gap: 12,
             }}
@@ -450,7 +450,7 @@ export function SecurityScreen() {
         >
           <View
             style={{
-              flexDirection: isRTL ? "row-reverse" : "row",
+              flexDirection: rowDirectionForAppLayout(isRTL),
               alignItems: "center",
               gap: 12,
               marginBottom: 8,

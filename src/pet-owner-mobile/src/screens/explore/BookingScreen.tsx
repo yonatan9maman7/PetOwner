@@ -12,7 +12,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation, useRoute } from "@react-navigation/native";
-import { useTranslation } from "../../i18n";
+import { useTranslation, rowDirectionForAppLayout } from "../../i18n";
 import { useTheme } from "../../theme/ThemeContext";
 import { bookingsApi } from "../../api/client";
 import { getApiErrorMessage } from "../../utils/apiUtils";
@@ -48,22 +48,45 @@ function combineDateAndTime(dateStr: string, timeStr: string): string {
 /** Matches backend `PricingUnit` / JSON string names from the API */
 type BillingMode = "perHour" | "perNight" | "flat";
 
+/**
+ * `ProviderPublicProfile` JSON uses `pricingUnit` (camelCase) and does not set `unit`.
+ * If `pricingUnit` is missing, infer from `serviceType` (same as catalog defaults) so
+ * hourly services don't fall through to "flat" (base rate only).
+ */
 function getBillingMode(rate: any): BillingMode {
-  const raw = rate?.pricingUnit;
+  const raw = rate?.pricingUnit ?? (rate as { PricingUnit?: string | number }).PricingUnit;
+
   if (typeof raw === "number" && !Number.isNaN(raw)) {
     if (raw === 0) return "perHour";
     if (raw === 1) return "perNight";
-    return "flat";
+    if (raw >= 2) return "flat";
   }
   if (typeof raw === "string") {
     const s = raw.replace(/\s+/g, "").toLowerCase();
     if (s === "perhour" || s === "0") return "perHour";
     if (s === "pernight" || s === "1") return "perNight";
+    if (
+      s === "pervisit" ||
+      s === "2" ||
+      s === "persession" ||
+      s === "3" ||
+      s === "perpackage" ||
+      s === "4"
+    ) {
+      return "flat";
+    }
     return "flat";
   }
+
   const unit = String(rate?.unit ?? "").toLowerCase();
   if (unit === "hour" || unit === "hours") return "perHour";
   if (unit === "night" || unit === "nights") return "perNight";
+
+  if (raw === undefined || raw === null || raw === "") {
+    const n = serviceTypeToNumber(rate);
+    if (n === 0 || n === 1 || n === 8) return "perHour";
+    if (n === 2) return "perNight";
+  }
   return "flat";
 }
 
@@ -86,7 +109,8 @@ function calculateBookingTotal(
       return rate * calendarNightsBetween(start, end);
     case "perHour": {
       const hours = (end.getTime() - start.getTime()) / 3600000;
-      return rate * Math.max(0, hours);
+      const total = rate * Math.max(0, hours);
+      return Math.round(total * 100) / 100;
     }
     default:
       return rate;
@@ -296,7 +320,7 @@ export function BookingScreen() {
       {/* Header */}
       <View
         style={{
-          flexDirection: isRTL ? "row-reverse" : "row",
+          flexDirection: rowDirectionForAppLayout(isRTL),
           alignItems: "center",
           paddingHorizontal: 20,
           paddingVertical: 14,
@@ -390,7 +414,7 @@ export function BookingScreen() {
                 key={idx}
                 onPress={() => setSelectedRateIdx(idx)}
                 style={{
-                  flexDirection: isRTL ? "row-reverse" : "row",
+                  flexDirection: rowDirectionForAppLayout(isRTL),
                   justifyContent: "space-between",
                   alignItems: "center",
                   paddingVertical: 14,
@@ -402,7 +426,7 @@ export function BookingScreen() {
                   backgroundColor: selected ? colors.cardHighlight : "transparent",
                 }}
               >
-                <View style={{ flexDirection: isRTL ? "row-reverse" : "row", alignItems: "center", gap: 10 }}>
+                <View style={{ flexDirection: rowDirectionForAppLayout(isRTL), alignItems: "center", gap: 10 }}>
                   <View
                     style={{
                       width: 22,
@@ -445,7 +469,7 @@ export function BookingScreen() {
           {prefillTimeInvalid && (
             <View
               style={{
-                flexDirection: isRTL ? "row-reverse" : "row",
+                flexDirection: rowDirectionForAppLayout(isRTL),
                 alignItems: "center",
                 gap: 8,
                 backgroundColor: colors.warningLight,

@@ -1,7 +1,7 @@
 import { View, Text, Pressable } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
-import { useTranslation } from "../../../../i18n";
+import { useTranslation, rowDirectionForAppLayout } from "../../../../i18n";
 import { useTheme } from "../../../../theme/ThemeContext";
 
 interface ActivityLogTileProps {
@@ -41,7 +41,7 @@ export function ActivityLogTile({ disabled, petId }: ActivityLogTileProps) {
         disabled={disabled}
         className="items-center gap-3.5 px-5 py-4"
         style={{
-          flexDirection: isRTL ? "row-reverse" : "row",
+          flexDirection: rowDirectionForAppLayout(isRTL),
           alignItems: "center",
           opacity: disabled ? 0.5 : 1,
         }}

@@ -1,6 +1,6 @@
 import { View, Text, Pressable, Alert } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { useTranslation } from "../../../../i18n";
+import { useTranslation, rowDirectionForAppLayout } from "../../../../i18n";
 import type { PetDto } from "../../../../types/api";
 import { usePetsStore } from "../../../../store/petsStore";
 
@@ -29,7 +29,7 @@ export function PetCardActions({
     <View
       style={{
         backgroundColor: surfaceColor,
-        flexDirection: isRTL ? "row-reverse" : "row",
+        flexDirection: rowDirectionForAppLayout(isRTL),
         paddingVertical: 12,
         paddingHorizontal: 20,
         justifyContent: "center",
@@ -39,7 +39,7 @@ export function PetCardActions({
       <Pressable
         onPress={() => onEdit(pet)}
         style={{
-          flexDirection: isRTL ? "row-reverse" : "row",
+          flexDirection: rowDirectionForAppLayout(isRTL),
           alignItems: "center",
           gap: 6,
           backgroundColor: primaryLight,
@@ -54,7 +54,7 @@ export function PetCardActions({
       <Pressable
         onPress={() => onDelete(pet)}
         style={{
-          flexDirection: isRTL ? "row-reverse" : "row",
+          flexDirection: rowDirectionForAppLayout(isRTL),
           alignItems: "center",
           gap: 6,
           backgroundColor: "#fef2f2",
@@ -85,7 +85,7 @@ export function PetCardActions({
             ]);
           }}
           style={{
-            flexDirection: isRTL ? "row-reverse" : "row",
+            flexDirection: rowDirectionForAppLayout(isRTL),
             alignItems: "center",
             gap: 6,
             backgroundColor: "#ecfdf5",

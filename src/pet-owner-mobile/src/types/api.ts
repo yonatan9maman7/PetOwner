@@ -161,9 +161,14 @@ export interface MapSearchFilters {
 }
 
 export interface ServiceRateDto {
-  service: string;
+  /** API primary field; may also send `service` for display. */
+  serviceType?: string | number;
+  service?: string;
   rate: number;
-  unit: string;
+  /** C# `PricingUnit` (PerHour, PerVisit, etc.); not the display `unit` string. */
+  pricingUnit?: string | number;
+  /** Display hint only; not always present on `ProviderPublicProfile` rates. */
+  unit?: string;
   packages?: { id?: string; title: string; price: number; description?: string }[];
 }
 

@@ -1,7 +1,7 @@
 import { View, Text, TextInput, Pressable, ScrollView } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useFormContext } from "react-hook-form";
-import { useTranslation } from "../../i18n";
+import { useTranslation, rowDirectionForAppLayout } from "../../i18n";
 import { useTheme } from "../../theme/ThemeContext";
 import { servicesForOnboarding } from "./constants";
 import { FieldLabel } from "./FieldLabel";
@@ -62,7 +62,7 @@ export function PackagesStep() {
               borderColor: colors.border,
             }}
           >
-            <View style={{ flexDirection: isRTL ? "row-reverse" : "row", alignItems: "center", gap: 10, marginBottom: 10 }}>
+            <View style={{ flexDirection: rowDirectionForAppLayout(isRTL), alignItems: "center", gap: 10, marginBottom: 10 }}>
               <View
                 style={{
                   width: 36,
@@ -92,7 +92,7 @@ export function PackagesStep() {
                   borderColor: colors.borderLight,
                 }}
               >
-                <View style={{ flexDirection: isRTL ? "row-reverse" : "row", alignItems: "center", marginBottom: 8 }}>
+                <View style={{ flexDirection: rowDirectionForAppLayout(isRTL), alignItems: "center", marginBottom: 8 }}>
                   <Text style={{ flex: 1, fontSize: 13, fontWeight: "600", color: colors.text, textAlign: isRTL ? "right" : "left" }}>
                     #{idx + 1}
                   </Text>
@@ -160,7 +160,7 @@ export function PackagesStep() {
                 setValue(`services.${key}.packages`, updated);
               }}
               style={{
-                flexDirection: isRTL ? "row-reverse" : "row",
+                flexDirection: rowDirectionForAppLayout(isRTL),
                 alignItems: "center",
                 justifyContent: "center",
                 gap: 6,

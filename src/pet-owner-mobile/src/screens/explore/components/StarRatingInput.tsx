@@ -1,3 +1,4 @@
+import { rowDirectionForAppLayout } from "../../../i18n";
 import { View, Pressable } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 
@@ -23,7 +24,7 @@ export function StarRatingInput({
   return (
     <View
       className="flex-row items-center justify-center gap-1"
-      style={{ flexDirection: isRTL ? "row-reverse" : "row" }}
+      style={{ flexDirection: rowDirectionForAppLayout(isRTL) }}
       accessibilityRole="adjustable"
       accessibilityLabel={accessibilityLabel}
     >

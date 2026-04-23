@@ -9,7 +9,7 @@ import { useNavigation } from "@react-navigation/native";
 import type { PlaydatePrefsDto, UpdatePlaydatePrefsDto } from "../../../types/api";
 import { palsApi } from "../../../api/client";
 import { useTheme } from "../../../theme/ThemeContext";
-import { useTranslation } from "../../../i18n";
+import { useTranslation, rowDirectionForAppLayout } from "../../../i18n";
 import { useAuthStore } from "../../../store/authStore";
 
 const SPECIES = ["DOG", "CAT", "BIRD", "RABBIT", "REPTILE", "OTHER"];
@@ -86,7 +86,7 @@ export function PlaydatePrefsScreen() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={["top"]}>
-      <View style={{ flexDirection: isRTL ? "row-reverse" : "row", alignItems: "center", padding: 16, gap: 12 }}>
+      <View style={{ flexDirection: rowDirectionForAppLayout(isRTL), alignItems: "center", padding: 16, gap: 12 }}>
         <Pressable onPress={() => navigation.goBack()}>
           <Ionicons name={isRTL ? "chevron-forward" : "chevron-back"} size={24} color={colors.text} />
         </Pressable>

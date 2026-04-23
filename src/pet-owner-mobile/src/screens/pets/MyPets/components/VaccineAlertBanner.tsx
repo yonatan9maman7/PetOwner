@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { View, Text, Pressable } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { useTranslation } from "../../../../i18n";
+import { useTranslation, rowDirectionForAppLayout } from "../../../../i18n";
 import { medicalApi } from "../../../../api/client";
 
 interface VaccineAlertBannerProps {
@@ -32,7 +32,7 @@ export function VaccineAlertBanner({ petId, onPress }: VaccineAlertBannerProps) 
         <Pressable
           onPress={onPress}
           style={{
-            flexDirection: isRTL ? "row-reverse" : "row",
+            flexDirection: rowDirectionForAppLayout(isRTL),
             alignItems: "center",
             gap: 10,
             backgroundColor: "#fee2e2",
@@ -53,7 +53,7 @@ export function VaccineAlertBanner({ petId, onPress }: VaccineAlertBannerProps) 
         <Pressable
           onPress={onPress}
           style={{
-            flexDirection: isRTL ? "row-reverse" : "row",
+            flexDirection: rowDirectionForAppLayout(isRTL),
             alignItems: "center",
             gap: 10,
             backgroundColor: "#fef9c3",

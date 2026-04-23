@@ -7,7 +7,7 @@ import axios from "axios";
 import { useAuthStore } from "../../store/authStore";
 import { useNotificationStore } from "../../store/notificationStore";
 import { providerApi, bookingsApi } from "../../api/client";
-import { useTranslation } from "../../i18n";
+import { useTranslation, rowDirectionForAppLayout } from "../../i18n";
 import { useTheme } from "../../theme/ThemeContext";
 import { BrandedAppHeader } from "../../components/BrandedAppHeader";
 import type { ProviderMeResponse } from "../../types/api";
@@ -443,7 +443,7 @@ export function ProfileScreen() {
           onPress={handleLogout}
           activeOpacity={0.8}
           style={{
-            flexDirection: isRTL ? "row-reverse" : "row",
+            flexDirection: rowDirectionForAppLayout(isRTL),
             alignItems: "center",
             justifyContent: "center",
             gap: 8,

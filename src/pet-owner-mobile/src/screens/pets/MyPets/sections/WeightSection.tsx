@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { View, Text, Pressable, Alert, TextInput, ActivityIndicator } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { useTranslation, type TranslationKey } from "../../../../i18n";
+import { useTranslation, type TranslationKey, rowDirectionForAppLayout } from "../../../../i18n";
 import type { ThemeColors } from "../../../../theme/ThemeContext";
 import { useTheme } from "../../../../theme/ThemeContext";
 import { medicalApi } from "../../../../api/client";
@@ -122,7 +122,7 @@ function WeightTrendChart({
     const log = sorted[0]!;
     return (
       <View style={cardStyle}>
-        <View style={{ flexDirection: isRTL ? "row-reverse" : "row", alignItems: "baseline", gap: 8, marginBottom: 8 }}>
+        <View style={{ flexDirection: rowDirectionForAppLayout(isRTL), alignItems: "baseline", gap: 8, marginBottom: 8 }}>
           <Text style={{ fontSize: 22, fontWeight: "800", color: colors.text }}>
             {log.weight} {t("weightKg")}
           </Text>
@@ -192,7 +192,7 @@ function WeightTrendChart({
 
   return (
     <View style={cardStyle}>
-      <View style={{ flexDirection: isRTL ? "row-reverse" : "row", alignItems: "baseline", gap: 8, marginBottom: 12 }}>
+      <View style={{ flexDirection: rowDirectionForAppLayout(isRTL), alignItems: "baseline", gap: 8, marginBottom: 12 }}>
         <Text style={{ fontSize: 22, fontWeight: "800", color: colors.text }}>
           {latest.weight} {t("weightKg")}
         </Text>
@@ -536,7 +536,7 @@ export function WeightSection({ petId, reloadNonce = 0 }: { petId: string; reloa
             <View
               key={log.id}
               style={{
-                flexDirection: isRTL ? "row-reverse" : "row",
+                flexDirection: rowDirectionForAppLayout(isRTL),
                 alignItems: "center",
                 backgroundColor: colors.surface,
                 padding: 14,
@@ -650,7 +650,7 @@ export function WeightSection({ petId, reloadNonce = 0 }: { petId: string; reloa
             setShowForm(true);
           }}
           style={{
-            flexDirection: isRTL ? "row-reverse" : "row",
+            flexDirection: rowDirectionForAppLayout(isRTL),
             alignItems: "center",
             justifyContent: "center",
             gap: 8,

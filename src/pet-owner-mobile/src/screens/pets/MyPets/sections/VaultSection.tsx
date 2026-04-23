@@ -12,7 +12,7 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import * as DocumentPicker from "expo-document-picker";
 import * as ImagePicker from "expo-image-picker";
-import { useTranslation } from "../../../../i18n";
+import { useTranslation, rowDirectionForAppLayout } from "../../../../i18n";
 import { useTheme } from "../../../../theme/ThemeContext";
 import { medicalApi, filesApi } from "../../../../api/client";
 import { DatePickerField } from "../../../../components/DatePickerField";
@@ -185,7 +185,7 @@ export function VaultSection({ petId, reloadNonce = 0 }: { petId: string; reload
         <View
           key={rec.id}
           style={{
-            flexDirection: isRTL ? "row-reverse" : "row",
+            flexDirection: rowDirectionForAppLayout(isRTL),
             backgroundColor: colors.surface,
             borderRadius: 14,
             padding: 14,
@@ -279,7 +279,7 @@ export function VaultSection({ petId, reloadNonce = 0 }: { petId: string; reload
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={{
               gap: 8,
-              flexDirection: isRTL ? "row-reverse" : "row",
+              flexDirection: rowDirectionForAppLayout(isRTL),
             }}
           >
             {RECORD_TYPES.map((rt) => (
@@ -331,7 +331,7 @@ export function VaultSection({ petId, reloadNonce = 0 }: { petId: string; reload
             onPress={pickAttachment}
             disabled={uploading}
             style={{
-              flexDirection: isRTL ? "row-reverse" : "row",
+              flexDirection: rowDirectionForAppLayout(isRTL),
               alignItems: "center",
               gap: 8,
               paddingVertical: 10,
@@ -412,7 +412,7 @@ export function VaultSection({ petId, reloadNonce = 0 }: { petId: string; reload
             setShowForm(true);
           }}
           style={{
-            flexDirection: isRTL ? "row-reverse" : "row",
+            flexDirection: rowDirectionForAppLayout(isRTL),
             alignItems: "center",
             justifyContent: "center",
             gap: 8,

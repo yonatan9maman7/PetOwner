@@ -2,7 +2,7 @@ import { useState } from "react";
 import { View, Text, Image } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../../../theme/ThemeContext";
-import { useTranslation, type TranslationKey } from "../../../i18n";
+import { useTranslation, type TranslationKey, rowDirectionForAppLayout } from "../../../i18n";
 import type { ReviewDto } from "../../../types/api";
 
 const STAR_COLOR = "#f59e0b";
@@ -75,7 +75,7 @@ export function ReviewCard({ review, borderTop = true, avatarSize = 28 }: Review
     >
       <View
         style={{
-          flexDirection: isRTL ? "row-reverse" : "row",
+          flexDirection: rowDirectionForAppLayout(isRTL),
           alignItems: "center",
           gap: 8,
           marginBottom: 6,

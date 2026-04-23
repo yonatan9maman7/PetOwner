@@ -15,7 +15,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import * as Sharing from "expo-sharing";
 import { File, Paths } from "expo-file-system";
-import { useTranslation } from "../../i18n";
+import { useTranslation, rowDirectionForAppLayout } from "../../i18n";
 import { useTheme } from "../../theme/ThemeContext";
 import { useAuthStore } from "../../store/authStore";
 import { providerApi, usersApi } from "../../api/client";
@@ -177,7 +177,7 @@ export function MyStatsScreen() {
       {/* Header */}
       <View
         style={{
-          flexDirection: isRTL ? "row-reverse" : "row",
+          flexDirection: rowDirectionForAppLayout(isRTL),
           alignItems: "center",
           paddingHorizontal: 20,
           paddingVertical: 14,
@@ -214,7 +214,7 @@ export function MyStatsScreen() {
       {showProviderTab && (
         <View
           style={{
-            flexDirection: isRTL ? "row-reverse" : "row",
+            flexDirection: rowDirectionForAppLayout(isRTL),
             paddingHorizontal: 20,
             paddingTop: 12,
             paddingBottom: 4,
@@ -239,7 +239,7 @@ export function MyStatsScreen() {
       {/* Range chips */}
       <View
         style={{
-          flexDirection: isRTL ? "row-reverse" : "row",
+          flexDirection: rowDirectionForAppLayout(isRTL),
           paddingHorizontal: 20,
           paddingVertical: 12,
           gap: 8,
@@ -349,7 +349,7 @@ export function MyStatsScreen() {
                 alignItems: "center",
                 backgroundColor: colors.text,
                 opacity: exporting || Platform.OS === "web" ? 0.5 : 1,
-                flexDirection: isRTL ? "row-reverse" : "row",
+                flexDirection: rowDirectionForAppLayout(isRTL),
                 justifyContent: "center",
                 gap: 8,
               }}
@@ -528,7 +528,7 @@ function ProviderStatsView({
             borderRadius: 14,
             paddingVertical: 12,
             paddingHorizontal: 16,
-            flexDirection: isRTL ? "row-reverse" : "row",
+            flexDirection: rowDirectionForAppLayout(isRTL),
             alignItems: "center",
             gap: 10,
           }}
@@ -556,7 +556,7 @@ function ProviderStatsView({
       >
         <View
           style={{
-            flexDirection: isRTL ? "row-reverse" : "row",
+            flexDirection: rowDirectionForAppLayout(isRTL),
             justifyContent: "space-between",
             alignItems: "flex-end",
             marginBottom: 12,
@@ -755,7 +755,7 @@ function HeroCard({
         backgroundColor: accent,
         borderRadius: 18,
         padding: 20,
-        flexDirection: isRTL ? "row-reverse" : "row",
+        flexDirection: rowDirectionForAppLayout(isRTL),
         justifyContent: "space-between",
         alignItems: "center",
         shadowColor: accent,
@@ -879,7 +879,7 @@ function TopServiceCard({
         padding: 16,
         backgroundColor: colors.surface,
         borderRadius: 16,
-        flexDirection: isRTL ? "row-reverse" : "row",
+        flexDirection: rowDirectionForAppLayout(isRTL),
         alignItems: "center",
         gap: 14,
         shadowColor: colors.shadow,
