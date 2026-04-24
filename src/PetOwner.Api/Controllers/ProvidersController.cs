@@ -22,19 +22,22 @@ public class ProvidersController : ControllerBase
     private readonly IGeminiAiService _aiService;
     private readonly ITokenService _tokenService;
     private readonly INotificationService _notifications;
+    private readonly IProviderShareCardService _shareCard;
 
     public ProvidersController(
         ApplicationDbContext db,
         IBlobService blobService,
         IGeminiAiService aiService,
         ITokenService tokenService,
-        INotificationService notifications)
+        INotificationService notifications,
+        IProviderShareCardService shareCard)
     {
         _db = db;
         _blobService = blobService;
         _aiService = aiService;
         _tokenService = tokenService;
         _notifications = notifications;
+        _shareCard = shareCard;
     }
 
     [Authorize]
@@ -883,6 +886,21 @@ public class ProvidersController : ControllerBase
             bytes,
             "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             $"my-earnings-{DateTime.UtcNow:yyyyMMdd}.xlsx");
+    }
+
+    /// <summary>
+    /// Branded PNG share card (name, rating, service, photo, QR to public profile URL). Public for approved providers only.
+    /// </summary>
+    [AllowAnonymous]
+    [HttpGet("{providerId:guid}/share-card")]
+    [ResponseCache(Duration = 0, Location = ResponseCacheLocation.None, NoStore = true)]
+    public async Task<IActionResult> GetProviderShareCard(
+        Guid providerId,
+        CancellationToken cancellationToken)
+    {
+        var bytes = await _shareCard.TryGeneratePngAsync(providerId, cancellationToken);
+        if (bytes is null) return NotFound();
+        return File(bytes, "image/png", $"petowner-provider-{providerId}.png");
     }
 
     private async Task<List<StatsExportXlsx.ProviderEarningsExportRow>> LoadProviderEarningsExportRowsAsync(Guid userId) =>

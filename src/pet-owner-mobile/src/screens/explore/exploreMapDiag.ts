@@ -11,7 +11,7 @@
  * eliminate even the call-site argument allocations via dead-code elimination).
  */
 
-const EXPLORE_MAP_DIAG_ENABLED = true;
+const EXPLORE_MAP_DIAG_ENABLED = false;
 
 let seq = 0;
 let lastTs = Date.now();

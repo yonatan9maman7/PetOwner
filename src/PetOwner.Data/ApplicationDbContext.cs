@@ -1340,12 +1340,15 @@ public class ApplicationDbContext : DbContext
             entity.Property(e => e.Description).HasMaxLength(1000);
             entity.Property(e => e.LocationName).IsRequired().HasMaxLength(200);
             entity.Property(e => e.City).HasMaxLength(100);
+            entity.Property(e => e.GeoLocation)
+                .HasColumnType("geography")
+                .IsRequired();
             entity.Property(e => e.AllowedSpeciesCsv).HasMaxLength(200).HasDefaultValue("DOG");
             entity.Property(e => e.CancellationReason).HasMaxLength(500);
             entity.Property(e => e.CreatedAt).HasDefaultValueSql("GETUTCDATE()");
 
             entity.HasIndex(e => new { e.ScheduledFor, e.CancelledAt });
-            entity.HasIndex(e => new { e.Latitude, e.Longitude });
+            // Spatial index on GeoLocation is created via raw SQL in migration AddPlaydateGeoLocation
 
             entity.HasOne(e => e.Host)
                 .WithMany()

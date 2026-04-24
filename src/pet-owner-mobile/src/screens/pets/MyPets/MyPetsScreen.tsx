@@ -1,5 +1,5 @@
-import { useEffect, useState, useCallback, useRef } from "react";
-import { View, FlatList, Pressable, Alert, ScrollView, RefreshControl, Text } from "react-native";
+import { useEffect, useState, useCallback } from "react";
+import { View, Pressable, Alert, ScrollView, RefreshControl, Text } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
@@ -16,7 +16,6 @@ import { AuthPlaceholder } from "../../../components/AuthPlaceholder";
 import { BrandedAppHeader } from "../../../components/BrandedAppHeader";
 import { useTheme } from "../../../theme/ThemeContext";
 import type { PetDto } from "../../../types/api";
-import { useWindowDimensions } from "react-native";
 import { ListSkeleton } from "../../../components/shared/ListSkeleton";
 import { ListEmptyState } from "../../../components/shared/ListEmptyState";
 import { InlineError } from "../../../components/shared/InlineError";
@@ -26,15 +25,11 @@ import { VaccinesSection } from "./sections/VaccinesSection";
 import { WeightSection } from "./sections/WeightSection";
 import { VaultSection } from "./sections/VaultSection";
 import { TriageSection } from "./sections/TriageSection";
-import { EmergencyStrip } from "./components/EmergencyStrip";
-import { PetSwitcher } from "./components/PetSwitcher";
-import { PetHeroCard } from "./components/PetHeroCard";
-import { PetCardActions } from "./components/PetCardActions";
-import { PetAllergyChips } from "./components/PetAllergyChips";
-import { ActionTiles } from "./components/ActionTiles";
+import { PetAvatarSwitcher } from "./components/PetAvatarSwitcher";
+import { PetPassportCard } from "./components/PetPassportCard";
 import { VaccineAlertBanner } from "./components/VaccineAlertBanner";
-import { ActivityLogTile } from "./components/ActivityLogTile";
-import { TriageHistoryTile } from "./components/TriageHistoryTile";
+import { HealthHubList } from "./components/HealthHubList";
+import { useActivePetSummary } from "./hooks/useActivePetSummary";
 import type { Section } from "./types";
 
 export function MyPetsScreen() {
@@ -42,7 +37,6 @@ export function MyPetsScreen() {
   const { pets, loading, error } = usePetsStore();
   const { t, isRTL, rtlStyle } = useTranslation();
   const navigation = useNavigation<any>();
-  const { width: screenWidth } = useWindowDimensions();
   const { colors } = useTheme();
 
   const [activePetIndex, setActivePetIndex] = useState(0);
@@ -50,9 +44,6 @@ export function MyPetsScreen() {
   const [shareModalPetId, setShareModalPetId] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [sectionReloadNonce, setSectionReloadNonce] = useState(0);
-  const pagerRef = useRef<FlatList<PetDto>>(null);
-
-  const CARD_WIDTH = screenWidth - 48;
 
   useEffect(() => {
     if (isLoggedIn) usePetsStore.getState().fetchPets();
@@ -70,15 +61,17 @@ export function MyPetsScreen() {
 
   const activePet = pets[activePetIndex] ?? null;
 
+  const summary = useActivePetSummary(activePet?.id, sectionReloadNonce);
+
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
     try {
       await usePetsStore.getState().fetchPets();
-      if (activeSection) setSectionReloadNonce((n) => n + 1);
+      setSectionReloadNonce((n) => n + 1);
     } finally {
       setRefreshing(false);
     }
-  }, [activeSection]);
+  }, []);
 
   const handleDelete = (pet: PetDto) => {
     const allPets = usePetsStore.getState().pets;
@@ -162,8 +155,6 @@ export function MyPetsScreen() {
     );
   }
 
-  const tileDisabled = !activePet;
-
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background, marginTop: -8 }} edges={["top"]}>
       <BrandedAppHeader />
@@ -213,93 +204,46 @@ export function MyPetsScreen() {
             <InlineError message={error} onRetry={() => usePetsStore.getState().fetchPets()} />
           ) : null}
 
-          <EmergencyStrip onPress={() => navigation.navigate("Triage")} />
-
-          <PetSwitcher
+          {/* Avatar switcher row */}
+          <PetAvatarSwitcher
             pets={pets}
             activeIndex={activePetIndex}
             onSelect={setActivePetIndex}
             onAddPress={() => navigation.navigate("AddPet")}
-            pagerRef={pagerRef}
-            isRTL={isRTL}
-            primaryColor={colors.brand}
-            borderColor={colors.border}
-            textSecondary={colors.textSecondary}
           />
 
-          <FlatList
-            ref={pagerRef}
-            data={pets}
-            keyExtractor={(item) => item.id}
-            horizontal
-            pagingEnabled
-            showsHorizontalScrollIndicator={false}
-            snapToInterval={CARD_WIDTH + 16}
-            decelerationRate="fast"
-            contentContainerStyle={{ paddingHorizontal: 24, paddingTop: 12 }}
-            onMomentumScrollEnd={(e) => {
-              const idx = Math.round(e.nativeEvent.contentOffset.x / (CARD_WIDTH + 16));
-              setActivePetIndex(Math.min(idx, pets.length - 1));
-            }}
-            getItemLayout={(_, index) => ({
-              length: CARD_WIDTH + 16,
-              offset: (CARD_WIDTH + 16) * index,
-              index,
-            })}
-            renderItem={({ item }) => (
-              <View
-                style={{
-                  width: CARD_WIDTH,
-                  marginRight: 16,
-                  borderRadius: 24,
-                  overflow: "hidden",
-                  shadowColor: colors.shadow,
-                  shadowOffset: { width: 0, height: 6 },
-                  shadowOpacity: 0.1,
-                  shadowRadius: 16,
-                  elevation: 8,
-                }}
-              >
-                <PetHeroCard pet={item} primaryColor={colors.brand} />
-                <PetCardActions
-                  pet={item}
-                  isRTL={isRTL}
-                  surfaceColor={colors.surface}
-                  primaryColor={colors.brand}
-                  primaryLight={colors.primaryLight}
-                  onEdit={(p) => navigation.navigate("AddPet", { petId: p.id })}
-                  onDelete={handleDelete}
-                />
-                <PetAllergyChips
-                  pet={item}
-                  isRTL={isRTL}
-                  surfaceColor={colors.surface}
-                  borderLight={colors.borderLight}
-                />
-              </View>
-            )}
-          />
+          {/* Passport card */}
+          {activePet && (
+            <View style={{ marginTop: 14 }}>
+              <PetPassportCard
+                pet={activePet}
+                onShare={() => setShareModalPetId(activePet.id)}
+                onEdit={() => navigation.navigate("AddPet", { petId: activePet.id })}
+                onDelete={() => handleDelete(activePet)}
+                onExportPdf={() => handleExportPdf(activePet)}
+              />
+            </View>
+          )}
 
+          {/* Vaccine alert banners */}
           {activePet && (
             <VaccineAlertBanner petId={activePet.id} onPress={() => setActiveSection("vaccines")} />
           )}
 
-          <ActionTiles
-            disabled={tileDisabled}
+          {/* Health hub dashboard */}
+          <HealthHubList
+            activePet={activePet}
+            summary={summary}
             onSelectSection={(s) => {
               if (activePet) setActiveSection(s);
             }}
-          />
-
-          <ActivityLogTile disabled={tileDisabled} petId={activePet?.id} />
-
-          <TriageHistoryTile
-            disabled={tileDisabled}
-            onPress={() => {
-              if (activePet) setActiveSection("triage");
-            }}
+            onOpenTriage={() => navigation.navigate("Triage")}
           />
         </ScrollView>
+      )}
+
+      {shareModalPetId && (
+        <ShareHealthPassportModal petId={shareModalPetId} visible onClose={() => setShareModalPetId(null)} />
       )}
     </SafeAreaView>
   );

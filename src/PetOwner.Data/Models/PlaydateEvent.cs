@@ -1,3 +1,5 @@
+using NetTopologySuite.Geometries;
+
 namespace PetOwner.Data.Models;
 
 public class PlaydateEvent
@@ -7,8 +9,7 @@ public class PlaydateEvent
     public string Title { get; set; } = null!;
     public string? Description { get; set; }
     public string LocationName { get; set; } = null!;
-    public double Latitude { get; set; }
-    public double Longitude { get; set; }
+    public Point GeoLocation { get; set; } = null!;
     public string? City { get; set; }
     public DateTime ScheduledFor { get; set; }
     public DateTime? EndsAt { get; set; }

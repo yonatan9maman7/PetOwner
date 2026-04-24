@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   View,
   Text,
@@ -24,6 +24,7 @@ const PHONE_REGEX = /^0(5[0-9])\d{7}$/;
 export function CompleteProfileScreen() {
   const [phone, setPhone] = useState("");
   const [loading, setLoading] = useState(false);
+  const phoneRef = useRef<TextInput>(null);
 
   const clearRequiresPhone = useAuthStore((s) => s.clearRequiresPhone);
   const logout = useAuthStore((s) => s.logout);
@@ -37,6 +38,7 @@ export function CompleteProfileScreen() {
   }, []);
 
   const handleSave = async () => {
+    if (loading) return;
     const trimmed = phone.trim();
     if (!trimmed) {
       Alert.alert(t("errorTitle"), t("phoneInvalidFormat"));
@@ -145,6 +147,7 @@ export function CompleteProfileScreen() {
             >
               <Ionicons name="call-outline" size={20} color={colors.textSecondary} />
               <TextInput
+                ref={phoneRef}
                 style={[
                   rtlInput,
                   {
@@ -162,6 +165,8 @@ export function CompleteProfileScreen() {
                 keyboardType="phone-pad"
                 maxLength={10}
                 autoFocus
+                returnKeyType="done"
+                onSubmitEditing={handleSave}
               />
             </View>
           </View>

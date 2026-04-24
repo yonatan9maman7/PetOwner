@@ -2,6 +2,7 @@ using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using NetTopologySuite.Geometries;
 using PetOwner.Api.DTOs;
 using PetOwner.Api.Infrastructure;
 using PetOwner.Api.Services;
@@ -97,6 +98,80 @@ public class MapController : ControllerBase
             var ids = pins.Select(p => p.ProviderId).ToList();
             await IncrementSearchAppearanceCountsAsync(ids, HttpContext.RequestAborted);
         }
+
+        return Ok(pins);
+    }
+
+    [Authorize]
+    [HttpGet("playdate-pins")]
+    public async Task<IActionResult> GetPlaydatePins(
+        [FromQuery] double? latitude,
+        [FromQuery] double? longitude,
+        [FromQuery] double? radiusKm,
+        [FromQuery] DateTime? from,
+        [FromQuery] DateTime? to)
+    {
+        var now = DateTime.UtcNow;
+        var startFrom = from.HasValue ? DateTime.SpecifyKind(from.Value.ToUniversalTime(), DateTimeKind.Utc) : now;
+        var endTo = to.HasValue ? DateTime.SpecifyKind(to.Value.ToUniversalTime(), DateTimeKind.Utc) : now.AddDays(30);
+
+        var query = _db.PlaydateEvents
+            .AsNoTracking()
+            .Include(e => e.Rsvps)
+            .Where(e => e.CancelledAt == null
+                        && e.ScheduledFor >= startFrom
+                        && e.ScheduledFor <= endTo);
+
+        if (latitude.HasValue && longitude.HasValue && radiusKm.HasValue && !IsInMemoryDatabase(_db))
+        {
+            var center = new Point(longitude.Value, latitude.Value) { SRID = 4326 };
+            var radiusMeters = radiusKm.Value * 1000;
+            query = query.Where(e => e.GeoLocation.Distance(center) <= radiusMeters);
+        }
+
+        var raw = await query
+            .Select(e => new
+            {
+                e.Id,
+                e.HostUserId,
+                HostName = e.Host.Name,
+                e.Title,
+                e.LocationName,
+                Latitude = e.GeoLocation.Y,
+                Longitude = e.GeoLocation.X,
+                e.ScheduledFor,
+                e.EndsAt,
+                e.AllowedSpeciesCsv,
+                GoingCount = e.Rsvps.Count(r => r.Status == RsvpStatus.Going),
+            })
+            .ToListAsync();
+
+        // In-memory Haversine fallback for dev/test
+        IEnumerable<dynamic> filtered = raw;
+        if (latitude.HasValue && longitude.HasValue && radiusKm.HasValue && IsInMemoryDatabase(_db))
+        {
+            filtered = raw.Where(e =>
+                HaversineKm(latitude.Value, longitude.Value, (double)e.Latitude, (double)e.Longitude) <= radiusKm.Value);
+        }
+
+        var pins = filtered.Select(e => new PlaydateMapPinDto(
+            e.Id,
+            e.HostUserId,
+            (string)e.HostName,
+            (string)e.Title,
+            (string)e.LocationName,
+            (double)e.Latitude,
+            (double)e.Longitude,
+            (DateTime)e.ScheduledFor,
+            (DateTime?)e.EndsAt,
+            (int)e.GoingCount,
+            string.IsNullOrEmpty((string)e.AllowedSpeciesCsv)
+                ? (IReadOnlyList<string>)Array.Empty<string>()
+                : (IReadOnlyList<string>)((string)e.AllowedSpeciesCsv).Split(',', StringSplitOptions.RemoveEmptyEntries),
+            latitude.HasValue && longitude.HasValue
+                ? Math.Round(HaversineKm(latitude.Value, longitude.Value, (double)e.Latitude, (double)e.Longitude) * 2, MidpointRounding.AwayFromZero) / 2
+                : (double?)null))
+        .ToList();
 
         return Ok(pins);
     }
@@ -215,5 +290,16 @@ public class MapController : ControllerBase
             return NotFound(new { message = "Provider contact not found." });
 
         return Ok(new ContactDto(phone));
+    }
+
+    private static double HaversineKm(double lat1, double lng1, double lat2, double lng2)
+    {
+        const double R = 6371.0;
+        var dLat = (lat2 - lat1) * Math.PI / 180.0;
+        var dLng = (lng2 - lng1) * Math.PI / 180.0;
+        var a = Math.Sin(dLat / 2) * Math.Sin(dLat / 2)
+              + Math.Cos(lat1 * Math.PI / 180.0) * Math.Cos(lat2 * Math.PI / 180.0)
+              * Math.Sin(dLng / 2) * Math.Sin(dLng / 2);
+        return 2 * R * Math.Asin(Math.Sqrt(a));
     }
 }

@@ -9,9 +9,7 @@ import {
   Alert,
   KeyboardAvoidingView,
   Platform,
-  FlatList,
   Image,
-  TouchableOpacity,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -25,6 +23,8 @@ import {
   MapViewWrapper,
   MarkerWrapper,
 } from "../../components/MapViewWrapper";
+import { AddressAutocomplete } from "../../components/shared/AddressAutocomplete";
+import { fetchReverseGeocode } from "../../api/googlePlaces";
 import { useAuthStore } from "../../store/authStore";
 import { usePetsStore } from "../../store/petsStore";
 import { filesApi } from "../../api/client";
@@ -40,43 +40,6 @@ const TEL_AVIV = {
   latitudeDelta: 0.035,
   longitudeDelta: 0.035,
 };
-
-interface NominatimResult {
-  display_name: string;
-  lat: string;
-  lon: string;
-}
-
-async function geocodeSearch(query: string): Promise<NominatimResult[]> {
-  if (query.trim().length < 3) return [];
-  try {
-    const url = `https://nominatim.openstreetmap.org/search?format=json&limit=5&q=${encodeURIComponent(query)}`;
-    const res = await fetch(url, {
-      headers: { "User-Agent": "PetOwnerMobileApp/1.0" },
-    });
-    if (!res.ok) return [];
-    return (await res.json()) as NominatimResult[];
-  } catch {
-    return [];
-  }
-}
-
-async function reverseGeocode(
-  lat: number,
-  lng: number,
-): Promise<string | null> {
-  try {
-    const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`;
-    const res = await fetch(url, {
-      headers: { "User-Agent": "PetOwnerMobileApp/1.0" },
-    });
-    if (!res.ok) return null;
-    const data = await res.json();
-    return (data.display_name as string) ?? null;
-  } catch {
-    return null;
-  }
-}
 
 function RequiredMark({ color }: { color: string }) {
   return <Text style={{ color, fontWeight: "700" }}> *</Text>;
@@ -142,10 +105,6 @@ export function ReportLostScreen() {
   const [locLoading, setLocLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
-  const [suggestions, setSuggestions] = useState<NominatimResult[]>([]);
-  const [showSuggestions, setShowSuggestions] = useState(false);
-  const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-
   useEffect(() => {
     if (isLoggedIn) fetchPets();
   }, [isLoggedIn, fetchPets]);
@@ -172,44 +131,37 @@ export function ReportLostScreen() {
     })();
   }, []);
 
-  const handleLocationTextChange = useCallback((text: string) => {
-    setLastSeenLocation(text);
-    if (searchTimer.current) clearTimeout(searchTimer.current);
-    if (text.trim().length < 3) {
-      setSuggestions([]);
-      setShowSuggestions(false);
-      return;
-    }
-    searchTimer.current = setTimeout(async () => {
-      const results = await geocodeSearch(text);
-      setSuggestions(results);
-      setShowSuggestions(results.length > 0);
-    }, 500);
-  }, []);
-
-  const pickSuggestion = useCallback((item: NominatimResult) => {
-    const lat = parseFloat(item.lat);
-    const lng = parseFloat(item.lon);
-    setLastSeenLocation(item.display_name);
-    setMarkerCoord({ latitude: lat, longitude: lng });
-    const newRegion = {
-      latitude: lat,
-      longitude: lng,
-      latitudeDelta: 0.015,
-      longitudeDelta: 0.015,
-    };
-    setMapRegion(newRegion);
-    mapRef.current?.animateToRegion?.(newRegion, 400);
-    setSuggestions([]);
-    setShowSuggestions(false);
-  }, []);
+  const handleAddressSelect = useCallback(
+    (selection: {
+      formattedAddress: string;
+      latitude: number;
+      longitude: number;
+    }) => {
+      setLastSeenLocation(selection.formattedAddress);
+      setMarkerCoord({
+        latitude: selection.latitude,
+        longitude: selection.longitude,
+      });
+      const newRegion = {
+        latitude: selection.latitude,
+        longitude: selection.longitude,
+        latitudeDelta: 0.015,
+        longitudeDelta: 0.015,
+      };
+      setMapRegion(newRegion);
+      mapRef.current?.animateToRegion?.(newRegion, 400);
+    },
+    [],
+  );
 
   const handleMapPress = useCallback((e: any) => {
     const { latitude, longitude } = e.nativeEvent.coordinate ?? {};
     if (latitude != null && longitude != null) {
       setMarkerCoord({ latitude, longitude });
-      reverseGeocode(latitude, longitude).then((addr) => {
-        if (addr) setLastSeenLocation(addr);
+      fetchReverseGeocode({ latitude, longitude }).then((result) => {
+        if (result?.formattedAddress) {
+          setLastSeenLocation(result.formattedAddress);
+        }
       });
     }
   }, []);
@@ -469,114 +421,16 @@ export function ReportLostScreen() {
 
             {/* ── Location search + map ── */}
             <View style={{ marginTop: 8 }}>
-              <FieldLabel
-                text={t("lastSeenLocation")}
+              <AddressAutocomplete
+                label={t("lastSeenLocation")}
                 required
+                value={lastSeenLocation}
+                onChangeText={setLastSeenLocation}
+                onSelect={handleAddressSelect}
+                placeholder={t("lastSeenLocationPlaceholder")}
                 isRTL={isRTL}
+                type="geocode"
               />
-            </View>
-            <View style={{ position: "relative", zIndex: 50 }}>
-              <View
-                style={{
-                  flexDirection: rowDirectionForAppLayout(isRTL),
-                  alignItems: "center",
-                  backgroundColor: colors.surface,
-                  borderRadius: 12,
-                  borderWidth: 1,
-                  borderColor: colors.border,
-                  paddingHorizontal: 12,
-                }}
-              >
-                <Ionicons name="search" size={18} color={colors.textMuted} />
-                <TextInput
-                  style={[
-                    rtlInput,
-                    { flex: 1, padding: 14, fontSize: 15, color: colors.text },
-                  ]}
-                  placeholder={t("lastSeenLocationPlaceholder")}
-                  placeholderTextColor={colors.textMuted}
-                  value={lastSeenLocation}
-                  onChangeText={handleLocationTextChange}
-                  returnKeyType="search"
-                  onSubmitEditing={() => {
-                    if (lastSeenLocation.trim().length >= 3) {
-                      geocodeSearch(lastSeenLocation).then((r) => {
-                        if (r.length > 0) pickSuggestion(r[0]);
-                      });
-                    }
-                  }}
-                />
-                {lastSeenLocation.length > 0 && (
-                  <Pressable
-                    onPress={() => {
-                      setLastSeenLocation("");
-                      setSuggestions([]);
-                      setShowSuggestions(false);
-                    }}
-                  >
-                    <Ionicons name="close-circle" size={20} color={colors.textMuted} />
-                  </Pressable>
-                )}
-              </View>
-
-              {showSuggestions && (
-                <View
-                  style={{
-                    position: "absolute",
-                    top: 52,
-                    left: 0,
-                    right: 0,
-                    backgroundColor: colors.surface,
-                    borderRadius: 12,
-                    borderWidth: 1,
-                    borderColor: colors.border,
-                    maxHeight: 200,
-                    shadowColor: colors.shadow,
-                    shadowOffset: { width: 0, height: 4 },
-                    shadowOpacity: 0.12,
-                    shadowRadius: 12,
-                    elevation: 10,
-                  }}
-                >
-                  <FlatList
-                    data={suggestions}
-                    keyExtractor={(_, i) => String(i)}
-                    keyboardShouldPersistTaps="handled"
-                    nestedScrollEnabled
-                    renderItem={({ item }) => (
-                      <TouchableOpacity
-                        onPress={() => pickSuggestion(item)}
-                        activeOpacity={0.7}
-                        style={{
-                          flexDirection: rowDirectionForAppLayout(isRTL),
-                          alignItems: "center",
-                          gap: 10,
-                          paddingHorizontal: 14,
-                          paddingVertical: 12,
-                          backgroundColor: colors.surface,
-                          borderBottomWidth: 1,
-                          borderBottomColor: colors.borderLight,
-                        }}
-                      >
-                        <Ionicons
-                          name="location-outline"
-                          size={18}
-                          color={colors.text}
-                        />
-                        <Text
-                          numberOfLines={2}
-                          style={[
-                            rtlText,
-                            { flex: 1, fontSize: 13, color: colors.textSecondary },
-                          ]}
-                        >
-                          {item.display_name}
-                        </Text>
-                      </TouchableOpacity>
-                    )}
-                  />
-                </View>
-              )}
             </View>
 
             {/* Map */}

@@ -3,6 +3,7 @@ import { View, Text, Pressable } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useTranslation, rowDirectionForAppLayout } from "../../../../i18n";
 import { medicalApi } from "../../../../api/client";
+import { useTheme } from "../../../../theme/ThemeContext";
 
 interface VaccineAlertBannerProps {
   petId: string;
@@ -11,6 +12,7 @@ interface VaccineAlertBannerProps {
 
 export function VaccineAlertBanner({ petId, onPress }: VaccineAlertBannerProps) {
   const { t, isRTL } = useTranslation();
+  const { colors } = useTheme();
   const [overdueCount, setOverdueCount] = useState(0);
   const [dueSoonCount, setDueSoonCount] = useState(0);
 
@@ -34,19 +36,37 @@ export function VaccineAlertBanner({ petId, onPress }: VaccineAlertBannerProps) 
           style={{
             flexDirection: rowDirectionForAppLayout(isRTL),
             alignItems: "center",
-            gap: 10,
-            backgroundColor: "#fee2e2",
+            gap: 12,
+            backgroundColor: colors.surface,
             borderRadius: 14,
-            padding: 14,
-            borderWidth: 1,
-            borderColor: "#fecaca",
+            paddingHorizontal: 14,
+            paddingVertical: 12,
+            borderWidth: 1.5,
+            borderColor: colors.danger,
+            shadowColor: colors.danger,
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: 0.12,
+            shadowRadius: 6,
+            elevation: 2,
           }}
+          android_ripple={{ color: `${colors.danger}18` }}
         >
-          <Ionicons name="alert-circle" size={22} color="#dc2626" />
-          <Text style={{ flex: 1, fontSize: 13, fontWeight: "700", color: "#991b1b", textAlign: isRTL ? "right" : "left" }}>
+          <View
+            style={{
+              width: 32,
+              height: 32,
+              borderRadius: 10,
+              backgroundColor: colors.dangerLight,
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <Ionicons name="alert-circle" size={18} color={colors.danger} />
+          </View>
+          <Text style={{ flex: 1, fontSize: 13, fontWeight: "700", color: colors.danger, textAlign: isRTL ? "right" : "left" }}>
             {t("vaccineOverdueBanner").replace("{count}", String(overdueCount))}
           </Text>
-          <Ionicons name={isRTL ? "chevron-back" : "chevron-forward"} size={16} color="#991b1b" />
+          <Ionicons name={isRTL ? "chevron-back" : "chevron-forward"} size={16} color={colors.danger} />
         </Pressable>
       )}
       {dueSoonCount > 0 && (
@@ -55,19 +75,37 @@ export function VaccineAlertBanner({ petId, onPress }: VaccineAlertBannerProps) 
           style={{
             flexDirection: rowDirectionForAppLayout(isRTL),
             alignItems: "center",
-            gap: 10,
-            backgroundColor: "#fef9c3",
+            gap: 12,
+            backgroundColor: colors.surface,
             borderRadius: 14,
-            padding: 14,
-            borderWidth: 1,
-            borderColor: "#fde68a",
+            paddingHorizontal: 14,
+            paddingVertical: 12,
+            borderWidth: 1.5,
+            borderColor: colors.warning,
+            shadowColor: colors.warning,
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: 0.12,
+            shadowRadius: 6,
+            elevation: 2,
           }}
+          android_ripple={{ color: `${colors.warning}18` }}
         >
-          <Ionicons name="time-outline" size={22} color="#d97706" />
-          <Text style={{ flex: 1, fontSize: 13, fontWeight: "700", color: "#854d0e", textAlign: isRTL ? "right" : "left" }}>
+          <View
+            style={{
+              width: 32,
+              height: 32,
+              borderRadius: 10,
+              backgroundColor: colors.warningLight,
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <Ionicons name="time-outline" size={18} color={colors.warning} />
+          </View>
+          <Text style={{ flex: 1, fontSize: 13, fontWeight: "700", color: colors.warning, textAlign: isRTL ? "right" : "left" }}>
             {t("vaccineDueSoonBanner").replace("{count}", String(dueSoonCount))}
           </Text>
-          <Ionicons name={isRTL ? "chevron-back" : "chevron-forward"} size={16} color="#854d0e" />
+          <Ionicons name={isRTL ? "chevron-back" : "chevron-forward"} size={16} color={colors.warning} />
         </Pressable>
       )}
     </View>

@@ -1066,6 +1066,21 @@ export interface CreateLiveBeaconDto {
   species: string;
 }
 
+export interface PlaydateMapPinDto {
+  eventId: string;
+  hostUserId: string;
+  hostName: string;
+  title: string;
+  locationName: string;
+  latitude: number;
+  longitude: number;
+  scheduledForUtc: string;
+  endsAtUtc: string | null;
+  goingCount: number;
+  allowedSpecies: string[];
+  distanceKm: number | null;
+}
+
 export interface PlaydateEventDto {
   id: string;
   hostUserId: string;

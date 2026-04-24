@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useRef, useEffect } from "react";
 import {
   View,
   Text,
@@ -66,6 +66,10 @@ export function MyBookingsScreen() {
   const route = useRoute<any>();
   const { colors } = useTheme();
   const { t, isRTL, rtlText } = useTranslation();
+  const tRef = useRef(t);
+  useEffect(() => {
+    tRef.current = t;
+  });
   const user = useAuthStore((s) => s.user);
   const userId = user?.id;
   const role = user?.role ?? "Owner";
@@ -85,17 +89,19 @@ export function MyBookingsScreen() {
       await fetchMine({ silent });
       const err = useBookingsStore.getState().error;
       if (err) {
-        Alert.alert(t("genericErrorTitle"), err);
+        Alert.alert(tRef.current("genericErrorTitle"), err);
         clearBookingError();
       }
       setRefreshing(false);
     },
-    [t, fetchMine, clearBookingError],
+    // `t` from useTranslation is a new function each render; including it (or a callback
+    // that closed over t) in deps caused useFocusEffect to re-run every render while focused.
+    [fetchMine, clearBookingError],
   );
 
   useFocusEffect(
     useCallback(() => {
-      fetchBookings();
+      void fetchBookings();
     }, [fetchBookings]),
   );
 

@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using NetTopologySuite.Geometries;
 using PetOwner.Api.DTOs;
 using PetOwner.Api.Services;
 using PetOwner.Data;
@@ -26,6 +27,9 @@ public class PlaydatesController : ControllerBase
     private Guid GetUserId() =>
         Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
 
+    private static bool IsInMemoryDatabase(ApplicationDbContext db) =>
+        db.Database.ProviderName?.Contains("InMemory", StringComparison.Ordinal) == true;
+
     // ─── List events ─────────────────────────────────────────────────────
 
     [HttpGet]
@@ -45,8 +49,8 @@ public class PlaydatesController : ControllerBase
         double maxKm = Math.Clamp(radiusKm ?? me.Prefs?.MaxDistanceKm ?? 20, 1, 200);
 
         var now = DateTime.UtcNow;
-        var startFrom = from ?? now;
-        var endTo = to ?? now.AddDays(30);
+        var startFrom = from.HasValue ? DateTime.SpecifyKind(from.Value.ToUniversalTime(), DateTimeKind.Utc) : now;
+        var endTo = to.HasValue ? DateTime.SpecifyKind(to.Value.ToUniversalTime(), DateTimeKind.Utc) : now.AddDays(30);
 
         var query = _db.PlaydateEvents.AsNoTracking()
             .Include(e => e.Rsvps)
@@ -54,11 +58,20 @@ public class PlaydatesController : ControllerBase
                         && e.ScheduledFor >= startFrom
                         && e.ScheduledFor <= endTo);
 
+        // Server-side spatial radius filter (SQL Server / NTS); falls back to in-memory Haversine below
+        if (meLat.HasValue && meLng.HasValue && !IsInMemoryDatabase(_db))
+        {
+            var center = new Point(meLng.Value, meLat.Value) { SRID = 4326 };
+            var radiusMeters = maxKm * 1000;
+            query = query.Where(e => e.GeoLocation.Distance(center) <= radiusMeters);
+        }
+
         var raw = await query.Select(e => new
         {
             e.Id, e.HostUserId, HostName = e.Host.Name,
             e.Title, e.Description, e.LocationName,
-            e.Latitude, e.Longitude, e.City, e.ScheduledFor, e.EndsAt,
+            Latitude = e.GeoLocation.Y, Longitude = e.GeoLocation.X,
+            e.City, e.ScheduledFor, e.EndsAt,
             e.AllowedSpeciesCsv, e.MaxPets, e.CreatedAt,
             GoingCount = e.Rsvps.Count(r => r.Status == RsvpStatus.Going),
             MaybeCount = e.Rsvps.Count(r => r.Status == RsvpStatus.Maybe),
@@ -70,10 +83,13 @@ public class PlaydatesController : ControllerBase
             {
                 double? dist = null;
                 if (meLat.HasValue && meLng.HasValue)
-                    dist = Math.Round(HaversineKm(meLat.Value, meLng.Value, e.Latitude, e.Longitude) * 2, MidpointRounding.AwayFromZero) / 2;
+                {
+                    var haversine = HaversineKm(meLat.Value, meLng.Value, e.Latitude, e.Longitude);
+                    dist = Math.Round(haversine * 2, MidpointRounding.AwayFromZero) / 2;
+                }
                 return (e, dist);
             })
-            .Where(x => !meLat.HasValue || x.dist == null || x.dist <= maxKm)
+            .Where(x => !meLat.HasValue || IsInMemoryDatabase(_db) || x.dist == null || x.dist <= maxKm)
             .OrderBy(x => x.e.ScheduledFor)
             .Select(x => MapEvent(x.e.Id, x.e.HostUserId, x.e.HostName, x.e.Title, x.e.Description,
                 x.e.LocationName, x.e.Latitude, x.e.Longitude, x.e.City, x.e.ScheduledFor, x.e.EndsAt,
@@ -98,7 +114,8 @@ public class PlaydatesController : ControllerBase
             {
                 ev.Id, ev.HostUserId, HostName = ev.Host.Name,
                 ev.Title, ev.Description, ev.LocationName,
-                ev.Latitude, ev.Longitude, ev.City, ev.ScheduledFor, ev.EndsAt,
+                Latitude = ev.GeoLocation.Y, Longitude = ev.GeoLocation.X,
+                ev.City, ev.ScheduledFor, ev.EndsAt,
                 ev.AllowedSpeciesCsv, ev.MaxPets, ev.CancelledAt,
                 GoingCount = ev.Rsvps.Count(r => r.Status == RsvpStatus.Going),
                 MaybeCount = ev.Rsvps.Count(r => r.Status == RsvpStatus.Maybe),
@@ -146,8 +163,18 @@ public class PlaydatesController : ControllerBase
         if (string.IsNullOrWhiteSpace(dto.Title))
             return BadRequest(new { message = "Title is required." });
 
-        if (dto.ScheduledFor <= DateTime.UtcNow)
+        // Validate coordinates
+        if (dto.Latitude < -90 || dto.Latitude > 90 || dto.Longitude < -180 || dto.Longitude > 180
+            || (dto.Latitude == 0 && dto.Longitude == 0))
+            return BadRequest(new { message = "A valid location must be selected." });
+
+        var scheduledFor = DateTime.SpecifyKind(dto.ScheduledFor.ToUniversalTime(), DateTimeKind.Utc);
+        if (scheduledFor <= DateTime.UtcNow)
             return BadRequest(new { message = "ScheduledFor must be in the future." });
+
+        DateTime? endsAt = dto.EndsAt.HasValue
+            ? DateTime.SpecifyKind(dto.EndsAt.Value.ToUniversalTime(), DateTimeKind.Utc)
+            : null;
 
         var e = new PlaydateEvent
         {
@@ -156,11 +183,10 @@ public class PlaydatesController : ControllerBase
             Title = dto.Title.Trim(),
             Description = dto.Description?.Trim(),
             LocationName = dto.LocationName.Trim(),
-            Latitude = dto.Latitude,
-            Longitude = dto.Longitude,
+            GeoLocation = new Point(dto.Longitude, dto.Latitude) { SRID = 4326 },
             City = dto.City,
-            ScheduledFor = dto.ScheduledFor,
-            EndsAt = dto.EndsAt,
+            ScheduledFor = scheduledFor,
+            EndsAt = endsAt,
             AllowedSpeciesCsv = dto.AllowedSpecies?.Count > 0 ? string.Join(",", dto.AllowedSpecies) : "DOG",
             MaxPets = dto.MaxPets,
             CreatedAt = DateTime.UtcNow,
@@ -171,7 +197,7 @@ public class PlaydatesController : ControllerBase
         _ = FanOutNewEventAsync(e.Id, meId, e);
 
         var result = MapEvent(e.Id, e.HostUserId, "", e.Title, e.Description,
-            e.LocationName, e.Latitude, e.Longitude, e.City, e.ScheduledFor, e.EndsAt,
+            e.LocationName, dto.Latitude, dto.Longitude, e.City, e.ScheduledFor, e.EndsAt,
             e.AllowedSpeciesCsv, e.MaxPets, 0, 0, null, null, null, false);
         return Created($"/api/playdates/{e.Id}", result);
     }
@@ -292,7 +318,6 @@ public class PlaydatesController : ControllerBase
 
         var meName = await _db.Users.Where(u => u.Id == meId).Select(u => u.Name).FirstAsync();
 
-        // notify host and previous commenters
         var notifyIds = new HashSet<Guid> { e.HostUserId };
         var prevCommenters = await _db.PlaydateEventComments.AsNoTracking()
             .Where(x => x.EventId == id && x.UserId != meId)
@@ -327,7 +352,9 @@ public class PlaydatesController : ControllerBase
     {
         try
         {
-            var (latDiff, lngDiff) = BoundingBox(e.Latitude, 10);
+            var eLat = e.GeoLocation.Y;
+            var eLng = e.GeoLocation.X;
+            var (latDiff, lngDiff) = BoundingBox(eLat, 10);
             var thirtyDaysAgo = DateTime.UtcNow.AddDays(-30);
 
             var nearby = await _db.Users.AsNoTracking()
@@ -336,10 +363,10 @@ public class PlaydatesController : ControllerBase
                             && u.PlaydatePrefs.LastActiveAt >= thirtyDaysAgo
                             && (u.NotificationPrefs == null || u.NotificationPrefs.Community)
                             && u.Location != null && u.Location.GeoLocation != null
-                            && u.Location.GeoLocation.Y >= e.Latitude - latDiff
-                            && u.Location.GeoLocation.Y <= e.Latitude + latDiff
-                            && u.Location.GeoLocation.X >= e.Longitude - lngDiff
-                            && u.Location.GeoLocation.X <= e.Longitude + lngDiff)
+                            && u.Location.GeoLocation.Y >= eLat - latDiff
+                            && u.Location.GeoLocation.Y <= eLat + latDiff
+                            && u.Location.GeoLocation.X >= eLng - lngDiff
+                            && u.Location.GeoLocation.X <= eLng + lngDiff)
                 .Select(u => u.Id).Take(50).ToListAsync();
 
             var hostName = await _db.Users.Where(u => u.Id == hostId).Select(u => u.Name).FirstAsync();

@@ -27,6 +27,10 @@ import { useTranslation, rowDirectionForAppLayout } from "../../i18n";
 import { useAuthStore } from "../../store/authStore";
 import { useFavoritesStore } from "../../store/favoritesStore";
 import { useTheme } from "../../theme/ThemeContext";
+import * as Clipboard from "expo-clipboard";
+import { File, Paths } from "expo-file-system";
+import * as Sharing from "expo-sharing";
+import { appProviderProfileDeepLink, publicProviderProfileUrl } from "../../config/publicLinks";
 import { mapApi } from "../../api/client";
 import type { DogSize, ProviderPublicProfileDto } from "../../types/api";
 import { ProviderType } from "../../types/api";
@@ -213,6 +217,7 @@ export function ProviderProfileScreen() {
 
   const [profile, setProfile] = useState<ProviderPublicProfileDto | null>(null);
   const [loading, setLoading] = useState(true);
+  const [shareCardBusy, setShareCardBusy] = useState(false);
   const [directReviewOpen, setDirectReviewOpen] = useState(false);
   const [directRating, setDirectRating] = useState(0);
   const [directComment, setDirectComment] = useState("");
@@ -319,12 +324,46 @@ export function ProviderProfileScreen() {
   };
 
   const handleShare = async () => {
+    if (shareCardBusy) return;
+    setShareCardBusy(true);
     try {
-      await Share.share({
-        message: `${profile?.name ?? "Provider"} — PetOwner`,
-        title: profile?.name,
+      const png = await mapApi.getProviderShareCard(providerId);
+      const filename = `po-provider-share-${providerId}.png`;
+      const out = new File(Paths.cache, filename);
+      if (out.exists) out.delete();
+      out.create();
+      out.write(new Uint8Array(png));
+
+      const name = profile?.name?.trim() || "Provider";
+      const web = publicProviderProfileUrl(providerId);
+      const app = appProviderProfileDeepLink(providerId);
+      const caption = `${t("shareProviderCardLine1")} ${name}.\n${web}\n${t("shareProviderCardLineApp")} ${app}`;
+
+      if (Platform.OS === "ios") {
+        await Share.share({
+          message: caption,
+          url: out.uri,
+          title: name,
+        });
+        return;
+      }
+
+      await Clipboard.setStringAsync(caption);
+      const canShare = await Sharing.isAvailableAsync();
+      if (!canShare) {
+        Alert.alert(t("errorTitle"), t("shareProviderNotSupported"));
+        return;
+      }
+      await Sharing.shareAsync(out.uri, {
+        mimeType: "image/png",
+        UTI: "public.png",
+        dialogTitle: t("shareProviderCardDialogTitle"),
       });
-    } catch {}
+    } catch {
+      Alert.alert(t("errorTitle"), t("shareProviderCardFailed"));
+    } finally {
+      setShareCardBusy(false);
+    }
   };
 
   const handleMessage = () => {

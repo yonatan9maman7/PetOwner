@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import {
   View,
   Text,
@@ -9,10 +9,13 @@ import {
   Platform,
   ActivityIndicator,
   Alert,
+  Animated,
+  Easing,
+  Image,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
-import { useNavigation } from "@react-navigation/native";
+import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import * as AppleAuthentication from "expo-apple-authentication";
 import * as Crypto from "expo-crypto";
 import * as WebBrowser from "expo-web-browser";
@@ -20,12 +23,13 @@ import * as Google from "expo-auth-session/providers/google";
 import { useAuthStore } from "../../store/authStore";
 import { useTranslation } from "../../i18n";
 import { LanguageToggle } from "../../components/LanguageToggle";
-import { BrandedAppHeader } from "../../components/BrandedAppHeader";
 import { authApi } from "../../api/client";
 import { useTheme } from "../../theme/ThemeContext";
 import * as biometricService from "../../services/biometricService";
 
 WebBrowser.maybeCompleteAuthSession();
+
+const LOGIN_HERO_LOGO = require("../../../assets/petcare-logo-transparent.png");
 
 /* ─── LoginScreen (root) ─────────────────────────────────────────── */
 
@@ -83,8 +87,10 @@ function LoginForm() {
   const [appleAvailable, setAppleAvailable] = useState(false);
 
   const emailRef = useRef<TextInput>(null);
+  const passwordRef = useRef<TextInput>(null);
   const navigation = useNavigation<any>();
   const setAuth = useAuthStore((s) => s.setAuth);
+  const insets = useSafeAreaInsets();
   const { t, isHebrew, rtlText, rtlStyle, rtlRow, rtlInput, alignCls, trailingFormLinkAlign } =
     useTranslation();
   const { colors } = useTheme();
@@ -94,6 +100,14 @@ function LoginForm() {
     androidClientId: process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID,
     webClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID,
   });
+
+  /* Warm hero logo decode/cache as soon as the screen mounts */
+  useEffect(() => {
+    const src = Image.resolveAssetSource(LOGIN_HERO_LOGO);
+    if (src?.uri) {
+      Image.prefetch(src.uri).catch(() => {});
+    }
+  }, []);
 
   /* ── Check biometric availability on mount ── */
   useEffect(() => {
@@ -175,6 +189,7 @@ function LoginForm() {
   };
 
   const handleLogin = async () => {
+    if (loading) return;
     if (!email.trim() || !password.trim()) {
       Alert.alert(t("errorTitle"), t("fillAllFields"));
       return;
@@ -266,9 +281,115 @@ function LoginForm() {
       : t("biometricFingerprintButton");
 
   const bioIcon = bioTypeLabel === "faceId" ? "scan-circle-outline" : "finger-print";
+  const heroBackgroundColor = "#081B3E";
+  /**
+   * Logo reveal tuning (local ≈ production; tunnel is slower before onLoad):
+   * - Lower OPACITY_START = stronger fade (0.35–0.55 typical). Above ~0.75 feels “no fade”.
+   * - Lower SCALE_START = more “pop” (0.965–0.985). Above ~0.99 is basically invisible.
+   * - FADE_MS = opacity  → 1 duration. SCALE_MS often slightly shorter feels natural.
+   */
+  const LOGO_REVEAL_OPACITY_START = 0.35;
+  const LOGO_REVEAL_SCALE_START = 0.6;
+  const LOGO_FADE_MS = 880;
+  const LOGO_SCALE_MS = 420;
+
+  const logoOpacity = useRef(new Animated.Value(LOGO_REVEAL_OPACITY_START)).current;
+  const logoScale = useRef(new Animated.Value(LOGO_REVEAL_SCALE_START)).current;
+
+  const startLogoReveal = useCallback(() => {
+    logoOpacity.stopAnimation();
+    logoScale.stopAnimation();
+    logoOpacity.setValue(LOGO_REVEAL_OPACITY_START);
+    logoScale.setValue(LOGO_REVEAL_SCALE_START);
+    Animated.parallel([
+      Animated.timing(logoOpacity, {
+        toValue: 1,
+        duration: LOGO_FADE_MS,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
+      Animated.timing(logoScale, {
+        toValue: 1,
+        duration: LOGO_SCALE_MS,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [logoOpacity, logoScale]);
+
+  useFocusEffect(
+    useCallback(() => {
+      startLogoReveal();
+      return () => {
+        logoOpacity.stopAnimation();
+        logoScale.stopAnimation();
+      };
+    }, [startLogoReveal, logoOpacity, logoScale]),
+  );
 
   return (
-    <SafeAreaView className="flex-1" edges={["top"]} style={{ marginTop: -8, backgroundColor: colors.surface }}>
+    <View style={{ flex: 1, backgroundColor: colors.surface }}>
+      <View
+        style={{
+          backgroundColor: heroBackgroundColor,
+          borderBottomLeftRadius: 36,
+          borderBottomRightRadius: 36,
+          paddingTop: insets.top + 6,
+          paddingBottom: 22,
+          paddingHorizontal: 20,
+          alignItems: "center",
+          overflow: "hidden",
+        }}
+      >
+        <View
+          pointerEvents="none"
+          style={{
+            position: "absolute",
+            left: 0,
+            right: 0,
+            top: 0,
+            bottom: 0,
+          }}
+        >
+          <Ionicons
+            name="paw-outline"
+            size={88}
+            color="rgba(255,255,255,0.08)"
+            style={{ position: "absolute", left: 18, top: insets.top + 14 }}
+          />
+          <Ionicons
+            name="paw-outline"
+            size={64}
+            color="rgba(255,255,255,0.06)"
+            style={{ position: "absolute", left: 84, top: insets.top + 72 }}
+          />
+          <Ionicons
+            name="paw-outline"
+            size={80}
+            color="rgba(255,255,255,0.08)"
+            style={{ position: "absolute", right: 24, top: insets.top + 20 }}
+          />
+          <Ionicons
+            name="paw-outline"
+            size={58}
+            color="rgba(255,255,255,0.05)"
+            style={{ position: "absolute", right: 94, top: insets.top + 88 }}
+          />
+        </View>
+        <Animated.Image
+          source={LOGIN_HERO_LOGO}
+          style={{
+            width: "100%",
+            maxWidth: 326,
+            height: 152,
+            opacity: logoOpacity,
+            transform: [{ scale: logoScale }],
+          }}
+          resizeMode="contain"
+          onLoad={startLogoReveal}
+        />
+      </View>
+
       <KeyboardAvoidingView
         className="flex-1"
         behavior={Platform.OS === "ios" ? "padding" : undefined}
@@ -278,19 +399,14 @@ function LoginForm() {
           contentContainerStyle={{
             flexGrow: 1,
             paddingHorizontal: 28,
-            paddingTop: 4,
+            paddingTop: 14,
             paddingBottom: 120,
           }}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          {/* ── Header: brand + language ── */}
-          <View className="mb-8">
-            <BrandedAppHeader
-              horizontalPadding={0}
-              elevated={false}
-              trailing={<LanguageToggle />}
-            />
+          <View style={{ marginBottom: 12, alignItems: "flex-end" }}>
+            <LanguageToggle />
           </View>
 
           {/* ── Welcome ── */}
@@ -349,6 +465,9 @@ function LoginForm() {
                 keyboardType="email-address"
                 autoCapitalize="none"
                 autoComplete="email"
+                returnKeyType="next"
+                blurOnSubmit={false}
+                onSubmitEditing={() => passwordRef.current?.focus()}
               />
             </View>
           </View>
@@ -379,6 +498,7 @@ function LoginForm() {
               />
               <TextInput
                 testID="login-password-input"
+                ref={passwordRef}
                 style={[
                   rtlInput,
                   {
@@ -394,6 +514,8 @@ function LoginForm() {
                 value={password}
                 onChangeText={setPassword}
                 secureTextEntry={secureEntry}
+                returnKeyType="done"
+                onSubmitEditing={handleLogin}
               />
               <Pressable
                 onPress={() => setSecureEntry((v) => !v)}
@@ -556,6 +678,6 @@ function LoginForm() {
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
-    </SafeAreaView>
+    </View>
   );
 }

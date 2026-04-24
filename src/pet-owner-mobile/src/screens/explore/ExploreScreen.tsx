@@ -33,7 +33,7 @@ import { useTheme } from "../../theme/ThemeContext";
 import { DatePickerField } from "../../components/DatePickerField";
 import { TimePickerField } from "../../components/TimePickerField";
 import { mapApi } from "../../api/client";
-import { ProviderType, type MapPinDto, type MapSearchFilters } from "../../types/api";
+import { ProviderType, type MapPinDto, type MapSearchFilters, type PlaydateMapPinDto } from "../../types/api";
 import { MapViewWrapper, MarkerWrapper, CircleWrapper } from "../../components/MapViewWrapper";
 import { groupPinsForMapMarkers, sortMarkerItemsStable } from "./mapCollision";
 import {
@@ -209,6 +209,12 @@ export function ExploreScreen() {
   const [filterTime, setFilterTime] = useState("");
   const [showFilterPanel, setShowFilterPanel] = useState(false);
 
+  /* Playdate-on-map layer */
+  const [playdateMode, setPlaydateMode] = useState(false);
+  const [playdatePins, setPlaydatePins] = useState<PlaydateMapPinDto[]>([]);
+  const [selectedPlaydate, setSelectedPlaydate] = useState<PlaydateMapPinDto | null>(null);
+  const playdateAbortRef = useRef<AbortController | null>(null);
+
   /* User location */
   const [userLat, setUserLat] = useState<number | null>(null);
   const [userLng, setUserLng] = useState<number | null>(null);
@@ -324,8 +330,9 @@ export function ExploreScreen() {
     if (filterMaxRate) count++;
     if (filterRadiusKm) count++;
     if (filterDate && filterTime) count++;
+    if (playdateMode) count++;
     return count;
-  }, [activeServices, filterMinRating, filterMaxRate, filterRadiusKm, filterDate, filterTime]);
+  }, [activeServices, filterMinRating, filterMaxRate, filterRadiusKm, filterDate, filterTime, playdateMode]);
 
   useFocusEffect(
     useCallback(() => {
@@ -350,6 +357,36 @@ export function ExploreScreen() {
   useEffect(() => {
     mapApi.getServiceTypes().then(setServiceTypes).catch(() => {});
   }, []);
+
+  /* ─── Playdate pin layer ─── */
+  useEffect(() => {
+    if (!playdateMode) {
+      playdateAbortRef.current?.abort();
+      setPlaydatePins([]);
+      setSelectedPlaydate(null);
+      return;
+    }
+    playdateAbortRef.current?.abort();
+    const ctrl = new AbortController();
+    playdateAbortRef.current = ctrl;
+
+    const r = mapRegionRef.current;
+    const lat = userLat ?? r.latitude;
+    const lng = userLng ?? r.longitude;
+    const latDelta = r.latitudeDelta / 2;
+    const lngDelta = r.longitudeDelta / 2;
+    const diagKm = Math.sqrt(
+      Math.pow(latDelta * 111, 2) +
+        Math.pow(lngDelta * 111 * Math.cos((lat * Math.PI) / 180), 2),
+    ) * 1.38;
+    const radius = filterRadiusKm ?? Math.max(5, Math.min(diagKm, 80));
+
+    mapApi
+      .fetchPlaydatePins({ latitude: lat, longitude: lng, radiusKm: radius }, ctrl.signal)
+      .then(setPlaydatePins)
+      .catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [playdateMode, userLat, userLng, filterRadiusKm]);
 
   /* ─── Request location ─── */
   useEffect(() => {
@@ -786,7 +823,9 @@ export function ExploreScreen() {
     setFilterDate("");
     setFilterTime("");
     setSearchText("");
+    setPlaydateMode(false);
     setSelectedPin(null);
+    setSelectedPlaydate(null);
     setCollocatedChooserPins(null);
     setShowFilterPanel(false);
     setTimeout(() => loadPinsRef.current(), 0);
@@ -910,6 +949,24 @@ export function ExploreScreen() {
           latitude={selectedPin?.latitude ?? null}
           longitude={selectedPin?.longitude ?? null}
         />
+        {playdateMode && playdatePins.map((pd) => (
+          <MarkerWrapper
+            key={pd.eventId}
+            coordinate={{ latitude: pd.latitude, longitude: pd.longitude }}
+            tracksViewChanges={false}
+            onPress={() => {
+              suppressViewportFetchAfterMarkerMsRef.current = Date.now() + MARKER_TAP_VIEWPORT_SUPPRESS_MS;
+              setSelectedPlaydate(pd);
+              setSelectedPin(null);
+              setCollocatedChooserPins(null);
+            }}
+          >
+            <View style={styles.playdateMarker}>
+              <Ionicons name="paw" size={14} color="#fff" />
+              <Ionicons name="calendar" size={10} color="#fff" style={{ marginLeft: 2 }} />
+            </View>
+          </MarkerWrapper>
+        ))}
       </MapViewWrapper>
 
       <SafeAreaView edges={["top"]} style={{ zIndex: 10, marginTop: -8 }}>
@@ -971,6 +1028,31 @@ export function ExploreScreen() {
           </View>
 
           {/* Active filter chips (compact summary) */}
+          {playdateMode && (
+            <View style={{ paddingTop: 10 }}>
+              <View
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  alignSelf: "flex-start",
+                  backgroundColor: colors.text,
+                  borderRadius: 16,
+                  paddingLeft: 10,
+                  paddingRight: 6,
+                  paddingVertical: 5,
+                  gap: 4,
+                }}
+              >
+                <Ionicons name="paw" size={12} color={colors.textInverse} />
+                <Text style={{ fontSize: 11, fontWeight: "700", color: colors.textInverse }}>
+                  {t("filterPlayWithPal")}
+                </Text>
+                <Pressable onPress={() => setPlaydateMode(false)} hitSlop={6}>
+                  <Ionicons name="close-circle" size={14} color={colors.textInverse} />
+                </Pressable>
+              </View>
+            </View>
+          )}
           {activeServices.size > 0 && (
             <ScrollView
               horizontal
@@ -1294,6 +1376,73 @@ export function ExploreScreen() {
                 </View>
               </View>
             </View>
+          </View>
+        </View>
+      )}
+
+      {/* Selected playdate card */}
+      {selectedPlaydate && (
+        <View
+          className="absolute left-0 right-0"
+          style={{ bottom: 110, zIndex: 20, paddingHorizontal: BRAND_HEADER_HORIZONTAL_PAD }}
+        >
+          <View
+            className="p-4 rounded-xl"
+            style={[styles.sitterCard, { backgroundColor: colors.surface, shadowColor: colors.shadow }]}
+          >
+            <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+              <View
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: 6,
+                  backgroundColor: colors.primaryLight,
+                  borderRadius: 12,
+                  paddingHorizontal: 10,
+                  paddingVertical: 4,
+                }}
+              >
+                <Ionicons name="paw" size={13} color={colors.primary as string} />
+                <Ionicons name="calendar" size={11} color={colors.primary as string} />
+                <Text style={{ fontSize: 11, fontWeight: "700", color: colors.primary as string }}>
+                  {t("filterPlayWithPal")}
+                </Text>
+              </View>
+              <Pressable onPress={() => setSelectedPlaydate(null)} hitSlop={8}>
+                <Ionicons name="close" size={20} color={colors.textMuted} />
+              </Pressable>
+            </View>
+            <Text style={{ fontSize: 16, fontWeight: "800", color: colors.text }} numberOfLines={1}>
+              {selectedPlaydate.title}
+            </Text>
+            <Text style={{ fontSize: 13, color: colors.textSecondary, marginTop: 2 }} numberOfLines={1}>
+              {selectedPlaydate.locationName}
+            </Text>
+            <Text style={{ fontSize: 12, color: colors.textMuted, marginTop: 2 }}>
+              {new Date(selectedPlaydate.scheduledForUtc).toLocaleString()} · {selectedPlaydate.hostName}
+            </Text>
+            {selectedPlaydate.goingCount > 0 && (
+              <Text style={{ fontSize: 12, color: colors.textMuted, marginTop: 2 }}>
+                {selectedPlaydate.goingCount} going
+              </Text>
+            )}
+            <Pressable
+              onPress={() => {
+                setSelectedPlaydate(null);
+                navigation.navigate("PlaydateEventDetail", { eventId: selectedPlaydate.eventId });
+              }}
+              style={{
+                marginTop: 12,
+                backgroundColor: colors.text,
+                paddingVertical: 10,
+                borderRadius: 12,
+                alignItems: "center",
+              }}
+            >
+              <Text style={{ fontSize: 13, fontWeight: "700", color: colors.textInverse }}>
+                {t("viewProfile")}
+              </Text>
+            </Pressable>
           </View>
         </View>
       )}
@@ -1639,6 +1788,33 @@ export function ExploreScreen() {
               showsVerticalScrollIndicator={false}
               contentContainerStyle={{ gap: 20, paddingBottom: 20 }}
             >
+              {/* ── Play with a Pal toggle ── */}
+              <View>
+                <Pressable
+                  onPress={() => setPlaydateMode((prev) => !prev)}
+                  style={{
+                    flexDirection: rowDirectionForAppLayout(isRTL),
+                    alignItems: "center",
+                    gap: 10,
+                    backgroundColor: playdateMode ? colors.text : colors.surfaceSecondary,
+                    paddingHorizontal: 14,
+                    paddingVertical: 12,
+                    borderRadius: 12,
+                    borderWidth: 1.5,
+                    borderColor: playdateMode ? colors.text : colors.border,
+                  }}
+                >
+                  <Ionicons name="paw" size={16} color={playdateMode ? colors.textInverse : colors.textSecondary} />
+                  <Ionicons name="calendar" size={14} color={playdateMode ? colors.textInverse : colors.textSecondary} />
+                  <Text style={{ fontSize: 13, fontWeight: "600", color: playdateMode ? colors.textInverse : colors.textSecondary, flex: 1 }}>
+                    {t("filterPlayWithPal")}
+                  </Text>
+                  {playdateMode && (
+                    <Ionicons name="checkmark-circle" size={16} color={colors.textInverse} />
+                  )}
+                </Pressable>
+              </View>
+
               {/* ── Service type (multi-select) ── */}
               <View>
                 <Text style={filterLabel(isRTL, colors)}>
@@ -1927,6 +2103,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 12,
     maxHeight: "62%",
+  },
+  playdateMarker: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#7c3aed",
+    borderRadius: 14,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderWidth: 2,
+    borderColor: "#fff",
   },
   /**
    * IMPORTANT: No shadow* props here. On iOS with tracksViewChanges={false}

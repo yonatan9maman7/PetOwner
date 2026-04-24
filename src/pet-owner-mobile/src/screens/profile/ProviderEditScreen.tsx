@@ -22,7 +22,11 @@ import { MapViewWrapper, MarkerWrapper } from "../../components/MapViewWrapper";
 import { useTranslation, type TranslationKey, rowDirectionForAppLayout } from "../../i18n";
 import { useTheme } from "../../theme/ThemeContext";
 import { providerApi } from "../../api/client";
-import { CityAutocompleteInput } from "../../components/shared/CityAutocompleteInput";
+import {
+  AddressAutocomplete,
+  type AddressAutocompleteSelection,
+} from "../../components/shared/AddressAutocomplete";
+import { fetchReverseGeocode } from "../../api/googlePlaces";
 import { DogSizeCapacityEditor, toggleDogSize } from "../../features/provider-onboarding/DogSizeCapacityFields";
 import type { AvailabilitySlotDto, DogSize } from "../../types/api";
 
@@ -530,6 +534,9 @@ function AddressMapModal({
   const [localStreet, setLocalStreet] = useState(street);
   const [localBuilding, setLocalBuilding] = useState(building);
   const [localApartment, setLocalApartment] = useState(apartment);
+  const [searchText, setSearchText] = useState(
+    [street, building, city].filter(Boolean).join(" ").trim(),
+  );
   const mapRef = useRef<any>(null);
 
   useEffect(() => {
@@ -540,28 +547,44 @@ function AddressMapModal({
       setLocalStreet(street);
       setLocalBuilding(building);
       setLocalApartment(apartment);
+      setSearchText([street, building, city].filter(Boolean).join(" ").trim());
     }
   }, [visible, lat, lng, city, street, building, apartment]);
 
-  const handleMapPress = async (e: any) => {
-    const { latitude: newLat, longitude: newLng } = e.nativeEvent.coordinate;
-    setLocalLat(newLat);
-    setLocalLng(newLng);
-    try {
-      const resp = await fetch(
-        `https://nominatim.openstreetmap.org/reverse?lat=${newLat}&lon=${newLng}&format=json&addressdetails=1`,
-        { headers: { "Accept-Language": isRTL ? "he" : "en" } },
-      );
-      const data = await resp.json();
-      if (data?.address) {
-        setLocalCity(data.address.city || data.address.town || data.address.village || localCity);
-        setLocalStreet(data.address.road || localStreet);
-        setLocalBuilding(data.address.house_number || localBuilding);
+  const applyPlace = useCallback(
+    (selection: AddressAutocompleteSelection) => {
+      setLocalLat(selection.latitude);
+      setLocalLng(selection.longitude);
+      if (selection.components.city) setLocalCity(selection.components.city);
+      if (selection.components.street) setLocalStreet(selection.components.street);
+      if (selection.components.streetNumber) {
+        setLocalBuilding(selection.components.streetNumber);
       }
-    } catch {
-      /* geocoding is best-effort */
-    }
-  };
+    },
+    [],
+  );
+
+  const handleMapPress = useCallback(
+    async (e: any) => {
+      const { latitude: newLat, longitude: newLng } = e.nativeEvent.coordinate;
+      setLocalLat(newLat);
+      setLocalLng(newLng);
+      const result = await fetchReverseGeocode({
+        latitude: newLat,
+        longitude: newLng,
+        language: isRTL ? "he" : "en",
+      });
+      if (result) {
+        if (result.components.city) setLocalCity(result.components.city);
+        if (result.components.street) setLocalStreet(result.components.street);
+        if (result.components.streetNumber) {
+          setLocalBuilding(result.components.streetNumber);
+        }
+        if (result.formattedAddress) setSearchText(result.formattedAddress);
+      }
+    },
+    [isRTL],
+  );
 
   const insets = useSafeAreaInsets();
 
@@ -650,15 +673,20 @@ function AddressMapModal({
           </Text>
 
           <View style={{ paddingHorizontal: 20, gap: 12, marginTop: 4 }}>
-            <CityAutocompleteInput
+            <AddressAutocomplete
+              label={t("searchAddress")}
+              required
+              value={searchText}
+              onChangeText={setSearchText}
+              onSelect={applyPlace}
+              placeholder={t("searchAddressPlaceholder")}
+              isRTL={isRTL}
+              type="address"
+            />
+            <AddressField
               label={t("addressCity")}
               value={localCity}
               onChangeText={setLocalCity}
-              onCitySelect={(cityName, newLat, newLng) => {
-                setLocalCity(cityName);
-                setLocalLat(newLat);
-                setLocalLng(newLng);
-              }}
               isRTL={isRTL}
             />
             <AddressField
@@ -831,7 +859,9 @@ export function ProviderEditScreen() {
 
         const loaded = buildInitialServiceStates();
         for (const rate of profile.serviceRates) {
-          const typeNum = SERVICE_NAME_TO_TYPE[rate.service];
+          const serviceKey = rate.service;
+          if (serviceKey == null) continue;
+          const typeNum = SERVICE_NAME_TO_TYPE[serviceKey];
           if (typeNum != null) {
             const existingPkgs: ServicePackage[] = (rate.packages || []).map(
               (p: any) => ({

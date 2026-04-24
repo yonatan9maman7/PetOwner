@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { View, Text, TextInput, Pressable, ScrollView, Modal } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -6,7 +6,11 @@ import { MapViewWrapper, MarkerWrapper } from "../../components/MapViewWrapper";
 import { useTranslation, rowDirectionForAppLayout } from "../../i18n";
 import { useTheme } from "../../theme/ThemeContext";
 import { DEFAULT_LAT, DEFAULT_LNG } from "./constants";
-import { CityAutocompleteInput } from "../../components/shared/CityAutocompleteInput";
+import {
+  AddressAutocomplete,
+  type AddressAutocompleteSelection,
+} from "../../components/shared/AddressAutocomplete";
+import { fetchReverseGeocode } from "../../api/googlePlaces";
 
 interface AddressData {
   lat: number;
@@ -36,6 +40,10 @@ export function AddressMapModal({ visible, onClose, onConfirm, initial }: Props)
   const [street, setStreet] = useState(initial.street);
   const [building, setBuilding] = useState(initial.building);
   const [apartment, setApartment] = useState(initial.apartment);
+  /** Search-bar text — separate from individual address fields so the user can edit either independently. */
+  const [searchText, setSearchText] = useState(
+    [initial.street, initial.building].filter(Boolean).join(" ").trim(),
+  );
 
   useEffect(() => {
     if (visible) {
@@ -45,28 +53,49 @@ export function AddressMapModal({ visible, onClose, onConfirm, initial }: Props)
       setStreet(initial.street);
       setBuilding(initial.building);
       setApartment(initial.apartment);
+      setSearchText(
+        [initial.street, initial.building, initial.city]
+          .filter(Boolean)
+          .join(" ")
+          .trim(),
+      );
     }
   }, [visible, initial.lat, initial.lng, initial.city, initial.street, initial.building, initial.apartment]);
 
-  const handleMapPress = async (e: any) => {
-    const { latitude: newLat, longitude: newLng } = e.nativeEvent.coordinate;
-    setLat(newLat);
-    setLng(newLng);
-    try {
-      const resp = await fetch(
-        `https://nominatim.openstreetmap.org/reverse?lat=${newLat}&lon=${newLng}&format=json&addressdetails=1`,
-        { headers: { "Accept-Language": isRTL ? "he" : "en" } },
-      );
-      const data = await resp.json();
-      if (data?.address) {
-        setCity(data.address.city || data.address.town || data.address.village || city);
-        setStreet(data.address.road || street);
-        setBuilding(data.address.house_number || building);
+  const applyPlace = useCallback(
+    (selection: AddressAutocompleteSelection) => {
+      setLat(selection.latitude);
+      setLng(selection.longitude);
+      if (selection.components.city) setCity(selection.components.city);
+      if (selection.components.street) setStreet(selection.components.street);
+      if (selection.components.streetNumber) {
+        setBuilding(selection.components.streetNumber);
       }
-    } catch {
-      /* best-effort */
-    }
-  };
+    },
+    [],
+  );
+
+  const handleMapPress = useCallback(
+    async (e: any) => {
+      const { latitude: newLat, longitude: newLng } = e.nativeEvent.coordinate;
+      setLat(newLat);
+      setLng(newLng);
+      const result = await fetchReverseGeocode({
+        latitude: newLat,
+        longitude: newLng,
+        language: isRTL ? "he" : "en",
+      });
+      if (result) {
+        if (result.components.city) setCity(result.components.city);
+        if (result.components.street) setStreet(result.components.street);
+        if (result.components.streetNumber) {
+          setBuilding(result.components.streetNumber);
+        }
+        if (result.formattedAddress) setSearchText(result.formattedAddress);
+      }
+    },
+    [isRTL],
+  );
 
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
@@ -120,18 +149,17 @@ export function AddressMapModal({ visible, onClose, onConfirm, initial }: Props)
           </Text>
 
           <View style={{ paddingHorizontal: 20, gap: 12, marginTop: 4 }}>
-            <CityAutocompleteInput
-              label={t("addressCity")}
+            <AddressAutocomplete
+              label={t("searchAddress")}
               required
-              value={city}
-              onChangeText={setCity}
-              onCitySelect={(cityName, newLat, newLng) => {
-                setCity(cityName);
-                setLat(newLat);
-                setLng(newLng);
-              }}
+              value={searchText}
+              onChangeText={setSearchText}
+              onSelect={applyPlace}
+              placeholder={t("searchAddressPlaceholder")}
               isRTL={isRTL}
+              type="address"
             />
+            <Field label={t("addressCity")} required value={city} onChangeText={setCity} isRTL={isRTL} />
             <Field label={t("addressStreet")} required value={street} onChangeText={setStreet} isRTL={isRTL} />
             <View style={{ flexDirection: "row", gap: 12 }}>
               <View style={{ flex: 1 }}>

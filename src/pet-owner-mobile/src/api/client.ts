@@ -67,6 +67,7 @@ import type {
   ProviderBookingStatsDto,
   EarningsSparklineDto,
   StatRange,
+  PlaydateMapPinDto,
 } from "../types/api";
 
 const apiClient = axios.create({
@@ -149,6 +150,13 @@ export const mapApi = {
       .get<MapPinDto[]>("/map/pins", { params, signal })
       .then((r) => r.data);
   },
+  fetchPlaydatePins: (
+    params?: { latitude?: number; longitude?: number; radiusKm?: number; from?: string; to?: string },
+    signal?: AbortSignal,
+  ) =>
+    apiClient
+      .get<PlaydateMapPinDto[]>("/map/playdate-pins", { params, signal })
+      .then((r) => r.data),
   getServiceTypes: () =>
     apiClient.get<string[]>("/map/service-types").then((r) => r.data),
   getProviderProfile: (providerId: string) =>
@@ -158,6 +166,12 @@ export const mapApi = {
   getProviderContact: (providerId: string) =>
     apiClient
       .get<ContactDto>(`/providers/${providerId}/contact`)
+      .then((r) => r.data),
+  getProviderShareCard: (providerId: string) =>
+    apiClient
+      .get<ArrayBuffer>(`/providers/${providerId}/share-card`, {
+        responseType: "arraybuffer",
+      })
       .then((r) => r.data),
 };
 

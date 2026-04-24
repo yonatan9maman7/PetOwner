@@ -126,6 +126,20 @@ public record CreatePlaydateEventDto(
     int? MaxPets
 );
 
+public record PlaydateMapPinDto(
+    Guid EventId,
+    Guid HostUserId,
+    string HostName,
+    string Title,
+    string LocationName,
+    double Latitude,
+    double Longitude,
+    DateTime ScheduledForUtc,
+    DateTime? EndsAtUtc,
+    int GoingCount,
+    IReadOnlyList<string> AllowedSpecies,
+    double? DistanceKm);
+
 public record RsvpDto(string Status, Guid? PetId);
 
 public record PlaydateCommentDto(

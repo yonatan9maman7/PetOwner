@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import {
   View,
   Text,
@@ -30,6 +30,12 @@ export function RegisterScreen() {
   const [loading, setLoading] = useState(false);
   const [secureEntry, setSecureEntry] = useState(true);
 
+  const fullNameRef = useRef<TextInput>(null);
+  const emailRef = useRef<TextInput>(null);
+  const phoneRef = useRef<TextInput>(null);
+  const passwordRef = useRef<TextInput>(null);
+  const confirmPasswordRef = useRef<TextInput>(null);
+
   const navigation = useNavigation<any>();
   const setAuth = useAuthStore((s) => s.setAuth);
   const isLoggedIn = useAuthStore((s) => s.isLoggedIn);
@@ -42,6 +48,7 @@ export function RegisterScreen() {
   }, [isLoggedIn, navigation]);
 
   const handleRegister = async () => {
+    if (loading) return;
     if (
       !fullName.trim() ||
       !email.trim() ||
@@ -170,6 +177,7 @@ export function RegisterScreen() {
             >
               <Ionicons name="person-outline" size={20} color={colors.textSecondary} />
               <TextInput
+                ref={fullNameRef}
                 style={[
                   rtlInput,
                   {
@@ -186,6 +194,9 @@ export function RegisterScreen() {
                 onChangeText={setFullName}
                 autoCapitalize="words"
                 autoComplete="name"
+                returnKeyType="next"
+                blurOnSubmit={false}
+                onSubmitEditing={() => emailRef.current?.focus()}
               />
             </View>
           </View>
@@ -229,6 +240,10 @@ export function RegisterScreen() {
                 keyboardType="email-address"
                 autoCapitalize="none"
                 autoComplete="email"
+                ref={emailRef}
+                returnKeyType="next"
+                blurOnSubmit={false}
+                onSubmitEditing={() => phoneRef.current?.focus()}
               />
             </View>
           </View>
@@ -271,6 +286,10 @@ export function RegisterScreen() {
                 onChangeText={setPhone}
                 keyboardType="phone-pad"
                 autoComplete="tel"
+                ref={phoneRef}
+                returnKeyType="next"
+                blurOnSubmit={false}
+                onSubmitEditing={() => passwordRef.current?.focus()}
               />
             </View>
           </View>
@@ -301,6 +320,7 @@ export function RegisterScreen() {
                 color={colors.textSecondary}
               />
               <TextInput
+                ref={passwordRef}
                 style={[
                   rtlInput,
                   {
@@ -316,6 +336,9 @@ export function RegisterScreen() {
                 value={password}
                 onChangeText={setPassword}
                 secureTextEntry={secureEntry}
+                returnKeyType="next"
+                blurOnSubmit={false}
+                onSubmitEditing={() => confirmPasswordRef.current?.focus()}
               />
               <Pressable
                 onPress={() => setSecureEntry((v) => !v)}
@@ -356,6 +379,7 @@ export function RegisterScreen() {
                 color={colors.textSecondary}
               />
               <TextInput
+                ref={confirmPasswordRef}
                 style={[
                   rtlInput,
                   {
@@ -371,6 +395,8 @@ export function RegisterScreen() {
                 value={confirmPassword}
                 onChangeText={setConfirmPassword}
                 secureTextEntry={secureEntry}
+                returnKeyType="done"
+                onSubmitEditing={handleRegister}
               />
               <Pressable
                 onPress={() => setSecureEntry((v) => !v)}

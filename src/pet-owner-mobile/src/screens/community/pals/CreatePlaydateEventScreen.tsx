@@ -1,7 +1,13 @@
 import { useState } from "react";
 import {
-  View, Text, TextInput, Pressable, ScrollView,
-  ActivityIndicator, Alert, StyleSheet, Platform,
+  View,
+  Text,
+  TextInput,
+  Pressable,
+  ScrollView,
+  ActivityIndicator,
+  Alert,
+  StyleSheet,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -10,6 +16,9 @@ import type { CreatePlaydateEventDto } from "../../../types/api";
 import { playdatesApi } from "../../../api/client";
 import { useTheme } from "../../../theme/ThemeContext";
 import { useTranslation, rowDirectionForAppLayout } from "../../../i18n";
+import { DatePickerField } from "../../../components/DatePickerField";
+import { TimePickerField } from "../../../components/TimePickerField";
+import { LocationPickerField, type LocationValue } from "../../../components/LocationPickerField";
 
 const SPECIES = ["DOG", "CAT", "BIRD", "RABBIT", "OTHER"];
 
@@ -20,36 +29,44 @@ export function CreatePlaydateEventScreen() {
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [locationName, setLocationName] = useState("");
+  const [location, setLocation] = useState<LocationValue | null>(null);
   const [species, setSpecies] = useState<string[]>(["DOG"]);
   const [maxPets, setMaxPets] = useState("");
   const [creating, setCreating] = useState(false);
 
-  // Simple date/time state (30 min from now, rounded to nearest 30)
-  const defaultDate = new Date(Date.now() + 24 * 3600 * 1000);
-  const [scheduledFor, setScheduledFor] = useState(defaultDate.toISOString().slice(0, 16));
+  // Default date: tomorrow, time 10:00
+  const tomorrow = new Date(Date.now() + 24 * 3600 * 1000);
+  const [dateIso, setDateIso] = useState(
+    () => `${tomorrow.getFullYear()}-${String(tomorrow.getMonth() + 1).padStart(2, "0")}-${String(tomorrow.getDate()).padStart(2, "0")}`,
+  );
+  const [timeHHmm, setTimeHHmm] = useState("10:00");
 
   const toggleSpecies = (s: string) =>
-    setSpecies((prev) => prev.includes(s) ? prev.filter((x) => x !== s) : [...prev, s]);
+    setSpecies((prev) => (prev.includes(s) ? prev.filter((x) => x !== s) : [...prev, s]));
+
+  const canSubmit =
+    title.trim().length > 0 &&
+    location !== null &&
+    location.latitude !== 0 &&
+    location.longitude !== 0 &&
+    dateIso.length > 0 &&
+    timeHHmm.length > 0;
 
   const create = async () => {
-    if (!title.trim()) {
-      Alert.alert(t("errorTitle"), "Title is required.");
-      return;
-    }
-    if (!locationName.trim()) {
-      Alert.alert(t("errorTitle"), "Location is required.");
-      return;
-    }
+    if (!canSubmit || !location) return;
+
+    const scheduledFor = new Date(`${dateIso}T${timeHHmm}:00`).toISOString();
+
     setCreating(true);
     try {
       const dto: CreatePlaydateEventDto = {
         title: title.trim(),
         description: description.trim() || undefined,
-        locationName: locationName.trim(),
-        latitude: 0,
-        longitude: 0,
-        scheduledFor: new Date(scheduledFor).toISOString(),
+        locationName: location.name,
+        latitude: location.latitude,
+        longitude: location.longitude,
+        city: location.city,
+        scheduledFor,
         allowedSpecies: species.length > 0 ? species : ["DOG"],
         maxPets: maxPets ? parseInt(maxPets, 10) : undefined,
       };
@@ -75,6 +92,7 @@ export function CreatePlaydateEventScreen() {
       </View>
 
       <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 120 }}>
+        {/* Title */}
         <Text style={[styles.label, { color: colors.textSecondary }]}>{t("eventTitle")} *</Text>
         <TextInput
           style={[styles.input, { backgroundColor: colors.surfaceTertiary, borderColor: colors.border, color: colors.text }]}
@@ -85,16 +103,11 @@ export function CreatePlaydateEventScreen() {
           textAlign={isRTL ? "right" : "left"}
         />
 
+        {/* Location */}
         <Text style={[styles.label, { color: colors.textSecondary }]}>{t("eventLocation")} *</Text>
-        <TextInput
-          style={[styles.input, { backgroundColor: colors.surfaceTertiary, borderColor: colors.border, color: colors.text }]}
-          value={locationName}
-          onChangeText={setLocationName}
-          placeholder="e.g. Hayarkon Park"
-          placeholderTextColor={colors.textMuted}
-          textAlign={isRTL ? "right" : "left"}
-        />
+        <LocationPickerField value={location} onChange={setLocation} isRTL={isRTL} />
 
+        {/* Description */}
         <Text style={[styles.label, { color: colors.textSecondary }]}>{t("eventDescription")}</Text>
         <TextInput
           style={[styles.input, { backgroundColor: colors.surfaceTertiary, borderColor: colors.border, color: colors.text, minHeight: 80, textAlignVertical: "top" }]}
@@ -106,29 +119,48 @@ export function CreatePlaydateEventScreen() {
           textAlign={isRTL ? "right" : "left"}
         />
 
+        {/* Date & Time */}
         <Text style={[styles.label, { color: colors.textSecondary }]}>{t("eventDate")} *</Text>
-        <TextInput
-          style={[styles.input, { backgroundColor: colors.surfaceTertiary, borderColor: colors.border, color: colors.text }]}
-          value={scheduledFor}
-          onChangeText={setScheduledFor}
-          placeholder="YYYY-MM-DDTHH:MM"
-          placeholderTextColor={colors.textMuted}
-          textAlign={isRTL ? "right" : "left"}
-        />
+        <View style={{ flexDirection: rowDirectionForAppLayout(isRTL), gap: 10 }}>
+          <View style={{ flex: 1 }}>
+            <DatePickerField
+              value={dateIso}
+              onChange={setDateIso}
+              placeholder={t("date")}
+              isRTL={isRTL}
+              minimumDate={new Date()}
+            />
+          </View>
+          <View style={{ flex: 1 }}>
+            <TimePickerField
+              value={timeHHmm}
+              onChange={setTimeHHmm}
+              placeholder={t("time")}
+              isRTL={isRTL}
+            />
+          </View>
+        </View>
 
+        {/* Allowed species */}
         <Text style={[styles.label, { color: colors.textSecondary }]}>{t("eventAllowedSpecies")}</Text>
         <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
           {SPECIES.map((s) => {
             const active = species.includes(s);
             return (
-              <Pressable key={s} onPress={() => toggleSpecies(s)}
-                style={[styles.pill, { backgroundColor: active ? colors.text : colors.surface, borderColor: colors.border }]}>
-                <Text style={{ fontSize: 13, fontWeight: "600", color: active ? colors.textInverse : colors.textSecondary }}>{s}</Text>
+              <Pressable
+                key={s}
+                onPress={() => toggleSpecies(s)}
+                style={[styles.pill, { backgroundColor: active ? colors.text : colors.surface, borderColor: colors.border }]}
+              >
+                <Text style={{ fontSize: 13, fontWeight: "600", color: active ? colors.textInverse : colors.textSecondary }}>
+                  {s}
+                </Text>
               </Pressable>
             );
           })}
         </View>
 
+        {/* Max pets */}
         <Text style={[styles.label, { color: colors.textSecondary }]}>{t("eventMaxPets")}</Text>
         <TextInput
           style={[styles.input, { backgroundColor: colors.surfaceTertiary, borderColor: colors.border, color: colors.text, width: 100 }]}
@@ -141,8 +173,8 @@ export function CreatePlaydateEventScreen() {
 
         <Pressable
           onPress={create}
-          disabled={creating}
-          style={[styles.createBtn, { backgroundColor: colors.text, opacity: creating ? 0.6 : 1 }]}
+          disabled={creating || !canSubmit}
+          style={[styles.createBtn, { backgroundColor: colors.text, opacity: creating || !canSubmit ? 0.5 : 1 }]}
         >
           {creating
             ? <ActivityIndicator color={colors.textInverse} />
