@@ -220,7 +220,8 @@ const he = {
   yourBioLabel: "הביוגרפיה שלכם",
   bioPolishedPlaceholder:
     "כאן תופיע הביוגרפיה שנוצרה — אפשר לערוך בחופשיות!",
-  toastBioFail: "יצירת הביוגרפיה נכשלה. נסה שוב.",
+  toastBioFail:
+    "לא הצלחנו ליצור ביוגרפיה כרגע — ייתכן שהעוזר החכם זמנית לא זמין. בינתיים אפשר לכתוב ביוגרפיה קצרה בעצמכם; אנחנו עובדים על זה והשירות יחזור בקרוב.",
   generateWithAI: "צור ביו עם AI",
   aiPreviewLabel: "AI Preview",
   aiPreviewText:
@@ -1465,7 +1466,8 @@ const en: Record<keyof typeof he, string> = {
   yourBioLabel: "Your Bio",
   bioPolishedPlaceholder:
     "Your AI-generated bio will appear here — feel free to edit it!",
-  toastBioFail: "Failed to generate bio. Please try again.",
+  toastBioFail:
+    "We couldn't generate a bio right now — the AI helper may be temporarily unavailable. You can write a short bio yourself for now; we're working on it and it'll be back soon.",
   generateWithAI: "Generate Bio with AI",
   aiPreviewLabel: "AI Preview",
   aiPreviewText:

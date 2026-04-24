@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import {
   View,
   Text,
@@ -9,16 +9,20 @@ import {
   Platform,
   ActivityIndicator,
   Alert,
+  Animated,
+  Easing,
+  Image,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
-import { useNavigation } from "@react-navigation/native";
+import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import { useAuthStore } from "../../store/authStore";
 import { useTranslation } from "../../i18n";
-import { BrandedAppHeader } from "../../components/BrandedAppHeader";
 import { LanguageToggle } from "../../components/LanguageToggle";
 import { authApi } from "../../api/client";
 import { useTheme } from "../../theme/ThemeContext";
+
+const AUTH_PETCARE_HERO_LOGO = require("../../../assets/petcare-logo-transparent.png");
 
 export function RegisterScreen() {
   const [fullName, setFullName] = useState("");
@@ -39,9 +43,57 @@ export function RegisterScreen() {
   const navigation = useNavigation<any>();
   const setAuth = useAuthStore((s) => s.setAuth);
   const isLoggedIn = useAuthStore((s) => s.isLoggedIn);
+  const insets = useSafeAreaInsets();
   const { t, language, isHebrew, rtlText, rtlStyle, rtlRow, rtlInput, alignCls } =
     useTranslation();
   const { colors } = useTheme();
+
+  const heroBackgroundColor = "#081B3E";
+  const LOGO_REVEAL_OPACITY_START = 0.35;
+  const LOGO_REVEAL_SCALE_START = 0.6;
+  const LOGO_FADE_MS = 880;
+  const LOGO_SCALE_MS = 420;
+
+  const logoOpacity = useRef(new Animated.Value(LOGO_REVEAL_OPACITY_START)).current;
+  const logoScale = useRef(new Animated.Value(LOGO_REVEAL_SCALE_START)).current;
+
+  const startLogoReveal = useCallback(() => {
+    logoOpacity.stopAnimation();
+    logoScale.stopAnimation();
+    logoOpacity.setValue(LOGO_REVEAL_OPACITY_START);
+    logoScale.setValue(LOGO_REVEAL_SCALE_START);
+    Animated.parallel([
+      Animated.timing(logoOpacity, {
+        toValue: 1,
+        duration: LOGO_FADE_MS,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
+      Animated.timing(logoScale, {
+        toValue: 1,
+        duration: LOGO_SCALE_MS,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [logoOpacity, logoScale]);
+
+  useFocusEffect(
+    useCallback(() => {
+      startLogoReveal();
+      return () => {
+        logoOpacity.stopAnimation();
+        logoScale.stopAnimation();
+      };
+    }, [startLogoReveal, logoOpacity, logoScale]),
+  );
+
+  useEffect(() => {
+    const src = Image.resolveAssetSource(AUTH_PETCARE_HERO_LOGO);
+    if (src?.uri) {
+      Image.prefetch(src.uri).catch(() => {});
+    }
+  }, []);
 
   useEffect(() => {
     if (isLoggedIn) navigation.popToTop();
@@ -108,7 +160,68 @@ export function RegisterScreen() {
   );
 
   return (
-    <SafeAreaView className="flex-1" edges={["top"]} style={{ marginTop: -8, backgroundColor: colors.surface }}>
+    <View style={{ flex: 1, backgroundColor: colors.surface }}>
+      <View
+        style={{
+          backgroundColor: heroBackgroundColor,
+          borderBottomLeftRadius: 36,
+          borderBottomRightRadius: 36,
+          paddingTop: insets.top + 6,
+          paddingBottom: 22,
+          paddingHorizontal: 20,
+          alignItems: "center",
+          overflow: "hidden",
+        }}
+      >
+        <View
+          pointerEvents="none"
+          style={{
+            position: "absolute",
+            left: 0,
+            right: 0,
+            top: 0,
+            bottom: 0,
+          }}
+        >
+          <Ionicons
+            name="paw-outline"
+            size={88}
+            color="rgba(255,255,255,0.08)"
+            style={{ position: "absolute", left: 18, top: insets.top + 14 }}
+          />
+          <Ionicons
+            name="paw-outline"
+            size={64}
+            color="rgba(255,255,255,0.06)"
+            style={{ position: "absolute", left: 84, top: insets.top + 72 }}
+          />
+          <Ionicons
+            name="paw-outline"
+            size={80}
+            color="rgba(255,255,255,0.08)"
+            style={{ position: "absolute", right: 24, top: insets.top + 20 }}
+          />
+          <Ionicons
+            name="paw-outline"
+            size={58}
+            color="rgba(255,255,255,0.05)"
+            style={{ position: "absolute", right: 94, top: insets.top + 88 }}
+          />
+        </View>
+        <Animated.Image
+          source={AUTH_PETCARE_HERO_LOGO}
+          style={{
+            width: "100%",
+            maxWidth: 326,
+            height: 152,
+            opacity: logoOpacity,
+            transform: [{ scale: logoScale }],
+          }}
+          resizeMode="contain"
+          onLoad={startLogoReveal}
+        />
+      </View>
+
       <KeyboardAvoidingView
         className="flex-1"
         behavior={Platform.OS === "ios" ? "padding" : undefined}
@@ -118,38 +231,36 @@ export function RegisterScreen() {
           contentContainerStyle={{
             flexGrow: 1,
             paddingHorizontal: 28,
-            paddingTop: 4,
+            paddingTop: 8,
             paddingBottom: 120,
           }}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          {/* ── Header: brand + language ── */}
-          <View className="mb-6">
-            <BrandedAppHeader
-              horizontalPadding={0}
-              elevated={false}
-              trailing={<LanguageToggle />}
-            />
-          </View>
-
-          {/* ── Hero ── */}
-          <View className="items-center mb-7">
+          {/* Title + language: EN title left | toggle right; HE toggle left | title right (rtlRow) */}
+          <View className="mb-5">
             <View
-              className="w-14 h-14 rounded-2xl items-center justify-center mb-4"
-              style={{ backgroundColor: colors.brand }}
+              style={[
+                rtlRow,
+                {
+                  alignItems: "center",
+                  gap: 10,
+                  marginBottom: 8,
+                },
+              ]}
             >
-              <Ionicons name="heart" size={24} color={colors.textInverse} />
+              <Text
+                style={[rtlText, { color: colors.text, flex: 1, minWidth: 0 }]}
+                className={`text-2xl font-bold ${alignCls}`}
+                numberOfLines={2}
+              >
+                {t("registerTitle")}
+              </Text>
+              <LanguageToggle />
             </View>
             <Text
-              style={[rtlStyle, { color: colors.text }]}
-              className="text-2xl font-bold text-center mb-2"
-            >
-              {t("registerTitle")}
-            </Text>
-            <Text
-              style={[rtlStyle, { color: colors.textSecondary }]}
-              className="text-sm text-center"
+              style={[rtlText, { color: colors.textSecondary }]}
+              className={`text-sm leading-5 ${alignCls}`}
             >
               {t("registerSubtitle")}
             </Text>
@@ -474,6 +585,6 @@ export function RegisterScreen() {
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
-    </SafeAreaView>
+    </View>
   );
 }

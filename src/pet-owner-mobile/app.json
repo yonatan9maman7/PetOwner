@@ -18,7 +18,9 @@
       "bundleIdentifier": "com.petowner.app",
       "usesAppleSignIn": true,
       "entitlements": {
-        "com.apple.developer.applesignin": ["Default"]
+        "com.apple.developer.applesignin": [
+          "Default"
+        ]
       },
       "infoPlist": {
         "NSFaceIDUsageDescription": "Allow PetOwner to use Face ID for fast and secure sign-in."
@@ -36,7 +38,11 @@
       "notification": {
         "icon": "./assets/adaptive-icon.png",
         "color": "#000000"
-      }
+      },
+      "permissions": [
+        "android.permission.USE_BIOMETRIC",
+        "android.permission.USE_FINGERPRINT"
+      ]
     },
     "web": {
       "bundler": "metro",
@@ -44,7 +50,7 @@
     },
     "extra": {
       "eas": {
-        "projectId": "YOUR_EAS_PROJECT_ID"
+        "projectId": "a152acc8-00c8-4730-aee4-08354bf924d1"
       }
     },
     "plugins": [
@@ -68,6 +74,7 @@
       ],
       "expo-web-browser",
       "expo-apple-authentication"
-    ]
+    ],
+    "owner": "mamanyon"
   }
 }

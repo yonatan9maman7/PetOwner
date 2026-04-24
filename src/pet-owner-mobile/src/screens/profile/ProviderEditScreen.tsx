@@ -978,7 +978,7 @@ export function ProviderEditScreen() {
       setAiGeneratedBio(result.bio);
       setShowAiPreview(true);
     } catch {
-      Alert.alert(t("errorTitle"), t("profileSaveError"));
+      Alert.alert(t("errorTitle"), t("toastBioFail"));
     } finally {
       setGeneratingBio(false);
     }

@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import {
   View,
   Text,
@@ -12,6 +12,10 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import * as Location from "expo-location";
+import {
+  AddressAutocomplete,
+  type AddressAutocompleteSelection,
+} from "./shared/AddressAutocomplete";
 import { MapViewWrapper, MarkerWrapper } from "./MapViewWrapper";
 import { useTheme } from "../theme/ThemeContext";
 import { useTranslation, rowDirectionForAppLayout } from "../i18n";
@@ -131,9 +135,22 @@ function LocationPickerModal({
     initialValue ? { latitude: initialValue.latitude, longitude: initialValue.longitude } : null,
   );
   const [locationName, setLocationName] = useState(initialValue?.name ?? "");
+  const [searchText, setSearchText] = useState(initialValue?.name ?? "");
   const [city, setCity] = useState(initialValue?.city ?? "");
   const [locating, setLocating] = useState(false);
   const [reverseGeocoding, setReverseGeocoding] = useState(false);
+
+  useEffect(() => {
+    if (!visible) return;
+    setPin(
+      initialValue
+        ? { latitude: initialValue.latitude, longitude: initialValue.longitude }
+        : null,
+    );
+    setLocationName(initialValue?.name ?? "");
+    setSearchText(initialValue?.name ?? "");
+    setCity(initialValue?.city ?? "");
+  }, [initialValue, visible]);
 
   const reverseGeocode = useCallback(
     async (lat: number, lng: number) => {
@@ -148,6 +165,7 @@ function LocationPickerModal({
           setCity(r.city ?? r.subregion ?? "");
           if (!locationName || locationName === autoName) {
             setLocationName(autoName);
+            setSearchText(autoName);
           }
         }
       } catch {
@@ -200,6 +218,25 @@ function LocationPickerModal({
       setLocating(false);
     }
   }, [reverseGeocode]);
+
+  const handleAddressSelect = useCallback(
+    (selection: AddressAutocompleteSelection) => {
+      const coord = {
+        latitude: selection.latitude,
+        longitude: selection.longitude,
+      };
+      const name = selection.formattedAddress || selection.mainText;
+      setPin(coord);
+      setLocationName(name);
+      setSearchText(name);
+      setCity(selection.components.city ?? "");
+      mapRef.current?.animateToRegion?.(
+        { ...coord, latitudeDelta: 0.02, longitudeDelta: 0.02 },
+        500,
+      );
+    },
+    [],
+  );
 
   const canConfirm = pin != null && locationName.trim().length > 0;
 
@@ -256,6 +293,27 @@ function LocationPickerModal({
               {t("confirmLocation")}
             </Text>
           </Pressable>
+        </View>
+
+        {/* Address search */}
+        <View
+          style={[
+            styles.searchRow,
+            {
+              backgroundColor: colors.surface,
+              borderBottomColor: colors.border,
+            },
+          ]}
+        >
+          <AddressAutocomplete
+            value={searchText}
+            onChangeText={setSearchText}
+            onSelect={handleAddressSelect}
+            placeholder={t("searchAddressPlaceholder")}
+            isRTL={isRTL}
+            type="geocode"
+            maxResultsHeight={220}
+          />
         </View>
 
         {/* Location name input */}
@@ -365,6 +423,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  searchRow: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    zIndex: 20,
   },
   nameInput: {
     flex: 1,

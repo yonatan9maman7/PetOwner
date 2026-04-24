@@ -44,16 +44,22 @@ export function CreatePlaydateEventScreen() {
   const toggleSpecies = (s: string) =>
     setSpecies((prev) => (prev.includes(s) ? prev.filter((x) => x !== s) : [...prev, s]));
 
+  const hasSelectedCoordinates =
+    location != null &&
+    Number.isFinite(location.latitude) &&
+    Number.isFinite(location.longitude);
+
   const canSubmit =
     title.trim().length > 0 &&
-    location !== null &&
-    location.latitude !== 0 &&
-    location.longitude !== 0 &&
+    hasSelectedCoordinates &&
     dateIso.length > 0 &&
     timeHHmm.length > 0;
 
   const create = async () => {
-    if (!canSubmit || !location) return;
+    if (!canSubmit || !location) {
+      Alert.alert(t("errorTitle"), t("pickLocation"));
+      return;
+    }
 
     const scheduledFor = new Date(`${dateIso}T${timeHHmm}:00`).toISOString();
 

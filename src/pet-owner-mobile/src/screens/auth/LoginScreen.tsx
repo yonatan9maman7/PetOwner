@@ -16,8 +16,9 @@ import {
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
-import * as AppleAuthentication from "expo-apple-authentication";
-import * as Crypto from "expo-crypto";
+// Paused until Apple Developer Program enrollment — restore when enabling Sign in with Apple.
+// import * as AppleAuthentication from "expo-apple-authentication";
+// import * as Crypto from "expo-crypto";
 import * as WebBrowser from "expo-web-browser";
 import * as Google from "expo-auth-session/providers/google";
 import { useAuthStore } from "../../store/authStore";
@@ -84,7 +85,6 @@ function LoginForm() {
   const [bioEnabled, setBioEnabled] = useState(false);
   const [bioTypeLabel, setBioTypeLabel] = useState<biometricService.BiometricTypeLabel>("generic");
   const [autoPromptDone, setAutoPromptDone] = useState(false);
-  const [appleAvailable, setAppleAvailable] = useState(false);
 
   const emailRef = useRef<TextInput>(null);
   const passwordRef = useRef<TextInput>(null);
@@ -132,12 +132,13 @@ function LoginForm() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  /* ── Check Apple availability on mount (iOS only) ── */
+  /* ── Check Apple availability on mount (iOS only) — paused with Sign in with Apple
   useEffect(() => {
     if (Platform.OS === "ios") {
       AppleAuthentication.isAvailableAsync().then(setAppleAvailable).catch(() => {});
     }
   }, []);
+  ── */
 
   /* ── Handle Google auth result ── */
   useEffect(() => {
@@ -233,40 +234,43 @@ function LoginForm() {
   };
 
   const handleAppleSignIn = async () => {
-    try {
-      const rawNonce = Array.from(
-        await Crypto.getRandomBytesAsync(32),
-        (b) => b.toString(16).padStart(2, "0")
-      ).join("");
-      const hashedNonce = await Crypto.digestStringAsync(
-        Crypto.CryptoDigestAlgorithm.SHA256,
-        rawNonce
-      );
+    Alert.alert("בפיתוח", "התחברות עם אפל תתאפשר בעדכון הבא");
 
-      const credential = await AppleAuthentication.signInAsync({
-        requestedScopes: [
-          AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
-          AppleAuthentication.AppleAuthenticationScope.EMAIL,
-        ],
-        nonce: hashedNonce,
-      });
-
-      if (!credential.identityToken) {
-        Alert.alert(t("errorTitle"), t("socialLoginFailed"));
-        return;
-      }
-
-      await handleSocialLoginToken("Apple", credential.identityToken, {
-        givenName: credential.fullName?.givenName ?? undefined,
-        familyName: credential.fullName?.familyName ?? undefined,
-        rawNonce,
-      });
-    } catch (err: any) {
-      if (err.code === "ERR_REQUEST_CANCELED") {
-        return; // silent cancel
-      }
-      Alert.alert(t("errorTitle"), t("socialLoginFailed"));
-    }
+    // ── Sign in with Apple (restore when enrolled in Apple Developer Program) ──
+    // try {
+    //   const rawNonce = Array.from(
+    //     await Crypto.getRandomBytesAsync(32),
+    //     (b) => b.toString(16).padStart(2, "0")
+    //   ).join("");
+    //   const hashedNonce = await Crypto.digestStringAsync(
+    //     Crypto.CryptoDigestAlgorithm.SHA256,
+    //     rawNonce
+    //   );
+    //
+    //   const credential = await AppleAuthentication.signInAsync({
+    //     requestedScopes: [
+    //       AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
+    //       AppleAuthentication.AppleAuthenticationScope.EMAIL,
+    //     ],
+    //     nonce: hashedNonce,
+    //   });
+    //
+    //   if (!credential.identityToken) {
+    //     Alert.alert(t("errorTitle"), t("socialLoginFailed"));
+    //     return;
+    //   }
+    //
+    //   await handleSocialLoginToken("Apple", credential.identityToken, {
+    //     givenName: credential.fullName?.givenName ?? undefined,
+    //     familyName: credential.fullName?.familyName ?? undefined,
+    //     rawNonce,
+    //   });
+    // } catch (err: any) {
+    //   if (err.code === "ERR_REQUEST_CANCELED") {
+    //     return; // silent cancel
+    //   }
+    //   Alert.alert(t("errorTitle"), t("socialLoginFailed"));
+    // }
   };
 
   const handleGoogleSignIn = async () => {
@@ -399,24 +403,33 @@ function LoginForm() {
           contentContainerStyle={{
             flexGrow: 1,
             paddingHorizontal: 28,
-            paddingTop: 14,
+            paddingTop: 8,
             paddingBottom: 120,
           }}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          <View style={{ marginBottom: 12, alignItems: "flex-end" }}>
-            <LanguageToggle />
-          </View>
-
-          {/* ── Welcome ── */}
-          <View className="mb-6">
-            <Text
-              style={[rtlText, { color: colors.text }]}
-              className={`text-3xl font-bold mb-2 ${alignCls}`}
+          {/* ── Welcome + language (one row: EN title | toggle, HE toggle | title via rtlRow) ── */}
+          <View className="mb-5">
+            <View
+              style={[
+                rtlRow,
+                {
+                  alignItems: "center",
+                  gap: 10,
+                  marginBottom: 8,
+                },
+              ]}
             >
-              {t("welcomeTitle")}
-            </Text>
+              <Text
+                style={[rtlText, { color: colors.text, flex: 1, minWidth: 0 }]}
+                className={`text-3xl font-bold ${alignCls}`}
+                numberOfLines={2}
+              >
+                {t("welcomeTitle")}
+              </Text>
+              <LanguageToggle />
+            </View>
             <Text
               style={[rtlText, { color: colors.textSecondary }]}
               className={`text-base leading-6 ${alignCls}`}
@@ -623,7 +636,7 @@ function LoginForm() {
 
           {/* ── Social Login ── */}
           <View className="flex-row gap-4">
-            {appleAvailable && (
+            {Platform.OS === "ios" && (
               <Pressable
                 className="flex-1 items-center justify-center gap-3 h-12 rounded-xl"
                 style={({ pressed }) => ({
