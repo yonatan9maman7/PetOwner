@@ -5,6 +5,7 @@ import { Ionicons } from "@expo/vector-icons";
 import type { PalDto } from "../../../types/api";
 import { useTheme } from "../../../theme/ThemeContext";
 import { useTranslation, rowDirectionForAppLayout } from "../../../i18n";
+import { formatBreedForDisplay } from "../../pets/addPetHelpers";
 import { PetTagChips } from "./PetTagChips";
 import { initials, formatDistance } from "./helpers";
 
@@ -57,7 +58,7 @@ export function PalCard({ pal }: Props) {
             <View style={{ flex: 1 }}>
               <Text style={{ fontSize: 14, fontWeight: "600", color: colors.text, textAlign: isRTL ? "right" : "left" }}>
                 {pet.name}
-                {pet.breed ? ` · ${pet.breed}` : ""}
+                {pet.breed ? ` · ${formatBreedForDisplay(pet.breed, t)}` : ""}
                 {pet.dogSize ? ` · ${pet.dogSize}` : ""}
               </Text>
             </View>

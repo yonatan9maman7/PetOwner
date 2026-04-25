@@ -33,6 +33,7 @@ import type { TranslationKey } from "../../i18n";
 import {
   ALLERGY_OPTIONS,
   findSimilarBreed,
+  formatBreedForDisplay,
   getBreedsForSpecies,
   parseAllergiesFromString,
   serializeAllergies,
@@ -46,6 +47,9 @@ import { pickImageWithSource } from "../../utils/imagePicker";
 import { isIsraeliBusinessPhoneValid } from "../../features/provider-onboarding/phoneUtils";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
+
+const KEYBOARD_AVOID_BEHAVIOR: "padding" | "height" =
+  Platform.OS === "ios" ? "padding" : "height";
 
 const CELEBRATION_AUTO_NAV_MS = 3000;
 
@@ -279,7 +283,7 @@ export function AddPetScreen() {
       if (match) {
         Alert.alert(
           t("breedMatchTitle"),
-          t("breedMatchMessage").replace("{breed}", match),
+          t("breedMatchMessage").replace("{breed}", formatBreedForDisplay(match, t)),
           [
             {
               text: t("breedMatchUseSuggested"),
@@ -475,12 +479,15 @@ export function AddPetScreen() {
   };
 
   const textAlign = isRTL ? ("right" as const) : ("left" as const);
+  const writingDirection = isRTL ? ("rtl" as const) : ("ltr" as const);
+  const paraTextStyle = { textAlign, writingDirection };
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background, marginTop: -8 }} edges={["top"]}>
       <KeyboardAvoidingView
         style={{ flex: 1 }}
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        behavior={KEYBOARD_AVOID_BEHAVIOR}
+        keyboardVerticalOffset={0}
       >
         <BrandedAppHeader
           leading={
@@ -503,16 +510,19 @@ export function AddPetScreen() {
           style={{ flex: 1 }}
           contentContainerStyle={{
             paddingHorizontal: 24,
-            paddingBottom: 24,
+            paddingBottom: 32 + insets.bottom,
+            flexGrow: 1,
             ...Platform.select({ android: { paddingTop: 24 } }),
           }}
           keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="interactive"
           showsVerticalScrollIndicator={false}
+          automaticallyAdjustKeyboardInsets={Platform.OS === "ios"}
         >
           {/* ── Progress Bar ── */}
           <View
             style={{
-              flexDirection: "row",
+              flexDirection: rowDirectionForAppLayout(isRTL),
               alignItems: "center",
               gap: 10,
               marginTop: 20,
@@ -613,7 +623,7 @@ export function AddPetScreen() {
                       fontWeight: "700",
                       color: colors.text,
                       paddingHorizontal: 4,
-                      textAlign,
+                      ...paraTextStyle,
                     }}
                   >
                     {t("petName")}{" "}
@@ -637,7 +647,7 @@ export function AddPetScreen() {
                       fontWeight: "700",
                       color: colors.text,
                       paddingHorizontal: 4,
-                      textAlign,
+                      ...paraTextStyle,
                     }}
                   >
                     {t("petSpecies")}{" "}
@@ -698,7 +708,7 @@ export function AddPetScreen() {
                         fontWeight: "700",
                         color: colors.text,
                         paddingHorizontal: 4,
-                        textAlign,
+                        ...paraTextStyle,
                       }}
                     >
                       {t("customSpeciesLabel")}{" "}
@@ -724,7 +734,7 @@ export function AddPetScreen() {
                         fontWeight: "700",
                         color: colors.text,
                         paddingHorizontal: 4,
-                        textAlign,
+                        ...paraTextStyle,
                       }}
                     >
                       {t("petBreed")}
@@ -750,10 +760,14 @@ export function AddPetScreen() {
                             fontWeight: "500",
                             color: breed ? colors.text : colors.textMuted,
                             flex: 1,
-                            textAlign,
+                            ...paraTextStyle,
                           }}
                         >
-                          {breed || t("selectBreed")}
+                          {breed
+                            ? breed === "Other"
+                              ? customBreedOther.trim() || t("breedOther")
+                              : formatBreedForDisplay(breed, t)
+                            : t("selectBreed")}
                         </Text>
                         <Ionicons
                           name="chevron-down"
@@ -779,7 +793,7 @@ export function AddPetScreen() {
                             fontWeight: "700",
                             color: colors.text,
                             paddingHorizontal: 4,
-                            textAlign,
+                            ...paraTextStyle,
                           }}
                         >
                           {t("customBreedLabel")}{" "}
@@ -841,7 +855,7 @@ export function AddPetScreen() {
                         fontWeight: "700",
                         color: colors.text,
                         paddingHorizontal: 4,
-                        textAlign,
+                        ...paraTextStyle,
                       }}
                     >
                       {t("ageYears")}{" "}
@@ -864,7 +878,7 @@ export function AddPetScreen() {
                         fontWeight: "700",
                         color: colors.text,
                         paddingHorizontal: 4,
-                        textAlign,
+                        ...paraTextStyle,
                       }}
                     >
                       {t("petWeight")}
@@ -887,7 +901,7 @@ export function AddPetScreen() {
                       />
                       <View
                         style={{
-                          flexDirection: "row",
+                          flexDirection: rowDirectionForAppLayout(isRTL),
                           backgroundColor: colors.inputBg,
                           borderRadius: 10,
                           padding: 2,
@@ -943,7 +957,7 @@ export function AddPetScreen() {
                         fontWeight: "700",
                         color: colors.text,
                         fontSize: 15,
-                        textAlign,
+                        ...paraTextStyle,
                       }}
                     >
                       {t("neuteredQuestion")}
@@ -953,7 +967,7 @@ export function AddPetScreen() {
                         fontSize: 11,
                         color: colors.textSecondary,
                         marginTop: 2,
-                        textAlign,
+                        ...paraTextStyle,
                       }}
                     >
                       {t("neuteredHelp")}
@@ -975,14 +989,14 @@ export function AddPetScreen() {
                       fontWeight: "700",
                       color: colors.text,
                       paddingHorizontal: 4,
-                      textAlign,
+                      ...paraTextStyle,
                     }}
                   >
                     {t("petAllergies")}
                   </Text>
                   <View
                     style={{
-                      flexDirection: "row",
+                      flexDirection: rowDirectionForAppLayout(isRTL),
                       backgroundColor: colors.inputBg,
                       borderRadius: 99,
                       padding: 3,
@@ -1045,9 +1059,9 @@ export function AddPetScreen() {
                           fontWeight: "500",
                           color: colors.textSecondary,
                           paddingHorizontal: 4,
-                          textAlign,
-                        }}
-                      >
+                        ...paraTextStyle,
+                      }}
+                    >
                         {t("allergySelectHint")}
                       </Text>
                       <View
@@ -1107,9 +1121,9 @@ export function AddPetScreen() {
                               fontWeight: "600",
                               color: colors.text,
                               paddingHorizontal: 4,
-                              textAlign,
-                            }}
-                          >
+                        ...paraTextStyle,
+                      }}
+                    >
                             {t("allergyOtherDetail")}{" "}
                             <Text style={{ color: colors.danger }}>*</Text>
                           </Text>
@@ -1135,14 +1149,14 @@ export function AddPetScreen() {
                       fontWeight: "700",
                       color: colors.text,
                       paddingHorizontal: 4,
-                      textAlign,
+                      ...paraTextStyle,
                     }}
                   >
                     {t("petMedicalConditions")}
                   </Text>
                   <View
                     style={{
-                      flexDirection: "row",
+                      flexDirection: rowDirectionForAppLayout(isRTL),
                       backgroundColor: colors.inputBg,
                       borderRadius: 99,
                       padding: 3,
@@ -1216,7 +1230,7 @@ export function AddPetScreen() {
                       fontWeight: "700",
                       color: colors.text,
                       paddingHorizontal: 4,
-                      textAlign,
+                      ...paraTextStyle,
                     }}
                   >
                     {t("petNotes")}
@@ -1300,7 +1314,7 @@ export function AddPetScreen() {
                       color: colors.text,
                       lineHeight: 20,
                       fontWeight: "500",
-                      textAlign,
+                      ...paraTextStyle,
                     }}
                   >
                     {t("stepMedicalDesc")}
@@ -1343,7 +1357,7 @@ export function AddPetScreen() {
                   <View style={{ gap: 18 }}>
                     {/* Medical Notes */}
                     <View style={{ gap: 6 }}>
-                      <Text style={fieldLabelStyle(textAlign, colors)}>
+                      <Text style={fieldLabelStyle(textAlign, colors, isRTL)}>
                         {t("medicalNotes")}
                       </Text>
                       <TextInput
@@ -1362,7 +1376,7 @@ export function AddPetScreen() {
 
                     {/* Feeding Schedule */}
                     <View style={{ gap: 6 }}>
-                      <Text style={fieldLabelStyle(textAlign, colors)}>
+                      <Text style={fieldLabelStyle(textAlign, colors, isRTL)}>
                         {t("feedingSchedule")}
                       </Text>
                       <TextInput
@@ -1381,7 +1395,7 @@ export function AddPetScreen() {
 
                     {/* Microchip */}
                     <View style={{ gap: 6 }}>
-                      <Text style={fieldLabelStyle(textAlign, colors)}>
+                      <Text style={fieldLabelStyle(textAlign, colors, isRTL)}>
                         {t("microchip")}
                       </Text>
                       <Controller
@@ -1413,7 +1427,7 @@ export function AddPetScreen() {
                                 style={{
                                   fontSize: 12,
                                   color: colors.danger,
-                                  textAlign,
+                                  ...paraTextStyle,
                                   marginStart: 8,
                                 }}
                               >
@@ -1473,7 +1487,7 @@ export function AddPetScreen() {
                     }}
                   >
                     <View style={{ gap: 6 }}>
-                      <Text style={fieldLabelStyle(textAlign, colors)}>
+                      <Text style={fieldLabelStyle(textAlign, colors, isRTL)}>
                         {t("vetName")}
                       </Text>
                       <TextInput
@@ -1486,7 +1500,7 @@ export function AddPetScreen() {
                       />
                     </View>
                     <View style={{ gap: 6 }}>
-                      <Text style={fieldLabelStyle(textAlign, colors)}>
+                      <Text style={fieldLabelStyle(textAlign, colors, isRTL)}>
                         {t("vetPhone")}
                       </Text>
                       <TextInput
@@ -1496,7 +1510,7 @@ export function AddPetScreen() {
                         placeholder={t("vetPhonePlaceholder")}
                         placeholderTextColor={colors.textMuted}
                         keyboardType="phone-pad"
-                        textAlign={isRTL ? "right" : "left"}
+                        textAlign={textAlign}
                       />
                     </View>
                   </View>
@@ -1755,9 +1769,11 @@ export function AddPetScreen() {
                       fontSize: 16,
                       fontWeight: selected ? "700" : "500",
                       color: selected ? colors.text : colors.textSecondary,
+                      flex: 1,
+                      ...paraTextStyle,
                     }}
                   >
-                    {item}
+                    {formatBreedForDisplay(item, t)}
                   </Text>
                   {selected && (
                     <Ionicons
@@ -1892,7 +1908,11 @@ function inputStyle(isRTL: boolean, colors: any) {
   };
 }
 
-function fieldLabelStyle(textAlign: "left" | "right", colors: any) {
+function fieldLabelStyle(
+  textAlign: "left" | "right",
+  colors: { textSecondary: string },
+  isRTL: boolean,
+) {
   return {
     fontSize: 13,
     fontWeight: "700" as const,
@@ -1900,6 +1920,7 @@ function fieldLabelStyle(textAlign: "left" | "right", colors: any) {
     marginStart: 8,
     marginBottom: 2,
     textAlign,
+    writingDirection: (isRTL ? "rtl" : "ltr") as "rtl" | "ltr",
   };
 }
 

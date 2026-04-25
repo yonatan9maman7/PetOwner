@@ -24,6 +24,7 @@ export function FieldLabel({
         color: isSmall ? colors.textSecondary : colors.text,
         marginBottom: isSmall ? 3 : 8,
         textAlign: isRTL ? "right" : "left",
+        writingDirection: isRTL ? "rtl" : "ltr",
       }}
     >
       {text}

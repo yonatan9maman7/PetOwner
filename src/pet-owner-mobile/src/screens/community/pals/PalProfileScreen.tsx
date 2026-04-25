@@ -10,6 +10,7 @@ import type { PalDto } from "../../../types/api";
 import { palsApi } from "../../../api/client";
 import { useTheme } from "../../../theme/ThemeContext";
 import { useTranslation, rowDirectionForAppLayout } from "../../../i18n";
+import { formatBreedForDisplay } from "../../pets/addPetHelpers";
 import { PetTagChips } from "./PetTagChips";
 import { initials, formatDistance } from "./helpers";
 
@@ -111,7 +112,13 @@ export function PalProfileScreen() {
               <View style={{ flex: 1 }}>
                 <Text style={{ fontSize: 16, fontWeight: "700", color: colors.text }}>{pet.name}</Text>
                 <Text style={{ fontSize: 13, color: colors.textSecondary, marginTop: 2 }}>
-                  {[pet.species, pet.breed, pet.dogSize ? `(${pet.dogSize})` : null].filter(Boolean).join(" · ")}
+                  {[
+                    pet.species,
+                    pet.breed ? formatBreedForDisplay(pet.breed, t) : null,
+                    pet.dogSize ? `(${pet.dogSize})` : null,
+                  ]
+                    .filter(Boolean)
+                    .join(" · ")}
                 </Text>
                 <Text style={{ fontSize: 12, color: colors.textMuted, marginTop: 2 }}>{pet.age}y old</Text>
               </View>

@@ -17,8 +17,10 @@ import { useAuthStore } from "./src/store/authStore";
 import { useThemeStore } from "./src/store/themeStore";
 import { ThemeProvider, useTheme } from "./src/theme/ThemeContext";
 import { ErrorFallback } from "./src/components/ErrorFallback";
+import { ImageSourcePickerHost } from "./src/components/ImageSourcePickerHost";
 import { attachNotificationListeners, type TapPayload } from "./src/services/pushService";
 import { routeForNotification } from "./src/services/notificationRouter";
+import Toast from "react-native-toast-message";
 
 // Set the foreground notification handler once at module scope (before first render).
 // Without this, Expo silently drops notifications when the app is in the foreground.
@@ -61,10 +63,14 @@ function AppInner() {
       };
 
   return (
-    <NavigationContainer ref={navigationRef} theme={navTheme}>
-      <AppNavigator />
-      <StatusBar style={isDark ? "light" : "dark"} />
-    </NavigationContainer>
+    <>
+      <NavigationContainer ref={navigationRef} theme={navTheme}>
+        <AppNavigator />
+        <StatusBar style={isDark ? "light" : "dark"} />
+      </NavigationContainer>
+      <Toast />
+      <ImageSourcePickerHost />
+    </>
   );
 }
 

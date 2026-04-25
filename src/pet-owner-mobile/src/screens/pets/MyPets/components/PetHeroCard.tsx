@@ -1,6 +1,7 @@
 import { View, Text } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useTranslation } from "../../../../i18n";
+import { formatBreedForDisplay } from "../../addPetHelpers";
 import type { PetDto } from "../../../../types/api";
 import { getSpeciesEmoji } from "../constants";
 
@@ -54,7 +55,7 @@ export function PetHeroCard({ pet, primaryColor }: PetHeroCardProps) {
           marginTop: 4,
         }}
       >
-        {pet.breed ?? ""}
+        {pet.breed ? formatBreedForDisplay(pet.breed, t) : ""}
         {pet.breed ? " · " : ""}
         {pet.age}y
         {pet.weight ? ` · ${pet.weight}kg` : ""}

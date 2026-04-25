@@ -15,7 +15,6 @@ import { useNavigation, useRoute } from "@react-navigation/native";
 import { useTranslation, rowDirectionForAppLayout } from "../../i18n";
 import { useTheme } from "../../theme/ThemeContext";
 import { bookingsApi } from "../../api/client";
-import { getApiErrorMessage } from "../../utils/apiUtils";
 import type { ProviderPublicProfileDto } from "../../types/api";
 import { SmartCalendarPicker } from "../../components/shared/SmartCalendarPicker";
 import { TimeSlotSelector } from "../../components/shared/TimeSlotSelector";
@@ -230,6 +229,18 @@ export function BookingScreen() {
   const selectedRate = selectedRateIdx !== null ? profile.serviceRates[selectedRateIdx] : null;
   const sr = selectedRate as any;
 
+  /** End-time slots must be after start only on the same calendar day; multi-day boarding allows early pickup on the last day. */
+  const endTimeDisableAtOrBefore = useMemo(() => {
+    if (!sr) return undefined;
+    const mode = getBillingMode(sr);
+    if (mode === "perNight") {
+      const resolvedEnd = endDate || startDate;
+      if (resolvedEnd === startDate && startTime) return startTime;
+      return undefined;
+    }
+    return startTime || undefined;
+  }, [sr, startTime, startDate, endDate]);
+
   /** True when a prefill time was requested but falls outside this provider's working hours */
   const prefillTimeInvalid = useMemo(() => {
     if (!prefillTime || !prefillDate) return false;
@@ -307,8 +318,8 @@ export function BookingScreen() {
           onPress: () => navigateToMyBookingsOutgoing(navigation),
         },
       ]);
-    } catch (err: unknown) {
-      Alert.alert(t("errorTitle"), getApiErrorMessage(err));
+    } catch {
+      /* error toast from global API interceptor */
     } finally {
       submitLockRef.current = false;
       setSubmitting(false);
@@ -513,6 +524,7 @@ export function BookingScreen() {
                 selectedDate={startDate}
                 selectedTime={startTime}
                 onTimeSelect={setStartTime}
+                filterPastSlotsForToday
               />
             </>
           ) : null}
@@ -541,6 +553,7 @@ export function BookingScreen() {
                     selectedDate={endDate}
                     selectedTime={endTime}
                     onTimeSelect={setEndTime}
+                    disableTimesAtOrBefore={endTimeDisableAtOrBefore}
                   />
                 </>
               ) : null}
@@ -560,6 +573,7 @@ export function BookingScreen() {
                     setEndTime(t);
                     setEndDate(startDate);
                   }}
+                  disableTimesAtOrBefore={endTimeDisableAtOrBefore}
                 />
               </>
             ) : null

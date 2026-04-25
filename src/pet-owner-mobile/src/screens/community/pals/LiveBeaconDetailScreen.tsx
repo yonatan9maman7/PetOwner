@@ -10,6 +10,7 @@ import type { LiveBeaconDto } from "../../../types/api";
 import { palsApi } from "../../../api/client";
 import { useTheme } from "../../../theme/ThemeContext";
 import { useTranslation, rowDirectionForAppLayout } from "../../../i18n";
+import { formatBreedForDisplay } from "../../pets/addPetHelpers";
 import { useAuthStore } from "../../../store/authStore";
 import { PetTagChips } from "./PetTagChips";
 import { initials, formatRemaining, formatDistance } from "./helpers";
@@ -134,7 +135,13 @@ export function LiveBeaconDetailScreen() {
           <View key={pet.id} style={[styles.petCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
             <Text style={{ fontSize: 15, fontWeight: "700", color: colors.text }}>🐾 {pet.name}</Text>
             <Text style={{ fontSize: 13, color: colors.textSecondary, marginTop: 2 }}>
-              {[pet.species, pet.breed, pet.dogSize].filter(Boolean).join(" · ")}
+              {[
+                pet.species,
+                pet.breed ? formatBreedForDisplay(pet.breed, t) : null,
+                pet.dogSize,
+              ]
+                .filter(Boolean)
+                .join(" · ")}
             </Text>
             <PetTagChips pet={pet} maxChips={6} />
           </View>

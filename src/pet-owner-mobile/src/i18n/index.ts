@@ -45,6 +45,14 @@ const he = {
   genericErrorDesc: "בדוק את חיבור האינטרנט שלך ונסה שוב.",
   apiNetworkTimeout:
     "פג הזמן או אין חיבור לרשת. בדוק את החיבור שלך ונסה שוב.",
+  apiErrorBadRequest: "הבקשה לא תקינה. בדוק את הפרטים ונסה שוב.",
+  apiErrorUnauthorized: "נדרשת התחברות.",
+  apiErrorForbidden: "אין לך הרשאה לפעולה זו.",
+  apiErrorNotFound: "הפריט לא נמצא או שאינו זמין יותר.",
+  apiErrorConflict: "הנתונים השתנו. רענן ונסה שוב.",
+  apiErrorValidation: "נתונים לא תקינים. בדוק את השדות ונסה שוב.",
+  apiErrorTooManyRequests: "יותר מדי בקשות. המתן רגע ונסה שוב.",
+  apiErrorServer: "בעיה בשרת. נסה שוב מאוחר יותר.",
   fillAllFields: "נא למלא את כל השדות",
   nameRequired: "נא להזין שם לחיית המחמד",
   speciesRequired: "נא לבחור סוג חיית מחמד",
@@ -272,6 +280,7 @@ const he = {
   activityGroomingSubtitle: "מקלחת, הברשה או תספורת",
   activityAddTitle: "הוספת פעילות",
   activityDateLabel: "תאריך",
+  activityFeedingTimeLabel: "שעת האכלה",
   activityDurationLabel: "משך (דקות)",
   activityWeightLabel: "משקל (ק״ג)",
   activityNotesLabel: "הערות (אופציונלי)",
@@ -279,6 +288,7 @@ const he = {
   activityDurationPlaceholder: "למשל 30",
   activityWeightPlaceholder: "למשל 12.5",
   activityValidationDuration: "נא להזין משך חיובי בדקות",
+  activityValidationFeedingTime: "נא לבחור שעת האכלה",
   activityValidationWeight: "נא להזין משקל חיובי",
   activityCreateFailed: "לא ניתן לשמור את הפעילות",
   noPetsSubtitle: "הוסיפו את חיית המחמד הראשונה שלכם ותתחילו לנהל את הבריאות, החיסונים והמשקל שלה במקום אחד.",
@@ -559,6 +569,8 @@ const he = {
   chooseFromLibrary: "בחר מהגלריה",
   removePhoto: "הסר תמונה",
   uploadingImage: "מעלה תמונה...",
+  imagePickerSheetTitle: "מאיפה לבחור תמונה?",
+  imagePickerSheetSubtitle: "צלמו תמונה חדשה או בחרו מהגלריה.",
   imageTooLarge: "התמונה גדולה מדי (מקס׳ 10MB)",
   tapToView: "הקש להגדלה",
   commentsCountTitle: "תגובות",
@@ -944,6 +956,29 @@ const he = {
   selectBreed: "בחר גזע",
   breedMixed: "מעורב",
   breedOther: "אחר",
+  /** Canonical dog/cat breed labels (storage stays English). */
+  breedDogMixedMutt: "מעורב / מורסת",
+  breedGoldenRetriever: "גולדן רטריבר",
+  breedLabrador: "לברדור",
+  breedGermanShepherd: "רועה גרמני",
+  breedPoodle: "פודל",
+  breedBorderCollie: "בורדר קולי",
+  breedMalinois: "מלינואה",
+  breedFrenchBulldog: "בולדוג צרפתי",
+  breedShihTzu: "שיצו",
+  breedPomeranian: "פומרניין",
+  breedCatMixed: "מעורב",
+  breedPersian: "פרסי",
+  breedSiamese: "סיאמי",
+  breedBritishShorthair: "בריטי קצר-שיער",
+  breedSphynx: "ספינקס",
+  breedMaineCoon: "מיין קון",
+  breedStreetCat: "חתול רחוב",
+  breedTricolorCalico: "שלושה צבעים / קליקו",
+  /** User role badge (JWT role string). */
+  roleOwner: "בעל חיים",
+  roleProvider: "מטפל",
+  roleAdmin: "מנהל",
 
   softDeleteTitle: "מחיקת חיית מחמד",
   softDeleteMessage: "האם למחוק את הפרופיל של חיית המחמד? ניתן לשחזר בעתיד.",
@@ -1291,6 +1326,14 @@ const en: Record<keyof typeof he, string> = {
   genericErrorDesc: "Check your internet connection and try again.",
   apiNetworkTimeout:
     "Network timeout. Please check your connection and try again.",
+  apiErrorBadRequest: "Invalid request. Check your details and try again.",
+  apiErrorUnauthorized: "Sign-in required.",
+  apiErrorForbidden: "You don't have permission to do that.",
+  apiErrorNotFound: "That item wasn't found or is no longer available.",
+  apiErrorConflict: "This data changed. Refresh and try again.",
+  apiErrorValidation: "Validation failed. Check the fields and try again.",
+  apiErrorTooManyRequests: "Too many requests. Wait a moment and try again.",
+  apiErrorServer: "Server problem. Please try again later.",
   fillAllFields: "Please fill in all fields",
   nameRequired: "Please enter a pet name",
   speciesRequired: "Please select a species",
@@ -1522,6 +1565,7 @@ const en: Record<keyof typeof he, string> = {
   activityGroomingSubtitle: "Shower, brushing, or haircut",
   activityAddTitle: "Add activity",
   activityDateLabel: "Date",
+  activityFeedingTimeLabel: "Feeding time",
   activityDurationLabel: "Duration (minutes)",
   activityWeightLabel: "Weight (kg)",
   activityNotesLabel: "Notes (optional)",
@@ -1529,6 +1573,7 @@ const en: Record<keyof typeof he, string> = {
   activityDurationPlaceholder: "e.g. 30",
   activityWeightPlaceholder: "e.g. 12.5",
   activityValidationDuration: "Enter a positive duration in minutes",
+  activityValidationFeedingTime: "Choose a feeding time",
   activityValidationWeight: "Enter a positive weight",
   activityCreateFailed: "Could not save this activity",
   noPetsSubtitle: "Add your first pet and start tracking their health, vaccines, and weight all in one place.",
@@ -1809,6 +1854,8 @@ const en: Record<keyof typeof he, string> = {
   chooseFromLibrary: "Choose from library",
   removePhoto: "Remove photo",
   uploadingImage: "Uploading...",
+  imagePickerSheetTitle: "Choose a photo",
+  imagePickerSheetSubtitle: "Take a new photo or pick one from your library.",
   imageTooLarge: "Image too large (max 10MB)",
   tapToView: "Tap to view",
   commentsCountTitle: "Comments",
@@ -2193,6 +2240,27 @@ const en: Record<keyof typeof he, string> = {
   selectBreed: "Select Breed",
   breedMixed: "Mixed",
   breedOther: "Other",
+  breedDogMixedMutt: "Mixed / Mutt",
+  breedGoldenRetriever: "Golden Retriever",
+  breedLabrador: "Labrador",
+  breedGermanShepherd: "German Shepherd",
+  breedPoodle: "Poodle",
+  breedBorderCollie: "Border Collie",
+  breedMalinois: "Malinois",
+  breedFrenchBulldog: "French Bulldog",
+  breedShihTzu: "Shih Tzu",
+  breedPomeranian: "Pomeranian",
+  breedCatMixed: "Mixed",
+  breedPersian: "Persian",
+  breedSiamese: "Siamese",
+  breedBritishShorthair: "British Shorthair",
+  breedSphynx: "Sphynx",
+  breedMaineCoon: "Maine Coon",
+  breedStreetCat: "Street Cat",
+  breedTricolorCalico: "Tricolor / Calico",
+  roleOwner: "Owner",
+  roleProvider: "Provider",
+  roleAdmin: "Admin",
 
   softDeleteTitle: "Delete Pet",
   softDeleteMessage: "Delete this pet's profile? This can be restored later.",
@@ -2504,6 +2572,11 @@ const translations = { he, en };
 
 export type TranslationKey = keyof typeof he;
 
+/** Resolve a translation key for an explicit language (e.g. PDF export). */
+export function translateKey(language: Language, key: TranslationKey): string {
+  return translations[language][key];
+}
+
 /** Use outside React (e.g. axios interceptors, Zustand) — follows `useAuthStore` language. */
 export function translate(key: TranslationKey): string {
   const language = useAuthStore.getState().language;
@@ -2593,5 +2666,10 @@ export function useTranslation() {
     },
     /** Tailwind class for label alignment. */
     alignCls: isHebrew ? "text-right" : "text-left",
+    /**
+     * Logical gap after a row-leading icon toward the text block.
+     * Prefer this over marginLeft/marginRight pairs in RTL-aware rows.
+     */
+    rowIconGapEnd: { marginEnd: 12 } as const,
   };
 }

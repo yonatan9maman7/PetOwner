@@ -1,5 +1,53 @@
-import type { TranslationKey } from "../../i18n";
+import type { Language, TranslationKey } from "../../i18n";
+import { translateKey } from "../../i18n";
 import { PetSpecies } from "../../types/api";
+
+/** Maps canonical API/storage breed string → i18n key (display only). */
+export const BREED_LABEL_I18N: Record<string, TranslationKey> = {
+  "Mixed / Mutt": "breedDogMixedMutt",
+  "Golden Retriever": "breedGoldenRetriever",
+  Labrador: "breedLabrador",
+  "German Shepherd": "breedGermanShepherd",
+  Poodle: "breedPoodle",
+  "Border Collie": "breedBorderCollie",
+  Malinois: "breedMalinois",
+  "French Bulldog": "breedFrenchBulldog",
+  "Shih Tzu": "breedShihTzu",
+  Pomeranian: "breedPomeranian",
+  Other: "breedOther",
+  Mixed: "breedCatMixed",
+  Persian: "breedPersian",
+  Siamese: "breedSiamese",
+  "British Shorthair": "breedBritishShorthair",
+  Sphynx: "breedSphynx",
+  "Maine Coon": "breedMaineCoon",
+  "Street Cat": "breedStreetCat",
+  "Tricolor / Calico": "breedTricolorCalico",
+  /** Legacy / web alias */
+  "Labrador Retriever": "breedLabrador",
+};
+
+export function formatBreedForDisplay(
+  stored: string | null | undefined,
+  t: (key: TranslationKey) => string,
+): string {
+  const s = stored?.trim() ?? "";
+  if (!s) return "";
+  const key = BREED_LABEL_I18N[s];
+  if (key) return t(key);
+  return s;
+}
+
+export function formatBreedForLanguage(
+  stored: string | null | undefined,
+  language: Language,
+): string {
+  const s = stored?.trim() ?? "";
+  if (!s) return "";
+  const key = BREED_LABEL_I18N[s];
+  if (key) return translateKey(language, key);
+  return s;
+}
 
 /** Maps canonical storage labels (English) to i18n keys for display on pet cards. */
 export const ALLERGY_LABEL_I18N: Record<string, TranslationKey> = {

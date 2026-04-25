@@ -1,5 +1,4 @@
 import { useState, useCallback, useRef, useEffect } from "react";
-import axios from "axios";
 import {
   View,
   Text,
@@ -257,10 +256,8 @@ export function CommunityScreen() {
         setPosts((prev) => (replace ? data : [...prev, ...data]));
         setHasMore(data.length >= PAGE_SIZE);
         setPage(p);
-      } catch (error) {
-        if (!(axios.isAxiosError(error) && error.response?.status === 401)) {
-          Alert.alert(t("genericErrorTitle"), t("genericErrorDesc"));
-        }
+      } catch {
+        /* error toast from global API interceptor */
       } finally {
         setLoading(false);
       }
@@ -278,10 +275,8 @@ export function CommunityScreen() {
     setGroupsLoading(true);
     try {
       setGroups(await communityApi.getGroups());
-    } catch (error) {
-      if (!(axios.isAxiosError(error) && error.response?.status === 401)) {
-        Alert.alert(t("genericErrorTitle"), t("genericErrorDesc"));
-      }
+    } catch {
+      /* error toast from global API interceptor */
     } finally {
       setGroupsLoading(false);
     }
@@ -291,10 +286,8 @@ export function CommunityScreen() {
     setGroupsRefreshing(true);
     try {
       setGroups(await communityApi.getGroups());
-    } catch (error) {
-      if (!(axios.isAxiosError(error) && error.response?.status === 401)) {
-        Alert.alert(t("genericErrorTitle"), t("genericErrorDesc"));
-      }
+    } catch {
+      /* error toast from global API interceptor */
     } finally {
       setGroupsRefreshing(false);
     }
@@ -336,7 +329,7 @@ export function CommunityScreen() {
       setPickedImageUri(null);
       setComposerOpen(false);
     } catch {
-      Alert.alert(t("errorTitle"), t("postError"));
+      /* error toast from global API interceptor */
     } finally {
       setUploadingImage(false);
       setPosting(false);
@@ -379,10 +372,8 @@ export function CommunityScreen() {
             : p,
         ),
       );
-    } catch (error) {
-      if (!(axios.isAxiosError(error) && error.response?.status === 401)) {
-        Alert.alert(t("genericErrorTitle"), t("genericErrorDesc"));
-      }
+    } catch {
+      /* error toast from global API interceptor */
     } finally {
       likeLockRef.current.delete(id);
       setLikeBusy((p) => {
@@ -400,10 +391,8 @@ export function CommunityScreen() {
     try {
       await postsApi.deletePost(id);
       setPosts((prev) => prev.filter((p) => p.id !== id));
-    } catch (error) {
-      if (!(axios.isAxiosError(error) && error.response?.status === 401)) {
-        Alert.alert(t("genericErrorTitle"), t("genericErrorDesc"));
-      }
+    } catch {
+      /* error toast from global API interceptor */
     } finally {
       deleteLockRef.current.delete(id);
       setDeleteBusy((p) => {

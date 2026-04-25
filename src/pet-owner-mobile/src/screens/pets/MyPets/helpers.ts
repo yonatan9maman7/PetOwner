@@ -11,5 +11,6 @@ export function formInputStyle(isRTL: boolean, colors: ThemeColors) {
     fontSize: 14,
     color: colors.text,
     textAlign: (isRTL ? "right" : "left") as "right" | "left",
+    writingDirection: (isRTL ? "rtl" : "ltr") as "rtl" | "ltr",
   };
 }

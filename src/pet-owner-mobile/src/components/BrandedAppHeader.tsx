@@ -2,6 +2,8 @@ import type { ReactNode } from "react";
 import { View, Text, type StyleProp, type ViewStyle } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../theme/ThemeContext";
+import { useAuthStore } from "../store/authStore";
+import { rowDirectionForAppLayout } from "../i18n";
 
 export const BRAND_HEADER_HORIZONTAL_PAD = 28;
 
@@ -25,12 +27,15 @@ export function BrandedAppHeader({
   style,
 }: Props) {
   const { colors } = useTheme();
+  const language = useAuthStore((s) => s.language);
+  const isRTL = language === "he";
+  const row = rowDirectionForAppLayout(isRTL);
 
   return (
     <View
       style={[
         {
-          flexDirection: "row",
+          flexDirection: row,
           alignItems: "center",
           justifyContent: "space-between",
           paddingHorizontal: horizontalPadding,
@@ -50,7 +55,7 @@ export function BrandedAppHeader({
     >
       <View
         style={{
-          flexDirection: "row",
+          flexDirection: row,
           alignItems: "center",
           flex: 1,
           minWidth: 0,
@@ -58,7 +63,15 @@ export function BrandedAppHeader({
         }}
       >
         {leading}
-        <View className="flex-row items-center gap-3" style={{ minWidth: 0, flexShrink: 1 }}>
+        <View
+          style={{
+            flexDirection: row,
+            alignItems: "center",
+            gap: 12,
+            minWidth: 0,
+            flexShrink: 1,
+          }}
+        >
           <View
             className="w-10 h-10 rounded-xl items-center justify-center"
             style={{ backgroundColor: colors.text }}

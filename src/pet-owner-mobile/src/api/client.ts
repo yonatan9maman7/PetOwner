@@ -1,8 +1,21 @@
-import axios, { type AxiosError, type InternalAxiosRequestConfig } from "axios";
-import { Alert } from "react-native";
+import axios, {
+  type AxiosError,
+  type AxiosRequestConfig,
+  type InternalAxiosRequestConfig,
+} from "axios";
 import { useAuthStore } from "../store/authStore";
 import { translate } from "../i18n";
-import { isConnectivityAxiosError } from "../utils/apiUtils";
+import {
+  isConnectivityAxiosError,
+  normalizeApiError,
+  attachNormalizedApiError,
+} from "../utils/apiUtils";
+import { logAxiosErrorDev } from "../utils/apiErrorLogger";
+import {
+  shouldToastApiError,
+  showApiErrorToast,
+  showSessionExpiredToast,
+} from "../services/apiErrorToast";
 import { API_BASE_URL } from "../config/server";
 import type {
   LoginDto,
@@ -97,31 +110,42 @@ function requestHadBearerToken(config: InternalAxiosRequestConfig | undefined): 
 apiClient.interceptors.response.use(
   (response) => response,
   async (error: AxiosError) => {
-    if (error.response?.status === 401) {
-      // Login/register return 401 without a session — do not treat as session expiry.
-      if (requestHadBearerToken(error.config)) {
-        await useAuthStore.getState().logout();
-        Alert.alert(
-          translate("sessionExpiredTitle"),
-          translate("sessionExpiredDesc"),
-        );
-      }
-    } else if (isConnectivityAxiosError(error)) {
+    if (isConnectivityAxiosError(error)) {
       (
         error as AxiosError & { userFriendlyMessage?: string }
       ).userFriendlyMessage = translate("apiNetworkTimeout");
     }
+
+    if (error.response?.status === 401 && requestHadBearerToken(error.config)) {
+      await useAuthStore.getState().logout();
+      showSessionExpiredToast();
+    }
+
+    const normalized = normalizeApiError(error);
+    attachNormalizedApiError(error, normalized);
+    logAxiosErrorDev(error);
+
+    if (shouldToastApiError(error, error.config)) {
+      showApiErrorToast(normalized, {
+        title: error.config?.errorToastTitle ?? normalized.title,
+      });
+    }
+
     return Promise.reject(error);
   },
 );
 
 export const authApi = {
   login: (data: LoginDto) =>
-    apiClient.post<AuthResponse>("/auth/login", data).then((r) => r.data),
+    apiClient
+      .post<AuthResponse>("/auth/login", data, { skipGlobalErrorToast: true })
+      .then((r) => r.data),
   register: (data: RegisterDto) =>
-    apiClient.post<AuthResponse>("/auth/register", data).then((r) => r.data),
+    apiClient
+      .post<AuthResponse>("/auth/register", data, { skipGlobalErrorToast: true })
+      .then((r) => r.data),
   forgotPassword: (email: string) =>
-    apiClient.post("/auth/forgot-password", { email }),
+    apiClient.post("/auth/forgot-password", { email }, { skipGlobalErrorToast: true }),
   getMe: () =>
     apiClient
       .get<{ name: string; email: string; phone: string | null }>("/auth/me")
@@ -132,10 +156,12 @@ export const authApi = {
       .then((r) => r.data),
   socialLogin: (data: SocialLoginDto) =>
     apiClient
-      .post<SocialLoginResponse>("/auth/social-login", data)
+      .post<SocialLoginResponse>("/auth/social-login", data, {
+        skipGlobalErrorToast: true,
+      })
       .then((r) => r.data),
   updatePhone: (phone: string) =>
-    apiClient.put("/auth/me/phone", { phone }),
+    apiClient.put("/auth/me/phone", { phone }, { skipGlobalErrorToast: true }),
 };
 
 export const mapApi = {
@@ -147,7 +173,11 @@ export const mapApi = {
       }
     }
     return apiClient
-      .get<MapPinDto[]>("/map/pins", { params, signal })
+      .get<MapPinDto[]>("/map/pins", {
+        params,
+        signal,
+        backgroundRequest: true,
+      })
       .then((r) => r.data);
   },
   fetchPlaydatePins: (
@@ -155,13 +185,21 @@ export const mapApi = {
     signal?: AbortSignal,
   ) =>
     apiClient
-      .get<PlaydateMapPinDto[]>("/map/playdate-pins", { params, signal })
+      .get<PlaydateMapPinDto[]>("/map/playdate-pins", {
+        params,
+        signal,
+        backgroundRequest: true,
+      })
       .then((r) => r.data),
   getServiceTypes: () =>
-    apiClient.get<string[]>("/map/service-types").then((r) => r.data),
+    apiClient
+      .get<string[]>("/map/service-types", { backgroundRequest: true })
+      .then((r) => r.data),
   getProviderProfile: (providerId: string) =>
     apiClient
-      .get<ProviderPublicProfileDto>(`/providers/${providerId}/profile`)
+      .get<ProviderPublicProfileDto>(`/providers/${providerId}/profile`, {
+        backgroundRequest: true,
+      })
       .then((r) => r.data),
   getProviderContact: (providerId: string) =>
     apiClient
@@ -176,7 +214,10 @@ export const mapApi = {
 };
 
 export const petsApi = {
-  getMyPets: () => apiClient.get<PetDto[]>("/pets").then((r) => r.data),
+  getMyPets: () =>
+    apiClient
+      .get<PetDto[]>("/pets", { skipGlobalErrorToast: true })
+      .then((r) => r.data),
   createPet: (data: CreatePetRequest) =>
     apiClient.post<PetDto>("/pets", data).then((r) => r.data),
   updatePet: (id: string, data: UpdatePetRequest) =>
@@ -193,9 +234,9 @@ export const petsApi = {
 };
 
 export const chatApi = {
-  getConversations: () =>
+  getConversations: (cfg?: AxiosRequestConfig) =>
     apiClient
-      .get<ChatConversationDto[]>("/chat/conversations")
+      .get<ChatConversationDto[]>("/chat/conversations", cfg)
       .then((r) => r.data),
   getMessages: (otherUserId: string, page?: number) =>
     apiClient
@@ -257,6 +298,7 @@ export const providerApi = {
     apiClient
       .get<ProviderBookingStatsDto>("/providers/me/booking-stats", {
         params: { range },
+        backgroundRequest: true,
       })
       .then((r) => r.data),
 
@@ -265,6 +307,7 @@ export const providerApi = {
     apiClient
       .get<EarningsSparklineDto>("/providers/me/earnings/sparkline", {
         params: { weeks },
+        backgroundRequest: true,
       })
       .then((r) => r.data),
 
@@ -283,7 +326,10 @@ export const usersApi = {
   /** Owner-side stats dashboard. */
   getStats: (range: StatRange = "all") =>
     apiClient
-      .get<OwnerStatsDto>("/users/me/stats", { params: { range } })
+      .get<OwnerStatsDto>("/users/me/stats", {
+        params: { range },
+        backgroundRequest: true,
+      })
       .then((r) => r.data),
 
   /** Owner-side Excel export of paid bookings. */
@@ -303,9 +349,9 @@ export const triageApi = {
         timeout: 60_000,
       })
       .then((r) => r.data),
-  getHistory: (petId: string) =>
+  getHistory: (petId: string, cfg?: AxiosRequestConfig) =>
     apiClient
-      .get<TeletriageHistoryDto[]>(`/teletriage/history/${petId}`)
+      .get<TeletriageHistoryDto[]>(`/teletriage/history/${petId}`, cfg)
       .then((r) => r.data),
   getNearbyVets: (lat: number, lng: number, maxResults = 5) =>
     apiClient
@@ -451,7 +497,9 @@ export const notificationsApi = {
       .then((r) => r.data),
   getUnreadCount: () =>
     apiClient
-      .get<{ count: number }>("/notifications/unread-count")
+      .get<{ count: number }>("/notifications/unread-count", {
+        backgroundRequest: true,
+      })
       .then((r) => r.data),
   markRead: (id: string) =>
     apiClient.put(`/notifications/${id}/read`).then((r) => r.data),
@@ -528,7 +576,9 @@ export const bookingsApi = {
   create: (data: CreateBookingRequest) =>
     apiClient.post<BookingDto>("/bookings", data).then((r) => r.data),
   getMine: () =>
-    apiClient.get<BookingDto[]>("/bookings/mine").then((r) => r.data),
+    apiClient
+      .get<BookingDto[]>("/bookings/mine", { skipGlobalErrorToast: true })
+      .then((r) => r.data),
   getById: (id: string) =>
     apiClient.get<BookingDto>(`/bookings/${id}`).then((r) => r.data),
   confirm: (id: string) =>
@@ -541,9 +591,9 @@ export const bookingsApi = {
 
 /** Pet health: vaccinations, weight, vaccine status, and medical vault (`/pets/{id}/medical-records`). */
 export const medicalApi = {
-  getWeightHistory: (petId: string) =>
+  getWeightHistory: (petId: string, cfg?: AxiosRequestConfig) =>
     apiClient
-      .get<WeightLogDto[]>(`/pets/${petId}/weight-history`)
+      .get<WeightLogDto[]>(`/pets/${petId}/weight-history`, cfg)
       .then((r) => r.data),
   addWeightLog: (petId: string, data: CreateWeightLogRequest) =>
     apiClient
@@ -555,9 +605,9 @@ export const medicalApi = {
       .then((r) => r.data),
   deleteWeightLog: (petId: string, logId: string) =>
     apiClient.delete(`/pets/${petId}/weight-logs/${logId}`).then((r) => r.data),
-  getVaccineStatus: (petId: string) =>
+  getVaccineStatus: (petId: string, cfg?: AxiosRequestConfig) =>
     apiClient
-      .get<VaccineStatusDto[]>(`/pets/${petId}/vaccine-status`)
+      .get<VaccineStatusDto[]>(`/pets/${petId}/vaccine-status`, cfg)
       .then((r) => r.data),
   getVaccinations: (petId: string) =>
     apiClient
@@ -585,9 +635,9 @@ export const medicalApi = {
     apiClient
       .delete(`/pets/${petId}/vaccinations/${vacId}`)
       .then((r) => r.data),
-  getMedicalRecords: (petId: string) =>
+  getMedicalRecords: (petId: string, cfg?: AxiosRequestConfig) =>
     apiClient
-      .get<MedicalRecordDto[]>(`/pets/${petId}/medical-records`)
+      .get<MedicalRecordDto[]>(`/pets/${petId}/medical-records`, cfg)
       .then((r) => r.data),
   addMedicalRecord: (petId: string, data: { type: string; title: string; description?: string; date: string; documentUrl?: string }) =>
     apiClient
@@ -613,7 +663,7 @@ export const favoritesApi = {
       .then((r) => r.data),
   getIds: () =>
     apiClient
-      .get<string[]>("/favorites/ids")
+      .get<string[]>("/favorites/ids", { backgroundRequest: true })
       .then((r) => r.data),
   toggle: (providerId: string) =>
     apiClient

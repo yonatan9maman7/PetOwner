@@ -108,7 +108,7 @@ function startHubs() {
     m.useFavoritesStore.getState().fetchIds().catch(() => {});
   });
   import("./chatStore").then((m) => {
-    m.useChatStore.getState().fetchConversations().catch(() => {});
+    m.useChatStore.getState().fetchConversations({ backgroundRequest: true }).catch(() => {});
   });
   // Register Expo push token with the backend (no-op on web / simulator).
   import("../services/pushService").then(async (push) => {

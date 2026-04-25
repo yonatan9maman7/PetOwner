@@ -21,8 +21,13 @@ import { useTranslation } from "../../i18n";
 import { LanguageToggle } from "../../components/LanguageToggle";
 import { authApi } from "../../api/client";
 import { useTheme } from "../../theme/ThemeContext";
+import { getNormalizedApiError } from "../../utils/apiUtils";
+import { showApiErrorToast } from "../../services/apiErrorToast";
 
 const AUTH_PETCARE_HERO_LOGO = require("../../../assets/petcare-logo-transparent.png");
+
+const KEYBOARD_AVOID_BEHAVIOR: "padding" | "height" =
+  Platform.OS === "ios" ? "padding" : "height";
 
 export function RegisterScreen() {
   const [fullName, setFullName] = useState("");
@@ -41,7 +46,6 @@ export function RegisterScreen() {
   const confirmPasswordRef = useRef<TextInput>(null);
 
   const navigation = useNavigation<any>();
-  const setAuth = useAuthStore((s) => s.setAuth);
   const isLoggedIn = useAuthStore((s) => s.isLoggedIn);
   const insets = useSafeAreaInsets();
   const { t, language, isHebrew, rtlText, rtlStyle, rtlRow, rtlInput, alignCls } =
@@ -122,7 +126,7 @@ export function RegisterScreen() {
 
     setLoading(true);
     try {
-      const data = await authApi.register({
+      await authApi.register({
         name: fullName,
         email,
         phone,
@@ -130,11 +134,23 @@ export function RegisterScreen() {
         role: "Owner",
         languagePreference: language,
       });
-      await setAuth(data.token, data.userId);
-      navigation.navigate("Explore");
-    } catch (err: any) {
-      const message = err.response?.data?.message ?? t("registerError");
-      Alert.alert(t("errorTitle"), message);
+      Alert.alert(
+        "הרשמה הושלמה!",
+        "החשבון שלך נוצר בהצלחה. כעת תוכל להתחבר.",
+        [
+          {
+            text: "המשך",
+            style: "default",
+            onPress: () =>
+              navigation.reset({
+                index: 0,
+                routes: [{ name: "LoginScreen" }],
+              }),
+          },
+        ],
+      );
+    } catch (err: unknown) {
+      showApiErrorToast(getNormalizedApiError(err));
     } finally {
       setLoading(false);
     }
@@ -223,19 +239,22 @@ export function RegisterScreen() {
       </View>
 
       <KeyboardAvoidingView
-        className="flex-1"
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        style={{ flex: 1 }}
+        behavior={KEYBOARD_AVOID_BEHAVIOR}
+        keyboardVerticalOffset={0}
       >
         <ScrollView
-          className="flex-1"
+          style={{ flex: 1 }}
           contentContainerStyle={{
             flexGrow: 1,
             paddingHorizontal: 28,
             paddingTop: 8,
-            paddingBottom: 120,
+            paddingBottom: 120 + insets.bottom,
           }}
           keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="interactive"
           showsVerticalScrollIndicator={false}
+          automaticallyAdjustKeyboardInsets={Platform.OS === "ios"}
         >
           {/* Title + language: EN title left | toggle right; HE toggle left | title right (rtlRow) */}
           <View className="mb-5">

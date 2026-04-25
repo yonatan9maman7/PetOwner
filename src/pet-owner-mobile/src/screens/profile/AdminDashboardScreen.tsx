@@ -17,6 +17,7 @@ import { useNavigation } from "@react-navigation/native";
 import axios from "axios";
 import { adminApi } from "../../api/client";
 import { useTranslation, rowDirectionForAppLayout } from "../../i18n";
+import { formatBreedForDisplay } from "../pets/addPetHelpers";
 import { useTheme } from "../../theme/ThemeContext";
 import type {
   AdminStatsDto,
@@ -1206,7 +1207,7 @@ export function AdminDashboardScreen() {
             style={{ fontSize: 11, color: colors.textSecondary, marginTop: 2 }}
             numberOfLines={1}
           >
-            {pet.breed ?? pet.species} · {pet.age}y
+            {pet.breed ? formatBreedForDisplay(pet.breed, t) : pet.species} · {pet.age}y
           </Text>
           <Text
             style={{ fontSize: 11, color: colors.textMuted, marginTop: 2 }}

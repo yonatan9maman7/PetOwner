@@ -50,11 +50,12 @@ export function useActivePetSummary(
     inflightRef.current = token;
     setState((prev) => ({ ...prev, loading: true }));
 
+    const bg = { backgroundRequest: true } as const;
     Promise.all([
-      medicalApi.getVaccineStatus(petId).catch(() => [] as VaccineStatusDto[]),
-      medicalApi.getWeightHistory(petId).catch(() => [] as WeightLogDto[]),
-      medicalApi.getMedicalRecords(petId).catch(() => [] as MedicalRecordDto[]),
-      activitiesApi.getSummary(petId, 7).catch(() => null as ActivitySummaryDto | null),
+      medicalApi.getVaccineStatus(petId, bg).catch(() => [] as VaccineStatusDto[]),
+      medicalApi.getWeightHistory(petId, bg).catch(() => [] as WeightLogDto[]),
+      medicalApi.getMedicalRecords(petId, bg).catch(() => [] as MedicalRecordDto[]),
+      activitiesApi.getSummary(petId, 7, bg).catch(() => null as ActivitySummaryDto | null),
     ]).then(([vaccineStatuses, weightHistory, medicalRecords, activitySummary]) => {
       if (inflightRef.current !== token) return;
       const data: Omit<ActivePetSummary, "loading"> = {

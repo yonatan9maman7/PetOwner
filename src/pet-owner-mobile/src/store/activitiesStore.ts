@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { activitiesApi, type ActivitiesListParams } from "../api/activitiesApi";
 import type { ActivityDto, ActivitySummaryDto, CreateActivityDto, UpdateActivityDto } from "../types/api";
+import { getApiErrorMessage } from "../utils/apiUtils";
 
 type PetBucket = {
   items: ActivityDto[];
@@ -70,7 +71,7 @@ export const useActivitiesStore = create<ActivitiesState>((set, get) => ({
         },
       }));
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : "Failed to load activities";
+      const msg = getApiErrorMessage(e);
       set((s) => ({
         byPetId: {
           ...s.byPetId,
@@ -106,7 +107,7 @@ export const useActivitiesStore = create<ActivitiesState>((set, get) => ({
         },
       }));
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : "Failed to load summary";
+      const msg = getApiErrorMessage(e);
       set((s) => ({
         byPetId: {
           ...s.byPetId,
@@ -138,7 +139,7 @@ export const useActivitiesStore = create<ActivitiesState>((set, get) => ({
       });
       return created;
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : "Failed to create activity";
+      const msg = getApiErrorMessage(e);
       set((s) => ({
         byPetId: {
           ...s.byPetId,
@@ -167,7 +168,7 @@ export const useActivitiesStore = create<ActivitiesState>((set, get) => ({
       });
       return updated;
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : "Failed to update activity";
+      const msg = getApiErrorMessage(e);
       set((s) => ({
         byPetId: {
           ...s.byPetId,
@@ -196,7 +197,7 @@ export const useActivitiesStore = create<ActivitiesState>((set, get) => ({
       });
       return true;
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : "Failed to delete activity";
+      const msg = getApiErrorMessage(e);
       set((s) => ({
         byPetId: {
           ...s.byPetId,

@@ -31,6 +31,21 @@ function activityIcon(type: string): keyof typeof Ionicons.glyphMap {
   }
 }
 
+function activityListWhenLabel(isoDate: string, withTime: boolean): string {
+  const d = new Date(isoDate);
+  if (withTime) {
+    return d.toLocaleString(undefined, {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    });
+  }
+  return d.toLocaleDateString();
+}
+
 function activityTypeLabel(type: string, t: (k: import("../../i18n").TranslationKey) => string): string {
   switch (type) {
     case "Walk":
@@ -59,7 +74,7 @@ function ActivityRow({
   colors: import("../../theme/ThemeContext").ThemeColors;
   t: (k: import("../../i18n").TranslationKey) => string;
 }) {
-  const meta = `${activityTypeLabel(item.type, t)} · ${new Date(item.date).toLocaleDateString()}`;
+  const meta = `${activityTypeLabel(item.type, t)} · ${activityListWhenLabel(item.date, item.type === "Meal")}`;
   const detail =
     item.type === "Walk" || item.type === "Exercise"
       ? item.durationMinutes != null

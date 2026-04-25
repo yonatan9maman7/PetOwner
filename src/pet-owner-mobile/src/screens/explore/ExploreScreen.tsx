@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback, useMemo } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo, type PropsWithChildren } from "react";
 import {
   View,
   Text,
@@ -27,6 +27,8 @@ import { BRAND_HEADER_HORIZONTAL_PAD } from "../../components/BrandedAppHeader";
 const EXPLORE_HEADER_LOGO = require("../../../assets/petcare-logo-header-trimmed.png");
 const EXPLORE_HEADER_LOGO_ASPECT = 639 / 246;
 import { useTranslation, rowDirectionForAppLayout } from "../../i18n";
+import { getNormalizedApiError } from "../../utils/apiUtils";
+import { showApiErrorToast } from "../../services/apiErrorToast";
 import { useAuthStore } from "../../store/authStore";
 import { usePetsStore } from "../../store/petsStore";
 import { useFavoritesStore } from "../../store/favoritesStore";
@@ -99,6 +101,23 @@ function getServiceIcon(name: string, isActive: boolean) {
   const entry = SERVICE_ICONS[name.toLowerCase()];
   if (!entry) return isActive ? "paw" : "paw-outline";
   return isActive ? entry.active : entry.icon;
+}
+
+/**
+ * Google Maps on Android can stop receiving gestures after `I18nManager.forceRTL`
+ * (language toggle → reload). Keep the map subtree in native LTR; Explore chrome
+ * still uses `rowDirectionForAppLayout` / `rtlInput` for RTL UI.
+ */
+function AndroidMapRtlIsolation({ children }: PropsWithChildren) {
+  if (Platform.OS !== "android") return <>{children}</>;
+  return (
+    <View
+      style={[StyleSheet.absoluteFillObject, styles.androidMapLtrShell]}
+      pointerEvents="box-none"
+    >
+      {children}
+    </View>
+  );
 }
 
 function formatMapPinRating(rating: unknown): string | null {
@@ -583,7 +602,9 @@ export function ExploreScreen() {
         mapDiag("fetchPins.error", { gen, dur, msg: (error as Error)?.message });
         // Keep existing pins visible; do not clear the map on transient errors.
         if (!(axios.isAxiosError(error) && error.response?.status === 401)) {
-          Alert.alert(t("genericErrorTitle"), t("genericErrorDesc"));
+          showApiErrorToast(getNormalizedApiError(error), {
+            title: t("genericErrorTitle"),
+          });
         }
       } finally {
         if (gen === pinsFetchGenRef.current && showLoading) {
@@ -666,7 +687,9 @@ export function ExploreScreen() {
         .catch((error) => {
           if (gen !== pinsFetchGenRef.current) return;
           if (!(axios.isAxiosError(error) && error.response?.status === 401)) {
-            Alert.alert(t("genericErrorTitle"), t("genericErrorDesc"));
+            showApiErrorToast(getNormalizedApiError(error), {
+              title: t("genericErrorTitle"),
+            });
           }
         })
         .finally(() => {
@@ -868,22 +891,23 @@ export function ExploreScreen() {
 
   return (
     <View style={[styles.root, { backgroundColor: colors.background }]}>
-      {/* MapView must be a direct child of a positioned View — wrapping it in a custom memo component breaks iOS MapKit layout */}
-      <MapViewWrapper
-        ref={mapRef}
-        style={StyleSheet.absoluteFillObject}
-        initialRegion={EXPLORE_MAP_INITIAL_REGION}
-        fallbackLabel="Explore Map"
-        showsMyLocationButton={false}
-        showsCompass={false}
-        toolbarEnabled={false}
-        pitchEnabled={false}
-        moveOnMarkerPress={false}
-        mapPadding={EXPLORE_MAP_PADDING}
-        onRegionChangeComplete={handleRegionChange}
-        onPress={handleMapBackgroundPress}
-        {...(Platform.OS === "android" && { mapType: "standard" })}
-      >
+      {/* MapView: iOS stays a direct child of the root; Android uses AndroidMapRtlIsolation (positioned View + LTR) so Google Maps keeps gestures after RTL language reload. */}
+      <AndroidMapRtlIsolation>
+        <MapViewWrapper
+          ref={mapRef}
+          style={StyleSheet.absoluteFillObject}
+          initialRegion={EXPLORE_MAP_INITIAL_REGION}
+          fallbackLabel="Explore Map"
+          showsMyLocationButton={false}
+          showsCompass={false}
+          toolbarEnabled={false}
+          pitchEnabled={false}
+          moveOnMarkerPress={false}
+          mapPadding={EXPLORE_MAP_PADDING}
+          onRegionChangeComplete={handleRegionChange}
+          onPress={handleMapBackgroundPress}
+          {...(Platform.OS === "android" && { mapType: "standard" })}
+        >
         {userLocationCoordinate != null && (
           <>
             {/*
@@ -946,9 +970,16 @@ export function ExploreScreen() {
             </View>
           </MarkerWrapper>
         ))}
-      </MapViewWrapper>
+        </MapViewWrapper>
+      </AndroidMapRtlIsolation>
 
-      <SafeAreaView edges={["top"]} style={{ zIndex: 10, marginTop: -8 }}>
+      <SafeAreaView
+        edges={["top"]}
+        style={[
+          { zIndex: 10, marginTop: -8 },
+          Platform.OS === "android" && { elevation: 22 },
+        ]}
+      >
         <View
           style={{
             flexDirection: "row",
@@ -1117,9 +1148,9 @@ export function ExploreScreen() {
         </View>
       </SafeAreaView>
 
-      {/* Loading */}
+      {/* Loading — do not block touches; map/header stay usable while pins load */}
       {loading && (
-        <View style={styles.loadingOverlay}>
+        <View style={styles.loadingOverlay} pointerEvents="none">
           <ActivityIndicator size="large" color={colors.text} />
         </View>
       )}
@@ -2085,6 +2116,10 @@ const styles = StyleSheet.create({
   root: {
     flex: 1,
   },
+  /** Android: subtree layout direction for Google Maps only (see AndroidMapRtlIsolation). */
+  androidMapLtrShell: {
+    direction: "ltr",
+  },
   searchBar: {
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.08,
@@ -2103,6 +2138,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     zIndex: 15,
+    pointerEvents: "none",
   },
   emptyOverlay: {
     ...StyleSheet.absoluteFillObject,

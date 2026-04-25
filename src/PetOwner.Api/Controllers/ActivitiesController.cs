@@ -14,7 +14,7 @@ namespace PetOwner.Api.Controllers;
 public class ActivitiesController : ControllerBase
 {
     private static readonly HashSet<string> ValidTypes = new(StringComparer.OrdinalIgnoreCase)
-        { "Walk", "Meal", "Exercise", "Weight" };
+        { "Walk", "Meal", "Exercise", "Weight", "Grooming" };
 
     private readonly ApplicationDbContext _db;
 
@@ -50,7 +50,7 @@ public class ActivitiesController : ControllerBase
         if (!await OwnsOrNot(petId, userId)) return NotFound(new { message = "Pet not found." });
 
         if (!ValidTypes.Contains(dto.Type))
-            return BadRequest(new { message = "Type must be Walk, Meal, Exercise, or Weight." });
+            return BadRequest(new { message = "Type must be Walk, Meal, Exercise, Weight, or Grooming." });
 
         var activity = new Activity
         {
@@ -60,7 +60,7 @@ public class ActivitiesController : ControllerBase
             Value = dto.Value,
             DurationMinutes = dto.DurationMinutes,
             Notes = dto.Notes?.Trim(),
-            Date = dto.Date.Date,
+            Date = NormalizeActivityDate(dto.Type, dto.Date),
         };
 
         _db.Activities.Add(activity);
@@ -83,13 +83,13 @@ public class ActivitiesController : ControllerBase
             return NotFound(new { message = "Activity not found." });
 
         if (!ValidTypes.Contains(dto.Type))
-            return BadRequest(new { message = "Type must be Walk, Meal, Exercise, or Weight." });
+            return BadRequest(new { message = "Type must be Walk, Meal, Exercise, Weight, or Grooming." });
 
         activity.Type = dto.Type;
         activity.Value = dto.Value;
         activity.DurationMinutes = dto.DurationMinutes;
         activity.Notes = dto.Notes?.Trim();
-        activity.Date = dto.Date.Date;
+        activity.Date = NormalizeActivityDate(dto.Type, dto.Date);
 
         await _db.SaveChangesAsync();
 
@@ -188,4 +188,8 @@ public class ActivitiesController : ControllerBase
 
     private Guid GetUserId() =>
         Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+
+    /// <summary>Meals keep clock time for feeding logs; other types stay calendar-day only.</summary>
+    private static DateTime NormalizeActivityDate(string type, DateTime date) =>
+        string.Equals(type, "Meal", StringComparison.OrdinalIgnoreCase) ? date : date.Date;
 }

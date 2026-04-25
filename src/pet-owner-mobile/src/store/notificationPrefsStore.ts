@@ -1,8 +1,6 @@
-import { Alert } from "react-native";
 import axios from "axios";
 import { create } from "zustand";
 import { notificationsApi } from "../api/client";
-import { translate } from "../i18n";
 
 export type NotifPrefKey =
   | "push"
@@ -58,10 +56,7 @@ export const useNotificationPrefsStore = create<NotifPrefsState>((set, get) => (
       set({ prefs, dirty: false });
     } catch (error) {
       if (!(axios.isAxiosError(error) && error.response?.status === 401)) {
-        Alert.alert(
-          translate("genericErrorTitle"),
-          translate("genericErrorDesc"),
-        );
+        /* error toast from global API interceptor */
       }
     } finally {
       set({ loading: false });
@@ -79,10 +74,7 @@ export const useNotificationPrefsStore = create<NotifPrefsState>((set, get) => (
       set({ dirty: false });
     } catch (error) {
       if (!(axios.isAxiosError(error) && error.response?.status === 401)) {
-        Alert.alert(
-          translate("genericErrorTitle"),
-          translate("genericErrorDesc"),
-        );
+        /* error toast from global API interceptor */
       }
     } finally {
       set({ loading: false });

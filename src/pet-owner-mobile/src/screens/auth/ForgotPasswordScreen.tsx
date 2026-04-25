@@ -20,6 +20,8 @@ import { useAuthStore } from "../../store/authStore";
 import { useTranslation } from "../../i18n";
 import { LanguageToggle } from "../../components/LanguageToggle";
 import { authApi } from "../../api/client";
+import { getNormalizedApiError } from "../../utils/apiUtils";
+import { showApiErrorToast } from "../../services/apiErrorToast";
 import { useTheme } from "../../theme/ThemeContext";
 
 const AUTH_PETCARE_HERO_LOGO = require("../../../assets/petcare-logo-transparent.png");
@@ -98,9 +100,8 @@ export function ForgotPasswordScreen() {
       Alert.alert(t("resetSentTitle"), t("resetSentMessage"), [
         { text: "OK", onPress: () => navigation.goBack() },
       ]);
-    } catch (err: any) {
-      const message = err.response?.data?.message ?? t("forgotError");
-      Alert.alert(t("errorTitle"), message);
+    } catch (err: unknown) {
+      showApiErrorToast(getNormalizedApiError(err));
     } finally {
       setLoading(false);
     }

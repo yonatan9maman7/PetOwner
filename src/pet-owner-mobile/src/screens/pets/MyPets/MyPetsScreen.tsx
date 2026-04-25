@@ -31,6 +31,8 @@ import { VaccineAlertBanner } from "./components/VaccineAlertBanner";
 import { HealthHubList } from "./components/HealthHubList";
 import { useActivePetSummary } from "./hooks/useActivePetSummary";
 import type { Section } from "./types";
+import { getNormalizedApiError } from "../../../utils/apiUtils";
+import { showApiErrorToast } from "../../../services/apiErrorToast";
 
 export function MyPetsScreen() {
   const isLoggedIn = useAuthStore((s) => s.isLoggedIn);
@@ -105,7 +107,7 @@ export function MyPetsScreen() {
         medicalApi.getVaccineStatus(pet.id),
         medicalApi.getWeightHistory(pet.id),
         medicalApi.getMedicalRecords(pet.id),
-        triageApi.getHistory(pet.id).catch(() => []),
+        triageApi.getHistory(pet.id, { backgroundRequest: true }).catch(() => []),
       ]);
       const html = generateHealthPassportHtml({
         pet,
@@ -119,8 +121,8 @@ export function MyPetsScreen() {
       });
       const { uri } = await Print.printToFileAsync({ html });
       await Sharing.shareAsync(uri, { mimeType: "application/pdf", UTI: "com.adobe.pdf" });
-    } catch {
-      Alert.alert(t("errorTitle"), t("genericError"));
+    } catch (e: unknown) {
+      showApiErrorToast(getNormalizedApiError(e), { title: t("errorTitle") });
     }
   };
 

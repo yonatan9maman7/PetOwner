@@ -9,7 +9,6 @@ import {
   Platform,
   ScrollView,
   ActivityIndicator,
-  Alert,
 } from "react-native";
 import { useForm, Controller, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -18,6 +17,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useTranslation, rowDirectionForAppLayout } from "../../../i18n";
 import { useTheme } from "../../../theme/ThemeContext";
 import { DatePickerField } from "../../../components/DatePickerField";
+import { TimePickerField } from "../../../components/TimePickerField";
 import { useActivitiesStore } from "../../../store/activitiesStore";
 import type { CreateActivityDto, PetActivityType } from "../../../types/api";
 import type { TranslationKey } from "../../../i18n";
@@ -35,10 +35,31 @@ function todayYmd(): string {
   return `${y}-${m}-${day}`;
 }
 
+function nowHHMM(): string {
+  const d = new Date();
+  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+}
+
+/** Local wall time as `yyyy-MM-ddTHH:mm:00` (no `Z`) for JSON → server `DateTime`. */
+function localYmdHhmmToIsoLike(ymd: string, hhmm: string): string {
+  const [y, mo, da] = ymd.split("-").map((p) => parseInt(p, 10));
+  const [hStr, mStr] = (hhmm || "00:00").split(":");
+  const h = parseInt(hStr ?? "0", 10);
+  const mi = parseInt(mStr ?? "0", 10);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  if (!Number.isFinite(y) || !Number.isFinite(mo) || !Number.isFinite(da)) {
+    return `${ymd}T00:00:00`;
+  }
+  return `${y}-${pad(mo)}-${pad(da)}T${pad(h)}:${pad(mi)}:00`;
+}
+
+const feedingTimeRe = /^([01]\d|2[0-3]):[0-5]\d$/;
+
 const addActivitySchema = z
   .object({
     type: z.enum(["Walk", "Meal", "Exercise", "Grooming"]),
     date: z.string().min(1),
+    feedingTime: z.string().optional(),
     durationMinutes: z.string().optional(),
     notes: z.string().optional(),
   })
@@ -50,6 +71,16 @@ const addActivitySchema = z
           code: "custom",
           message: "activityValidationDuration",
           path: ["durationMinutes"],
+        });
+      }
+    }
+    if (data.type === "Meal") {
+      const ft = (data.feedingTime ?? "").trim();
+      if (!feedingTimeRe.test(ft)) {
+        ctx.addIssue({
+          code: "custom",
+          message: "activityValidationFeedingTime",
+          path: ["feedingTime"],
         });
       }
     }
@@ -89,6 +120,7 @@ export function AddActivityModal({
     defaultValues: {
       type: initialType,
       date: todayYmd(),
+      feedingTime: nowHHMM(),
       durationMinutes: "",
       notes: "",
     },
@@ -99,6 +131,7 @@ export function AddActivityModal({
       reset({
         type: initialType,
         date: todayYmd(),
+        feedingTime: nowHHMM(),
         durationMinutes: "",
         notes: "",
       });
@@ -111,7 +144,10 @@ export function AddActivityModal({
     setSubmitting(true);
     const payload: CreateActivityDto = {
       type: data.type,
-      date: data.date,
+      date:
+        data.type === "Meal"
+          ? localYmdHhmmToIsoLike(data.date, (data.feedingTime ?? "").trim() || nowHHMM())
+          : data.date,
       notes: data.notes?.trim() || undefined,
     };
     if (data.type === "Walk" || data.type === "Exercise") {
@@ -123,8 +159,6 @@ export function AddActivityModal({
     if (created) {
       onCreated?.();
       onClose();
-    } else {
-      Alert.alert(t("errorTitle"), t("activityCreateFailed"));
     }
   });
 
@@ -192,6 +226,34 @@ export function AddActivityModal({
                 </View>
               )}
             />
+
+            {activityType === "Meal" && (
+              <Controller
+                control={control}
+                name="feedingTime"
+                render={({ field: { value, onChange } }) => (
+                  <View className="mb-3">
+                    <Text
+                      className="mb-1 text-xs font-bold uppercase tracking-wide"
+                      style={{ color: colors.textMuted, textAlign: isRTL ? "right" : "left" }}
+                    >
+                      {t("activityFeedingTimeLabel")}
+                    </Text>
+                    <TimePickerField
+                      value={value ?? nowHHMM()}
+                      onChange={onChange}
+                      placeholder={t("activityFeedingTimeLabel")}
+                      isRTL={isRTL}
+                    />
+                    {errors.feedingTime ? (
+                      <Text className="mt-1 text-xs" style={{ color: colors.danger }}>
+                        {errMsg(errors.feedingTime.message, t)}
+                      </Text>
+                    ) : null}
+                  </View>
+                )}
+              />
+            )}
 
             {(activityType === "Walk" || activityType === "Exercise") && (
               <Controller

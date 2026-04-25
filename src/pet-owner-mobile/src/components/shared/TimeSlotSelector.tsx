@@ -16,6 +16,16 @@ interface Props {
   label?: string;
   /** Slot interval in minutes (default: 60) */
   intervalMinutes?: number;
+  /**
+   * When set (HH:mm), slots at or before this time are disabled — e.g. same-calendar-day end
+   * must be strictly after start.
+   */
+  disableTimesAtOrBefore?: string;
+  /**
+   * When true and `selectedDate` is today (local), slots that start before the current local
+   * time are disabled — for start time on "today".
+   */
+  filterPastSlotsForToday?: boolean;
 }
 
 /** Parse "HH:mm" or "HH:mm:ss" → total minutes from midnight */
@@ -35,6 +45,12 @@ function formatSlot(minutes: number): string {
 function dowFromDate(dateStr: string): number {
   if (!dateStr) return -1;
   return new Date(`${dateStr}T12:00:00`).getDay();
+}
+
+/** Local calendar today as YYYY-MM-DD */
+function todayISO(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
 /** Builds the list of time slots for the selected date, respecting provider working hours */
@@ -73,6 +89,8 @@ export function TimeSlotSelector({
   onTimeSelect,
   label,
   intervalMinutes = 60,
+  disableTimesAtOrBefore,
+  filterPastSlotsForToday,
 }: Props) {
   const { colors } = useTheme();
 
@@ -80,6 +98,20 @@ export function TimeSlotSelector({
     () => buildTimeSlots(availabilitySlots, selectedDate, intervalMinutes),
     [availabilitySlots, selectedDate, intervalMinutes],
   );
+
+  const cutoffMinutes =
+    disableTimesAtOrBefore && disableTimesAtOrBefore.includes(":")
+      ? parseTimeMinutes(disableTimesAtOrBefore)
+      : null;
+
+  const todayStr = todayISO();
+  const pastCutoffMinutes =
+    filterPastSlotsForToday && selectedDate === todayStr
+      ? (() => {
+          const n = new Date();
+          return n.getHours() * 60 + n.getMinutes();
+        })()
+      : null;
 
   if (!selectedDate) {
     return (
@@ -118,10 +150,19 @@ export function TimeSlotSelector({
       <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
         {slots.map((slot) => {
           const isSelected = slot === selectedTime;
+          const slotM = parseTimeMinutes(slot);
+          const disabledByEndRule =
+            cutoffMinutes !== null && slotM <= cutoffMinutes;
+          const disabledByPast =
+            pastCutoffMinutes !== null && slotM < pastCutoffMinutes;
+          const disabled = disabledByEndRule || disabledByPast;
           return (
             <Pressable
               key={slot}
-              onPress={() => onTimeSelect(slot)}
+              disabled={disabled}
+              onPress={() => {
+                if (!disabled) onTimeSelect(slot);
+              }}
               style={{
                 paddingHorizontal: 14,
                 paddingVertical: 10,
@@ -129,6 +170,7 @@ export function TimeSlotSelector({
                 borderWidth: 2,
                 borderColor: isSelected ? colors.primary : colors.border,
                 backgroundColor: isSelected ? colors.primaryLight : colors.surfaceTertiary,
+                opacity: disabled ? 0.35 : 1,
               }}
             >
               <Text

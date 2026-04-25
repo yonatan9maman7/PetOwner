@@ -18,6 +18,8 @@ import { useTranslation } from "../../i18n";
 import { BrandedAppHeader } from "../../components/BrandedAppHeader";
 import { authApi } from "../../api/client";
 import { useTheme } from "../../theme/ThemeContext";
+import { getNormalizedApiError } from "../../utils/apiUtils";
+import { showApiErrorToast } from "../../services/apiErrorToast";
 
 const PHONE_REGEX = /^0(5[0-9])\d{7}$/;
 
@@ -53,11 +55,18 @@ export function CompleteProfileScreen() {
     try {
       await authApi.updatePhone(trimmed);
       await clearRequiresPhone();
-    } catch (err: any) {
-      if (err.response?.data?.code === "PHONE_TAKEN") {
-        Alert.alert(t("errorTitle"), t("phoneTaken"));
+    } catch (err: unknown) {
+      const n = getNormalizedApiError(err);
+      if (n.code === "PHONE_TAKEN") {
+        showApiErrorToast({
+          message: t("phoneTaken"),
+          title: t("errorTitle"),
+          isConnectivityError: false,
+          isAuthError: false,
+          isServerError: false,
+        });
       } else {
-        Alert.alert(t("errorTitle"), t("phoneUpdateError"));
+        showApiErrorToast(n);
       }
     } finally {
       setLoading(false);

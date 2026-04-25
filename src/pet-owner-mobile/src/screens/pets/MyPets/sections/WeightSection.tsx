@@ -366,9 +366,8 @@ export function WeightSection({ petId, reloadNonce = 0 }: { petId: string; reloa
       setFormWeight("");
       setFormDate("");
       await load();
-    } catch (e: any) {
-      const msg = e?.response?.data?.message ?? e?.message ?? t("genericError");
-      Alert.alert(t("errorTitle"), msg);
+    } catch {
+      /* error toast from global API interceptor */
     }
     setSaving(false);
   };
@@ -405,9 +404,8 @@ export function WeightSection({ petId, reloadNonce = 0 }: { petId: string; reloa
       });
       cancelEditLog();
       await load();
-    } catch (e: any) {
-      const msg = e?.response?.data?.message ?? e?.message ?? t("genericError");
-      Alert.alert(t("errorTitle"), msg);
+    } catch {
+      /* error toast from global API interceptor */
     }
     setSaving(false);
   };

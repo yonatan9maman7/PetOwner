@@ -28,6 +28,7 @@
     },
     "android": {
       "package": "com.petowner.app",
+      "softwareKeyboardLayoutMode": "resize",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"

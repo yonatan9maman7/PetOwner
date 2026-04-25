@@ -23,6 +23,8 @@ import * as WebBrowser from "expo-web-browser";
 import * as Google from "expo-auth-session/providers/google";
 import { useAuthStore } from "../../store/authStore";
 import { useTranslation } from "../../i18n";
+import { getNormalizedApiError } from "../../utils/apiUtils";
+import { showApiErrorToast } from "../../services/apiErrorToast";
 import { LanguageToggle } from "../../components/LanguageToggle";
 import { authApi } from "../../api/client";
 import { useTheme } from "../../theme/ThemeContext";
@@ -31,6 +33,9 @@ import * as biometricService from "../../services/biometricService";
 WebBrowser.maybeCompleteAuthSession();
 
 const LOGIN_HERO_LOGO = require("../../../assets/petcare-logo-transparent.png");
+
+const KEYBOARD_AVOID_BEHAVIOR: "padding" | "height" =
+  Platform.OS === "ios" ? "padding" : "height";
 
 /* ─── LoginScreen (root) ─────────────────────────────────────────── */
 
@@ -145,12 +150,24 @@ function LoginForm() {
     if (googleResponse?.type === "success") {
       const idToken = googleResponse.authentication?.idToken;
       if (!idToken) {
-        Alert.alert(t("errorTitle"), t("socialLoginFailed"));
+        showApiErrorToast({
+          message: t("socialLoginFailed"),
+          title: t("errorTitle"),
+          isConnectivityError: false,
+          isAuthError: false,
+          isServerError: false,
+        });
         return;
       }
       handleSocialLoginToken("Google", idToken);
     } else if (googleResponse?.type === "error") {
-      Alert.alert(t("errorTitle"), t("socialLoginFailed"));
+      showApiErrorToast({
+        message: t("socialLoginFailed"),
+        title: t("errorTitle"),
+        isConnectivityError: false,
+        isAuthError: false,
+        isServerError: false,
+      });
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [googleResponse]);
@@ -173,15 +190,31 @@ function LoginForm() {
       const data = await authApi.login(creds);
       await setAuth(data.token, data.userId);
       navigation.navigate("Explore");
-    } catch (err: any) {
-      if (err?.response?.status === 401) {
+    } catch (err: unknown) {
+      if (
+        typeof err === "object" &&
+        err !== null &&
+        "response" in err &&
+        (err as { response?: { status?: number } }).response?.status === 401
+      ) {
         // Stored password is stale (changed elsewhere) — wipe and fall back.
         await biometricService.disable();
         setBioEnabled(false);
-        Alert.alert(t("errorTitle"), t("biometricFailedFallback"));
+        showApiErrorToast({
+          message: t("biometricFailedFallback"),
+          title: t("errorTitle"),
+          isConnectivityError: false,
+          isAuthError: true,
+          isServerError: false,
+        });
         emailRef.current?.focus();
-      } else if (err?.response) {
-        Alert.alert(t("errorTitle"), t("loginError"));
+      } else if (
+        typeof err === "object" &&
+        err !== null &&
+        "response" in err &&
+        (err as { response?: unknown }).response
+      ) {
+        showApiErrorToast(getNormalizedApiError(err));
       }
       // Unexpected biometric / SecureStore errors: authenticateAndGetCredentials already showed "Biometric Error".
     } finally {
@@ -201,9 +234,8 @@ function LoginForm() {
       const data = await authApi.login({ email, password });
       await setAuth(data.token, data.userId);
       navigation.navigate("Explore");
-    } catch (err: any) {
-      const message = err.response?.data?.message ?? t("loginError");
-      Alert.alert(t("errorTitle"), message);
+    } catch (err: unknown) {
+      showApiErrorToast(getNormalizedApiError(err));
     } finally {
       setLoading(false);
     }
@@ -222,11 +254,22 @@ function LoginForm() {
         ...options,
       });
       await setAuth(data.token, data.userId, data.requiresPhone);
-    } catch (err: any) {
-      if (err.response?.status === 409) {
-        Alert.alert(t("errorTitle"), t("socialLoginEmailExists"));
+    } catch (err: unknown) {
+      const status =
+        typeof err === "object" &&
+        err !== null &&
+        "response" in err &&
+        (err as { response?: { status?: number } }).response?.status;
+      if (status === 409) {
+        showApiErrorToast({
+          message: t("socialLoginEmailExists"),
+          title: t("errorTitle"),
+          isConnectivityError: false,
+          isAuthError: false,
+          isServerError: false,
+        });
       } else {
-        Alert.alert(t("errorTitle"), t("socialLoginFailed"));
+        showApiErrorToast(getNormalizedApiError(err));
       }
     } finally {
       setSocialLoading(false);
@@ -395,19 +438,22 @@ function LoginForm() {
       </View>
 
       <KeyboardAvoidingView
-        className="flex-1"
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        style={{ flex: 1 }}
+        behavior={KEYBOARD_AVOID_BEHAVIOR}
+        keyboardVerticalOffset={0}
       >
         <ScrollView
-          className="flex-1"
+          style={{ flex: 1 }}
           contentContainerStyle={{
             flexGrow: 1,
             paddingHorizontal: 28,
             paddingTop: 8,
-            paddingBottom: 120,
+            paddingBottom: 120 + insets.bottom,
           }}
           keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="interactive"
           showsVerticalScrollIndicator={false}
+          automaticallyAdjustKeyboardInsets={Platform.OS === "ios"}
         >
           {/* ── Welcome + language (one row: EN title | toggle, HE toggle | title via rtlRow) ── */}
           <View className="mb-5">

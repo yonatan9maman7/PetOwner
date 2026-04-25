@@ -14,8 +14,12 @@ export const reviewsApi = {
     apiClient.get<ReviewDto[]>(`/reviews/provider/${providerId}`).then((r) => r.data),
 
   createBookingReview: (data: CreateBookingReviewRequest) =>
-    apiClient.post<{ id: string }>("/reviews", data).then((r) => r.data),
+    apiClient
+      .post<{ id: string }>("/reviews", data, { skipGlobalErrorToast: true })
+      .then((r) => r.data),
 
   createDirectReview: (data: CreateDirectReviewRequest) =>
-    apiClient.post<ReviewDto>("/reviews/direct", data).then((r) => r.data),
+    apiClient
+      .post<ReviewDto>("/reviews/direct", data, { skipGlobalErrorToast: true })
+      .then((r) => r.data),
 };

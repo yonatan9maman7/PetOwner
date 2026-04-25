@@ -17,7 +17,6 @@ import { useAuthStore } from "../../store/authStore";
 import { useBookingsStore } from "../../store/bookingsStore";
 import { bookingsApi } from "../../api/client";
 import type { BookingDto } from "../../types/api";
-import { getApiErrorMessage } from "../../utils/apiUtils";
 
 const STATUS_COLORS: Record<string, { bg: string; text: string }> = {
   Pending: { bg: "#fef9c3", text: "#92400e" },
@@ -133,8 +132,8 @@ export function MyBookingsScreen() {
             await bookingsApi.cancel(booking.id);
             Alert.alert(t("bookingCancelled"));
             fetchBookings(true);
-          } catch (e: unknown) {
-            Alert.alert(t("errorTitle"), getApiErrorMessage(e));
+          } catch {
+            /* error toast from global API interceptor */
           }
         },
       },
@@ -151,8 +150,8 @@ export function MyBookingsScreen() {
             await bookingsApi.confirm(booking.id);
             Alert.alert(t("bookingConfirmed"));
             fetchBookings(true);
-          } catch (e: unknown) {
-            Alert.alert(t("errorTitle"), getApiErrorMessage(e));
+          } catch {
+            /* error toast from global API interceptor */
           }
         },
       },
@@ -170,8 +169,8 @@ export function MyBookingsScreen() {
             await bookingsApi.cancel(booking.id);
             Alert.alert(t("bookingDeclined"));
             fetchBookings(true);
-          } catch (e: unknown) {
-            Alert.alert(t("errorTitle"), getApiErrorMessage(e));
+          } catch {
+            /* error toast from global API interceptor */
           }
         },
       },
@@ -187,8 +186,8 @@ export function MyBookingsScreen() {
           try {
             await bookingsApi.complete(booking.id);
             fetchBookings(true);
-          } catch (e: unknown) {
-            Alert.alert(t("errorTitle"), getApiErrorMessage(e));
+          } catch {
+            /* error toast from global API interceptor */
           }
         },
       },

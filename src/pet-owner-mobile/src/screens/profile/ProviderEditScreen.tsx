@@ -36,6 +36,8 @@ import {
 } from "../../features/provider-onboarding/constants";
 import { ProviderType, type AvailabilitySlotDto, type DogSize } from "../../types/api";
 import { pickImageWithSource } from "../../utils/imagePicker";
+import { getNormalizedApiError } from "../../utils/apiUtils";
+import { showApiErrorToast } from "../../services/apiErrorToast";
 
 const NAVY = "#001a5a";
 const DEFAULT_LAT = 32.0809;
@@ -1187,9 +1189,8 @@ export function ProviderEditScreen() {
         const msg = t("profileSaved");
         if (Platform.OS === "web") { window.alert(msg); } else { Alert.alert(msg); }
       }
-    } catch (e: any) {
-      const detail = e?.response?.data?.message || t("profileSaveError");
-      Alert.alert(t("errorTitle"), detail);
+    } catch (e: unknown) {
+      showApiErrorToast(getNormalizedApiError(e), { title: t("errorTitle") });
     } finally {
       setSaving(false);
     }

@@ -4,14 +4,18 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import { useAuthStore } from "../../store/authStore";
-import { useTranslation, rowDirectionForAppLayout } from "../../i18n";
+import {
+  useTranslation,
+  rowDirectionForAppLayout,
+  type TranslationKey,
+} from "../../i18n";
 import { useTheme } from "../../theme/ThemeContext";
 import type { ThemePreference } from "../../store/themeStore";
 
 /* ───────────────────── Primitives ───────────────────── */
 
 function GroupHeader({ label }: { label: string }) {
-  const { isRTL } = useTranslation();
+  const { rtlText } = useTranslation();
   const { colors } = useTheme();
   return (
     <Text
@@ -23,7 +27,7 @@ function GroupHeader({ label }: { label: string }) {
         letterSpacing: 0.8,
         marginBottom: 10,
         paddingHorizontal: 4,
-        textAlign: isRTL ? "right" : "left",
+        ...rtlText,
       }}
     >
       {label}
@@ -52,7 +56,7 @@ function SettingsRow({
   iconColor,
   iconBg,
 }: RowProps) {
-  const { isRTL } = useTranslation();
+  const { isRTL, rtlText, rowIconGapEnd } = useTranslation();
   const { colors } = useTheme();
   const fg = disabled ? colors.textMuted : colors.text;
   const defaultIconColor = disabled ? colors.textMuted : colors.primary;
@@ -76,8 +80,7 @@ function SettingsRow({
           borderRadius: 11,
           alignItems: "center",
           justifyContent: "center",
-          marginLeft: isRTL ? 12 : 0,
-          marginRight: isRTL ? 0 : 12,
+          ...rowIconGapEnd,
           backgroundColor: iconBg ?? (disabled ? colors.surfaceSecondary : colors.iconBlueBg),
         }}
       >
@@ -90,7 +93,7 @@ function SettingsRow({
             fontSize: 15,
             fontWeight: "600",
             color: fg,
-            textAlign: isRTL ? "right" : "left",
+            ...rtlText,
           }}
         >
           {label}
@@ -101,7 +104,7 @@ function SettingsRow({
               fontSize: 12.5,
               color: colors.textSecondary,
               marginTop: 1,
-              textAlign: isRTL ? "right" : "left",
+              ...rtlText,
               lineHeight: 17,
             }}
           >
@@ -133,15 +136,14 @@ function GroupCard({ children }: { children: React.ReactNode }) {
   );
 }
 
-function RowDivider({ isRTL }: { isRTL: boolean }) {
+function RowDivider() {
   const { colors } = useTheme();
   return (
     <View
       style={{
         height: StyleSheet.hairlineWidth,
         backgroundColor: colors.border,
-        marginLeft: isRTL ? 0 : 68,
-        marginRight: isRTL ? 68 : 0,
+        marginStart: 68,
       }}
     />
   );
@@ -163,7 +165,7 @@ function DarkModePicker({
   onClose: () => void;
 }) {
   const { colors, isDark, preference, setPreference } = useTheme();
-  const { t, isRTL } = useTranslation();
+  const { t, isRTL, rtlText } = useTranslation();
 
   const labels: Record<ThemePreference, string> = {
     light: t("themeLight"),
@@ -233,8 +235,7 @@ function DarkModePicker({
                   backgroundColor: active ? colors.primary : colors.surfaceSecondary,
                   alignItems: "center",
                   justifyContent: "center",
-                  marginLeft: isRTL ? 14 : 0,
-                  marginRight: isRTL ? 0 : 14,
+                  marginEnd: 14,
                 }}>
                   <Ionicons
                     name={opt.icon}
@@ -247,7 +248,7 @@ function DarkModePicker({
                   fontSize: 16,
                   fontWeight: "600",
                   color: active ? colors.primary : colors.text,
-                  textAlign: isRTL ? "right" : "left",
+                  ...rtlText,
                 }}>
                   {labels[opt.id]}
                 </Text>
@@ -256,7 +257,7 @@ function DarkModePicker({
                     name="checkmark-circle"
                     size={24}
                     color={colors.primary}
-                    style={{ marginLeft: isRTL ? 0 : 8, marginRight: isRTL ? 8 : 0 }}
+                    style={{ marginStart: 8 }}
                   />
                 )}
               </TouchableOpacity>
@@ -270,8 +271,22 @@ function DarkModePicker({
 
 /* ───────────────────── Profile Header ───────────────────── */
 
+function localizedUserRole(
+  t: (key: TranslationKey) => string,
+  role: string | undefined,
+): string {
+  const r = (role ?? "").trim();
+  if (!r) return "";
+  const low = r.toLowerCase();
+  if (low === "owner") return t("roleOwner");
+  if (low === "provider") return t("roleProvider");
+  if (low === "admin") return t("roleAdmin");
+  return r;
+}
+
 function ProfileHeader() {
   const user = useAuthStore((s) => s.user);
+  const { t, rtlStyle } = useTranslation();
   const { colors } = useTheme();
   const initials = (user?.name ?? "?")
     .split(" ")
@@ -317,7 +332,15 @@ function ProfileHeader() {
           </Text>
         </View>
       </View>
-      <Text style={{ fontSize: 19, fontWeight: "700", color: colors.text, textAlign: "center" }}>
+      <Text
+        style={{
+          fontSize: 19,
+          fontWeight: "700",
+          color: colors.text,
+          textAlign: "center",
+          ...rtlStyle,
+        }}
+      >
         {user?.name ?? "User"}
       </Text>
       {user?.role ? (
@@ -328,8 +351,16 @@ function ProfileHeader() {
           borderRadius: 20,
           backgroundColor: colors.primaryLight,
         }}>
-          <Text style={{ fontSize: 12, fontWeight: "600", color: colors.primary }}>
-            {user.role}
+          <Text
+            style={{
+              fontSize: 12,
+              fontWeight: "600",
+              color: colors.primary,
+              textAlign: "center",
+              ...rtlStyle,
+            }}
+          >
+            {localizedUserRole(t, user.role)}
           </Text>
         </View>
       ) : null}
@@ -342,7 +373,7 @@ function ProfileHeader() {
 export function AccountSettingsScreen() {
   const navigation = useNavigation<any>();
   const language = useAuthStore((s) => s.language);
-  const { t, isRTL } = useTranslation();
+  const { t, isRTL, rtlStyle } = useTranslation();
   const { colors, preference } = useTheme();
   const [showThemePicker, setShowThemePicker] = useState(false);
 
@@ -387,6 +418,7 @@ export function AccountSettingsScreen() {
             fontWeight: "700",
             color: colors.text,
             textAlign: "center",
+            ...rtlStyle,
           }}
         >
           {t("accountSettings")}
@@ -412,7 +444,7 @@ export function AccountSettingsScreen() {
               iconBg={colors.iconBlueBg}
               onPress={() => navigation.navigate("AccountEdit")}
             />
-            <RowDivider isRTL={isRTL} />
+            <RowDivider />
             <SettingsRow
               icon="shield-checkmark-outline"
               label={t("loginAndSecurity")}
@@ -421,7 +453,7 @@ export function AccountSettingsScreen() {
               iconBg={colors.iconGreenBg}
               onPress={() => navigation.navigate("Security")}
             />
-            <RowDivider isRTL={isRTL} />
+            <RowDivider />
             <SettingsRow
               icon="eye-off-outline"
               label={t("privacy")}
@@ -430,7 +462,7 @@ export function AccountSettingsScreen() {
               iconBg={colors.iconPurpleBg}
               onPress={() => navigation.navigate("Privacy")}
             />
-            <RowDivider isRTL={isRTL} />
+            <RowDivider />
             <SettingsRow
               icon="notifications-outline"
               label={t("notificationsLabel")}
@@ -459,7 +491,7 @@ export function AccountSettingsScreen() {
               iconBg={colors.iconCyanBg}
               onPress={() => navigation.navigate("LanguageSelect")}
             />
-            <RowDivider isRTL={isRTL} />
+            <RowDivider />
             <SettingsRow
               icon="moon-outline"
               label={t("darkMode")}
@@ -483,7 +515,7 @@ export function AccountSettingsScreen() {
               iconBg={colors.iconSkyBg}
               onPress={() => navigation.navigate("HelpCenter")}
             />
-            <RowDivider isRTL={isRTL} />
+            <RowDivider />
             <SettingsRow
               icon="chatbubble-outline"
               label={t("contactUs")}
@@ -492,7 +524,7 @@ export function AccountSettingsScreen() {
               iconBg={colors.iconTealBg}
               onPress={() => navigation.navigate("ContactUs")}
             />
-            <RowDivider isRTL={isRTL} />
+            <RowDivider />
             <SettingsRow
               icon="document-text-outline"
               label={t("termsOfService")}

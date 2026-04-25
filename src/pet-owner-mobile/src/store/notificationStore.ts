@@ -5,10 +5,8 @@ import {
   HubConnectionState,
 } from "@microsoft/signalr";
 import axios from "axios";
-import { Alert } from "react-native";
 import { create } from "zustand";
 import { notificationsApi } from "../api/client";
-import { translate } from "../i18n";
 import { NOTIFICATIONS_HUB_URL } from "../config/server";
 import type { NotificationDto } from "../types/api";
 
@@ -58,7 +56,6 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
     } catch (error) {
       set({ loading: false });
       if (axios.isAxiosError(error) && error.response?.status === 401) return;
-      Alert.alert(translate("genericErrorTitle"), translate("genericErrorDesc"));
     }
   },
 

@@ -1,3 +1,4 @@
+import type { AxiosRequestConfig } from "axios";
 import apiClient from "./client";
 import type {
   ActivityDto,
@@ -17,12 +18,19 @@ export type ActivitiesListParams = {
  */
 export const activitiesApi = {
   getList: (petId: string, params?: ActivitiesListParams) =>
-    apiClient.get<ActivityDto[]>(`/pets/${petId}/activities`, { params }).then((r) => r.data),
+    apiClient
+      .get<ActivityDto[]>(`/pets/${petId}/activities`, {
+        params,
+        skipGlobalErrorToast: true,
+      })
+      .then((r) => r.data),
 
-  getSummary: (petId: string, days?: number) =>
+  getSummary: (petId: string, days?: number, cfg?: AxiosRequestConfig) =>
     apiClient
       .get<ActivitySummaryDto>(`/pets/${petId}/activities/summary`, {
         params: days != null ? { days } : undefined,
+        skipGlobalErrorToast: true,
+        ...cfg,
       })
       .then((r) => r.data),
 

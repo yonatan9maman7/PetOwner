@@ -5,6 +5,7 @@ import { useNavigation } from "@react-navigation/native";
 import type { LiveBeaconDto } from "../../../types/api";
 import { useTheme } from "../../../theme/ThemeContext";
 import { useTranslation, rowDirectionForAppLayout } from "../../../i18n";
+import { formatBreedForDisplay } from "../../pets/addPetHelpers";
 import { PetTagChips } from "./PetTagChips";
 import { initials, formatRemaining, formatDistance } from "./helpers";
 
@@ -34,7 +35,7 @@ export function LiveBeaconCard({ beacon }: Props) {
         <Text style={{ fontSize: 12, fontWeight: "700", color: remaining.urgent ? "#dc2626" : "#16a34a" }}>
           {remaining.label}
         </Text>
-        <Text style={{ fontSize: 12, color: colors.textMuted, marginLeft: "auto" }}>
+        <Text style={{ fontSize: 12, color: colors.textMuted, marginStart: "auto" }}>
           {formatDistance(beacon.distanceKm, isRTL)}
         </Text>
       </View>
@@ -65,7 +66,8 @@ export function LiveBeaconCard({ beacon }: Props) {
       {beacon.pets.slice(0, 2).map((pet) => (
         <View key={pet.id} style={{ marginTop: 8 }}>
           <Text style={{ fontSize: 13, color: colors.textSecondary, textAlign: isRTL ? "right" : "left" }}>
-            🐾 {pet.name}{pet.breed ? ` · ${pet.breed}` : ""}
+            🐾 {pet.name}
+            {pet.breed ? ` · ${formatBreedForDisplay(pet.breed, t)}` : ""}
           </Text>
           <PetTagChips pet={pet} maxChips={2} />
         </View>

@@ -7,6 +7,7 @@ import {
   type TeletriageHistoryDto,
 } from "../types/api";
 import { getSpeciesEmoji } from "../screens/pets/MyPets/constants";
+import { formatBreedForLanguage } from "../screens/pets/addPetHelpers";
 
 interface HealthPassportParams {
   pet: PetDto;
@@ -132,7 +133,7 @@ export function generateHealthPassportHtml(params: HealthPassportParams): string
     <div style="display:flex;justify-content:center;margin-bottom:12px">${petPhotoHtml}</div>
     <h1 class="text-3xl font-bold text-purple-700 mb-1">${esc(pet.name)}</h1>
     <p class="text-sm text-slate-500">
-      ${esc(speciesLabel)}${pet.breed ? ` · ${esc(pet.breed)}` : ""}
+      ${esc(speciesLabel)}${pet.breed ? ` · ${esc(formatBreedForLanguage(pet.breed, language))}` : ""}
       · Age: ${pet.age}${pet.weight ? ` · ${pet.weight} kg` : ""}
       · ${pet.isNeutered ? "Neutered ✓" : "Not Neutered"}
     </p>

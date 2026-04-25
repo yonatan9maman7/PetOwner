@@ -1,8 +1,6 @@
-import { Alert } from "react-native";
 import axios from "axios";
 import { create } from "zustand";
 import { chatApi } from "../api/client";
-import { translate } from "../i18n";
 import { useAuthStore } from "./authStore";
 import type {
   ChatConversationDto,
@@ -15,7 +13,7 @@ interface ChatState {
   activeMessages: ChatMessageDto[];
   activeOtherUserId: string | null;
   loading: boolean;
-  fetchConversations: () => Promise<void>;
+  fetchConversations: (options?: { backgroundRequest?: boolean }) => Promise<void>;
   fetchMessages: (otherUserId: string, page?: number) => Promise<void>;
   markAsRead: (otherUserId: string) => Promise<void>;
   addIncomingMessage: (msg: ChatNewMessageResponse) => void;
@@ -74,15 +72,16 @@ export const useChatStore = create<ChatState>((set, get) => ({
   activeOtherUserId: null,
   loading: false,
 
-  fetchConversations: async () => {
+  fetchConversations: async (options) => {
     set({ loading: true });
     try {
-      const conversations = await chatApi.getConversations();
+      const conversations = await chatApi.getConversations(
+        options?.backgroundRequest ? { backgroundRequest: true } : undefined,
+      );
       set({ conversations, loading: false });
     } catch (error) {
       set({ loading: false });
       if (axios.isAxiosError(error) && error.response?.status === 401) return;
-      Alert.alert(translate("genericErrorTitle"), translate("genericErrorDesc"));
     }
   },
 
@@ -99,7 +98,6 @@ export const useChatStore = create<ChatState>((set, get) => ({
     } catch (error) {
       set({ loading: false });
       if (axios.isAxiosError(error) && error.response?.status === 401) return;
-      Alert.alert(translate("genericErrorTitle"), translate("genericErrorDesc"));
     }
   },
 
@@ -122,7 +120,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       (c) => c.conversationId === msg.conversationId,
     );
     set((state) => applyIncomingMessage(state, msg, myId));
-    if (!hadConversation) void get().fetchConversations();
+    if (!hadConversation) void get().fetchConversations({ backgroundRequest: true });
   },
 
   addSentMessage: (msg) => {

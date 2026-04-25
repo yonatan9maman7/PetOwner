@@ -18,7 +18,7 @@ export function VaccineAlertBanner({ petId, onPress }: VaccineAlertBannerProps) 
 
   useEffect(() => {
     medicalApi
-      .getVaccineStatus(petId)
+      .getVaccineStatus(petId, { backgroundRequest: true })
       .then((statuses) => {
         setOverdueCount(statuses.filter((s) => s.status === "Overdue").length);
         setDueSoonCount(statuses.filter((s) => s.status === "Due Soon").length);

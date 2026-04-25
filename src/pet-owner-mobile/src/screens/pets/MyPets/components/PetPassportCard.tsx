@@ -7,7 +7,7 @@ import { useTheme } from "../../../../theme/ThemeContext";
 import { usePetsStore } from "../../../../store/petsStore";
 import type { PetDto } from "../../../../types/api";
 import { getSpeciesEmoji } from "../constants";
-import { ALLERGY_LABEL_I18N } from "../../addPetHelpers";
+import { ALLERGY_LABEL_I18N, formatBreedForDisplay } from "../../addPetHelpers";
 
 interface PetPassportCardProps {
   pet: PetDto;
@@ -90,7 +90,7 @@ export function PetPassportCard({
     : null;
 
   const metaLine = [
-    pet.breed,
+    pet.breed ? formatBreedForDisplay(pet.breed, t) : null,
     pet.age != null ? `${pet.age}y` : null,
     pet.weight ? `${pet.weight}kg` : null,
     pet.isNeutered ? "✂" : null,

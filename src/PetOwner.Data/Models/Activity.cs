@@ -5,7 +5,7 @@ public class Activity
     public Guid Id { get; set; }
     public Guid PetId { get; set; }
     public Guid UserId { get; set; }
-    public string Type { get; set; } = null!; // Walk, Meal, Exercise, Weight
+    public string Type { get; set; } = null!; // Walk, Meal, Exercise, Weight, Grooming
     public decimal? Value { get; set; } // e.g., distance in km, weight in kg, calories
     public int? DurationMinutes { get; set; }
     public string? Notes { get; set; }
