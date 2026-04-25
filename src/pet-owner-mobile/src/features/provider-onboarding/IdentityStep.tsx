@@ -11,13 +11,13 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useFormContext } from "react-hook-form";
-import * as ImagePicker from "expo-image-picker";
 import { useTranslation, rowDirectionForAppLayout } from "../../i18n";
 import { useTheme } from "../../theme/ThemeContext";
 import { filesApi, providerApi } from "../../api/client";
 import { AddressMapModal } from "./AddressMapModal";
 import { FieldLabel } from "./FieldLabel";
 import type { OnboardingFormValues } from "./schemas";
+import { pickImageWithSource } from "../../utils/imagePicker";
 
 export function IdentityStep() {
   const { t, isRTL, rtlInput } = useTranslation();
@@ -44,15 +44,25 @@ export function IdentityStep() {
   const longitude = watch("longitude");
 
   const pickImage = async () => {
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ["images"],
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 0.8,
+    const uri = await pickImageWithSource({
+      labels: {
+        camera: t("takePhoto"),
+        gallery: t("chooseFromLibrary"),
+        cancel: t("cancel"),
+      },
+      pickerOptions: {
+        mediaTypes: ["images"],
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      },
+      permissionDeniedAlert: {
+        title: t("errorTitle"),
+        message: t("triagePhotoPermissionDenied"),
+      },
     });
-    if (result.canceled || !result.assets?.[0]?.uri) return;
+    if (!uri) return;
 
-    const uri = result.assets[0].uri;
     setValue("imageUri", uri);
     setUploading(true);
     try {

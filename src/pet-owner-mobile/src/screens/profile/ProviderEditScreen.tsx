@@ -35,6 +35,7 @@ import {
   type ServiceDef,
 } from "../../features/provider-onboarding/constants";
 import { ProviderType, type AvailabilitySlotDto, type DogSize } from "../../types/api";
+import { pickImageWithSource } from "../../utils/imagePicker";
 
 const NAVY = "#001a5a";
 const DEFAULT_LAT = 32.0809;
@@ -957,35 +958,24 @@ export function ProviderEditScreen() {
     }
   };
 
-  const pickProviderAvatarFromLibrary = async () => {
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== "granted") {
-      Alert.alert(t("errorTitle"), t("triagePhotoPermissionDenied"));
-      return;
-    }
-    const result = await ImagePicker.launchImageLibraryAsync(AVATAR_PICKER_OPTIONS);
-    if (result.canceled || !result.assets?.[0]?.uri) return;
-    await uploadProviderAvatar(result.assets[0].uri);
-  };
-
-  const pickProviderAvatarFromCamera = async () => {
-    const { status } = await ImagePicker.requestCameraPermissionsAsync();
-    if (status !== "granted") {
-      Alert.alert(t("errorTitle"), t("triagePhotoPermissionDenied"));
-      return;
-    }
-    const result = await ImagePicker.launchCameraAsync(AVATAR_PICKER_OPTIONS);
-    if (result.canceled || !result.assets?.[0]?.uri) return;
-    await uploadProviderAvatar(result.assets[0].uri);
-  };
-
-  const showProviderAvatarPicker = () => {
+  const showProviderAvatarPicker = async () => {
     if (uploadingAvatar || saving) return;
-    Alert.alert(t("triagePhotoSourceTitle"), t("triagePhotoSourceMessage"), [
-      { text: t("cancel"), style: "cancel" },
-      { text: t("triageTakePhoto"), onPress: () => void pickProviderAvatarFromCamera() },
-      { text: t("triageChooseGallery"), onPress: () => void pickProviderAvatarFromLibrary() },
-    ]);
+    const uri = await pickImageWithSource({
+      labels: {
+        camera: t("takePhoto"),
+        gallery: t("chooseFromLibrary"),
+        cancel: t("cancel"),
+      },
+      title: t("triagePhotoSourceTitle"),
+      message: t("triagePhotoSourceMessage"),
+      pickerOptions: AVATAR_PICKER_OPTIONS,
+      permissionDeniedAlert: {
+        title: t("errorTitle"),
+        message: t("triagePhotoPermissionDenied"),
+      },
+    });
+    if (!uri) return;
+    await uploadProviderAvatar(uri);
   };
 
   const handleGenerateBio = async () => {

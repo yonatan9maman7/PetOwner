@@ -11,7 +11,6 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import * as DocumentPicker from "expo-document-picker";
-import * as ImagePicker from "expo-image-picker";
 import { useTranslation, rowDirectionForAppLayout } from "../../../../i18n";
 import { useTheme } from "../../../../theme/ThemeContext";
 import { medicalApi, filesApi } from "../../../../api/client";
@@ -19,6 +18,7 @@ import { DatePickerField } from "../../../../components/DatePickerField";
 import { ListSkeleton } from "../../../../components/shared/ListSkeleton";
 import type { MedicalRecordDto } from "../../../../types/api";
 import { formInputStyle } from "../helpers";
+import { pickImageWithSource } from "../../../../utils/imagePicker";
 
 const RECORD_TYPES = ["Condition", "Medication", "VetVisit"] as const;
 
@@ -63,16 +63,27 @@ export function VaultSection({ petId, reloadNonce = 0 }: { petId: string; reload
       {
         text: t("pickImage"),
         onPress: async () => {
-          const result = await ImagePicker.launchImageLibraryAsync({
-            mediaTypes: ["images"],
-            quality: 0.8,
+          const uri = await pickImageWithSource({
+            labels: {
+              camera: t("takePhoto"),
+              gallery: t("chooseFromLibrary"),
+              cancel: t("cancel"),
+            },
+            pickerOptions: {
+              mediaTypes: ["images"],
+              quality: 0.8,
+            },
+            permissionDeniedAlert: {
+              title: t("errorTitle"),
+              message: t("triagePhotoPermissionDenied"),
+            },
           });
-          if (result.canceled || !result.assets?.[0]) return;
+          if (!uri) return;
           setUploading(true);
           try {
-            const res = await filesApi.uploadDocument(result.assets[0].uri, "health-records");
+            const res = await filesApi.uploadDocument(uri, "health-records");
             setFormAttachmentUrl(res.url);
-            setFormAttachmentName(result.assets[0].uri.split("/").pop() ?? "photo");
+            setFormAttachmentName(uri.split("/").pop() ?? "photo");
           } catch {
             Alert.alert(t("errorTitle"), t("genericError"));
           }

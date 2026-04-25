@@ -18,7 +18,6 @@ import {
   CommonActions,
 } from "@react-navigation/native";
 import * as Location from "expo-location";
-import * as ImagePicker from "expo-image-picker";
 import {
   MapViewWrapper,
   MarkerWrapper,
@@ -33,6 +32,7 @@ import { useTheme } from "../../theme/ThemeContext";
 import { PetSpecies } from "../../types/api";
 import type { PetDto } from "../../types/api";
 import { getSpeciesEmoji } from "./MyPets/constants";
+import { pickImageWithSource } from "../../utils/imagePicker";
 
 const TEL_AVIV = {
   latitude: 32.0853,
@@ -167,15 +167,25 @@ export function ReportLostScreen() {
   }, []);
 
   const pickImage = useCallback(async () => {
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      quality: 0.7,
+    const uri = await pickImageWithSource({
+      labels: {
+        camera: t("takePhoto"),
+        gallery: t("chooseFromLibrary"),
+        cancel: t("cancel"),
+      },
+      pickerOptions: {
+        mediaTypes: ["images"],
+        allowsEditing: true,
+        quality: 0.7,
+      },
+      permissionDeniedAlert: {
+        title: t("errorTitle"),
+        message: t("triagePhotoPermissionDenied"),
+      },
     });
-    if (!result.canceled && result.assets[0]) {
-      setImageUri(result.assets[0].uri);
-    }
-  }, []);
+    if (!uri) return;
+    setImageUri(uri);
+  }, [t]);
 
   const handleSubmit = async () => {
     if (!selectedId) {

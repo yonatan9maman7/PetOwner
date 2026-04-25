@@ -12,7 +12,6 @@ import {
   RefreshControl,
   Image,
 } from "react-native";
-import * as ImagePicker from "expo-image-picker";
 import { FlashList } from "@shopify/flash-list";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -28,6 +27,7 @@ import { CommentsBottomSheet } from "./CommentsBottomSheet";
 import { postsApi, communityApi, filesApi } from "../../api/client";
 import { PalsScreen } from "./pals/PalsScreen";
 import type { PostDto, CommunityGroupDto } from "../../types/api";
+import { pickImageWithSource } from "../../utils/imagePicker";
 
 const PAGE_SIZE = 20;
 
@@ -343,6 +343,29 @@ export function CommunityScreen() {
     }
   };
 
+  const handlePickPostImage = async () => {
+    if (posting || uploadingImage) return;
+    const uri = await pickImageWithSource({
+      labels: {
+        camera: t("takePhoto"),
+        gallery: t("chooseFromLibrary"),
+        cancel: t("cancel"),
+      },
+      pickerOptions: {
+        mediaTypes: ["images"],
+        allowsEditing: true,
+        aspect: [4, 3],
+        quality: 0.8,
+      },
+      permissionDeniedAlert: {
+        title: t("errorTitle"),
+        message: t("triagePhotoPermissionDenied"),
+      },
+    });
+    if (!uri) return;
+    setPickedImageUri(uri);
+  };
+
   const handleToggleLike = useCallback(async (id: string) => {
     if (likeLockRef.current.has(id)) return;
     likeLockRef.current.add(id);
@@ -535,33 +558,14 @@ export function CommunityScreen() {
             >
               <Pressable
                 disabled={posting || uploadingImage}
-                onPress={async () => {
-                  const perm = await ImagePicker.requestCameraPermissionsAsync();
-                  if (!perm.granted) return;
-                  const r = await ImagePicker.launchCameraAsync({
-                    allowsEditing: true,
-                    aspect: [4, 3],
-                    quality: 0.8,
-                  });
-                  if (!r.canceled) setPickedImageUri(r.assets[0].uri);
-                }}
+                onPress={() => void handlePickPostImage()}
                 style={styles.pickerIconBtn}
               >
                 <Ionicons name="camera-outline" size={22} color={colors.textSecondary} />
               </Pressable>
               <Pressable
                 disabled={posting || uploadingImage}
-                onPress={async () => {
-                  const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-                  if (!perm.granted) return;
-                  const r = await ImagePicker.launchImageLibraryAsync({
-                    mediaTypes: ["images"],
-                    allowsEditing: true,
-                    aspect: [4, 3],
-                    quality: 0.8,
-                  });
-                  if (!r.canceled) setPickedImageUri(r.assets[0].uri);
-                }}
+                onPress={() => void handlePickPostImage()}
                 style={styles.pickerIconBtn}
               >
                 <Ionicons name="image-outline" size={22} color={colors.textSecondary} />

@@ -10,7 +10,6 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import * as DocumentPicker from "expo-document-picker";
-import * as ImagePicker from "expo-image-picker";
 import { useTranslation, type TranslationKey, rowDirectionForAppLayout } from "../../../../i18n";
 import { useTheme } from "../../../../theme/ThemeContext";
 import { medicalApi, filesApi } from "../../../../api/client";
@@ -26,6 +25,7 @@ import {
 } from "../../../../types/api";
 import { STATUS_STYLE } from "../constants";
 import { formInputStyle } from "../helpers";
+import { pickImageWithSource } from "../../../../utils/imagePicker";
 
 const VACCINE_NAME_I18N: Record<VaccineNameOption, TranslationKey> = {
   Rabies: "vaccineRabies",
@@ -134,13 +134,24 @@ export function VaccinesSection({ petId, reloadNonce = 0 }: { petId: string; rel
       {
         text: t("pickImage"),
         onPress: async () => {
-          const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ["images"], quality: 0.8 });
-          if (result.canceled || !result.assets?.[0]) return;
+          const uri = await pickImageWithSource({
+            labels: {
+              camera: t("takePhoto"),
+              gallery: t("chooseFromLibrary"),
+              cancel: t("cancel"),
+            },
+            pickerOptions: { mediaTypes: ["images"], quality: 0.8 },
+            permissionDeniedAlert: {
+              title: t("errorTitle"),
+              message: t("triagePhotoPermissionDenied"),
+            },
+          });
+          if (!uri) return;
           setDocUploading(true);
           try {
-            const res = await filesApi.uploadDocument(result.assets[0].uri, "health-records");
+            const res = await filesApi.uploadDocument(uri, "health-records");
             setFormDocUrl(res.url);
-            setFormDocName(result.assets[0].uri.split("/").pop() ?? "photo");
+            setFormDocName(uri.split("/").pop() ?? "photo");
           } catch {
             Alert.alert(t("errorTitle"), t("genericError"));
           }

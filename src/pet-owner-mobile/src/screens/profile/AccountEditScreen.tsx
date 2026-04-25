@@ -9,17 +9,16 @@ import {
   KeyboardAvoidingView,
   Platform,
   Image,
-  ActionSheetIOS,
   ActivityIndicator,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
-import * as ImagePicker from "expo-image-picker";
 import { useAuthStore } from "../../store/authStore";
 import { authApi } from "../../api/client";
 import { useTranslation, rowDirectionForAppLayout } from "../../i18n";
 import { useTheme } from "../../theme/ThemeContext";
+import { pickImageWithSource } from "../../utils/imagePicker";
 
 function InputLabel({ text }: { text: string }) {
   const { isRTL } = useTranslation();
@@ -71,74 +70,27 @@ export function AccountEditScreen() {
     .slice(0, 2)
     .toUpperCase();
 
-  const pickFromLibrary = async () => {
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ["images"],
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 0.8,
+  const showPhotoOptions = async () => {
+    const uri = await pickImageWithSource({
+      labels: {
+        camera: t("takePhoto"),
+        gallery: t("chooseFromLibrary"),
+        cancel: t("cancel"),
+      },
+      title: t("editProfilePicture"),
+      pickerOptions: {
+        mediaTypes: ["images"],
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      },
+      permissionDeniedAlert: {
+        title: t("errorTitle"),
+        message: t("triagePhotoPermissionDenied"),
+      },
     });
-    if (!result.canceled && result.assets?.[0]) {
-      setAvatarUri(result.assets[0].uri);
-    }
-  };
-
-  const takePhoto = async () => {
-    const perm = await ImagePicker.requestCameraPermissionsAsync();
-    if (!perm.granted) {
-      Alert.alert(t("genericError"));
-      return;
-    }
-    const result = await ImagePicker.launchCameraAsync({
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 0.8,
-    });
-    if (!result.canceled && result.assets?.[0]) {
-      setAvatarUri(result.assets[0].uri);
-    }
-  };
-
-  const showPhotoOptions = () => {
-    const options = [
-      t("chooseFromLibrary"),
-      t("takePhoto"),
-      ...(avatarUri ? [t("removePhoto")] : []),
-      t("cancel"),
-    ];
-    const destructiveIndex = avatarUri ? 2 : undefined;
-    const cancelIndex = options.length - 1;
-
-    if (Platform.OS === "ios") {
-      ActionSheetIOS.showActionSheetWithOptions(
-        {
-          options,
-          cancelButtonIndex: cancelIndex,
-          destructiveButtonIndex: destructiveIndex,
-          title: t("editProfilePicture"),
-        },
-        (idx) => {
-          if (idx === 0) pickFromLibrary();
-          else if (idx === 1) takePhoto();
-          else if (idx === 2 && avatarUri) setAvatarUri(null);
-        },
-      );
-    } else {
-      Alert.alert(t("editProfilePicture"), undefined, [
-        { text: t("chooseFromLibrary"), onPress: pickFromLibrary },
-        { text: t("takePhoto"), onPress: takePhoto },
-        ...(avatarUri
-          ? [
-              {
-                text: t("removePhoto"),
-                style: "destructive" as const,
-                onPress: () => setAvatarUri(null),
-              },
-            ]
-          : []),
-        { text: t("cancel"), style: "cancel" as const },
-      ]);
-    }
+    if (!uri) return;
+    setAvatarUri(uri);
   };
 
   const handleSave = async () => {

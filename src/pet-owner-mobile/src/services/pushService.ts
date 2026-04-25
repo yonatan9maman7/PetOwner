@@ -17,6 +17,11 @@ export function isSupported(): boolean {
   return Platform.OS !== "web" && !!Device.isDevice;
 }
 
+/** Android Expo Go (SDK 53+) no longer supports remote push token registration. */
+function isAndroidExpoGo(): boolean {
+  return Platform.OS === "android" && Constants.executionEnvironment === "storeClient";
+}
+
 /**
  * Requests OS-level permission for push notifications.
  * - If already granted or denied, returns current status without a new prompt.
@@ -53,6 +58,7 @@ export async function ensurePermission(): Promise<Notifications.PermissionStatus
  */
 export async function registerForPushNotifications(): Promise<string | null> {
   if (!isSupported()) return null;
+  if (isAndroidExpoGo()) return null;
 
   const status = await ensurePermission();
   if (status !== Notifications.PermissionStatus.GRANTED) return null;
@@ -61,9 +67,21 @@ export async function registerForPushNotifications(): Promise<string | null> {
     (Constants.expoConfig?.extra?.eas?.projectId as string | undefined) ??
     Constants.easConfig?.projectId;
 
-  const { data: token } = await Notifications.getExpoPushTokenAsync(
-    projectId ? { projectId } : undefined,
-  );
+  let token: string;
+  try {
+    const { data } = await Notifications.getExpoPushTokenAsync(
+      projectId ? { projectId } : undefined,
+    );
+    token = data;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    const isExpoGoAndroidPushUnsupported =
+      Platform.OS === "android" &&
+      message.includes("Android Push notifications") &&
+      message.includes("removed from Expo Go");
+    if (isExpoGoAndroidPushUnsupported) return null;
+    throw error;
+  }
 
   const stored = await SecureStore.getItemAsync(PUSH_TOKEN_KEY);
   if (stored === token) return null; // no change — skip backend sync

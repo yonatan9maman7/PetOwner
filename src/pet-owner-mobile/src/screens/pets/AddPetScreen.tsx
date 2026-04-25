@@ -21,7 +21,6 @@ import ConfettiCannon from "react-native-confetti-cannon";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation, useRoute } from "@react-navigation/native";
-import * as ImagePicker from "expo-image-picker";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useTranslation, rowDirectionForAppLayout } from "../../i18n";
@@ -43,6 +42,7 @@ import { filesApi } from "../../api/client";
 import { usePetsStore } from "../../store/petsStore";
 import { PetSpecies } from "../../types/api";
 import type { CreatePetRequest, UpdatePetRequest } from "../../types/api";
+import { pickImageWithSource } from "../../utils/imagePicker";
 import { isIsraeliBusinessPhoneValid } from "../../features/provider-onboarding/phoneUtils";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
@@ -314,15 +314,25 @@ export function AddPetScreen() {
 
   const pickImage = async () => {
     if (saving || avatarUploading) return;
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ["images"],
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 0.5,
+    const uri = await pickImageWithSource({
+      labels: {
+        camera: t("takePhoto"),
+        gallery: t("chooseFromLibrary"),
+        cancel: t("cancel"),
+      },
+      pickerOptions: {
+        mediaTypes: ["images"],
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.5,
+      },
+      permissionDeniedAlert: {
+        title: t("errorTitle"),
+        message: t("triagePhotoPermissionDenied"),
+      },
     });
-    if (!result.canceled && result.assets?.[0]) {
-      setAvatarUri(result.assets[0].uri);
-    }
+    if (!uri) return;
+    setAvatarUri(uri);
   };
 
   const handleSave = async () => {

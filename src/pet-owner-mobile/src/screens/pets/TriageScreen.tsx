@@ -32,6 +32,7 @@ import { useTheme } from "../../theme/ThemeContext";
 import { triageApi, petsApi } from "../../api/client";
 import { getSpeciesEmoji } from "./MyPets/constants";
 import { PetSpecies } from "../../types/api";
+import { pickImageWithSource } from "../../utils/imagePicker";
 import type {
   PetDto,
   TeletriageResponseDto,
@@ -277,37 +278,24 @@ export function TriageScreen() {
     }
   };
 
-  const pickFromCamera = async () => {
-    const { status } = await ImagePicker.requestCameraPermissionsAsync();
-    if (status !== "granted") {
-      Alert.alert(t("errorTitle"), t("triagePhotoPermissionDenied"));
-      return;
-    }
-    const result = await ImagePicker.launchCameraAsync(TRIAGE_IMAGE_PICKER_OPTIONS);
-    if (result.canceled || !result.assets?.[0]) return;
-    await applyPickedAssetUri(result.assets[0].uri);
-  };
-
-  const pickFromLibrary = async () => {
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== "granted") {
-      Alert.alert(t("errorTitle"), t("triagePhotoPermissionDenied"));
-      return;
-    }
-    const result = await ImagePicker.launchImageLibraryAsync(
-      TRIAGE_IMAGE_PICKER_OPTIONS,
-    );
-    if (result.canceled || !result.assets?.[0]) return;
-    await applyPickedAssetUri(result.assets[0].uri);
-  };
-
-  const showPhotoSourcePicker = () => {
+  const showPhotoSourcePicker = async () => {
     if (assessing || triageImageProcessing) return;
-    Alert.alert(t("triagePhotoSourceTitle"), t("triagePhotoSourceMessage"), [
-      { text: t("cancel"), style: "cancel" },
-      { text: t("triageTakePhoto"), onPress: () => void pickFromCamera() },
-      { text: t("triageChooseGallery"), onPress: () => void pickFromLibrary() },
-    ]);
+    const uri = await pickImageWithSource({
+      labels: {
+        camera: t("takePhoto"),
+        gallery: t("chooseFromLibrary"),
+        cancel: t("cancel"),
+      },
+      title: t("triagePhotoSourceTitle"),
+      message: t("triagePhotoSourceMessage"),
+      pickerOptions: TRIAGE_IMAGE_PICKER_OPTIONS,
+      permissionDeniedAlert: {
+        title: t("errorTitle"),
+        message: t("triagePhotoPermissionDenied"),
+      },
+    });
+    if (!uri) return;
+    await applyPickedAssetUri(uri);
   };
 
   /* ─── Submit symptoms ─── */
