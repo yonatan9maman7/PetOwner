@@ -3,7 +3,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useFormContext } from "react-hook-form";
 import { useTranslation, rowDirectionForAppLayout } from "../../i18n";
 import { useTheme } from "../../theme/ThemeContext";
-import { servicesForOnboarding } from "./constants";
+import { servicesForProviderType } from "./constants";
 import { FieldLabel } from "./FieldLabel";
 import type { OnboardingFormValues } from "./schemas";
 
@@ -18,7 +18,7 @@ export function PackagesStep() {
   const { watch, setValue } = useFormContext<OnboardingFormValues>();
   const services = watch("services");
   const providerType = watch("providerType");
-  const serviceDefs = servicesForOnboarding(providerType);
+  const serviceDefs = servicesForProviderType(providerType);
 
   const enabledDefs = serviceDefs.filter((svc) => services[String(svc.serviceType)]?.enabled);
 

@@ -1,7 +1,7 @@
 import type { ProviderApplicationPayload } from "../../types/api";
 import type { OnboardingFormValues } from "./schemas";
 import {
-  servicesForOnboarding,
+  servicesForProviderType,
   DESCRIPTION_MAX_LENGTH,
   DOG_CARE_SERVICE_TYPES,
 } from "./constants";
@@ -51,7 +51,7 @@ export function formToPayload(values: OnboardingFormValues): ProviderApplication
   let primaryServiceType = 6; // PetStore default for Business
 
   if (!isBusiness) {
-    const enabledServices = servicesForOnboarding(0).filter(
+    const enabledServices = servicesForProviderType(0).filter(
       (svc) => values.services[String(svc.serviceType)]?.enabled,
     );
     selectedServices = enabledServices.map((svc) => {

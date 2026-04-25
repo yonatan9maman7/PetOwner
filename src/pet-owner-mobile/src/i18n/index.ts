@@ -489,7 +489,8 @@ const he = {
   newAssessment: "הערכה חדשה",
   nearbyVets: "וטרינרים בקרבת מקום",
   callVet: "התקשר לוטרינר",
-  triageError: "שגיאה בביצוע ההערכה",
+  triageError:
+    "לא הצלחנו להשלים את ההערכה — ייתכן שיש בעיית רשת או שהשירות זמנית לא זמין. נסה שוב בעוד רגע. אם חיית המחמד נראית חולה או שיש חשש דחוף, פנה/י לוטרינר; כלי זה אינו תחליף לטיפול מקצועי.",
   noPetsTriage: "הוסף/י חיית מחמד כדי להשתמש בבדיקת הסימפטומים",
   addPetFirst: "הוסף/י חיית מחמד",
   triageWelcome: "שלום! אני כאן לעזור לך להעריך את הסימפטומים של",
@@ -676,6 +677,9 @@ const he = {
   notifPlaydateBeaconLive: "{{petName}} ו{{name}} נמצאים ב{{place}} עכשיו",
 
   switchToProvider: "עבור ללוח מטפל",
+  providerPendingEditCta: "הבקשה ממתינה לאישור — עריכה",
+  providerDashboardEditProfile: "עריכת פרופיל מטפל",
+  providerDashboardEditProfileHint: "שירותים, מחירים, זמינות ופרטי פרופיל",
   providerDashboardTitle: "לוח מטפל",
   providerTotalEarnings: "סה״כ הכנסות",
   providerMonthlyEarnings: "הכנסות חודשיות",
@@ -1735,7 +1739,8 @@ const en: Record<keyof typeof he, string> = {
   newAssessment: "New Assessment",
   nearbyVets: "Nearby Vets",
   callVet: "Call Vet",
-  triageError: "Error performing assessment",
+  triageError:
+    "We couldn't complete this assessment — your connection may have dropped, or the symptom checker may be temporarily unavailable. Try again in a moment. If your pet seems unwell or you're worried, contact a veterinarian; this tool is not a substitute for professional care.",
   noPetsTriage: "Add a pet to use the symptom checker",
   addPetFirst: "Add a Pet",
   triageWelcome: "Hi! I'm here to help you assess the symptoms of",
@@ -1922,6 +1927,9 @@ const en: Record<keyof typeof he, string> = {
   notifPlaydateBeaconLive: "{{petName}} & {{name}} are at {{place}} now",
 
   switchToProvider: "Switch to Provider Dashboard",
+  providerPendingEditCta: "Awaiting approval — edit application",
+  providerDashboardEditProfile: "Edit provider profile",
+  providerDashboardEditProfileHint: "Services, pricing, availability, and profile details",
   providerDashboardTitle: "Provider Dashboard",
   providerTotalEarnings: "Total earnings",
   providerMonthlyEarnings: "Monthly earnings",

@@ -1,6 +1,6 @@
 import { z } from "zod";
 import type { DogSize } from "../../types/api";
-import { SERVICES } from "./constants";
+import { SERVICES, DOG_CARE_SERVICE_TYPES } from "./constants";
 import {
   isIsraeliBusinessPhoneValid,
   isIsraeliMobileValid,
@@ -144,8 +144,9 @@ export function validateStep2(values: OnboardingFormValues): string | null {
     const rate = Number(s.rate);
     if (!s.rate || isNaN(rate) || rate <= 0) return "serviceRateRequired";
   }
-  const needsDogPrefs =
-    values.services["0"]?.enabled || values.services["2"]?.enabled;
+  const needsDogPrefs = [...DOG_CARE_SERVICE_TYPES].some(
+    (id) => values.services[String(id)]?.enabled,
+  );
   if (needsDogPrefs) {
     if (!values.acceptedDogSizes?.length) return "acceptedSizesRequired";
     const cap = Number(values.maxDogsCapacity);

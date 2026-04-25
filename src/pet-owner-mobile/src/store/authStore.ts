@@ -61,6 +61,11 @@ function decodeUser(token: string): UserInfo | null {
   }
 }
 
+/** Use after a token refresh so `user_id` storage stays the real account id (not e.g. application id). */
+export function getUserInfoFromAccessToken(token: string): UserInfo | null {
+  return decodeUser(token);
+}
+
 function isTokenExpired(token: string): boolean {
   try {
     const decoded = jwtDecode<{ exp?: number }>(token);

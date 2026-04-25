@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import {
   View,
   Text,
@@ -28,7 +28,13 @@ import {
 } from "../../components/shared/AddressAutocomplete";
 import { fetchReverseGeocode } from "../../api/googlePlaces";
 import { DogSizeCapacityEditor, toggleDogSize } from "../../features/provider-onboarding/DogSizeCapacityFields";
-import type { AvailabilitySlotDto, DogSize } from "../../types/api";
+import {
+  SERVICES,
+  servicesForProviderType,
+  DOG_CARE_SERVICE_TYPES,
+  type ServiceDef,
+} from "../../features/provider-onboarding/constants";
+import { ProviderType, type AvailabilitySlotDto, type DogSize } from "../../types/api";
 
 const NAVY = "#001a5a";
 const DEFAULT_LAT = 32.0809;
@@ -41,28 +47,16 @@ const AVATAR_PICKER_OPTIONS: ImagePicker.ImagePickerOptions = {
   quality: 0.5,
 };
 
-interface ServiceDef {
-  serviceType: number;
-  pricingUnit: number;
-  nameKey: TranslationKey;
-  unitKey: TranslationKey;
-  icon: string;
-  bgColor: string;
-  iconColor: string;
-}
-
-const SERVICES: ServiceDef[] = [
-  { serviceType: 0, pricingUnit: 0, nameKey: "serviceDogWalking", unitKey: "perHour", icon: "footsteps", bgColor: "rgba(15,47,127,0.08)", iconColor: NAVY },
-  { serviceType: 1, pricingUnit: 0, nameKey: "servicePetSitting", unitKey: "perHour", icon: "home", bgColor: "rgba(211,232,215,0.3)", iconColor: "#506356" },
-  { serviceType: 2, pricingUnit: 1, nameKey: "serviceBoarding", unitKey: "perNight", icon: "bed", bgColor: "rgba(233,226,209,0.3)", iconColor: "#242116" },
-  { serviceType: 3, pricingUnit: 2, nameKey: "serviceDropInVisit", unitKey: "perVisit", icon: "paw", bgColor: "rgba(15,47,127,0.04)", iconColor: NAVY },
-  { serviceType: 4, pricingUnit: 3, nameKey: "serviceTraining", unitKey: "perSession", icon: "school", bgColor: "rgba(211,232,215,0.15)", iconColor: "#506356" },
-  { serviceType: 5, pricingUnit: 4, nameKey: "serviceInsurance", unitKey: "perPackage", icon: "shield-checkmark", bgColor: "rgba(233,226,209,0.15)", iconColor: "#242116" },
-  { serviceType: 6, pricingUnit: 4, nameKey: "servicePetStore", unitKey: "perPackage", icon: "storefront", bgColor: "rgba(15,47,127,0.06)", iconColor: NAVY },
-];
-
 const SERVICE_NAME_TO_TYPE: Record<string, number> = {
-  DogWalking: 0, PetSitting: 1, Boarding: 2, DropInVisit: 3, Training: 4, Insurance: 5, PetStore: 6,
+  DogWalking: 0,
+  PetSitting: 1,
+  Boarding: 2,
+  DropInVisit: 3,
+  Training: 4,
+  Insurance: 5,
+  PetStore: 6,
+  HouseSitting: 7,
+  DoggyDayCare: 8,
 };
 
 const DAYS: TranslationKey[] = [
@@ -829,6 +823,25 @@ export function ProviderEditScreen() {
   const [maxDogsCapacity, setMaxDogsCapacity] = useState("");
   const [profileImageUrl, setProfileImageUrl] = useState<string | null>(null);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [providerKind, setProviderKind] = useState<ProviderType>(ProviderType.Individual);
+  const [businessName, setBusinessName] = useState("");
+
+  const isBusiness = providerKind === ProviderType.Business;
+  const providerTypeNum = isBusiness ? 1 : 0;
+  const editableServices = useMemo(
+    () => servicesForProviderType(providerTypeNum),
+    [providerTypeNum],
+  );
+
+  const showDogSizeCapacity = useMemo(
+    () =>
+      editableServices.some(
+        (svc) =>
+          DOG_CARE_SERVICE_TYPES.has(svc.serviceType) &&
+          !!serviceStates[svc.serviceType]?.enabled,
+      ),
+    [editableServices, serviceStates],
+  );
 
   useEffect(() => {
     let active = true;
@@ -841,6 +854,10 @@ export function ProviderEditScreen() {
         if (!active) return;
 
         setProviderStatus(profile.status || "Approved");
+        setProviderKind(
+          profile.type === ProviderType.Business ? ProviderType.Business : ProviderType.Individual,
+        );
+        setBusinessName((profile.businessName ?? "").trim());
         setProfileImageUrl(profile.profileImageUrl ?? null);
         setVisibleOnMap(!!profile.isAvailableNow);
         setBio(profile.bio || "");
@@ -1056,7 +1073,8 @@ export function ProviderEditScreen() {
   const handleSave = async () => {
     setSaving(true);
     try {
-      const selectedServices = SERVICES.filter((svc) => {
+      const editable = servicesForProviderType(isBusiness ? 1 : 0);
+      const selectedServices = editable.filter((svc) => {
         const st = serviceStates[svc.serviceType];
         return st.enabled && st.rate && Number(st.rate) > 0;
       }).map((svc) => {
@@ -1073,7 +1091,11 @@ export function ProviderEditScreen() {
         };
       });
 
-      const needsDogPrefs = !!serviceStates[0]?.enabled || !!serviceStates[2]?.enabled;
+      const needsDogPrefs = editable.some(
+        (svc) =>
+          DOG_CARE_SERVICE_TYPES.has(svc.serviceType) &&
+          !!serviceStates[svc.serviceType]?.enabled,
+      );
       if (needsDogPrefs) {
         if (acceptedDogSizes.length === 0) {
           Alert.alert(t("errorTitle"), t("acceptedSizesRequired"));
@@ -1088,11 +1110,30 @@ export function ProviderEditScreen() {
         }
       }
 
+      if (isBusiness && !businessName.trim()) {
+        Alert.alert(t("errorTitle"), t("businessNameRequired"));
+        setSaving(false);
+        return;
+      }
+
       if (isNewProvider) {
+        if (!phoneNumber.trim()) {
+          Alert.alert(t("errorTitle"), t("phoneRequired"));
+          setSaving(false);
+          return;
+        }
+        if (!isBusiness && selectedServices.length === 0) {
+          Alert.alert(t("errorTitle"), t("atLeastOneService"));
+          setSaving(false);
+          return;
+        }
         const firstService = selectedServices[0];
+        const applyPayloadServices = isBusiness ? [] : selectedServices;
+        const primaryServiceType = isBusiness ? 6 : (firstService?.serviceType ?? 0);
         await providerApi.apply({
-          type: 0,
-          serviceType: firstService?.serviceType ?? 0,
+          type: isBusiness ? 1 : 0,
+          businessName: isBusiness ? businessName.trim() : undefined,
+          serviceType: primaryServiceType,
           city,
           street,
           buildingNumber,
@@ -1101,9 +1142,10 @@ export function ProviderEditScreen() {
           longitude,
           phoneNumber,
           isEmergencyService: false,
-          description: bio || t("bioPlaceholder"),
+          description: bio || (isBusiness ? t("bioPlaceholderBusiness") : t("bioPlaceholder")),
           bio: bio.trim() || undefined,
-          selectedServices,
+          imageUrl: profileImageUrl || undefined,
+          selectedServices: applyPayloadServices,
           acceptedDogSizes: needsDogPrefs ? acceptedDogSizes : [],
           maxDogsCapacity: needsDogPrefs ? Number(maxDogsCapacity) : null,
         });
@@ -1123,6 +1165,7 @@ export function ProviderEditScreen() {
           acceptsOffHoursRequests: urgentAvailable,
           acceptedDogSizes: needsDogPrefs ? acceptedDogSizes : [],
           maxDogsCapacity: needsDogPrefs ? Number(maxDogsCapacity) : null,
+          ...(isBusiness ? { businessName: businessName.trim() } : {}),
         });
 
         for (const id of deletedSlotIds) {
@@ -1322,6 +1365,35 @@ export function ProviderEditScreen() {
                 </View>
               )}
 
+              {isBusiness && (
+                <View style={{ marginBottom: 20 }}>
+                  <Text
+                    style={[rtlText, { fontSize: 13, fontWeight: "600", color: colors.text, marginBottom: 6 }]}
+                  >
+                    {t("onbBusinessName")} *
+                  </Text>
+                  <TextInput
+                    value={businessName}
+                    onChangeText={setBusinessName}
+                    placeholder={t("onbBusinessNamePlaceholder")}
+                    placeholderTextColor={colors.textMuted}
+                    style={[
+                      rtlInput,
+                      {
+                        backgroundColor: colors.surface,
+                        borderRadius: 12,
+                        paddingHorizontal: 14,
+                        paddingVertical: 12,
+                        fontSize: 15,
+                        color: colors.text,
+                        borderWidth: 1.5,
+                        borderColor: colors.border,
+                      },
+                    ]}
+                  />
+                </View>
+              )}
+
               {providerStatus === "Approved" && (
                 <View
                   style={{
@@ -1408,7 +1480,9 @@ export function ProviderEditScreen() {
                   <TextInput
                     value={phoneNumber}
                     onChangeText={setPhoneNumber}
-                    placeholder={t("phoneNumberPlaceholder")}
+                    placeholder={
+                      isBusiness ? t("phoneNumberPlaceholderBusiness") : t("phoneNumberPlaceholder")
+                    }
                     placeholderTextColor={colors.textMuted}
                     keyboardType="phone-pad"
                     style={[
@@ -1506,11 +1580,17 @@ export function ProviderEditScreen() {
                 >
                   {t("servicesAndPricing")}
                 </Text>
-                {SERVICES.map((svc) => (
+                {editableServices.map((svc) => (
                   <ServiceRow
                     key={svc.serviceType}
                     service={svc}
-                    state={serviceStates[svc.serviceType]}
+                    state={
+                      serviceStates[svc.serviceType] ?? {
+                        enabled: false,
+                        rate: "",
+                        packages: [],
+                      }
+                    }
                     onToggle={() => toggleService(svc.serviceType)}
                     onRateChange={(val) => updateRate(svc.serviceType, val)}
                     onDeletePackage={(pkgId) => deletePackage(svc.serviceType, pkgId)}
@@ -1518,7 +1598,7 @@ export function ProviderEditScreen() {
                     t={t}
                   />
                 ))}
-                {(serviceStates[0]?.enabled || serviceStates[2]?.enabled) && (
+                {showDogSizeCapacity && (
                   <DogSizeCapacityEditor
                     selected={acceptedDogSizes}
                     onToggleSize={(id) =>
@@ -1535,7 +1615,7 @@ export function ProviderEditScreen() {
                 <Text
                   style={[rtlText, { fontSize: 18, fontWeight: "800", color: colors.text, marginBottom: 14 }]}
                 >
-                  {t("bioTitle")}
+                  {t((isBusiness ? "bioTitleBusiness" : "bioTitle") as TranslationKey)}
                 </Text>
                 <View style={{ position: "relative", marginBottom: 12 }}>
                   <TextInput
@@ -1558,7 +1638,7 @@ export function ProviderEditScreen() {
                         elevation: 1,
                       },
                     ]}
-                    placeholder={t("bioPlaceholder")}
+                    placeholder={t((isBusiness ? "bioPlaceholderBusiness" : "bioPlaceholder") as TranslationKey)}
                     placeholderTextColor={colors.textMuted}
                     value={bio}
                     onChangeText={setBio}

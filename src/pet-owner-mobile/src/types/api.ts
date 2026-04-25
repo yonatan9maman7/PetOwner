@@ -674,6 +674,8 @@ export interface UpdateProfileDto {
   acceptsOffHoursRequests?: boolean;
   acceptedDogSizes: DogSize[];
   maxDogsCapacity?: number | null;
+  /** When supported by API — business providers / pending applications. */
+  businessName?: string;
 }
 
 export interface ProviderApplicationPayload {

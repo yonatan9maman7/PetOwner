@@ -1,4 +1,6 @@
 import { useCallback } from "react";
+import { providerApi } from "../../api/client";
+import type { ProviderMeResponse } from "../../types/api";
 import {
   View,
   Text,
@@ -22,6 +24,12 @@ import type {
 
 function formatMoney(n: number): string {
   return `₪${n.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+}
+
+function readDashboardProviderStatus(profile: ProviderMeResponse): string {
+  const p = profile as ProviderMeResponse & { Status?: string };
+  const s = p.status ?? p.Status;
+  return typeof s === "string" ? s.trim().toLowerCase() : "";
 }
 
 function formatDateTime(iso?: string): string {
@@ -243,6 +251,26 @@ export function ProviderDashboardScreen() {
     }, [fetchAll]),
   );
 
+  useFocusEffect(
+    useCallback(() => {
+      let cancelled = false;
+      (async () => {
+        try {
+          const profile = await providerApi.getMe();
+          if (cancelled) return;
+          if (readDashboardProviderStatus(profile) === "pending") {
+            navigation.replace("ProviderEdit");
+          }
+        } catch {
+          /* approved-only dashboard APIs may fail; keep screen */
+        }
+      })();
+      return () => {
+        cancelled = true;
+      };
+    }, [navigation]),
+  );
+
   const refreshing = loading && stats != null;
 
   const earningsSectionLoading = earningsLoading && !earnings;
@@ -274,14 +302,7 @@ export function ProviderDashboardScreen() {
         >
           {t("providerDashboardTitle")}
         </Text>
-        <Pressable
-          onPress={() => navigation.navigate("ProviderEdit")}
-          hitSlop={12}
-          accessibilityRole="button"
-          accessibilityLabel={t("providerSettings")}
-        >
-          <Ionicons name="settings-outline" size={24} color={colors.text} />
-        </Pressable>
+        <View style={{ width: 40 }} />
       </View>
 
       <ScrollView
@@ -293,6 +314,49 @@ export function ProviderDashboardScreen() {
         }
       >
         {error ? <InlineError message={error} onRetry={() => void fetchAll()} /> : null}
+
+        <Pressable
+          onPress={() => navigation.navigate("ProviderEdit")}
+          accessibilityRole="button"
+          accessibilityLabel={t("providerDashboardEditProfile")}
+          style={{
+            flexDirection: rowDirectionForAppLayout(isRTL),
+            alignItems: "center",
+            gap: 12,
+            backgroundColor: colors.surface,
+            borderRadius: 16,
+            padding: 16,
+            marginBottom: 16,
+            borderWidth: 1,
+            borderColor: colors.borderLight,
+          }}
+        >
+          <View
+            style={{
+              width: 44,
+              height: 44,
+              borderRadius: 12,
+              backgroundColor: colors.primaryLight,
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <Ionicons name="create-outline" size={22} color={colors.primary} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={[{ fontSize: 16, fontWeight: "800", color: colors.text }, rtlText]}>
+              {t("providerDashboardEditProfile")}
+            </Text>
+            <Text style={[{ fontSize: 12, color: colors.textSecondary, marginTop: 4, lineHeight: 17 }, rtlText]}>
+              {t("providerDashboardEditProfileHint")}
+            </Text>
+          </View>
+          <Ionicons
+            name={isRTL ? "chevron-back" : "chevron-forward"}
+            size={20}
+            color={colors.textMuted}
+          />
+        </Pressable>
 
         {loading && !stats ? (
           <View className="pt-2">

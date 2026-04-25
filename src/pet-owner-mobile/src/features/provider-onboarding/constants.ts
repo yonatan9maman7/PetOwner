@@ -32,25 +32,37 @@ export const SERVICES: ServiceDef[] = [
   { serviceType: 8, pricingUnit: 0, nameKey: "serviceDoggyDayCare", unitKey: "perHour", icon: "sunny", bgColor: "rgba(233,226,209,0.25)", iconColor: "#242116" },
 ];
 
-/** Rover-style allowlist for individual sitters (per product spec). */
+/** Individual sitters: dog care + training + visits — not business catalog services. */
 const INDIVIDUAL_ALLOWED_SERVICE_TYPES = new Set([
-  0, // Dog Walking
-  2, // Boarding (at the sitter's home)
-  3, // Drop-in Visits
+  0, // DogWalking
+  2, // Boarding
+  3, // DropInVisit
   4, // Training
-  7, // House Sitting (at the owner's home)
-  8, // Doggy Day Care
+  7, // HouseSitting
+  8, // DoggyDayCare
 ]);
 
-/** Insurance, pet-store and pet-sitting are catalogued for business-style providers. */
-const BUSINESS_HIDDEN_SERVICE_TYPES = new Set([7, 8]);
+/** Business providers: catalog-style services only — no mixing with individual dog-walker services. */
+const BUSINESS_ALLOWED_SERVICE_TYPES = new Set([
+  1, // PetSitting
+  5, // Insurance
+  6, // PetStore
+]);
 
-/** Services shown in the onboarding services/packages UI. */
-export function servicesForOnboarding(providerType: number): ServiceDef[] {
+/**
+ * Services shown for a provider application type (`0` = individual, `1` = business).
+ * Use everywhere onboarding or edit UI lists selectable services.
+ */
+export function servicesForProviderType(providerType: number): ServiceDef[] {
   if (providerType === 1) {
-    return SERVICES.filter((s) => !BUSINESS_HIDDEN_SERVICE_TYPES.has(s.serviceType));
+    return SERVICES.filter((s) => BUSINESS_ALLOWED_SERVICE_TYPES.has(s.serviceType));
   }
   return SERVICES.filter((s) => INDIVIDUAL_ALLOWED_SERVICE_TYPES.has(s.serviceType));
+}
+
+/** @alias servicesForProviderType — kept for existing call sites. */
+export function servicesForOnboarding(providerType: number): ServiceDef[] {
+  return servicesForProviderType(providerType);
 }
 
 /** Service ids that require dog-size + capacity preferences. Mirrors API NeedsDogSizesAndCapacity. */

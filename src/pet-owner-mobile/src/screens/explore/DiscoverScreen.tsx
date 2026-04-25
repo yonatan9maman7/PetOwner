@@ -38,13 +38,28 @@ const STATIC_CHIPS: CategoryChip[] = [
   { id: "all", labelKey: "chipAll", icon: "apps", label: "" },
 ];
 
-type DiscoverNavParams = { providerTypeFilter?: ProviderType };
+type DiscoverNavParams = {
+  providerTypeFilter?: ProviderType;
+  /** When set (e.g. from Explore FAB), pins match the same viewport as the map. */
+  latitude?: number;
+  longitude?: number;
+  radiusKm?: number;
+};
 
-/** Normalize pin type (API JSON may use camelCase or PascalCase). */
+/** Service-type chips to hide in "businesses only" mode (solo / home services, not storefront businesses). */
+const INDIVIDUAL_SERVICE_CHIP_IDS = new Set([
+  "dog walker",
+  "drop-in visit",
+  "house sitting",
+  "doggy day care",
+]);
+
+/** Normalize pin type (API may send enum string with different casing or legacy numeric JSON). */
 function mapPinProviderType(p: MapPinDto): ProviderType {
-  const anyPin = p as MapPinDto & { ProviderType?: string };
-  const raw = String(anyPin.providerType ?? anyPin.ProviderType ?? "");
-  if (raw === ProviderType.Business) return ProviderType.Business;
+  const anyPin = p as MapPinDto & { ProviderType?: string | number };
+  const raw = String(anyPin.providerType ?? anyPin.ProviderType ?? "").trim().toLowerCase();
+  if (raw === "business" || raw === "1") return ProviderType.Business;
+  if (raw === "individual" || raw === "0") return ProviderType.Individual;
   return ProviderType.Individual;
 }
 
@@ -122,6 +137,9 @@ export function DiscoverScreen() {
   const navigation = useNavigation<any>();
   const route = useRoute<RouteProp<{ Discover: DiscoverNavParams | undefined }, "Discover">>();
   const providerTypeFilter = route.params?.providerTypeFilter;
+  const viewportLat = route.params?.latitude;
+  const viewportLng = route.params?.longitude;
+  const viewportRadiusKm = route.params?.radiusKm;
   const { colors } = useTheme();
   const { t, isRTL, rtlText, rtlInput } = useTranslation();
   const insets = useSafeAreaInsets();
@@ -142,10 +160,22 @@ export function DiscoverScreen() {
       const q = search?.trim();
       if (q) f.searchTerm = q;
       if (providerTypeFilter != null) f.providerType = providerTypeFilter;
+      if (
+        viewportLat != null &&
+        viewportLng != null &&
+        viewportRadiusKm != null &&
+        Number.isFinite(viewportLat) &&
+        Number.isFinite(viewportLng) &&
+        Number.isFinite(viewportRadiusKm)
+      ) {
+        f.latitude = viewportLat;
+        f.longitude = viewportLng;
+        f.radiusKm = viewportRadiusKm;
+      }
       if (Object.keys(f).length === 0) return undefined;
       return f;
     },
-    [providerTypeFilter],
+    [providerTypeFilter, viewportLat, viewportLng, viewportRadiusKm],
   );
 
   const loadProviders = useCallback(
@@ -179,7 +209,11 @@ export function DiscoverScreen() {
 
   /* ─── Category chips (All + dynamic from API) ─── */
   const chips: CategoryChip[] = useMemo(() => {
-    const dynamic: CategoryChip[] = serviceTypes.map((svc) => ({
+    const typesForChips =
+      providerTypeFilter === ProviderType.Business
+        ? serviceTypes.filter((svc) => !INDIVIDUAL_SERVICE_CHIP_IDS.has(svc.toLowerCase()))
+        : serviceTypes;
+    const dynamic: CategoryChip[] = typesForChips.map((svc) => ({
       id: svc.toLowerCase(),
       label: svc,
       icon: serviceIcon(svc),
@@ -188,7 +222,13 @@ export function DiscoverScreen() {
       { id: "all", labelKey: "chipAll" as TranslationKey, icon: "apps", label: "" },
       ...dynamic,
     ];
-  }, [serviceTypes]);
+  }, [serviceTypes, providerTypeFilter]);
+
+  /* If "businesses only" hides a chip, drop a stale selection (e.g. dog walker). */
+  useEffect(() => {
+    const ids = new Set(chips.map((c) => c.id));
+    if (!ids.has(selectedCategory)) setSelectedCategory("all");
+  }, [chips, selectedCategory]);
 
   const onCategoryPress = useCallback((id: string) => {
     setSelectedCategory(id);

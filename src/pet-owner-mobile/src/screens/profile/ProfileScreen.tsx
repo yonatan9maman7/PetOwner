@@ -198,17 +198,10 @@ export function ProfileScreen() {
 
   const [pendingIncomingBookings, setPendingIncomingBookings] = useState(0);
 
-  const [providerCTA, setProviderCTA] = useState<ProviderCTAState>(
-    isProvider ? "approved" : "loading",
-  );
+  const [providerCTA, setProviderCTA] = useState<ProviderCTAState>("loading");
 
   useFocusEffect(
     useCallback(() => {
-      if (isProvider) {
-        setProviderCTA("approved");
-        return;
-      }
-
       let cancelled = false;
       setProviderCTA("loading");
       providerApi
@@ -243,7 +236,7 @@ export function ProfileScreen() {
       return () => {
         cancelled = true;
       };
-    }, [isProvider]),
+    }, []),
   );
 
   useFocusEffect(
@@ -350,11 +343,10 @@ export function ProfileScreen() {
 
         {providerCTA === "pending" && (
           <NavyButton
-            label={t("onbPendingCta")}
-            icon="time-outline"
-            onPress={() => {}}
+            label={t("providerPendingEditCta")}
+            icon="create-outline"
+            onPress={() => navigation.navigate("ProviderEdit")}
             isRTL={isRTL}
-            disabled
           />
         )}
 

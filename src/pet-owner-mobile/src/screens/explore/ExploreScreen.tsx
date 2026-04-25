@@ -21,10 +21,11 @@ import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context"
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect, useNavigation, useRoute } from "@react-navigation/native";
 import * as Location from "expo-location";
-import {
-  BrandedAppHeader,
-  BRAND_HEADER_HORIZONTAL_PAD,
-} from "../../components/BrandedAppHeader";
+import { BRAND_HEADER_HORIZONTAL_PAD } from "../../components/BrandedAppHeader";
+
+/** Tight crop of `petcare-logo-transparent.png` (Explore header only). */
+const EXPLORE_HEADER_LOGO = require("../../../assets/petcare-logo-header-trimmed.png");
+const EXPLORE_HEADER_LOGO_ASPECT = 639 / 246;
 import { useTranslation, rowDirectionForAppLayout } from "../../i18n";
 import { useAuthStore } from "../../store/authStore";
 import { usePetsStore } from "../../store/petsStore";
@@ -47,25 +48,9 @@ import {
   EXPLORE_MAP_INITIAL_REGION,
   EXPLORE_MAP_PADDING,
   EXPLORE_USER_MARKER_ANCHOR,
+  isValidMapRegion,
+  viewportPinsSearchParamsFromRegion,
 } from "./exploreMapLayoutConstants";
-
-/** iOS MapKit often passes transient/invalid regions during gestures; guard all map math. */
-function isValidMapRegion(region: {
-  latitude?: unknown;
-  longitude?: unknown;
-  latitudeDelta?: unknown;
-  longitudeDelta?: unknown;
-}): boolean {
-  const lat = Number(region.latitude);
-  const lng = Number(region.longitude);
-  const dLat = Number(region.latitudeDelta);
-  const dLng = Number(region.longitudeDelta);
-  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return false;
-  if (lat < -90 || lat > 90 || lng < -180 || lng > 180) return false;
-  if (!Number.isFinite(dLat) || !Number.isFinite(dLng)) return false;
-  if (dLat <= 0 || dLng <= 0) return false;
-  return true;
-}
 
 /** Debounce for silent pin refresh after map gestures (reduces GET /map/pins churn while dragging). */
 const MAP_VIEWPORT_DEBOUNCE_MS = 500;
@@ -464,18 +449,12 @@ export function ExploreScreen() {
     } else {
       const raw = mapRegionRef.current;
       const region = isValidMapRegion(raw) ? raw : EXPLORE_MAP_INITIAL_REGION;
-      const latDelta = region.latitudeDelta / 2;
-      const lngDelta = region.longitudeDelta / 2;
-      // Distance from map center to a corner of the visible region, with extra padding so
-      // providers near the viewport edge are not dropped (projection vs SQL geography tolerance).
-      const diagKm =
-        Math.sqrt(
-          Math.pow(latDelta * 111, 2) +
-            Math.pow(lngDelta * 111 * Math.cos((region.latitude * Math.PI) / 180), 2),
-        ) * 1.38;
-      f.latitude = region.latitude;
-      f.longitude = region.longitude;
-      f.radiusKm = Math.max(1.75, Math.min(diagKm, 80));
+      const geo = viewportPinsSearchParamsFromRegion(region);
+      if (geo) {
+        f.latitude = geo.latitude;
+        f.longitude = geo.longitude;
+        f.radiusKm = geo.radiusKm;
+      }
     }
 
     return Object.keys(f).length > 0 ? f : undefined;
@@ -970,7 +949,49 @@ export function ExploreScreen() {
       </MapViewWrapper>
 
       <SafeAreaView edges={["top"]} style={{ zIndex: 10, marginTop: -8 }}>
-        <BrandedAppHeader />
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "space-between",
+            paddingHorizontal: BRAND_HEADER_HORIZONTAL_PAD,
+            paddingVertical: 10,
+            gap: 12,
+            backgroundColor: colors.surface,
+            shadowColor: colors.shadow,
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: 0.08,
+            shadowRadius: 8,
+            elevation: 4,
+          }}
+        >
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              flexShrink: 1,
+              minWidth: 0,
+              gap: 12,
+            }}
+          >
+            <View
+              style={{
+                backgroundColor: colors.brand,
+                borderRadius: 10,
+                paddingHorizontal: 4,
+                paddingVertical: 3,
+                justifyContent: "center",
+                alignItems: "center",
+              }}
+            >
+              <Image
+                source={EXPLORE_HEADER_LOGO}
+                style={{ height: 40, aspectRatio: EXPLORE_HEADER_LOGO_ASPECT }}
+                resizeMode="contain"
+              />
+            </View>
+          </View>
+        </View>
 
         <View className="mt-2" style={{ paddingHorizontal: BRAND_HEADER_HORIZONTAL_PAD }}>
           {/* Search bar */}
@@ -1217,9 +1238,18 @@ export function ExploreScreen() {
 
       {/* Discover Businesses FAB */}
       <Pressable
-        onPress={() =>
-          navigation.navigate("Discover", { providerTypeFilter: ProviderType.Business })
-        }
+        onPress={() => {
+          const raw = mapRegionRef.current;
+          const geo =
+            viewportPinsSearchParamsFromRegion(raw) ??
+            viewportPinsSearchParamsFromRegion(EXPLORE_MAP_INITIAL_REGION)!;
+          navigation.navigate("Discover", {
+            providerTypeFilter: ProviderType.Business,
+            latitude: geo.latitude,
+            longitude: geo.longitude,
+            radiusKm: geo.radiusKm,
+          });
+        }}
         style={{
           position: "absolute",
           bottom: selectedPin ? 230 : 120,

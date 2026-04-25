@@ -13,7 +13,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useFormContext } from "react-hook-form";
 import { useTranslation, rowDirectionForAppLayout } from "../../i18n";
 import { useTheme } from "../../theme/ThemeContext";
-import { servicesForOnboarding, DAY_FULL_KEYS } from "./constants";
+import { servicesForProviderType, DAY_FULL_KEYS } from "./constants";
 import { FieldLabel } from "./FieldLabel";
 import type { OnboardingFormValues } from "./schemas";
 
@@ -105,7 +105,7 @@ export function AvailabilityReviewStep() {
     ]);
   };
 
-  const enabledServices = servicesForOnboarding(providerType).filter((svc) => services[String(svc.serviceType)]?.enabled);
+  const enabledServices = servicesForProviderType(providerType).filter((svc) => services[String(svc.serviceType)]?.enabled);
 
   const summarySlots = sortSlotsForDisplay(slots);
 

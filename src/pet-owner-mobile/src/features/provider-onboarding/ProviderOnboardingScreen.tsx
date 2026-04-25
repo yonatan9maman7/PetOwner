@@ -8,7 +8,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useTranslation, rowDirectionForAppLayout } from "../../i18n";
 import { useTheme } from "../../theme/ThemeContext";
 import { providerApi } from "../../api/client";
-import { useAuthStore } from "../../store/authStore";
+import { useAuthStore, getUserInfoFromAccessToken } from "../../store/authStore";
 import { INDIVIDUAL_STEPS, BUSINESS_STEPS } from "./constants";
 import {
   createOnboardingFormSchema,
@@ -119,8 +119,14 @@ export function ProviderOnboardingScreen() {
     setSubmitting(true);
     try {
       const res = await providerApi.apply(payload);
-      if (res.newAccessToken && res.applicationId) {
-        await useAuthStore.getState().setAuth(res.newAccessToken, res.applicationId);
+      if (res.newAccessToken) {
+        const fromToken = getUserInfoFromAccessToken(res.newAccessToken);
+        const stableUserId =
+          fromToken?.id ||
+          useAuthStore.getState().user?.id ||
+          useAuthStore.getState().userId ||
+          "";
+        await useAuthStore.getState().setAuth(res.newAccessToken, stableUserId);
       }
       Alert.alert("", t("applicationSubmitted"), [
         { text: "OK", onPress: () => navigation.goBack() },
