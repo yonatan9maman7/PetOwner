@@ -3,12 +3,12 @@ import {
   View,
   Text,
   Pressable,
-  Alert,
   TextInput,
   ScrollView,
   Linking,
   ActivityIndicator,
 } from "react-native";
+import { showGlobalAlertCompat } from "../../../../components/global-modal";
 import { Ionicons } from "@expo/vector-icons";
 import * as DocumentPicker from "expo-document-picker";
 import { useTranslation, rowDirectionForAppLayout } from "../../../../i18n";
@@ -59,7 +59,7 @@ export function VaultSection({ petId, reloadNonce = 0 }: { petId: string; reload
   };
 
   const pickAttachment = () => {
-    Alert.alert(t("attachFile"), undefined, [
+    showGlobalAlertCompat(t("attachFile"), undefined, [
       {
         text: t("pickImage"),
         onPress: async () => {
@@ -85,7 +85,7 @@ export function VaultSection({ petId, reloadNonce = 0 }: { petId: string; reload
             setFormAttachmentUrl(res.url);
             setFormAttachmentName(uri.split("/").pop() ?? "photo");
           } catch {
-            Alert.alert(t("errorTitle"), t("genericError"));
+            showGlobalAlertCompat(t("errorTitle"), t("genericError"));
           }
           setUploading(false);
         },
@@ -104,7 +104,7 @@ export function VaultSection({ petId, reloadNonce = 0 }: { petId: string; reload
             setFormAttachmentUrl(res.url);
             setFormAttachmentName(result.assets[0].name ?? "document");
           } catch {
-            Alert.alert(t("errorTitle"), t("genericError"));
+            showGlobalAlertCompat(t("errorTitle"), t("genericError"));
           }
           setUploading(false);
         },
@@ -128,7 +128,7 @@ export function VaultSection({ petId, reloadNonce = 0 }: { petId: string; reload
       await load();
     } catch (e: any) {
       const msg = e?.response?.data?.message ?? e?.message ?? t("genericError");
-      Alert.alert(t("errorTitle"), msg);
+      showGlobalAlertCompat(t("errorTitle"), msg);
     }
     setSaving(false);
   };

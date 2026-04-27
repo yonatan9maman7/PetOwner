@@ -1,8 +1,8 @@
 import { useState, useEffect } from "react";
 import {
-  View, Text, ScrollView, Pressable, Image, ActivityIndicator,
-  Alert, StyleSheet,
+  View, Text, ScrollView, Pressable, Image, ActivityIndicator, StyleSheet,
 } from "react-native";
+import { showGlobalAlertCompat } from "../../../components/global-modal";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation, useRoute } from "@react-navigation/native";
@@ -45,11 +45,11 @@ export function PalProfileScreen() {
       });
     } catch (e: any) {
       if (e?.response?.status === 429)
-        Alert.alert(t("palsLimitReachedTitle"), t("palsLimitReachedBody"));
+        showGlobalAlertCompat(t("palsLimitReachedTitle"), t("palsLimitReachedBody"));
       else if (e?.response?.data?.code === "NoPetOnProfile")
-        Alert.alert(t("errorTitle"), t("palsNoPetGateSubtitle"));
+        showGlobalAlertCompat(t("errorTitle"), t("palsNoPetGateSubtitle"));
       else
-        Alert.alert(t("errorTitle"), t("playdateRequestError"));
+        showGlobalAlertCompat(t("errorTitle"), t("playdateRequestError"));
     } finally {
       setSending(false);
     }

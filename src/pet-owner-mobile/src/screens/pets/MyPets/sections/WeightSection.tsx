@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
-import { View, Text, Pressable, Alert, TextInput, ActivityIndicator } from "react-native";
+import { View, Text, Pressable, TextInput, ActivityIndicator } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useTranslation, type TranslationKey, rowDirectionForAppLayout } from "../../../../i18n";
 import type { ThemeColors } from "../../../../theme/ThemeContext";
@@ -9,6 +9,7 @@ import { DatePickerField } from "../../../../components/DatePickerField";
 import { ListSkeleton } from "../../../../components/shared/ListSkeleton";
 import type { WeightLogDto } from "../../../../types/api";
 import { formInputStyle } from "../helpers";
+import { showGlobalAlertCompat } from "../../../../components/global-modal";
 
 function formatAxisWeightKg(v: number): string {
   const r = Math.round(v * 10) / 10;
@@ -349,11 +350,11 @@ export function WeightSection({ petId, reloadNonce = 0 }: { petId: string; reloa
   const addWeight = async () => {
     const w = parseFloat(formWeight);
     if (!formWeight || isNaN(w) || w <= 0) {
-      Alert.alert(t("errorTitle"), t("weightMustBePositive"));
+      showGlobalAlertCompat(t("errorTitle"), t("weightMustBePositive"));
       return;
     }
     if (!formDate) {
-      Alert.alert(t("errorTitle"), t("dateRequired"));
+      showGlobalAlertCompat(t("errorTitle"), t("dateRequired"));
       return;
     }
     setSaving(true);
@@ -389,11 +390,11 @@ export function WeightSection({ petId, reloadNonce = 0 }: { petId: string; reloa
     if (!editingId) return;
     const w = parseFloat(editWeight);
     if (!editWeight || isNaN(w) || w <= 0) {
-      Alert.alert(t("errorTitle"), t("weightMustBePositive"));
+      showGlobalAlertCompat(t("errorTitle"), t("weightMustBePositive"));
       return;
     }
     if (!editDate) {
-      Alert.alert(t("errorTitle"), t("dateRequired"));
+      showGlobalAlertCompat(t("errorTitle"), t("dateRequired"));
       return;
     }
     setSaving(true);

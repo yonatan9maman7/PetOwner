@@ -4,12 +4,12 @@ import {
   Text,
   Pressable,
   ActivityIndicator,
-  Alert,
   BackHandler,
   Platform,
   Linking,
   StyleSheet,
 } from "react-native";
+import { showGlobalAlertCompat } from "../../components/global-modal";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { WebView } from "react-native-webview";
 import type { WebViewNavigation } from "react-native-webview";
@@ -57,7 +57,7 @@ export function PaymentCheckoutScreen() {
   }, []);
 
   const finishWithDelayedMessage = useCallback(() => {
-    Alert.alert(t("paymentTitle"), t("paymentSuccessDelayed"), [
+    showGlobalAlertCompat(t("paymentTitle"), t("paymentSuccessDelayed"), [
       { text: t("confirmAction"), onPress: () => navigation.goBack() },
     ]);
   }, [navigation, t]);
@@ -128,7 +128,7 @@ export function PaymentCheckoutScreen() {
           navigation.goBack();
           return true;
         }
-        Alert.alert(t("paymentTitle"), t("paymentLeaveConfirm"), [
+        showGlobalAlertCompat(t("paymentTitle"), t("paymentLeaveConfirm"), [
           { text: t("backStep"), style: "cancel" },
           {
             text: t("confirmAction"),

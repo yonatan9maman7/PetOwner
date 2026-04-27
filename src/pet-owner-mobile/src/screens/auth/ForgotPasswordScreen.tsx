@@ -8,11 +8,11 @@ import {
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
-  Alert,
   Animated,
   Easing,
   Image,
 } from "react-native";
+import { showGlobalAlertCompat } from "../../components/global-modal";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
@@ -90,14 +90,14 @@ export function ForgotPasswordScreen() {
 
   const handleForgotPassword = async () => {
     if (!email.trim()) {
-      Alert.alert(t("errorTitle"), t("fillAllFields"));
+      showGlobalAlertCompat(t("errorTitle"), t("fillAllFields"));
       return;
     }
 
     setLoading(true);
     try {
       await authApi.forgotPassword(email);
-      Alert.alert(t("resetSentTitle"), t("resetSentMessage"), [
+      showGlobalAlertCompat(t("resetSentTitle"), t("resetSentMessage"), [
         { text: "OK", onPress: () => navigation.goBack() },
       ]);
     } catch (err: unknown) {

@@ -6,11 +6,11 @@ import {
   ActivityIndicator,
   FlatList,
   TextInput,
-  Alert,
   ScrollView,
   Image,
   RefreshControl,
 } from "react-native";
+import { showGlobalAlertCompat } from "../../components/global-modal";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
@@ -228,7 +228,7 @@ export function AdminDashboardScreen() {
       await loadUsers();
       await loadStats();
     } catch {
-      Alert.alert("Error", "Failed to change role");
+      showGlobalAlertCompat("Error", "Failed to change role");
     }
     setActionLoading(null);
   };
@@ -239,7 +239,7 @@ export function AdminDashboardScreen() {
       await adminApi.toggleUserStatus(user.id);
       await loadUsers();
     } catch {
-      Alert.alert("Error", "Failed to toggle status");
+      showGlobalAlertCompat("Error", "Failed to toggle status");
     }
     setActionLoading(null);
   };
@@ -254,7 +254,7 @@ export function AdminDashboardScreen() {
       );
       await loadUsers();
     } catch {
-      Alert.alert("Error", "Failed to suspend provider");
+      showGlobalAlertCompat("Error", "Failed to suspend provider");
     }
     setActionLoading(null);
     setSuspendTarget(null);
@@ -262,7 +262,7 @@ export function AdminDashboardScreen() {
   };
 
   const banProvider = (user: AdminUserDto) => {
-    Alert.alert(t("ban"), t("deleteConfirm"), [
+    showGlobalAlertCompat(t("ban"), t("deleteConfirm"), [
       { text: t("cancel"), style: "cancel" },
       {
         text: t("ban"),
@@ -273,7 +273,7 @@ export function AdminDashboardScreen() {
             await adminApi.banProvider(user.id);
             await loadUsers();
           } catch {
-            Alert.alert("Error", "Failed to ban");
+            showGlobalAlertCompat("Error", "Failed to ban");
           }
           setActionLoading(null);
         },
@@ -287,7 +287,7 @@ export function AdminDashboardScreen() {
       await adminApi.reactivateProvider(user.id);
       await loadUsers();
     } catch {
-      Alert.alert("Error", "Failed to reactivate");
+      showGlobalAlertCompat("Error", "Failed to reactivate");
     }
     setActionLoading(null);
   };
@@ -295,7 +295,7 @@ export function AdminDashboardScreen() {
   /* ─── Pet actions ─── */
 
   const deletePet = (pet: AdminPetDto) => {
-    Alert.alert(t("deleteConfirm"), pet.name, [
+    showGlobalAlertCompat(t("deleteConfirm"), pet.name, [
       { text: t("cancel"), style: "cancel" },
       {
         text: t("delete"),
@@ -307,7 +307,7 @@ export function AdminDashboardScreen() {
             setPets((prev) => prev.filter((p) => p.id !== pet.id));
             await loadStats();
           } catch {
-            Alert.alert("Error", "Failed to delete pet");
+            showGlobalAlertCompat("Error", "Failed to delete pet");
           }
           setActionLoading(null);
         },
@@ -331,7 +331,7 @@ export function AdminDashboardScreen() {
                 JSON.stringify(e.response.data),
             )
           : "Failed to approve";
-      Alert.alert("Error", msg);
+      showGlobalAlertCompat("Error", msg);
     }
     setActionLoading(null);
   };
@@ -343,9 +343,9 @@ export function AdminDashboardScreen() {
     try {
       await adminApi.seedDemoData();
       await reloadAll();
-      Alert.alert("Done", "Demo data seeded");
+      showGlobalAlertCompat("Done", "Demo data seeded");
     } catch {
-      Alert.alert("Error", "Seed failed");
+      showGlobalAlertCompat("Error", "Seed failed");
     }
     setActionLoading(null);
   };
@@ -356,9 +356,9 @@ export function AdminDashboardScreen() {
       const res = await adminApi.seedBogusPets();
       await loadPets();
       await loadStats();
-      Alert.alert("Done", (res as any)?.message || "Pets seeded");
+      showGlobalAlertCompat("Done", (res as any)?.message || "Pets seeded");
     } catch {
-      Alert.alert("Error", "Seed failed");
+      showGlobalAlertCompat("Error", "Seed failed");
     }
     setActionLoading(null);
   };
@@ -368,9 +368,9 @@ export function AdminDashboardScreen() {
     try {
       await adminApi.clearSos();
       await loadStats();
-      Alert.alert("Done", "SOS cleared");
+      showGlobalAlertCompat("Done", "SOS cleared");
     } catch {
-      Alert.alert("Error", "Clear failed");
+      showGlobalAlertCompat("Error", "Clear failed");
     }
     setActionLoading(null);
   };
@@ -1508,7 +1508,7 @@ export function AdminDashboardScreen() {
         );
         await loadStats();
       } catch {
-        Alert.alert("Error", "Failed to mark as read");
+        showGlobalAlertCompat("Error", "Failed to mark as read");
       }
       setActionLoading(null);
     };

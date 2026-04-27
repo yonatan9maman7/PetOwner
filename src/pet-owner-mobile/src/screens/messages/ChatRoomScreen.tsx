@@ -9,8 +9,8 @@ import {
   Platform,
   BackHandler,
   Keyboard,
-  Alert,
 } from "react-native";
+import { showGlobalAlertCompat } from "../../components/global-modal";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useChatStore } from "../../store/chatStore";
@@ -89,7 +89,7 @@ export function ChatRoomScreen() {
       await sendMessage(otherUserId, content);
     } catch {
       setText(content);
-      Alert.alert(t("genericErrorTitle"), t("genericErrorDesc"));
+      showGlobalAlertCompat(t("genericErrorTitle"), t("genericErrorDesc"));
     }
   };
 

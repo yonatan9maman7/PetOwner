@@ -7,10 +7,10 @@ import {
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
-  Alert,
   BackHandler,
   ScrollView,
 } from "react-native";
+import { showGlobalAlertCompat } from "../../components/global-modal";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuthStore } from "../../store/authStore";
@@ -43,11 +43,11 @@ export function CompleteProfileScreen() {
     if (loading) return;
     const trimmed = phone.trim();
     if (!trimmed) {
-      Alert.alert(t("errorTitle"), t("phoneInvalidFormat"));
+      showGlobalAlertCompat(t("errorTitle"), t("phoneInvalidFormat"));
       return;
     }
     if (!PHONE_REGEX.test(trimmed)) {
-      Alert.alert(t("errorTitle"), t("phoneInvalidFormat"));
+      showGlobalAlertCompat(t("errorTitle"), t("phoneInvalidFormat"));
       return;
     }
 
@@ -74,7 +74,7 @@ export function CompleteProfileScreen() {
   };
 
   const handleLogout = async () => {
-    Alert.alert(
+    showGlobalAlertCompat(
       t("logoutButton"),
       t("completeProfileLogout"),
       [

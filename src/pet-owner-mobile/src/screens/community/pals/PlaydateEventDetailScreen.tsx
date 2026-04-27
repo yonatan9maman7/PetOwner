@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback } from "react";
 import {
-  View, Text, ScrollView, TextInput, Pressable, ActivityIndicator,
-  Alert, StyleSheet, KeyboardAvoidingView, Platform,
+  View, Text, ScrollView, TextInput, Pressable, ActivityIndicator, StyleSheet, KeyboardAvoidingView, Platform,
 } from "react-native";
+import { showGlobalAlertCompat } from "../../../components/global-modal";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation, useRoute } from "@react-navigation/native";
@@ -54,7 +54,7 @@ export function PlaydateEventDetailScreen() {
   };
 
   const cancelEvent = async () => {
-    Alert.alert(t("cancelEvent"), t("confirmCancelEvent"), [
+    showGlobalAlertCompat(t("cancelEvent"), t("confirmCancelEvent"), [
       { text: t("cancel"), style: "cancel" },
       {
         text: t("cancelEvent"), style: "destructive",
@@ -62,7 +62,7 @@ export function PlaydateEventDetailScreen() {
           try {
             await playdatesApi.cancel(eventId);
             navigation.goBack();
-          } catch { Alert.alert(t("errorTitle"), "Failed to cancel event."); }
+          } catch { showGlobalAlertCompat(t("errorTitle"), "Failed to cancel event."); }
         },
       },
     ]);

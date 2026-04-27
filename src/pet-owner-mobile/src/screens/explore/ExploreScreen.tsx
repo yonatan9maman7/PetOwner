@@ -12,7 +12,6 @@ import {
   Linking,
   Modal,
   Keyboard,
-  Alert,
   FlatList,
   InteractionManager,
 } from "react-native";

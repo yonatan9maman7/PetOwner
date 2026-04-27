@@ -6,10 +6,10 @@ import {
   Pressable,
   ActivityIndicator,
   RefreshControl,
-  Alert,
   Platform,
   useWindowDimensions,
 } from "react-native";
+import { showGlobalAlertCompat } from "../../components/global-modal";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
@@ -144,7 +144,7 @@ export function MyStatsScreen() {
 
       const canShare = await Sharing.isAvailableAsync();
       if (!canShare) {
-        Alert.alert(t("statsExportNotSupported"));
+        showGlobalAlertCompat(t("statsExportNotSupported"));
         return;
       }
       await Sharing.shareAsync(file.uri, {
@@ -154,7 +154,7 @@ export function MyStatsScreen() {
         UTI: "org.openxmlformats.spreadsheetml.sheet",
       });
     } catch {
-      Alert.alert(t("errorTitle"), t("statsExportFailed"));
+      showGlobalAlertCompat(t("errorTitle"), t("statsExportFailed"));
     } finally {
       setExporting(false);
     }

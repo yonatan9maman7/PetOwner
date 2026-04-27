@@ -4,12 +4,12 @@ import {
   Text,
   Pressable,
   Switch,
-  Alert,
   ScrollView,
   Linking,
   ActivityIndicator,
   Platform,
 } from "react-native";
+import { showGlobalAlertCompat } from "../../components/global-modal";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
@@ -143,9 +143,9 @@ export function NotificationSettingsScreen() {
     const handleSave = async () => {
     try {
       await store.save();
-      Alert.alert(t("notifSaved"));
+      showGlobalAlertCompat(t("notifSaved"));
     } catch {
-      Alert.alert("Error", "Could not save settings. Please try again.");
+      showGlobalAlertCompat("Error", "Could not save settings. Please try again.");
     }
   };
 

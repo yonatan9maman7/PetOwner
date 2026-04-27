@@ -5,13 +5,13 @@ import {
   ScrollView,
   Pressable,
   TextInput,
-  Alert,
   ActivityIndicator,
   Platform,
 } from "react-native";
+import { showGlobalAlertCompat } from "../../components/global-modal";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
-import { useNavigation, useRoute } from "@react-navigation/native";
+import { CommonActions, useNavigation, useRoute } from "@react-navigation/native";
 import { useTranslation, rowDirectionForAppLayout } from "../../i18n";
 import { useTheme } from "../../theme/ThemeContext";
 import { bookingsApi } from "../../api/client";
@@ -157,8 +157,33 @@ function serviceTypeToNumber(rate: any): number {
   return enumHit ? Number(enumHit[0]) : 0;
 }
 
-/** Switch to Profile → My Bookings (outgoing) from any stack that hosts `Booking`. */
+/** Reset current stack, then switch to Profile -> MyBookings (outgoing). */
 function navigateToMyBookingsOutgoing(navigation: { getParent: () => any }) {
+  const stack = navigation as any;
+  const stackRouteNames = stack.getState?.()?.routeNames as string[] | undefined;
+  if (stackRouteNames?.includes("ExploreMain")) {
+    stack.dispatch(
+      CommonActions.reset({
+        index: 0,
+        routes: [{ name: "ExploreMain" }],
+      }),
+    );
+  } else if (stackRouteNames?.includes("MyPetsMain")) {
+    stack.dispatch(
+      CommonActions.reset({
+        index: 0,
+        routes: [{ name: "MyPetsMain" }],
+      }),
+    );
+  } else if (stackRouteNames?.includes("ProfileMain")) {
+    stack.dispatch(
+      CommonActions.reset({
+        index: 0,
+        routes: [{ name: "ProfileMain" }],
+      }),
+    );
+  }
+
   let parent: any = navigation.getParent();
   while (parent) {
     const names = parent.getState?.()?.routeNames as string[] | undefined;
@@ -267,36 +292,36 @@ export function BookingScreen() {
   const handleSubmit = async () => {
     if (submitting) return;
     if (selectedRateIdx === null) {
-      Alert.alert(t("errorTitle"), t("selectServiceFirst"));
+      showGlobalAlertCompat(t("errorTitle"), t("selectServiceFirst"));
       return;
     }
     if (!startDate || !startTime) {
-      Alert.alert(t("errorTitle"), t("invalidDates"));
+      showGlobalAlertCompat(t("errorTitle"), t("invalidDates"));
       return;
     }
     if (startTimeInvalid) {
-      Alert.alert(t("errorTitle"), t("timeSlotUnavailable"));
+      showGlobalAlertCompat(t("errorTitle"), t("timeSlotUnavailable"));
       return;
     }
     const billingMode = getBillingMode(sr);
     if (billingMode === "perNight" && (!endDate || !endTime)) {
-      Alert.alert(t("errorTitle"), t("invalidDates"));
+      showGlobalAlertCompat(t("errorTitle"), t("invalidDates"));
       return;
     }
     if (billingMode !== "perNight" && !endTime) {
-      Alert.alert(t("errorTitle"), t("invalidDates"));
+      showGlobalAlertCompat(t("errorTitle"), t("invalidDates"));
       return;
     }
     const range = resolveBookingRange(startDate, startTime, endDate, endTime);
     if (!range) {
-      Alert.alert(t("errorTitle"), t("invalidDates"));
+      showGlobalAlertCompat(t("errorTitle"), t("invalidDates"));
       return;
     }
     const startISO = range.start.toISOString();
     const endISO = range.end.toISOString();
     const clientTotal = calculateBookingTotal(billingMode, sr?.rate ?? 0, range.start, range.end);
     if (clientTotal <= 0) {
-      Alert.alert(t("errorTitle"), t("invalidDates"));
+      showGlobalAlertCompat(t("errorTitle"), t("invalidDates"));
       return;
     }
 
@@ -312,7 +337,7 @@ export function BookingScreen() {
         endDate: endISO,
         notes: notes.trim() || undefined,
       });
-      Alert.alert(t("bookingSuccess"), t("bookingCreated"), [
+      showGlobalAlertCompat(t("bookingSuccess"), t("bookingCreated"), [
         {
           text: "OK",
           onPress: () => navigateToMyBookingsOutgoing(navigation),

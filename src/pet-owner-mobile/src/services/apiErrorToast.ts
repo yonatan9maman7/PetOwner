@@ -8,6 +8,25 @@ import type { NormalizedApiError } from "../utils/apiUtils";
  * Session-expired (401 + bearer) is handled separately in the interceptor.
  * Login/register 401 (no bearer) is handled on the auth screens.
  */
+function requestPath(config: InternalAxiosRequestConfig | undefined): string {
+  if (!config?.url) return "";
+  const u = config.url.replace(/\?.*$/, "");
+  return u.startsWith("/") ? u : `/${u}`;
+}
+
+/**
+ * GET /providers/me returns 404 when the user is not a provider yet — expected, not an error UX.
+ */
+function isExpectedNoProviderProfile404(
+  error: unknown,
+  config: InternalAxiosRequestConfig | undefined,
+): boolean {
+  if (!axios.isAxiosError(error) || error.response?.status !== 404) return false;
+  if ((config?.method ?? "get").toLowerCase() !== "get") return false;
+  const path = requestPath(config);
+  return path === "/providers/me";
+}
+
 export function shouldToastApiError(
   error: unknown,
   config: InternalAxiosRequestConfig | undefined,
@@ -16,6 +35,7 @@ export function shouldToastApiError(
   if (config.skipGlobalErrorToast) return false;
   if (config.backgroundRequest) return false;
   if (axios.isAxiosError(error) && error.response?.status === 401) return false;
+  if (isExpectedNoProviderProfile404(error, config)) return false;
   return true;
 }
 

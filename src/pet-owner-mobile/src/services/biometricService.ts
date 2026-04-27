@@ -1,6 +1,7 @@
-import { Alert, Platform } from "react-native";
+import { Platform } from "react-native";
 import * as LocalAuthentication from "expo-local-authentication";
 import * as SecureStore from "expo-secure-store";
+import { showGlobalAlert, showGlobalModal } from "../components/global-modal";
 
 const KEYS = {
   enabled: "bio_enabled",
@@ -23,7 +24,7 @@ function secureStoreErrorMessage(error: unknown): string {
 
 function showBiometricErrorAlert(error: unknown): void {
   const msg = secureStoreErrorMessage(error);
-  Alert.alert("Biometric Error", msg || "Unknown error");
+  showGlobalAlert("Biometric Error", msg || "Unknown error");
 }
 
 export type BiometricTypeLabel = "faceId" | "fingerprint" | "iris" | "generic";
@@ -54,9 +55,12 @@ function showDebugHardwareAlert(): Promise<void> {
         resolve();
         return;
       }
-      Alert.alert("Debug", `Hardware supported: ${supported}`, [
-        { text: "OK", onPress: () => resolve() },
-      ]);
+      showGlobalModal({
+        title: "Debug",
+        message: `Hardware supported: ${supported}`,
+        dismissible: false,
+        buttons: [{ text: "OK", role: "primary", onPress: () => resolve() }],
+      });
     })();
   });
 }

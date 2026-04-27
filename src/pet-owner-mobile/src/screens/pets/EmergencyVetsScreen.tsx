@@ -10,8 +10,8 @@ import {
   RefreshControl,
   Platform,
   StyleSheet,
-  Alert,
 } from "react-native";
+import { showGlobalAlertCompat } from "../../components/global-modal";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
@@ -84,7 +84,7 @@ export function EmergencyVetsScreen() {
         } else {
           setState("location-denied");
           if (showSettingsAlertWhenBlocked) {
-            Alert.alert(
+            showGlobalAlertCompat(
               t("locationPermissionAlertTitle"),
               t("locationPermissionAlertDesc"),
               [

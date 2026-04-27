@@ -6,12 +6,12 @@ import {
   Pressable,
   Modal,
   ActivityIndicator,
-  Alert,
   KeyboardAvoidingView,
   Platform,
   StyleSheet,
   ActionSheetIOS,
 } from "react-native";
+import { showGlobalAlertCompat } from "../../components/global-modal";
 import { FlashList } from "@shopify/flash-list";
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../../theme/ThemeContext";
@@ -151,7 +151,7 @@ export function CommentsBottomSheet({
       onCommentCountChange(-1);
       setReplyTarget(savedReply);
       setDraft(content);
-      Alert.alert(t("errorTitle"), t("commentError"));
+      showGlobalAlertCompat(t("errorTitle"), t("commentError"));
     }
     setSubmitting(false);
   };
@@ -182,7 +182,7 @@ export function CommentsBottomSheet({
       const r = await postsApi.editComment(commentId, content);
       setComments((prev) => editCommentInTree(prev, commentId, r.content, r.editedAt));
     } catch {
-      Alert.alert(t("errorTitle"), t("commentError"));
+      showGlobalAlertCompat(t("errorTitle"), t("commentError"));
     }
     setEditingId(null);
   };
@@ -190,7 +190,7 @@ export function CommentsBottomSheet({
   // ── Delete ───────────────────────────────────────────────────────────────────
 
   const deleteComment = (comment: CommentDto) => {
-    Alert.alert("", t("confirmDeleteComment"), [
+    showGlobalAlertCompat("", t("confirmDeleteComment"), [
       { text: t("cancel"), style: "cancel" },
       {
         text: t("deletePet"),
@@ -227,7 +227,7 @@ export function CommentsBottomSheet({
         },
       );
     } else {
-      Alert.alert("", comment.content.slice(0, 60), [
+      showGlobalAlertCompat("", comment.content.slice(0, 60), [
         { text: t("cancel"), style: "cancel" },
         { text: t("editComment"), onPress: () => startEdit(comment) },
         { text: t("deletePet"), style: "destructive", onPress: () => deleteComment(comment) },

@@ -1,8 +1,8 @@
 import { useState, useEffect } from "react";
 import {
-  View, Text, ScrollView, Pressable, ActivityIndicator,
-  Alert, StyleSheet,
+  View, Text, ScrollView, Pressable, ActivityIndicator, StyleSheet,
 } from "react-native";
+import { showGlobalAlertCompat } from "../../../components/global-modal";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation, useRoute } from "@react-navigation/native";
@@ -52,7 +52,7 @@ export function LiveBeaconDetailScreen() {
       await palsApi.endBeacon(beacon.id);
       navigation.goBack();
     } catch (e: any) {
-      Alert.alert(t("errorTitle"), "Could not end beacon.");
+      showGlobalAlertCompat(t("errorTitle"), "Could not end beacon.");
     } finally {
       setEnding(false);
     }
@@ -69,9 +69,9 @@ export function LiveBeaconDetailScreen() {
       });
     } catch (e: any) {
       if (e?.response?.status === 429)
-        Alert.alert(t("palsLimitReachedTitle"), t("palsLimitReachedBody"));
+        showGlobalAlertCompat(t("palsLimitReachedTitle"), t("palsLimitReachedBody"));
       else
-        Alert.alert(t("errorTitle"), t("playdateRequestError"));
+        showGlobalAlertCompat(t("errorTitle"), t("playdateRequestError"));
     }
   };
 

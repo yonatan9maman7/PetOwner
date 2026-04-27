@@ -6,8 +6,8 @@ import {
   Pressable,
   FlatList,
   ActivityIndicator,
-  Alert,
 } from "react-native";
+import { showGlobalAlertCompat } from "../../components/global-modal";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation, useRoute, useFocusEffect } from "@react-navigation/native";
@@ -355,7 +355,7 @@ export function GroupDetailScreen() {
       setNewPostContent("");
       setComposerOpen(false);
     } catch {
-      Alert.alert(t("errorTitle"), t("postError"));
+      showGlobalAlertCompat(t("errorTitle"), t("postError"));
     }
     setPosting(false);
   };

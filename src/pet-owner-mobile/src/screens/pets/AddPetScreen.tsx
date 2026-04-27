@@ -7,7 +7,6 @@ import {
   ScrollView,
   KeyboardAvoidingView,
   Platform,
-  Alert,
   Switch,
   ActivityIndicator,
   Image,
@@ -17,6 +16,7 @@ import {
   FlatList,
   StyleSheet,
 } from "react-native";
+import { showGlobalAlertCompat } from "../../components/global-modal";
 import ConfettiCannon from "react-native-confetti-cannon";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -281,7 +281,7 @@ export function AddPetScreen() {
       const list = getBreedsForSpecies(species);
       const match = findSimilarBreed(customBreedOther, list);
       if (match) {
-        Alert.alert(
+        showGlobalAlertCompat(
           t("breedMatchTitle"),
           t("breedMatchMessage").replace("{breed}", formatBreedForDisplay(match, t)),
           [
@@ -341,7 +341,7 @@ export function AddPetScreen() {
 
   const handleSave = async () => {
     if (!name.trim() || !age.trim() || species === null) {
-      Alert.alert(t("errorTitle"), t("fillAllFields"));
+      showGlobalAlertCompat(t("errorTitle"), t("fillAllFields"));
       return;
     }
     const microchipOk = await triggerMicrochipField("microchipNumber");
@@ -351,22 +351,22 @@ export function AddPetScreen() {
       breed === "Other" &&
       !customBreedOther.trim()
     ) {
-      Alert.alert(t("errorTitle"), t("validationCustomBreedRequired"));
+      showGlobalAlertCompat(t("errorTitle"), t("validationCustomBreedRequired"));
       return;
     }
     if (allergyMode === "has") {
       if (selectedAllergyIds.size === 0) {
-        Alert.alert(t("errorTitle"), t("validationAllergiesRequired"));
+        showGlobalAlertCompat(t("errorTitle"), t("validationAllergiesRequired"));
         return;
       }
       if (selectedAllergyIds.has("other") && !allergyOtherText.trim()) {
-        Alert.alert(t("errorTitle"), t("validationAllergyOtherRequired"));
+        showGlobalAlertCompat(t("errorTitle"), t("validationAllergyOtherRequired"));
         return;
       }
     }
     const trimmedVetPhone = vetPhone.trim();
     if (trimmedVetPhone && !isIsraeliBusinessPhoneValid(trimmedVetPhone)) {
-      Alert.alert(t("errorTitle"), t("validationPhoneInvalidBusiness"));
+      showGlobalAlertCompat(t("errorTitle"), t("validationPhoneInvalidBusiness"));
       return;
     }
     setSaving(true);
@@ -396,7 +396,7 @@ export function AddPetScreen() {
             imageUrl = url;
             setAvatarUri(url);
           } catch {
-            Alert.alert(t("errorTitle"), t("genericErrorDesc"));
+            showGlobalAlertCompat(t("errorTitle"), t("genericErrorDesc"));
             return;
           } finally {
             setAvatarUploading(false);
@@ -448,7 +448,7 @@ export function AddPetScreen() {
         e && typeof e === "object" && "message" in e && typeof (e as Error).message === "string"
           ? (e as Error).message
           : t("profileSaveError");
-      Alert.alert(t("errorTitle"), msg);
+      showGlobalAlertCompat(t("errorTitle"), msg);
     } finally {
       setSaving(false);
     }
@@ -457,10 +457,10 @@ export function AddPetScreen() {
   const handleDelete = () => {
     const allPets = usePetsStore.getState().pets;
     if (allPets.length <= 1) {
-      Alert.alert(t("errorTitle"), t("cannotDeleteLast"));
+      showGlobalAlertCompat(t("errorTitle"), t("cannotDeleteLast"));
       return;
     }
-    Alert.alert(t("softDeleteTitle"), t("softDeleteMessage"), [
+    showGlobalAlertCompat(t("softDeleteTitle"), t("softDeleteMessage"), [
       { text: t("softDeleteCancel"), style: "cancel" },
       {
         text: t("softDeleteConfirm"),
@@ -468,10 +468,10 @@ export function AddPetScreen() {
         onPress: async () => {
           try {
             await usePetsStore.getState().deletePet(petId!);
-            Alert.alert(t("petDeleted"));
+            showGlobalAlertCompat(t("petDeleted"));
             navigation.goBack();
           } catch {
-            Alert.alert(t("errorTitle"), t("profileSaveError"));
+            showGlobalAlertCompat(t("errorTitle"), t("profileSaveError"));
           }
         },
       },

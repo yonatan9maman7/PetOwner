@@ -8,11 +8,11 @@ import {
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
-  Alert,
   Animated,
   Easing,
   Image,
 } from "react-native";
+import { showGlobalAlertCompat } from "../../components/global-modal";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
@@ -112,15 +112,15 @@ export function RegisterScreen() {
       !password.trim() ||
       !confirmPassword.trim()
     ) {
-      Alert.alert(t("errorTitle"), t("fillAllFields"));
+      showGlobalAlertCompat(t("errorTitle"), t("fillAllFields"));
       return;
     }
     if (!termsAccepted) {
-      Alert.alert(t("errorTitle"), t("acceptTermsError"));
+      showGlobalAlertCompat(t("errorTitle"), t("acceptTermsError"));
       return;
     }
     if (password !== confirmPassword) {
-      Alert.alert(t("errorTitle"), t("passwordMismatch"));
+      showGlobalAlertCompat(t("errorTitle"), t("passwordMismatch"));
       return;
     }
 
@@ -134,7 +134,7 @@ export function RegisterScreen() {
         role: "Owner",
         languagePreference: language,
       });
-      Alert.alert(
+      showGlobalAlertCompat(
         "הרשמה הושלמה!",
         "החשבון שלך נוצר בהצלחה. כעת תוכל להתחבר.",
         [

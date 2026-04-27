@@ -18,6 +18,7 @@ import { useThemeStore } from "./src/store/themeStore";
 import { ThemeProvider, useTheme } from "./src/theme/ThemeContext";
 import { ErrorFallback } from "./src/components/ErrorFallback";
 import { ImageSourcePickerHost } from "./src/components/ImageSourcePickerHost";
+import { GlobalModalProvider } from "./src/components/global-modal";
 import { attachNotificationListeners, type TapPayload } from "./src/services/pushService";
 import { routeForNotification } from "./src/services/notificationRouter";
 import Toast from "react-native-toast-message";
@@ -172,7 +173,9 @@ export default function App() {
       <GestureHandlerRootView style={{ flex: 1 }}>
         <SafeAreaProvider>
           <ThemeProvider>
-            <AppInner />
+            <GlobalModalProvider>
+              <AppInner />
+            </GlobalModalProvider>
           </ThemeProvider>
         </SafeAreaProvider>
       </GestureHandlerRootView>

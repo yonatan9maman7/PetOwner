@@ -1,4 +1,4 @@
-import { View, Text, Image, Pressable, Alert, ScrollView, useWindowDimensions } from "react-native";
+import { View, Text, Image, Pressable, ScrollView, useWindowDimensions } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { BlurView } from "expo-blur";
@@ -8,6 +8,7 @@ import { usePetsStore } from "../../../../store/petsStore";
 import type { PetDto } from "../../../../types/api";
 import { getSpeciesEmoji } from "../constants";
 import { ALLERGY_LABEL_I18N, formatBreedForDisplay } from "../../addPetHelpers";
+import { showGlobalAlertCompat } from "../../../../components/global-modal";
 
 interface PetPassportCardProps {
   pet: PetDto;
@@ -47,7 +48,7 @@ export function PetPassportCard({
     options.push(t("deletePet"));
     options.push(t("softDeleteCancel"));
 
-    Alert.alert(
+    showGlobalAlertCompat(
       pet.name,
       undefined,
       [
@@ -60,7 +61,7 @@ export function PetPassportCard({
                   try {
                     await usePetsStore.getState().markFound(pet.id);
                   } catch {
-                    Alert.alert(t("errorTitle"));
+                    showGlobalAlertCompat(t("errorTitle"));
                   }
                 },
               },

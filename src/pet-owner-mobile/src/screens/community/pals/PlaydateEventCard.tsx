@@ -1,11 +1,12 @@
 import { useState, useRef } from "react";
-import { View, Text, Pressable, StyleSheet, Alert } from "react-native";
+import { View, Text, Pressable, StyleSheet} from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
 import type { PlaydateEventDto } from "../../../types/api";
 import { playdatesApi } from "../../../api/client";
 import { useTheme } from "../../../theme/ThemeContext";
 import { useTranslation, rowDirectionForAppLayout } from "../../../i18n";
+import { showGlobalAlertCompat } from "../../../components/global-modal";
 
 interface Props {
   event: PlaydateEventDto;
@@ -33,7 +34,7 @@ export function PlaydateEventCard({ event, onRsvpChange }: Props) {
       if (status !== "Going" && prevRsvp === "Going") setGoingCount((n) => Math.max(0, n - 1));
       onRsvpChange?.(event.id, status);
     } catch {
-      Alert.alert(t("genericErrorTitle"), t("genericErrorDesc"));
+      showGlobalAlertCompat(t("genericErrorTitle"), t("genericErrorDesc"));
     } finally {
       setRsvping(false);
       rsvpLockRef.current = false;

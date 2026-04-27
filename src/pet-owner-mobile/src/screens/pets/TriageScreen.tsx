@@ -8,11 +8,11 @@ import {
   FlatList,
   KeyboardAvoidingView,
   Platform,
-  Alert,
   ActivityIndicator,
   Linking,
   Image,
 } from "react-native";
+import { showGlobalAlertCompat } from "../../components/global-modal";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import {
@@ -272,7 +272,7 @@ export function TriageScreen() {
       setImageUri(uri);
       setImageBase64(base64);
     } catch {
-      Alert.alert(t("errorTitle"), t("genericErrorDesc"));
+      showGlobalAlertCompat(t("errorTitle"), t("genericErrorDesc"));
     } finally {
       setTriageImageProcessing(false);
     }
@@ -335,7 +335,7 @@ export function TriageScreen() {
       setMessages((prev) => [...prev, assistantMsg]);
       fetchNearbyVets(data.severity, data.isEmergency);
     } catch {
-      Alert.alert(t("errorTitle"), t("triageError"));
+      showGlobalAlertCompat(t("errorTitle"), t("triageError"));
     } finally {
       setAssessing(false);
       setTimeout(

@@ -1,8 +1,9 @@
-import { View, Text, Pressable, Alert } from "react-native";
+import { View, Text, Pressable} from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useTranslation, rowDirectionForAppLayout } from "../../../../i18n";
 import type { PetDto } from "../../../../types/api";
 import { usePetsStore } from "../../../../store/petsStore";
+import { showGlobalAlertCompat } from "../../../../components/global-modal";
 
 interface PetCardActionsProps {
   pet: PetDto;
@@ -70,7 +71,7 @@ export function PetCardActions({
       {pet.isLost && (
         <Pressable
           onPress={() => {
-            Alert.alert(t("markFoundBtn"), t("markFound") + "?", [
+            showGlobalAlertCompat(t("markFoundBtn"), t("markFound") + "?", [
               { text: t("cancel"), style: "cancel" },
               {
                 text: t("markFoundBtn"),
@@ -78,7 +79,7 @@ export function PetCardActions({
                   try {
                     await usePetsStore.getState().markFound(pet.id);
                   } catch {
-                    Alert.alert(t("errorTitle"));
+                    showGlobalAlertCompat(t("errorTitle"));
                   }
                 },
               },

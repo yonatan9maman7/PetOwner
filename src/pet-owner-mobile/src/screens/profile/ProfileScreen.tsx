@@ -1,5 +1,5 @@
 import { useState, useCallback } from "react";
-import { View, Text, ScrollView, ActivityIndicator, TouchableOpacity, Alert, Platform } from "react-native";
+import { View, Text, ScrollView, ActivityIndicator, TouchableOpacity, Platform } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation, useFocusEffect } from "@react-navigation/native";
@@ -11,6 +11,7 @@ import { useTranslation, rowDirectionForAppLayout } from "../../i18n";
 import { useTheme } from "../../theme/ThemeContext";
 import { BrandedAppHeader } from "../../components/BrandedAppHeader";
 import type { ProviderMeResponse } from "../../types/api";
+import { showGlobalAlertCompat } from "../../components/global-modal";
 
 /** Normalize API payload (camelCase + occasional PascalCase from proxies). */
 function readProviderStatusRaw(profile: ProviderMeResponse): string {
@@ -184,7 +185,7 @@ export function ProfileScreen() {
       if (window.confirm(t("logoutButton") + "?")) logout();
       return;
     }
-    Alert.alert(t("logoutConfirmation"), "", [
+    showGlobalAlertCompat(t("logoutConfirmation"), "", [
       { text: t("cancel"), style: "cancel" },
       { text: t("logoutButton"), style: "destructive", onPress: logout },
     ]);

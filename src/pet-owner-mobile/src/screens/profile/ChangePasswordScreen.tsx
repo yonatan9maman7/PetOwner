@@ -3,12 +3,12 @@ import {
   View,
   Text,
   TouchableOpacity,
-  Alert,
   ActivityIndicator,
   TextInput,
   KeyboardAvoidingView,
   Platform,
 } from "react-native";
+import { showGlobalAlertCompat } from "../../components/global-modal";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
@@ -45,7 +45,7 @@ export function ChangePasswordScreen() {
       biometricService.disable().catch(() => {});
       setSent(true);
     } catch {
-      Alert.alert(t("errorTitle"), t("genericError"));
+      showGlobalAlertCompat(t("errorTitle"), t("genericError"));
     }
     setSending(false);
   };

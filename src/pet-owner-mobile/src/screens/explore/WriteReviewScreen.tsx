@@ -8,8 +8,8 @@ import {
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
-  Alert,
 } from "react-native";
+import { showGlobalAlertCompat } from "../../components/global-modal";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation, useRoute, CommonActions } from "@react-navigation/native";
@@ -125,7 +125,7 @@ export function WriteReviewScreen() {
       providerId,
     );
     if (ok) {
-      Alert.alert(t("reviewSubmitSuccess"), t("reviewSubmitSuccessMessage"), [
+      showGlobalAlertCompat(t("reviewSubmitSuccess"), t("reviewSubmitSuccessMessage"), [
         { text: t("confirmAction"), onPress: () => navigation.goBack() },
       ]);
     }

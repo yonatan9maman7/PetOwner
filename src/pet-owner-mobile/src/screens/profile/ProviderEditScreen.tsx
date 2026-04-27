@@ -6,7 +6,6 @@ import {
   Pressable,
   ScrollView,
   Switch,
-  Alert,
   Platform,
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -14,6 +13,7 @@ import {
   Image,
   StyleSheet,
 } from "react-native";
+import { showGlobalAlertCompat } from "../../components/global-modal";
 import * as ImagePicker from "expo-image-picker";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -954,7 +954,7 @@ export function ProviderEditScreen() {
       const url = res.url;
       setProfileImageUrl(url);
     } catch {
-      Alert.alert(t("errorTitle"), t("genericErrorDesc"));
+      showGlobalAlertCompat(t("errorTitle"), t("genericErrorDesc"));
     } finally {
       setUploadingAvatar(false);
     }
@@ -987,7 +987,7 @@ export function ProviderEditScreen() {
       setAiGeneratedBio(result.bio);
       setShowAiPreview(true);
     } catch {
-      Alert.alert(t("errorTitle"), t("toastBioFail"));
+      showGlobalAlertCompat(t("errorTitle"), t("toastBioFail"));
     } finally {
       setGeneratingBio(false);
     }
@@ -1054,7 +1054,7 @@ export function ProviderEditScreen() {
         await providerApi.updateAvailability(value);
         setVisibleOnMap(value);
       } catch {
-        Alert.alert(t("errorTitle"), t("mapVisibilityUpdateError"));
+        showGlobalAlertCompat(t("errorTitle"), t("mapVisibilityUpdateError"));
       } finally {
         setTogglingMapVisibility(false);
       }
@@ -1090,32 +1090,32 @@ export function ProviderEditScreen() {
       );
       if (needsDogPrefs) {
         if (acceptedDogSizes.length === 0) {
-          Alert.alert(t("errorTitle"), t("acceptedSizesRequired"));
+          showGlobalAlertCompat(t("errorTitle"), t("acceptedSizesRequired"));
           setSaving(false);
           return;
         }
         const cap = Number(maxDogsCapacity);
         if (!maxDogsCapacity.trim() || isNaN(cap) || cap < 1) {
-          Alert.alert(t("errorTitle"), t("maxCapacityInvalid"));
+          showGlobalAlertCompat(t("errorTitle"), t("maxCapacityInvalid"));
           setSaving(false);
           return;
         }
       }
 
       if (isBusiness && !businessName.trim()) {
-        Alert.alert(t("errorTitle"), t("businessNameRequired"));
+        showGlobalAlertCompat(t("errorTitle"), t("businessNameRequired"));
         setSaving(false);
         return;
       }
 
       if (isNewProvider) {
         if (!phoneNumber.trim()) {
-          Alert.alert(t("errorTitle"), t("phoneRequired"));
+          showGlobalAlertCompat(t("errorTitle"), t("phoneRequired"));
           setSaving(false);
           return;
         }
         if (!isBusiness && selectedServices.length === 0) {
-          Alert.alert(t("errorTitle"), t("atLeastOneService"));
+          showGlobalAlertCompat(t("errorTitle"), t("atLeastOneService"));
           setSaving(false);
           return;
         }
@@ -1143,7 +1143,7 @@ export function ProviderEditScreen() {
         });
         setProviderStatus("Pending");
         const msg = t("applicationSubmitted");
-        if (Platform.OS === "web") { window.alert(msg); } else { Alert.alert(msg); }
+        showGlobalAlertCompat(msg);
       } else {
         await providerApi.updateProfile({
           bio,
@@ -1187,7 +1187,7 @@ export function ProviderEditScreen() {
         }
 
         const msg = t("profileSaved");
-        if (Platform.OS === "web") { window.alert(msg); } else { Alert.alert(msg); }
+        showGlobalAlertCompat(msg);
       }
     } catch (e: unknown) {
       showApiErrorToast(getNormalizedApiError(e), { title: t("errorTitle") });

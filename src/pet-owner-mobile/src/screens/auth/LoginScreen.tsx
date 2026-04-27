@@ -8,11 +8,11 @@ import {
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
-  Alert,
   Animated,
   Easing,
   Image,
 } from "react-native";
+import { showGlobalAlertCompat } from "../../components/global-modal";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
@@ -225,7 +225,7 @@ function LoginForm() {
   const handleLogin = async () => {
     if (loading) return;
     if (!email.trim() || !password.trim()) {
-      Alert.alert(t("errorTitle"), t("fillAllFields"));
+      showGlobalAlertCompat(t("errorTitle"), t("fillAllFields"));
       return;
     }
 
@@ -277,7 +277,7 @@ function LoginForm() {
   };
 
   const handleAppleSignIn = async () => {
-    Alert.alert("בפיתוח", "התחברות עם אפל תתאפשר בעדכון הבא");
+    showGlobalAlertCompat("בפיתוח", "התחברות עם אפל תתאפשר בעדכון הבא");
 
     // ── Sign in with Apple (restore when enrolled in Apple Developer Program) ──
     // try {
@@ -299,7 +299,7 @@ function LoginForm() {
     //   });
     //
     //   if (!credential.identityToken) {
-    //     Alert.alert(t("errorTitle"), t("socialLoginFailed"));
+    //     showGlobalAlertCompat(t("errorTitle"), t("socialLoginFailed"));
     //     return;
     //   }
     //
@@ -312,7 +312,7 @@ function LoginForm() {
     //   if (err.code === "ERR_REQUEST_CANCELED") {
     //     return; // silent cancel
     //   }
-    //   Alert.alert(t("errorTitle"), t("socialLoginFailed"));
+    //   showGlobalAlertCompat(t("errorTitle"), t("socialLoginFailed"));
     // }
   };
 

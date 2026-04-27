@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
-import { View, Pressable, Alert, ScrollView, RefreshControl, Text } from "react-native";
+import { View, Pressable, ScrollView, RefreshControl, Text } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
@@ -33,6 +33,7 @@ import { useActivePetSummary } from "./hooks/useActivePetSummary";
 import type { Section } from "./types";
 import { getNormalizedApiError } from "../../../utils/apiUtils";
 import { showApiErrorToast } from "../../../services/apiErrorToast";
+import { showGlobalAlertCompat } from "../../../components/global-modal";
 
 export function MyPetsScreen() {
   const isLoggedIn = useAuthStore((s) => s.isLoggedIn);
@@ -78,10 +79,10 @@ export function MyPetsScreen() {
   const handleDelete = (pet: PetDto) => {
     const allPets = usePetsStore.getState().pets;
     if (allPets.length <= 1) {
-      Alert.alert(t("errorTitle"), t("cannotDeleteLast"));
+      showGlobalAlertCompat(t("errorTitle"), t("cannotDeleteLast"));
       return;
     }
-    Alert.alert(t("softDeleteTitle"), t("softDeleteMessage"), [
+    showGlobalAlertCompat(t("softDeleteTitle"), t("softDeleteMessage"), [
       { text: t("softDeleteCancel"), style: "cancel" },
       {
         text: t("softDeleteConfirm"),
@@ -89,10 +90,10 @@ export function MyPetsScreen() {
         onPress: async () => {
           try {
             await usePetsStore.getState().deletePet(pet.id);
-            Alert.alert(t("petDeleted"));
+            showGlobalAlertCompat(t("petDeleted"));
             if (activePetIndex >= pets.length - 1) setActivePetIndex(Math.max(0, pets.length - 2));
           } catch {
-            Alert.alert(t("errorTitle"), t("profileSaveError"));
+            showGlobalAlertCompat(t("errorTitle"), t("profileSaveError"));
           }
         },
       },

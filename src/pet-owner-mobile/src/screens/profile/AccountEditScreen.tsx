@@ -5,12 +5,12 @@ import {
   TextInput,
   TouchableOpacity,
   ScrollView,
-  Alert,
   KeyboardAvoidingView,
   Platform,
   Image,
   ActivityIndicator,
 } from "react-native";
+import { showGlobalAlertCompat } from "../../components/global-modal";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
@@ -101,10 +101,10 @@ export function AccountEditScreen() {
         phone: phone.trim() || undefined,
       });
       await useAuthStore.getState().setAuth(res.token, res.userId);
-      Alert.alert(t("profileUpdated"));
+      showGlobalAlertCompat(t("profileUpdated"));
       navigation.goBack();
     } catch {
-      Alert.alert(t("genericError"));
+      showGlobalAlertCompat(t("genericError"));
     } finally {
       setSaving(false);
     }

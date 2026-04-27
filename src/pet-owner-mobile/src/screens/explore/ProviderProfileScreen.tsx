@@ -7,7 +7,6 @@ import {
   Pressable,
   ActivityIndicator,
   Linking,
-  Alert,
   Platform,
   Share,
   StyleSheet,
@@ -15,6 +14,7 @@ import {
   TextInput,
   KeyboardAvoidingView,
 } from "react-native";
+import { showGlobalAlertCompat } from "../../components/global-modal";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -278,7 +278,7 @@ export function ProviderProfileScreen() {
       };
     });
     setDirectReviewOpen(false);
-    Alert.alert(t("reviewSubmitSuccess"), t("reviewSubmitSuccessMessage"));
+    showGlobalAlertCompat(t("reviewSubmitSuccess"), t("reviewSubmitSuccessMessage"));
   }, [
     profile,
     directRating,
@@ -351,7 +351,7 @@ export function ProviderProfileScreen() {
       await Clipboard.setStringAsync(caption);
       const canShare = await Sharing.isAvailableAsync();
       if (!canShare) {
-        Alert.alert(t("errorTitle"), t("shareProviderNotSupported"));
+        showGlobalAlertCompat(t("errorTitle"), t("shareProviderNotSupported"));
         return;
       }
       await Sharing.shareAsync(out.uri, {
@@ -360,7 +360,7 @@ export function ProviderProfileScreen() {
         dialogTitle: t("shareProviderCardDialogTitle"),
       });
     } catch {
-      Alert.alert(t("errorTitle"), t("shareProviderCardFailed"));
+      showGlobalAlertCompat(t("errorTitle"), t("shareProviderCardFailed"));
     } finally {
       setShareCardBusy(false);
     }
@@ -368,7 +368,7 @@ export function ProviderProfileScreen() {
 
   const handleMessage = () => {
     if (!isLoggedIn) {
-      Alert.alert(t("loginRequiredSos"), t("loginToMessage"));
+      showGlobalAlertCompat(t("loginRequiredSos"), t("loginToMessage"));
       return;
     }
     navigation.navigate("ChatRoom", {

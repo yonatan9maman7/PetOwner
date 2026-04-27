@@ -1,4 +1,3 @@
-import { Alert } from "react-native";
 import * as LocalAuthentication from "expo-local-authentication";
 import * as SecureStore from "expo-secure-store";
 import {
@@ -9,18 +8,23 @@ import {
 jest.mock("expo-local-authentication");
 jest.mock("expo-secure-store");
 
+jest.mock("../components/global-modal", () => {
+  const actual = jest.requireActual<typeof import("../components/global-modal")>(
+    "../components/global-modal",
+  );
+  return {
+    ...actual,
+    showGlobalModal: jest.fn((opts: Parameters<typeof actual.showGlobalModal>[0]) => {
+      if (opts.title === "Debug" && opts.buttons?.[0]?.onPress) {
+        void opts.buttons[0].onPress();
+      }
+    }),
+  };
+});
+
 describe("biometricService", () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    jest.spyOn(Alert, "alert").mockImplementation((title, _message, buttons) => {
-      if (title === "Debug" && Array.isArray(buttons) && buttons[0]?.onPress) {
-        buttons[0].onPress();
-      }
-    });
-  });
-
-  afterEach(() => {
-    jest.restoreAllMocks();
   });
 
   it("authenticateAndGetCredentials returns null when the user fails the biometric prompt", async () => {

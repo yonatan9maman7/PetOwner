@@ -7,8 +7,8 @@ import {
   ScrollView,
   Image,
   ActivityIndicator,
-  Alert,
 } from "react-native";
+import { showGlobalAlertCompat } from "../../components/global-modal";
 import { Ionicons } from "@expo/vector-icons";
 import { useFormContext } from "react-hook-form";
 import { useTranslation, rowDirectionForAppLayout } from "../../i18n";
@@ -69,7 +69,7 @@ export function IdentityStep() {
       const { url } = await filesApi.uploadImage(uri, "profiles");
       setValue("imageUrl", url);
     } catch {
-      Alert.alert(t("errorTitle"), t("onbImageUploadError"));
+      showGlobalAlertCompat(t("errorTitle"), t("onbImageUploadError"));
       setValue("imageUri", "");
     } finally {
       setUploading(false);
@@ -86,7 +86,7 @@ export function IdentityStep() {
       const result = await providerApi.generateBio(notes);
       setValue("bio", result.bio);
     } catch {
-      Alert.alert(t("errorTitle"), t("toastBioFail"));
+      showGlobalAlertCompat(t("errorTitle"), t("toastBioFail"));
     } finally {
       setGeneratingBio(false);
     }

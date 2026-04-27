@@ -1,8 +1,9 @@
 import { useState, useCallback } from "react";
 import {
   View, Text, Modal, Pressable, TextInput, ScrollView,
-  ActivityIndicator, Alert, StyleSheet, KeyboardAvoidingView, Platform,
+  ActivityIndicator, StyleSheet, KeyboardAvoidingView, Platform,
 } from "react-native";
+import { showGlobalAlertCompat } from "../../../components/global-modal";
 import { Ionicons } from "@expo/vector-icons";
 import type { PalPetDto } from "../../../types/api";
 import { palsApi, petsApi } from "../../../api/client";
@@ -51,11 +52,11 @@ export function StartBeaconSheet({ visible, onClose, onStarted }: Props) {
 
   const start = async () => {
     if (!placeName.trim()) {
-      Alert.alert(t("errorTitle"), t("beaconPlacePlaceholder"));
+      showGlobalAlertCompat(t("errorTitle"), t("beaconPlacePlaceholder"));
       return;
     }
     if (selectedPetIds.length === 0) {
-      Alert.alert(t("errorTitle"), "Select at least one pet.");
+      showGlobalAlertCompat(t("errorTitle"), "Select at least one pet.");
       return;
     }
     setLoading(true);
@@ -73,7 +74,7 @@ export function StartBeaconSheet({ visible, onClose, onStarted }: Props) {
       onClose();
     } catch (e: any) {
       const msg = e?.response?.data?.message ?? t("beaconStartError");
-      Alert.alert(t("errorTitle"), msg);
+      showGlobalAlertCompat(t("errorTitle"), msg);
     } finally {
       setLoading(false);
     }

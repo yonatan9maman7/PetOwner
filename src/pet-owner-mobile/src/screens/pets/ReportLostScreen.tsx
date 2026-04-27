@@ -6,11 +6,11 @@ import {
   Pressable,
   ScrollView,
   ActivityIndicator,
-  Alert,
   KeyboardAvoidingView,
   Platform,
   Image,
 } from "react-native";
+import { showGlobalAlertCompat } from "../../components/global-modal";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import {
@@ -189,13 +189,13 @@ export function ReportLostScreen() {
 
   const handleSubmit = async () => {
     if (!selectedId) {
-      Alert.alert(t("errorTitle"), t("reportLostSelectPet"));
+      showGlobalAlertCompat(t("errorTitle"), t("reportLostSelectPet"));
       return;
     }
     const locText = lastSeenLocation.trim();
     const phone = contactPhone.trim();
     if (!locText || !phone) {
-      Alert.alert(t("errorTitle"), t("fillAllFields"));
+      showGlobalAlertCompat(t("errorTitle"), t("fillAllFields"));
       return;
     }
     setSubmitting(true);
@@ -206,7 +206,7 @@ export function ReportLostScreen() {
           const res = await filesApi.uploadImage(imageUri, "sos");
           uploadedImageUrl = res.url;
         } catch {
-          Alert.alert(t("errorTitle"), "Failed to upload image");
+          showGlobalAlertCompat(t("errorTitle"), "Failed to upload image");
           setSubmitting(false);
           return;
         }
@@ -221,10 +221,10 @@ export function ReportLostScreen() {
       });
       const err = usePetsStore.getState().error;
       if (err) {
-        Alert.alert(t("errorTitle"), err);
+        showGlobalAlertCompat(t("errorTitle"), String(err));
         return;
       }
-      Alert.alert("", t("reportSubmitted"), [
+      showGlobalAlertCompat("", t("reportSubmitted"), [
         { text: "OK", onPress: goBackToMyPets },
       ]);
     } finally {

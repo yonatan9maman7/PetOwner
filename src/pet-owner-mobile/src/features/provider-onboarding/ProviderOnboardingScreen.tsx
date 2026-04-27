@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { View, Text, Pressable, Alert, ActivityIndicator, KeyboardAvoidingView, Platform } from "react-native";
+import { View, Text, Pressable, ActivityIndicator, KeyboardAvoidingView, Platform } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
@@ -19,6 +19,7 @@ import {
   validateStep4,
   type OnboardingFormValues,
 } from "./schemas";
+import { showGlobalAlertCompat } from "../../components/global-modal";
 import { formToPayload } from "./helpers";
 import { ProgressBar } from "./ProgressBar";
 import { IdentityStep } from "./IdentityStep";
@@ -80,7 +81,7 @@ export function ProviderOnboardingScreen() {
       if (errorKey === "referenceContactOwnNumber") {
         methods.setError("referenceContact", { type: "validate", message: t(errorKey as any) });
       }
-      Alert.alert(t("errorTitle"), t(errorKey as any));
+      showGlobalAlertCompat(t("errorTitle"), t(errorKey as any));
       return;
     }
     if (!isLast) setStepIndex(stepIndex + 1);
@@ -110,7 +111,7 @@ export function ProviderOnboardingScreen() {
         if (errorKey === "referenceContactOwnNumber") {
           methods.setError("referenceContact", { type: "validate", message: t(errorKey as any) });
         }
-        Alert.alert(t("errorTitle"), t(errorKey as any));
+        showGlobalAlertCompat(t("errorTitle"), t(errorKey as any));
         return;
       }
     }
@@ -128,12 +129,12 @@ export function ProviderOnboardingScreen() {
           "";
         await useAuthStore.getState().setAuth(res.newAccessToken, stableUserId);
       }
-      Alert.alert("", t("applicationSubmitted"), [
+      showGlobalAlertCompat("", t("applicationSubmitted"), [
         { text: "OK", onPress: () => navigation.goBack() },
       ]);
     } catch (e: any) {
       const msg = e?.response?.data?.message || e?.message || t("genericError");
-      Alert.alert(t("errorTitle"), msg);
+      showGlobalAlertCompat(t("errorTitle"), msg);
     } finally {
       setSubmitting(false);
     }

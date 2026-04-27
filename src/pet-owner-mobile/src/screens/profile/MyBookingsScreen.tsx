@@ -5,9 +5,9 @@ import {
   FlatList,
   Pressable,
   ActivityIndicator,
-  Alert,
   RefreshControl,
 } from "react-native";
+import { showGlobalAlertCompat } from "../../components/global-modal";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation, useRoute, useFocusEffect } from "@react-navigation/native";
@@ -88,7 +88,7 @@ export function MyBookingsScreen() {
       await fetchMine({ silent });
       const err = useBookingsStore.getState().error;
       if (err) {
-        Alert.alert(tRef.current("genericErrorTitle"), err);
+        showGlobalAlertCompat(tRef.current("genericErrorTitle"), String(err));
         clearBookingError();
       }
       setRefreshing(false);
@@ -122,7 +122,7 @@ export function MyBookingsScreen() {
   const bookings = activeTab === "incoming" ? incoming : outgoing;
 
   const handleCancel = (booking: BookingDto) => {
-    Alert.alert(t("cancelBooking"), t("cancelBookingConfirm"), [
+    showGlobalAlertCompat(t("cancelBooking"), t("cancelBookingConfirm"), [
       { text: t("backStep"), style: "cancel" },
       {
         text: t("cancelBooking"),
@@ -130,7 +130,7 @@ export function MyBookingsScreen() {
         onPress: async () => {
           try {
             await bookingsApi.cancel(booking.id);
-            Alert.alert(t("bookingCancelled"));
+            showGlobalAlertCompat(t("bookingCancelled"));
             fetchBookings(true);
           } catch {
             /* error toast from global API interceptor */
@@ -141,14 +141,14 @@ export function MyBookingsScreen() {
   };
 
   const handleConfirm = (booking: BookingDto) => {
-    Alert.alert(t("confirmBookingAction"), undefined, [
+    showGlobalAlertCompat(t("confirmBookingAction"), undefined, [
       { text: t("backStep"), style: "cancel" },
       {
         text: t("confirmBookingAction"),
         onPress: async () => {
           try {
             await bookingsApi.confirm(booking.id);
-            Alert.alert(t("bookingConfirmed"));
+            showGlobalAlertCompat(t("bookingConfirmed"));
             fetchBookings(true);
           } catch {
             /* error toast from global API interceptor */
@@ -159,7 +159,7 @@ export function MyBookingsScreen() {
   };
 
   const handleDecline = (booking: BookingDto) => {
-    Alert.alert(t("declineBooking"), t("declineBookingConfirm"), [
+    showGlobalAlertCompat(t("declineBooking"), t("declineBookingConfirm"), [
       { text: t("backStep"), style: "cancel" },
       {
         text: t("declineBooking"),
@@ -167,7 +167,7 @@ export function MyBookingsScreen() {
         onPress: async () => {
           try {
             await bookingsApi.cancel(booking.id);
-            Alert.alert(t("bookingDeclined"));
+            showGlobalAlertCompat(t("bookingDeclined"));
             fetchBookings(true);
           } catch {
             /* error toast from global API interceptor */
@@ -178,7 +178,7 @@ export function MyBookingsScreen() {
   };
 
   const handleMarkComplete = (booking: BookingDto) => {
-    Alert.alert(t("markCompleted"), undefined, [
+    showGlobalAlertCompat(t("markCompleted"), undefined, [
       { text: t("backStep"), style: "cancel" },
       {
         text: t("markCompleted"),

@@ -4,7 +4,6 @@ import {
   Text,
   Pressable,
   ScrollView,
-  Alert,
   Switch,
   TouchableOpacity,
   Modal,
@@ -12,6 +11,7 @@ import {
   ActivityIndicator,
   Platform,
 } from "react-native";
+import { showGlobalAlertCompat } from "../../components/global-modal";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
@@ -199,9 +199,9 @@ function BiometricCard() {
     } catch (err: any) {
       const status = err?.response?.status;
       if (status === 401) {
-        Alert.alert(t("errorTitle"), t("biometricPasswordWrong"));
+        showGlobalAlertCompat(t("errorTitle"), t("biometricPasswordWrong"));
       } else if (err?.response) {
-        Alert.alert(
+        showGlobalAlertCompat(
           t("errorTitle"),
           err.response?.data?.message ?? t("loginError"),
         );
@@ -214,7 +214,7 @@ function BiometricCard() {
 
   /* ── Turn OFF ── */
   const handleDisable = () => {
-    Alert.alert(
+    showGlobalAlertCompat(
       t("biometricDisableConfirm"),
       "",
       [
@@ -325,12 +325,12 @@ export function SecurityScreen() {
   const { colors } = useTheme();
 
   const handleDeleteAccount = () => {
-    Alert.alert(t("deleteAccount"), t("deleteAccountWarning"), [
+    showGlobalAlertCompat(t("deleteAccount"), t("deleteAccountWarning"), [
       { text: t("cancel"), style: "cancel" },
       {
         text: t("deleteAccount"),
         style: "destructive",
-        onPress: () => Alert.alert(t("comingSoon")),
+        onPress: () => showGlobalAlertCompat(t("comingSoon")),
       },
     ]);
   };

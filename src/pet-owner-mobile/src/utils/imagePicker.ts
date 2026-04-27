@@ -1,10 +1,7 @@
-import {
-  ActionSheetIOS,
-  Alert,
-  Platform,
-} from "react-native";
+import { ActionSheetIOS, Platform } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import { translate } from "../i18n";
+import { showGlobalAlert } from "../components/global-modal";
 
 export type ImagePickerSourceLabels = {
   camera: string;
@@ -83,7 +80,7 @@ async function pickFromCamera(
   const { status } = await ImagePicker.requestCameraPermissionsAsync();
   if (status !== "granted") {
     if (permissionDeniedAlert) {
-      Alert.alert(permissionDeniedAlert.title, permissionDeniedAlert.message);
+      showGlobalAlert(permissionDeniedAlert.title, permissionDeniedAlert.message);
     }
     return null;
   }
@@ -98,7 +95,7 @@ async function pickFromGallery(
   const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
   if (status !== "granted") {
     if (permissionDeniedAlert) {
-      Alert.alert(permissionDeniedAlert.title, permissionDeniedAlert.message);
+      showGlobalAlert(permissionDeniedAlert.title, permissionDeniedAlert.message);
     }
     return null;
   }

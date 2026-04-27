@@ -6,9 +6,9 @@ import {
   Pressable,
   ScrollView,
   ActivityIndicator,
-  Alert,
   StyleSheet,
 } from "react-native";
+import { showGlobalAlertCompat } from "../../../components/global-modal";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
@@ -57,7 +57,7 @@ export function CreatePlaydateEventScreen() {
 
   const create = async () => {
     if (!canSubmit || !location) {
-      Alert.alert(t("errorTitle"), t("pickLocation"));
+      showGlobalAlertCompat(t("errorTitle"), t("pickLocation"));
       return;
     }
 
@@ -80,7 +80,7 @@ export function CreatePlaydateEventScreen() {
       navigation.goBack();
     } catch (e: any) {
       const msg = e?.response?.data?.message ?? "Failed to create event.";
-      Alert.alert(t("errorTitle"), msg);
+      showGlobalAlertCompat(t("errorTitle"), msg);
     } finally {
       setCreating(false);
     }

@@ -1,8 +1,9 @@
 import { useState, useEffect } from "react";
 import {
   View, Text, TextInput, Pressable, Switch, ScrollView,
-  ActivityIndicator, Alert, StyleSheet,
+  ActivityIndicator, StyleSheet,
 } from "react-native";
+import { showGlobalAlertCompat } from "../../../components/global-modal";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
@@ -62,13 +63,13 @@ export function PlaydatePrefsScreen() {
         includeAsProvider,
       };
       await palsApi.updateMyPrefs(dto);
-      Alert.alert("", t("palsPrefsSaved"));
+      showGlobalAlertCompat("", t("palsPrefsSaved"));
       navigation.goBack();
     } catch (e: any) {
       if (e?.response?.data?.code === "NoPetOnProfile")
-        Alert.alert(t("errorTitle"), t("palsNoPetGateSubtitle"));
+        showGlobalAlertCompat(t("errorTitle"), t("palsNoPetGateSubtitle"));
       else
-        Alert.alert(t("errorTitle"), "Failed to save preferences.");
+        showGlobalAlertCompat(t("errorTitle"), "Failed to save preferences.");
     } finally {
       setSaving(false);
     }

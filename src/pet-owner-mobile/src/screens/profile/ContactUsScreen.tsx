@@ -8,9 +8,9 @@ import {
   Linking,
   Platform,
   StyleSheet,
-  Alert,
   ActivityIndicator,
 } from "react-native";
+import { showGlobalAlertCompat } from "../../components/global-modal";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import * as Clipboard from "expo-clipboard";
@@ -31,11 +31,7 @@ type TopicId = "general" | "account" | "bug" | "billing";
 const TOPICS: TopicId[] = ["general", "account", "bug", "billing"];
 
 function showNotice(message: string) {
-  if (Platform.OS === "web") {
-    window.alert(message);
-    return;
-  }
-  Alert.alert("", message);
+  showGlobalAlertCompat("", message);
 }
 
 function GroupHeader({ label }: { label: string }) {
