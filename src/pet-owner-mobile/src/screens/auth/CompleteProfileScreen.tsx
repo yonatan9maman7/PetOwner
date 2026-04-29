@@ -5,7 +5,6 @@ import {
   TextInput,
   Pressable,
   KeyboardAvoidingView,
-  Platform,
   ActivityIndicator,
   BackHandler,
   ScrollView,
@@ -20,6 +19,7 @@ import { authApi } from "../../api/client";
 import { useTheme } from "../../theme/ThemeContext";
 import { getNormalizedApiError } from "../../utils/apiUtils";
 import { showApiErrorToast } from "../../services/apiErrorToast";
+import { useKeyboardAvoidingState } from "../../hooks/useKeyboardAvoidingState";
 
 const PHONE_REGEX = /^0(5[0-9])\d{7}$/;
 
@@ -32,6 +32,7 @@ export function CompleteProfileScreen() {
   const logout = useAuthStore((s) => s.logout);
   const { t, rtlText, rtlStyle, rtlRow, rtlInput, alignCls, isHebrew } = useTranslation();
   const { colors } = useTheme();
+  const { behavior: keyboardAvoidBehavior } = useKeyboardAvoidingState();
 
   /* Block Android hardware back button — user must complete or logout */
   useEffect(() => {
@@ -98,7 +99,7 @@ export function CompleteProfileScreen() {
     >
       <KeyboardAvoidingView
         className="flex-1"
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        behavior={keyboardAvoidBehavior}
       >
         <ScrollView
           className="flex-1"

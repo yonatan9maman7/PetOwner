@@ -6,7 +6,6 @@ import {
   TextInput,
   TouchableOpacity,
   KeyboardAvoidingView,
-  Platform,
   BackHandler,
   Keyboard,
 } from "react-native";
@@ -19,6 +18,7 @@ import { sendMessage } from "../../services/signalr";
 import { useTranslation } from "../../i18n";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import { useTheme } from "../../theme/ThemeContext";
+import { useKeyboardAvoidingState } from "../../hooks/useKeyboardAvoidingState";
 import type { ChatMessageDto } from "../../types/api";
 
 function formatTime(dateStr: string): string {
@@ -39,7 +39,7 @@ export function ChatRoomScreen() {
   const currentUserId = useAuthStore((s) => s.userId);
   const activeMessages = useChatStore((s) => s.activeMessages);
   const [text, setText] = useState("");
-  const [keyboardVisible, setKeyboardVisible] = useState(false);
+  const { behavior: keyboardAvoidBehavior, keyboardVisible } = useKeyboardAvoidingState();
   const insets = useSafeAreaInsets();
   const listRef = useRef<FlatList>(null);
 
@@ -64,22 +64,15 @@ export function ChatRoomScreen() {
 
   useEffect(() => {
     const sub = BackHandler.addEventListener("hardwareBackPress", () => {
+      if (keyboardVisible) {
+        Keyboard.dismiss();
+        return true;
+      }
       handleBack();
       return true;
     });
     return () => sub.remove();
-  }, [handleBack]);
-
-  useEffect(() => {
-    const showEvt = Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow";
-    const hideEvt = Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide";
-    const show = Keyboard.addListener(showEvt, () => setKeyboardVisible(true));
-    const hide = Keyboard.addListener(hideEvt, () => setKeyboardVisible(false));
-    return () => {
-      show.remove();
-      hide.remove();
-    };
-  }, []);
+  }, [handleBack, keyboardVisible]);
 
   const handleSend = async () => {
     const content = text.trim();
@@ -138,7 +131,7 @@ export function ChatRoomScreen() {
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background, marginTop: -8 }} edges={["top"]}>
       <KeyboardAvoidingView
         style={{ flex: 1 }}
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        behavior={keyboardAvoidBehavior}
         keyboardVerticalOffset={0}
       >
         <View
@@ -179,6 +172,7 @@ export function ChatRoomScreen() {
 
         <FlatList
           ref={listRef}
+          style={{ flex: 1 }}
           data={activeMessages}
           keyExtractor={(item) => item.id}
           renderItem={renderMessage}

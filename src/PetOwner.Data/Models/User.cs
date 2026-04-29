@@ -27,6 +27,7 @@ public class User
     public ICollection<Notification> Notifications { get; set; } = [];
     public ICollection<Booking> Bookings { get; set; } = [];
     public ICollection<GroupPost> GroupPosts { get; set; } = [];
+    public ICollection<GroupMember> GroupMemberships { get; set; } = [];
     public ICollection<UserPushToken> PushTokens { get; set; } = [];
     public UserNotificationPrefs? NotificationPrefs { get; set; }
     public PlaydatePrefs? PlaydatePrefs { get; set; }

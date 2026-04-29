@@ -21,9 +21,11 @@ const SELECTED_MARKER_Z_INDEX = 1000;
 /* ── Styles ─────────────────────────────────────────────────────────────── */
 
 const S = StyleSheet.create({
+  /** Extra horizontal padding + width: Android Google Maps clips custom marker bitmaps to a tight bounds; without slack, the paw circle reads as cut off on the leading edge. */
   markerRoot: {
-    width: 64,
+    width: 88,
     minHeight: 70,
+    paddingHorizontal: 12,
     alignItems: "center",
     backgroundColor: "transparent",
     overflow: "visible",
@@ -65,8 +67,9 @@ const S = StyleSheet.create({
     borderTopColor: "#1a1a2e",
   },
   markerRootCluster: {
-    width: 68,
+    width: 92,
     minHeight: 74,
+    paddingHorizontal: 12,
     alignItems: "center",
     backgroundColor: "transparent",
     overflow: "visible",

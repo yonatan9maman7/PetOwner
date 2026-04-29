@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import {
-  View, Text, ScrollView, TextInput, Pressable, ActivityIndicator, StyleSheet, KeyboardAvoidingView, Platform,
+  View, Text, ScrollView, TextInput, Pressable, ActivityIndicator, StyleSheet, KeyboardAvoidingView,
 } from "react-native";
 import { showGlobalAlertCompat } from "../../../components/global-modal";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -12,6 +12,7 @@ import { useTheme } from "../../../theme/ThemeContext";
 import { useTranslation, rowDirectionForAppLayout } from "../../../i18n";
 import { useAuthStore } from "../../../store/authStore";
 import { relativeTime, initials } from "./helpers";
+import { useKeyboardAvoidingState } from "../../../hooks/useKeyboardAvoidingState";
 
 export function PlaydateEventDetailScreen() {
   const { colors } = useTheme();
@@ -26,6 +27,7 @@ export function PlaydateEventDetailScreen() {
   const [loading, setLoading] = useState(true);
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
+  const { behavior: keyboardAvoidBehavior } = useKeyboardAvoidingState();
 
   const load = useCallback(async () => {
     try {
@@ -85,7 +87,7 @@ export function PlaydateEventDetailScreen() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={["top"]}>
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={keyboardAvoidBehavior}>
         {/* Header */}
         <View style={{ flexDirection: rowDirectionForAppLayout(isRTL), alignItems: "center", padding: 16, gap: 12 }}>
           <Pressable onPress={() => navigation.goBack()}>

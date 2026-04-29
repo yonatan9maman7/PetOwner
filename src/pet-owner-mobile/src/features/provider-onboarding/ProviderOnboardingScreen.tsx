@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { View, Text, Pressable, ActivityIndicator, KeyboardAvoidingView, Platform } from "react-native";
+import { View, Text, Pressable, ActivityIndicator, KeyboardAvoidingView } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
@@ -26,6 +26,7 @@ import { IdentityStep } from "./IdentityStep";
 import { ServicesStep } from "./ServicesStep";
 import { PackagesStep } from "./PackagesStep";
 import { AvailabilityReviewStep } from "./AvailabilityReviewStep";
+import { useKeyboardAvoidingState } from "../../hooks/useKeyboardAvoidingState";
 
 const STEP_VALIDATORS: Record<number, (v: OnboardingFormValues) => string | null> = {
   0: validateStep1,
@@ -46,6 +47,7 @@ export function ProviderOnboardingScreen() {
   const { t, isRTL, language } = useTranslation();
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
+  const { behavior: keyboardAvoidBehavior } = useKeyboardAvoidingState();
 
   const [stepIndex, setStepIndex] = useState(0);
   const [submitting, setSubmitting] = useState(false);
@@ -179,7 +181,7 @@ export function ProviderOnboardingScreen() {
         {/* Step Content */}
         <KeyboardAvoidingView
           style={{ flex: 1 }}
-          behavior={Platform.OS === "ios" ? "padding" : undefined}
+          behavior={keyboardAvoidBehavior}
           keyboardVerticalOffset={0}
         >
           <View style={{ flex: 1, paddingTop: 12 }}>

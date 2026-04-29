@@ -15,6 +15,7 @@ import { showGlobalAlertCompat } from "../../components/global-modal";
 import { FlashList } from "@shopify/flash-list";
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../../theme/ThemeContext";
+import { useKeyboardAvoidingState } from "../../hooks/useKeyboardAvoidingState";
 import { useTranslation, rowDirectionForAppLayout } from "../../i18n";
 import { useAuthStore } from "../../store/authStore";
 import { postsApi } from "../../api/client";
@@ -74,6 +75,7 @@ export function CommentsBottomSheet({
   const { t, rtlText, rtlRow, rtlInput, isRTL } = useTranslation();
   const me = useAuthStore((s) => s.user);
   const styles = getStyles(colors);
+  const { behavior: keyboardAvoidBehavior } = useKeyboardAvoidingState();
 
   const [comments, setComments] = useState<CommentDto[]>([]);
   const [loading, setLoading] = useState(false);
@@ -387,7 +389,7 @@ export function CommentsBottomSheet({
 
         <KeyboardAvoidingView
           style={styles.sheet}
-          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          behavior={keyboardAvoidBehavior}
           keyboardVerticalOffset={0}
         >
           {/* Drag handle + header */}

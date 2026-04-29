@@ -7,7 +7,6 @@ import {
   ScrollView,
   ActivityIndicator,
   KeyboardAvoidingView,
-  Platform,
   Image,
 } from "react-native";
 import { showGlobalAlertCompat } from "../../components/global-modal";
@@ -33,6 +32,7 @@ import { PetSpecies } from "../../types/api";
 import type { PetDto } from "../../types/api";
 import { getSpeciesEmoji } from "./MyPets/constants";
 import { pickImageWithSource } from "../../utils/imagePicker";
+import { useKeyboardAvoidingState } from "../../hooks/useKeyboardAvoidingState";
 
 const TEL_AVIV = {
   latitude: 32.0853,
@@ -104,6 +104,7 @@ export function ReportLostScreen() {
   const [mapRegion, setMapRegion] = useState(TEL_AVIV);
   const [locLoading, setLocLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const { behavior: keyboardAvoidBehavior } = useKeyboardAvoidingState();
 
   useEffect(() => {
     if (isLoggedIn) fetchPets();
@@ -307,7 +308,7 @@ export function ReportLostScreen() {
     >
       <KeyboardAvoidingView
         style={{ flex: 1 }}
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        behavior={keyboardAvoidBehavior}
       >
         {/* ── Header ── */}
         <View

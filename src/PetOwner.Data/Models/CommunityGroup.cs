@@ -13,4 +13,5 @@ public class CommunityGroup
     public string? TargetCity { get; set; }
 
     public ICollection<GroupPost> Posts { get; set; } = [];
+    public ICollection<GroupMember> Members { get; set; } = [];
 }

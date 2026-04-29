@@ -13,6 +13,8 @@ export interface CommunityGroup {
   targetCountry: string | null;
   targetCity: string | null;
   postCount: number;
+  memberCount: number;
+  joinedByMe: boolean;
 }
 
 export interface CreateGroupPayload {

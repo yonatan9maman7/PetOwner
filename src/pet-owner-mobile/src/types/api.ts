@@ -317,7 +317,9 @@ export interface ProviderMeResponse {
   isAvailableNow: boolean;
   acceptsOffHoursRequests: boolean;
   status: ProviderStatus;
-  type: ProviderType;
+  /** C# record serializes `ProviderType` as `providerType` in JSON. */
+  providerType?: string;
+  type?: ProviderType;
   businessName: string | null;
   services: string[];
   city: string;
@@ -613,6 +615,13 @@ export interface CommunityGroupDto {
   targetCountry?: string;
   targetCity?: string;
   postCount: number;
+  memberCount: number;
+  joinedByMe: boolean;
+}
+
+export interface GroupJoinResponse {
+  joined: boolean;
+  memberCount: number;
 }
 
 export interface GroupPostDto {

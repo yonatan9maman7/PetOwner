@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { View, Text, Pressable, KeyboardAvoidingView, Platform } from "react-native";
+import { View, Text, Pressable, KeyboardAvoidingView } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -7,6 +7,7 @@ import { useTranslation, rowDirectionForAppLayout } from "../../../i18n";
 import { useTheme } from "../../../theme/ThemeContext";
 import type { PetDto } from "../../../types/api";
 import { getSpeciesEmoji } from "../MyPets/constants";
+import { useKeyboardAvoidingState } from "../../../hooks/useKeyboardAvoidingState";
 
 interface ActivityLogSectionShellProps {
   pet: PetDto | null;
@@ -22,6 +23,7 @@ export function ActivityLogSectionShell({ pet, onBack, children }: ActivityLogSe
   const { t, isRTL } = useTranslation();
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
+  const { behavior: keyboardAvoidBehavior } = useKeyboardAvoidingState();
   const headerColor = colors.primary;
 
   return (
@@ -30,7 +32,7 @@ export function ActivityLogSectionShell({ pet, onBack, children }: ActivityLogSe
       style={{ backgroundColor: colors.background, marginTop: -8 }}
       edges={["top"]}
     >
-      <KeyboardAvoidingView className="flex-1" behavior={Platform.OS === "ios" ? "padding" : undefined}>
+      <KeyboardAvoidingView className="flex-1" behavior={keyboardAvoidBehavior}>
         <View
           style={{
             backgroundColor: headerColor,

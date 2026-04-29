@@ -21,13 +21,11 @@ import { useTranslation } from "../../i18n";
 import { LanguageToggle } from "../../components/LanguageToggle";
 import { authApi } from "../../api/client";
 import { useTheme } from "../../theme/ThemeContext";
+import { useKeyboardAvoidingState } from "../../hooks/useKeyboardAvoidingState";
 import { getNormalizedApiError } from "../../utils/apiUtils";
 import { showApiErrorToast } from "../../services/apiErrorToast";
 
 const AUTH_PETCARE_HERO_LOGO = require("../../../assets/petcare-logo-transparent.png");
-
-const KEYBOARD_AVOID_BEHAVIOR: "padding" | "height" =
-  Platform.OS === "ios" ? "padding" : "height";
 
 export function RegisterScreen() {
   const [fullName, setFullName] = useState("");
@@ -51,6 +49,7 @@ export function RegisterScreen() {
   const { t, language, isHebrew, rtlText, rtlStyle, rtlRow, rtlInput, alignCls } =
     useTranslation();
   const { colors } = useTheme();
+  const { behavior: keyboardAvoidBehavior } = useKeyboardAvoidingState();
 
   const heroBackgroundColor = "#081B3E";
   const LOGO_REVEAL_OPACITY_START = 0.35;
@@ -240,7 +239,7 @@ export function RegisterScreen() {
 
       <KeyboardAvoidingView
         style={{ flex: 1 }}
-        behavior={KEYBOARD_AVOID_BEHAVIOR}
+        behavior={keyboardAvoidBehavior}
         keyboardVerticalOffset={0}
       >
         <ScrollView

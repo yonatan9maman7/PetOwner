@@ -519,7 +519,9 @@ public class ProvidersController : ControllerBase
             profile.OpeningHours,
             profile.IsEmergencyService,
             profile.AcceptedDogSizes,
-            profile.MaxDogsCapacity
+            profile.MaxDogsCapacity,
+            profile.PhoneNumber ?? profile.User.Phone,
+            profile.BusinessName
         ));
     }
 

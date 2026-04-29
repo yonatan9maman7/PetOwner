@@ -32,6 +32,7 @@ public class ApplicationDbContext : DbContext
     public DbSet<ProviderServiceRate> ProviderServiceRates => Set<ProviderServiceRate>();
     public DbSet<Booking> Bookings => Set<Booking>();
     public DbSet<CommunityGroup> CommunityGroups => Set<CommunityGroup>();
+    public DbSet<GroupMember> GroupMembers => Set<GroupMember>();
     public DbSet<GroupPost> GroupPosts => Set<GroupPost>();
     public DbSet<GroupPostLike> GroupPostLikes => Set<GroupPostLike>();
     public DbSet<GroupPostComment> GroupPostComments => Set<GroupPostComment>();
@@ -73,6 +74,7 @@ public class ApplicationDbContext : DbContext
         ConfigureNotification(modelBuilder);
         ConfigureBooking(modelBuilder);
         ConfigureCommunityGroup(modelBuilder);
+        ConfigureGroupMember(modelBuilder);
         ConfigureGroupPost(modelBuilder);
         ConfigureFavoriteProvider(modelBuilder);
         ConfigureVaccination(modelBuilder);
@@ -969,6 +971,30 @@ public class ApplicationDbContext : DbContext
                 .HasMaxLength(100);
 
             entity.HasIndex(g => new { g.TargetCountry, g.TargetCity });
+        });
+    }
+
+    private static void ConfigureGroupMember(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<GroupMember>(entity =>
+        {
+            entity.HasKey(m => m.Id);
+
+            entity.Property(m => m.JoinedAt)
+                .HasDefaultValueSql("GETUTCDATE()");
+
+            entity.HasIndex(m => new { m.GroupId, m.UserId })
+                .IsUnique();
+
+            entity.HasOne(m => m.Group)
+                .WithMany(g => g.Members)
+                .HasForeignKey(m => m.GroupId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(m => m.User)
+                .WithMany(u => u.GroupMemberships)
+                .HasForeignKey(m => m.UserId)
+                .OnDelete(DeleteBehavior.Restrict);
         });
     }
 

@@ -6,7 +6,6 @@ import {
   Pressable,
   ScrollView,
   KeyboardAvoidingView,
-  Platform,
   ActivityIndicator,
   Animated,
   Easing,
@@ -23,6 +22,7 @@ import { authApi } from "../../api/client";
 import { getNormalizedApiError } from "../../utils/apiUtils";
 import { showApiErrorToast } from "../../services/apiErrorToast";
 import { useTheme } from "../../theme/ThemeContext";
+import { useKeyboardAvoidingState } from "../../hooks/useKeyboardAvoidingState";
 
 const AUTH_PETCARE_HERO_LOGO = require("../../../assets/petcare-logo-transparent.png");
 
@@ -36,6 +36,7 @@ export function ForgotPasswordScreen() {
   const { t, isHebrew, rtlText, rtlStyle, rtlRow, rtlInput, alignCls } =
     useTranslation();
   const { colors } = useTheme();
+  const { behavior: keyboardAvoidBehavior } = useKeyboardAvoidingState();
 
   const heroBackgroundColor = "#081B3E";
   const LOGO_REVEAL_OPACITY_START = 0.35;
@@ -174,7 +175,7 @@ export function ForgotPasswordScreen() {
 
       <KeyboardAvoidingView
         className="flex-1"
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        behavior={keyboardAvoidBehavior}
       >
         <ScrollView
           className="flex-1"

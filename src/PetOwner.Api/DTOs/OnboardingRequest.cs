@@ -115,7 +115,9 @@ public record ProviderMeResponse(
     string? OpeningHours,
     bool IsEmergencyService,
     List<DogSize> AcceptedDogSizes,
-    int? MaxDogsCapacity
+    int? MaxDogsCapacity,
+    string? PhoneNumber,
+    string? BusinessName
 );
 
 public record GenerateBioRequest([param: MaxLength(500)] string UserNotes);

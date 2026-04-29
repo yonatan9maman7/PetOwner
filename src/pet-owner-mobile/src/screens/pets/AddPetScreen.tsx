@@ -44,12 +44,10 @@ import { usePetsStore } from "../../store/petsStore";
 import { PetSpecies } from "../../types/api";
 import type { CreatePetRequest, UpdatePetRequest } from "../../types/api";
 import { pickImageWithSource } from "../../utils/imagePicker";
+import { useKeyboardAvoidingState } from "../../hooks/useKeyboardAvoidingState";
 import { isIsraeliBusinessPhoneValid } from "../../features/provider-onboarding/phoneUtils";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
-
-const KEYBOARD_AVOID_BEHAVIOR: "padding" | "height" =
-  Platform.OS === "ios" ? "padding" : "height";
 
 const CELEBRATION_AUTO_NAV_MS = 3000;
 
@@ -92,6 +90,7 @@ export function AddPetScreen() {
   const { t, isRTL, isHebrew, language } = useTranslation();
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
+  const { behavior: keyboardAvoidBehavior } = useKeyboardAvoidingState();
 
   const microchipSchema = useMemo(
     () =>
@@ -486,7 +485,7 @@ export function AddPetScreen() {
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background, marginTop: -8 }} edges={["top"]}>
       <KeyboardAvoidingView
         style={{ flex: 1 }}
-        behavior={KEYBOARD_AVOID_BEHAVIOR}
+        behavior={keyboardAvoidBehavior}
         keyboardVerticalOffset={0}
       >
         <BrandedAppHeader

@@ -25,7 +25,7 @@ import { BRAND_HEADER_HORIZONTAL_PAD } from "../../components/BrandedAppHeader";
 /** Tight crop of `petcare-logo-transparent.png` (Explore header only). */
 const EXPLORE_HEADER_LOGO = require("../../../assets/petcare-logo-header-trimmed.png");
 const EXPLORE_HEADER_LOGO_ASPECT = 639 / 246;
-import { useTranslation, rowDirectionForAppLayout } from "../../i18n";
+import { useTranslation, rowDirectionForAppLayout, type TranslationKey } from "../../i18n";
 import { getNormalizedApiError } from "../../utils/apiUtils";
 import { showApiErrorToast } from "../../services/apiErrorToast";
 import { useAuthStore } from "../../store/authStore";
@@ -61,11 +61,11 @@ const MARKER_TAP_VIEWPORT_SUPPRESS_MS = MAP_VIEWPORT_DEBOUNCE_MS + 450;
 
 const DISTANCE_OPTIONS = [
   { value: null, labelKey: "anyDistance" as const },
-  { value: 1, label: "1 km" },
-  { value: 3, label: "3 km" },
-  { value: 5, label: "5 km" },
-  { value: 10, label: "10 km" },
-  { value: 25, label: "25 km" },
+  { value: 1, labelKey: "distanceOption1km" as const },
+  { value: 3, labelKey: "distanceOption3km" as const },
+  { value: 5, labelKey: "distanceOption5km" as const },
+  { value: 10, labelKey: "distanceOption10km" as const },
+  { value: 25, labelKey: "distanceOption25km" as const },
 ];
 
 const SERVICE_ICONS: Record<string, { icon: string; active: string }> = {
@@ -95,6 +95,24 @@ const SERVICE_I18N_MAP: Record<string, string> = {
   "house sitting": "serviceHouseSitting",
   "doggy day care": "serviceDoggyDayCare",
 };
+
+/** Map API comma-separated English service labels to current locale (same keys as filter chips). */
+function translateServiceNamesCsv(
+  services: string | null | undefined,
+  t: (key: TranslationKey) => string,
+): string {
+  const raw = services?.trim();
+  if (!raw) return "";
+  return raw
+    .split(",")
+    .map((p) => p.trim())
+    .filter(Boolean)
+    .map((part) => {
+      const key = SERVICE_I18N_MAP[part.toLowerCase()] as TranslationKey | undefined;
+      return key ? t(key) : part;
+    })
+    .join(", ");
+}
 
 function getServiceIcon(name: string, isActive: boolean) {
   const entry = SERVICE_ICONS[name.toLowerCase()];
@@ -606,7 +624,7 @@ export function ExploreScreen() {
           });
         }
       } finally {
-        if (gen === pinsFetchGenRef.current && showLoading) {
+        if (gen === pinsFetchGenRef.current) {
           setLoading(false);
         }
       }
@@ -828,7 +846,6 @@ export function ExploreScreen() {
     setSelectedPin(null);
     setSelectedPlaydate(null);
     setCollocatedChooserPins(null);
-    setShowFilterPanel(false);
     setTimeout(() => loadPinsRef.current(), 0);
   }, []);
 
@@ -885,6 +902,10 @@ export function ExploreScreen() {
       setCollocatedChooserPins(null);
     }
   }, []);
+
+  const bottomActionOffset = selectedPin ? 132 : 16;
+  const locationButtonOffset = selectedPin ? 194 : 78;
+  const selectedPinCardOffset = 16;
 
   /* ═════════════════════ RENDER ═════════════════════ */
 
@@ -1203,7 +1224,7 @@ export function ExploreScreen() {
         }}
         style={{
           position: "absolute",
-          bottom: selectedPin ? 290 : 180,
+          bottom: locationButtonOffset,
           ...(isRTL ? { left: 20 } : { right: 20 }),
           width: 46,
           height: 46,
@@ -1242,7 +1263,7 @@ export function ExploreScreen() {
         }}
         style={{
           position: "absolute",
-          bottom: selectedPin ? 230 : 120,
+          bottom: bottomActionOffset,
           alignSelf: isRTL ? "flex-start" : "flex-end",
           ...(isRTL ? { left: 20 } : { right: 20 }),
           flexDirection: rowDirectionForAppLayout(isRTL),
@@ -1282,7 +1303,7 @@ export function ExploreScreen() {
         }}
         style={{
           position: "absolute",
-          bottom: selectedPin ? 230 : 120,
+          bottom: bottomActionOffset,
           ...(isRTL ? { right: 20 } : { left: 20 }),
           alignItems: "center",
           zIndex: 18,
@@ -1321,7 +1342,7 @@ export function ExploreScreen() {
       {selectedPin && (
         <View
           className="absolute left-0 right-0"
-          style={{ bottom: 110, zIndex: 20, paddingHorizontal: BRAND_HEADER_HORIZONTAL_PAD }}
+          style={{ bottom: selectedPinCardOffset, zIndex: 20, paddingHorizontal: BRAND_HEADER_HORIZONTAL_PAD }}
         >
           <View
             className="p-4 rounded-xl flex-row items-center gap-4"
@@ -1383,7 +1404,7 @@ export function ExploreScreen() {
                 numberOfLines={1}
                 style={{ color: colors.textSecondary }}
               >
-                {selectedPin.services}
+                {translateServiceNamesCsv(selectedPin.services, t)}
               </Text>
 
               {selectedPin.reviewCount > 0 && (
@@ -1596,8 +1617,9 @@ export function ExploreScreen() {
               contentContainerStyle={{ paddingTop: 8, paddingBottom: 4 }}
               renderItem={({ item: pin }) => {
                 const servicesLine = pin.services?.trim();
-                const servicesDisplay =
-                  servicesLine || t("mapCollocatedServicesPlaceholder");
+                const servicesDisplay = servicesLine
+                  ? translateServiceNamesCsv(pin.services, t)
+                  : t("mapCollocatedServicesPlaceholder");
                 const rate =
                   typeof pin.minRate === "number" && Number.isFinite(pin.minRate)
                     ? pin.minRate
@@ -1930,6 +1952,7 @@ export function ExploreScreen() {
                 <View
                   style={{
                     flexDirection: rowDirectionForAppLayout(isRTL),
+                    flexWrap: "wrap",
                     gap: 8,
                   }}
                 >
@@ -2012,8 +2035,7 @@ export function ExploreScreen() {
                     const isActive =
                       opt.value === filterRadiusKm ||
                       (opt.value === null && filterRadiusKm === null);
-                    const label =
-                      "labelKey" in opt ? t(opt.labelKey as any) : opt.label!;
+                    const label = t(opt.labelKey);
                     return (
                       <Pressable
                         key={String(opt.value)}

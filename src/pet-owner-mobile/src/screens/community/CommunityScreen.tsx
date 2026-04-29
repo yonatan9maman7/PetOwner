@@ -12,20 +12,26 @@ import {
   ScrollView,
   FlatList,
   KeyboardAvoidingView,
-  Platform,
+  type KeyboardAvoidingViewProps,
   Share,
+  StatusBar,
 } from "react-native";
 import { showGlobalAlertCompat } from "../../components/global-modal";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
+import * as Location from "expo-location";
 import { useAuthStore } from "../../store/authStore";
+import { usePetsStore } from "../../store/petsStore";
 import { useTranslation, rowDirectionForAppLayout } from "../../i18n";
 import { useTheme } from "../../theme/ThemeContext";
 import { AuthPlaceholder } from "../../components/AuthPlaceholder";
 import { BrandedAppHeader } from "../../components/BrandedAppHeader";
+import { DatePickerField } from "../../components/DatePickerField";
 import { ListSkeleton, ListEmptyState } from "../../components/shared";
+import { TimePickerField } from "../../components/TimePickerField";
 import { ImageLightbox } from "../../components/ImageLightbox";
+import { MapViewWrapper, MarkerWrapper } from "../../components/MapViewWrapper";
 import { CommentsBottomSheet } from "./CommentsBottomSheet";
 import {
   postsApi,
@@ -44,6 +50,9 @@ import type {
   RsvpStatusValue,
 } from "../../types/api";
 import { pickImageWithSource } from "../../utils/imagePicker";
+import { formatBreedForDisplay } from "../pets/addPetHelpers";
+import { fetchNearbyDogParks, geocodeAddress } from "../../api/googlePlaces";
+import { useKeyboardAvoidingState } from "../../hooks/useKeyboardAvoidingState";
 
 const PAGE_SIZE = 20;
 
@@ -55,7 +64,8 @@ type FeedFilter =
   | "Recommendations"
   | "Dog Parks"
   | "Lost & Found"
-  | "Events";
+  | "Events"
+  | "Groups";
 type PostKind =
   | "Cute moment"
   | "Question"
@@ -79,7 +89,11 @@ interface PostMeta {
 
 interface DogPark {
   id: string;
+  placeId?: string;
   name: string;
+  address?: string;
+  latitude: number;
+  longitude: number;
   distance: string;
   rating: number;
   activity: "Low" | "Medium" | "High";
@@ -90,19 +104,6 @@ interface DogPark {
   peakHours: string;
 }
 
-interface LocalEvent {
-  id: string;
-  name: string;
-  organizer: string;
-  dateTime: string;
-  location: string;
-  price: string;
-  spotsLeft: number;
-  description: string;
-  attendingDogs: number;
-  joined: boolean;
-}
-
 const FEED_FILTERS: FeedFilter[] = [
   "Nearby",
   "Playdates",
@@ -111,6 +112,7 @@ const FEED_FILTERS: FeedFilter[] = [
   "Dog Parks",
   "Lost & Found",
   "Events",
+  "Groups",
 ];
 
 const POST_TYPES: PostKind[] = [
@@ -133,38 +135,38 @@ const VISIBILITY_OPTIONS: Visibility[] = [
 const demoPostMeta: Record<string, PostMeta> = {
   "demo-post-1": {
     kind: "Playdate",
-    location: "Park Hayarkon",
-    dogName: "Mika",
+    location: "פארק הירקון",
+    dogName: "מיקה",
     visibility: "Nearby only",
     tags: ["evening", "friendly"],
     isDemo: true,
   },
   "demo-post-2": {
     kind: "Question",
-    location: "Tel Aviv",
-    dogName: "Bamba",
+    location: "תל אביב",
+    dogName: "במבה",
     visibility: "Public",
     tags: ["training"],
     isDemo: true,
   },
   "demo-post-3": {
     kind: "Recommendation",
-    location: "Dubnov Park",
+    location: "גינת דובנוב",
     visibility: "Public",
     tags: ["dog-park"],
     isDemo: true,
   },
   "demo-post-4": {
     kind: "Playdate",
-    location: "Gan Meir",
-    dogName: "Luna",
+    location: "גן מאיר",
+    dogName: "לונה",
     visibility: "Nearby only",
     tags: ["small-dogs"],
     isDemo: true,
   },
   "demo-post-5": {
     kind: "Lost & Found",
-    location: "Dizengoff Center",
+    location: "דיזנגוף סנטר",
     visibility: "Public",
     tags: ["lost-dog"],
     isDemo: true,
@@ -175,8 +177,8 @@ const DEMO_POSTS: PostDto[] = [
   {
     id: "demo-post-1",
     userId: "demo-user-mika",
-    userName: "Mika and Noa",
-    content: "Mika is looking for friends to play with today at Park Hayarkon at 18:30.",
+    userName: "מיקה ונועה",
+    content: "מיקה מחפשת חברים למשחק היום בגינת פארק הירקון בשעה 18:30. מי מצטרף?",
     likeCount: 18,
     commentCount: 4,
     likedByMe: false,
@@ -188,8 +190,8 @@ const DEMO_POSTS: PostDto[] = [
   {
     id: "demo-post-2",
     userId: "demo-user-bamba",
-    userName: "Amit Cohen",
-    content: "Does anyone know a good trainer for an energetic Labrador?",
+    userName: "עמית כהן",
+    content: "מישהו מכיר מאלף טוב ללברדור אנרגטי באזור תל אביב?",
     likeCount: 9,
     commentCount: 7,
     likedByMe: false,
@@ -201,8 +203,8 @@ const DEMO_POSTS: PostDto[] = [
   {
     id: "demo-post-3",
     userId: "demo-user-park",
-    userName: "Dubnov Dog Crew",
-    content: "Dog park update: the water fountain at Dubnov Park is working again.",
+    userName: "חברי גינת דובנוב",
+    content: "עדכון מגינת דובנוב: הברזייה חזרה לעבוד.",
     likeCount: 31,
     commentCount: 3,
     likedByMe: true,
@@ -214,8 +216,8 @@ const DEMO_POSTS: PostDto[] = [
   {
     id: "demo-post-4",
     userId: "demo-user-luna",
-    userName: "Luna Meetup",
-    content: "Looking for small dogs meetup this Friday.",
+    userName: "מפגש לונה",
+    content: "מחפשים מפגש כלבים קטנים ביום שישי.",
     likeCount: 14,
     commentCount: 5,
     likedByMe: false,
@@ -227,8 +229,8 @@ const DEMO_POSTS: PostDto[] = [
   {
     id: "demo-post-5",
     userId: "demo-user-lost",
-    userName: "Community Alert",
-    content: "Lost dog notice near Dizengoff Center. Brown mixed breed, red collar.",
+    userName: "התראת קהילה",
+    content: "כלב אבד באזור דיזנגוף סנטר, אשמח לעזרה.",
     likeCount: 42,
     commentCount: 11,
     likedByMe: false,
@@ -242,11 +244,14 @@ const DEMO_POSTS: PostDto[] = [
 const DEMO_PARKS: DogPark[] = [
   {
     id: "park-hayarkon",
-    name: "Park Hayarkon Dog Run",
+    name: "גינת הכלבים פארק הירקון",
+    address: "פארק הירקון, תל אביב",
+    latitude: 32.1047,
+    longitude: 34.8158,
     distance: "1.2 km",
     rating: 4.8,
     activity: "High",
-    amenities: ["Water fountain", "Shade", "Fence", "Small dog area"],
+    amenities: ["ברזייה", "צל", "גדר", "אזור לכלבים קטנים"],
     activeDogs: 8,
     upcomingPlaydates: 2,
     recentPosts: 6,
@@ -254,11 +259,14 @@ const DEMO_PARKS: DogPark[] = [
   },
   {
     id: "dubnov",
-    name: "Dubnov Park",
+    name: "גינת דובנוב",
+    address: "גינת דובנוב, תל אביב",
+    latitude: 32.0744,
+    longitude: 34.7831,
     distance: "2.4 km",
     rating: 4.5,
     activity: "Medium",
-    amenities: ["Water fountain", "Lighting", "Fence"],
+    amenities: ["ברזייה", "תאורה", "גדר"],
     activeDogs: 4,
     upcomingPlaydates: 1,
     recentPosts: 3,
@@ -266,11 +274,14 @@ const DEMO_PARKS: DogPark[] = [
   },
   {
     id: "gan-meir",
-    name: "Gan Meir Small Dogs",
+    name: "גן מאיר לכלבים קטנים",
+    address: "גן מאיר, תל אביב",
+    latitude: 32.0735,
+    longitude: 34.7736,
     distance: "3.1 km",
     rating: 4.6,
     activity: "Low",
-    amenities: ["Shade", "Small dog area", "Fence"],
+    amenities: ["צל", "אזור לכלבים קטנים", "גדר"],
     activeDogs: 2,
     upcomingPlaydates: 1,
     recentPosts: 2,
@@ -278,44 +289,313 @@ const DEMO_PARKS: DogPark[] = [
   },
 ];
 
-const DEMO_EVENTS: LocalEvent[] = [
-  {
-    id: "event-puppy-social",
-    name: "Puppy Socialization Meetup",
-    organizer: "PawSquare hosts",
-    dateTime: new Date(Date.now() + 3 * 24 * 60 * 60_000).toISOString(),
-    location: "Park Hayarkon",
-    price: "Free",
-    spotsLeft: 7,
-    description: "Gentle social time for puppies with short guided play breaks.",
-    attendingDogs: 11,
-    joined: false,
-  },
-  {
-    id: "event-photo-day",
-    name: "Dog Photography Day",
-    organizer: "Tel Aviv Dog Owners",
-    dateTime: new Date(Date.now() + 6 * 24 * 60 * 60_000).toISOString(),
-    location: "Dubnov Park",
-    price: "Paid",
-    spotsLeft: 5,
-    description: "Mini photo sessions and a relaxed park meetup.",
-    attendingDogs: 9,
-    joined: false,
-  },
-  {
-    id: "event-adoption",
-    name: "Adoption Day",
-    organizer: "Local Rescue Volunteers",
-    dateTime: new Date(Date.now() + 9 * 24 * 60 * 60_000).toISOString(),
-    location: "Gan Meir",
-    price: "Free",
-    spotsLeft: 20,
-    description: "Meet adoptable dogs and get advice from foster families.",
-    attendingDogs: 18,
-    joined: false,
-  },
-];
+const HE = {
+  title: "הקהילה",
+  subtitle: "הקהילה המקומית של הכלב שלך",
+  privacy: "המיקום המדויק ישותף רק כאשר תבחר להצטרף או ליצור מפגש.",
+  search: "חיפוש פוסטים, גינות וכלבים",
+  createPost: "יצירת פוסט",
+  createPlaydate: "קביעת מפגש",
+  myDogs: "הכלבים שלי",
+  noPets: "עדיין אין כלבים להצגה.",
+  feed: "פיד",
+  playdates: "מפגשים",
+  parks: "גינות כלבים",
+  groups: "קבוצות",
+  qa: "שאלות ותשובות",
+  events: "אירועים",
+  nearby: "קרוב אליי",
+  questions: "שאלות",
+  recommendations: "המלצות",
+  lostFound: "אבדות ומציאות",
+  coming: "אני מגיע",
+  like: "אהבתי",
+  comment: "תגובה",
+  share: "שיתוף",
+  follow: "עקוב",
+  invite: "הזמן למשחק",
+  checkIn: "אני כאן",
+  removeCheckIn: "הסר צ'ק-אין",
+  viewPark: "צפה בגינה",
+  hidePost: "הסתר פוסט",
+  reportPost: "דווח על פוסט",
+  blockUser: "חסום משתמש",
+  provider: "נותן שירות",
+  demoBanner: "מוצגת פעילות לדוגמה עד שיהיו פוסטים אמיתיים.",
+  apiFallback: "הפיד אינו זמין כרגע, לכן מוצגים פוסטים לדוגמה.",
+  localDogProfile: "פרופיל כלב מקומי",
+  communityPlaydate: "מפגש קהילתי",
+  interested: "מתעניינים",
+  posted: "הפוסט פורסם",
+  postedDesc: "הפוסט שלך עלה לקהילה.",
+  savedLocal: "נשמר מקומית",
+  savedLocalPost: "ה-API לא זמין, לכן הפוסט יוצג רק בסשן הנוכחי.",
+  postNeedsContent: "צריך תוכן לפוסט",
+  postNeedsContentDesc: "כתוב משהו או צרף תמונה לפני הפרסום.",
+  locationRecommended: "מומלץ להוסיף מיקום",
+  locationRecommendedDesc: "פוסט אבדות ומציאות עובד טוב יותר עם אזור משוער.",
+  tip: "טיפ",
+  playdateTip: "לפרטי RSVP מלאים, כדאי להשתמש גם בקביעת מפגש.",
+  deletePost: "למחוק פוסט?",
+  cancel: "ביטול",
+  delete: "מחיקה",
+  postHidden: "הפוסט הוסתר",
+  postHiddenDesc: "הפוסט הוסר מהפיד שלך.",
+  reportReceived: "הדיווח התקבל",
+  reportReceivedDesc: "תודה שעזרת לשמור על הקהילה בטוחה.",
+  userBlocked: "המשתמש נחסם",
+  userBlockedDesc: "פוסטים מהמשתמש הזה מוסתרים מקומית.",
+  youAreComing: "סימנו שאתה מגיע",
+  youAreComingDesc: "העניין שלך במפגש נשמר.",
+  dogPlaydatesTitle: "מפגשי כלבים",
+  dogPlaydatesSub: "תאם מפגשים מקומיים והצטרף עם הכלב שלך.",
+  noPlaydates: "אין מפגשים עדיין",
+  noPlaydatesSub: "אפשר ליצור את המפגש הראשון לכלבים באזור.",
+  openPlaydate: "מפגש פתוח לכלבים חברותיים מהאזור.",
+  allSizes: "כל הגדלים",
+  going: "מגיעים",
+  maybe: "אולי",
+  notGoing: "לא מגיע",
+  comments: "תגובות",
+  parksTitle: "גינות כלבים / פעילים עכשיו",
+  parksSub: "ראה צ'ק-אינים חיים וגלה פעילות ידידותית בגינות.",
+  activeNow: "פעילים עכשיו",
+  noBeacons: "אין צ'ק-אינים כרגע. אפשר לסמן שאתה כאן כדי שבעלי כלבים באזור ידעו.",
+  activeNowShort: "פעיל עכשיו",
+  rating: "דירוג",
+  activity: "פעילות",
+  activeDogsNow: "כלבים פעילים עכשיו",
+  upcomingPlaydates: "מפגשים קרובים",
+  recentPosts: "פוסטים אחרונים",
+  createPlaydateInPark: "קבע מפגש",
+  groupsTitle: "קבוצות קהילה",
+  groupsSub: "מצא תחומי עניין, המלצות, קבוצות גזע ותמיכה.",
+  searchGroups: "חיפוש קבוצות",
+  joined: "הצטרפת",
+  joinGroup: "הצטרף",
+  groupUpdated: "הקבוצה עודכנה",
+  groupUpdatedDesc: "החברות מוצגת מקומית עד שתתווסף תמיכת שרת.",
+  qaTitle: "שאלות ותשובות / המלצות",
+  qaSub: "שאל בעלי כלבים באזור על מאלפים, דוגסיטרים, אוכל והתנהגות.",
+  askQuestion: "שאל שאלה",
+  askedBy: "נשאל על ידי",
+  answers: "תשובות",
+  training: "אילוף",
+  bestAnswerPending: "תשובה מומלצת ממתינה",
+  helpful: "מועיל",
+  answer: "ענה",
+  answerHint: "אפשר לענות דרך כפתור התגובות בפוסט.",
+  eventsTitle: "אירועים ופעילויות",
+  eventsSub: "טיולי סוף שבוע, מפגשי גורים, ימי אימוץ וסדנאות.",
+  spotsLeft: "מקומות נותרו",
+  dogsAttending: "כלבים משתתפים",
+  joinEvent: "הצטרף לאירוע",
+  eventUpdated: "האירוע עודכן",
+  eventUpdatedDesc: "ההצטרפות נשמרה מקומית.",
+  createPostTitle: "יצירת פוסט",
+  postType: "סוג פוסט",
+  dog: "כלב",
+  whatHappening: "מה קורה בקהילת הכלבים שלך?",
+  locationOrPark: "מיקום או גינת כלבים",
+  visibility: "פרטיות",
+  tags: "תגיות, מופרדות בפסיקים",
+  addMedia: "הוסף תמונה / וידאו",
+  publishPost: "פרסם בקהילה",
+  createPlaydateTitle: "קביעת מפגש",
+  titleField: "כותרת",
+  dateField: "YYYY-MM-DD",
+  timeField: "HH:mm",
+  sizeFit: "התאמת גודל",
+  ageFit: "התאמת גיל",
+  energyLevel: "רמת אנרגיה",
+  maxParticipants: "מספר משתתפים מקסימלי",
+  description: "תיאור",
+  requiresApproval: "דורש אישור מארגן",
+  missingDetails: "חסרים פרטים",
+  missingDetailsDesc: "כותרת, תאריך, שעה ומיקום הם שדות חובה.",
+  invalidDate: "תאריך לא תקין",
+  invalidDateDesc: "יש להזין תאריך בפורמט YYYY-MM-DD ושעה בפורמט HH:mm.",
+  futureTime: "בחר זמן עתידי",
+  futureTimeDesc: "אי אפשר ליצור מפגש בעבר.",
+  playdateCreated: "המפגש נוצר",
+  playdateCreatedDesc: "בעלי כלבים יכולים להצטרף עכשיו.",
+  playdateSavedLocal: "ה-API לא זמין, לכן המפגש מוצג רק בסשן הנוכחי.",
+  checkedIn: "סימנת שאתה כאן",
+  checkedInDesc: "סימנת שאתה כאן עם הכלב שלך.",
+  checkedInLocal: "הצ'ק-אין נשמר מקומית",
+  checkedInLocalDesc: "Beacon API לא זמין, לכן הצ'ק-אין מקומי.",
+  checkInRemoved: "הצ'ק-אין הוסר",
+  parkLocation: "מיקום גינה משוער",
+  peak: "שעות עומס",
+  playdateComments: "תגובות למפגש",
+  commentsHint: "תגובות מלאות נטענות במסך פרטי המפגש. אפשר להוסיף כאן תגובה קצרה לסשן.",
+  writeComment: "כתיבת תגובה",
+  postComment: "פרסם תגובה",
+  commentAdded: "התגובה נוספה",
+  commentAddedDesc: "התגובה פורסמה.",
+  commentLocal: "התגובה נשמרה מקומית",
+  commentLocalDesc: "ה-API לא זמין, לכן התגובה מקומית כרגע.",
+  inviteOpened: "הזמנה למשחק נפתחה",
+  following: "עקיבה",
+  followingDesc: "העקיבה נשמרה מקומית.",
+  invited: "הוזמן",
+  followed: "עוקב",
+} as const;
+
+const EN: Record<keyof typeof HE, string> = {
+  title: "Community",
+  subtitle: "Your local dog community",
+  privacy: "Exact location is only shared when you choose to join or create a playdate.",
+  search: "Search posts, parks and dogs",
+  createPost: "Create Post",
+  createPlaydate: "Create Playdate",
+  myDogs: "My dogs",
+  noPets: "No dogs to show yet.",
+  feed: "Feed",
+  playdates: "Playdates",
+  parks: "Dog Parks",
+  groups: "Groups",
+  qa: "Q&A",
+  events: "Events",
+  nearby: "Nearby",
+  questions: "Questions",
+  recommendations: "Recommendations",
+  lostFound: "Lost & Found",
+  coming: "I'm coming",
+  like: "Like",
+  comment: "Comment",
+  share: "Share",
+  follow: "Follow",
+  invite: "Invite to play",
+  checkIn: "Check in",
+  removeCheckIn: "Remove check-in",
+  viewPark: "View park",
+  hidePost: "Hide post",
+  reportPost: "Report post",
+  blockUser: "Block user",
+  provider: "Provider",
+  demoBanner: "Showing demo community activity until real posts are available.",
+  apiFallback: "Feed API is unavailable, so fallback posts are shown for this session.",
+  localDogProfile: "Friendly local dog profile",
+  communityPlaydate: "Community playdate",
+  interested: "interested",
+  posted: "Posted",
+  postedDesc: "Your post is live in the community.",
+  savedLocal: "Saved locally",
+  savedLocalPost: "The API was unavailable, so this post is visible in this session.",
+  postNeedsContent: "Post needs content",
+  postNeedsContentDesc: "Write something or attach an image before publishing.",
+  locationRecommended: "Location recommended",
+  locationRecommendedDesc: "Lost & Found posts work best with an approximate area.",
+  tip: "Tip",
+  playdateTip: "For full RSVP details, use Create Playdate too.",
+  deletePost: "Delete post?",
+  cancel: "Cancel",
+  delete: "Delete",
+  postHidden: "Post hidden",
+  postHiddenDesc: "This post was hidden from your feed.",
+  reportReceived: "Report received",
+  reportReceivedDesc: "Thanks for helping keep PawSquare safe.",
+  userBlocked: "User blocked",
+  userBlockedDesc: "Posts from this user are hidden locally.",
+  youAreComing: "You're coming",
+  youAreComingDesc: "Marked your interest for this playdate post.",
+  dogPlaydatesTitle: "Dog Playdates",
+  dogPlaydatesSub: "Coordinate local meetups and RSVP with your dog.",
+  noPlaydates: "No playdates yet",
+  noPlaydatesSub: "Create the first meetup for dogs nearby.",
+  openPlaydate: "Open dog playdate for friendly local dogs.",
+  allSizes: "All sizes",
+  going: "Going",
+  maybe: "Maybe",
+  notGoing: "Not going",
+  comments: "Comments",
+  parksTitle: "Dog Parks / Live Nearby",
+  parksSub: "See live check-ins and discover friendly park activity.",
+  activeNow: "Active now",
+  noBeacons: "No live beacons yet. Check in to let nearby dog owners know you are around.",
+  activeNowShort: "active now",
+  rating: "rating",
+  activity: "activity",
+  activeDogsNow: "active dogs now",
+  upcomingPlaydates: "upcoming playdates",
+  recentPosts: "recent posts",
+  createPlaydateInPark: "Create playdate",
+  groupsTitle: "Community Groups",
+  groupsSub: "Find local interests, advice, breed groups and support circles.",
+  searchGroups: "Search groups",
+  joined: "Joined",
+  joinGroup: "Join",
+  groupUpdated: "Group updated",
+  groupUpdatedDesc: "Membership is reflected locally until backend join support is added.",
+  qaTitle: "Q&A / Recommendations",
+  qaSub: "Ask local dog owners for trainers, sitters, food and behavior advice.",
+  askQuestion: "Ask Question",
+  askedBy: "Asked by",
+  answers: "answers",
+  training: "Training",
+  bestAnswerPending: "Best answer pending",
+  helpful: "Helpful",
+  answer: "Answer",
+  answerHint: "Use the comments button on the feed post to answer.",
+  eventsTitle: "Events / Local Activities",
+  eventsSub: "Weekend walks, puppy socials, adoption days and workshops.",
+  spotsLeft: "spots left",
+  dogsAttending: "dogs attending",
+  joinEvent: "Join event",
+  eventUpdated: "Event updated",
+  eventUpdatedDesc: "Your event RSVP is saved locally.",
+  createPostTitle: "Create Post",
+  postType: "Post type",
+  dog: "Dog",
+  whatHappening: "What is happening in your dog community?",
+  locationOrPark: "Location or dog park",
+  visibility: "Visibility",
+  tags: "Tags, comma separated",
+  addMedia: "Add image/video placeholder",
+  publishPost: "Post to Community",
+  createPlaydateTitle: "Create Playdate",
+  titleField: "Title",
+  dateField: "YYYY-MM-DD",
+  timeField: "HH:mm",
+  sizeFit: "Dog size suitability",
+  ageFit: "Dog age suitability",
+  energyLevel: "Energy level",
+  maxParticipants: "Max participants",
+  description: "Description",
+  requiresApproval: "Requires organizer approval",
+  missingDetails: "Missing details",
+  missingDetailsDesc: "Title, date, time and location are required.",
+  invalidDate: "Invalid date",
+  invalidDateDesc: "Use date as YYYY-MM-DD and time as HH:mm.",
+  futureTime: "Choose a future time",
+  futureTimeDesc: "Playdates cannot be created in the past.",
+  playdateCreated: "Playdate created",
+  playdateCreatedDesc: "Dog owners can RSVP now.",
+  playdateSavedLocal: "The API was unavailable, so this playdate is visible in this session.",
+  checkedIn: "Checked in",
+  checkedInDesc: "You checked in with your dog.",
+  checkedInLocal: "Checked in locally",
+  checkedInLocalDesc: "Beacon API was unavailable, so this check-in is local.",
+  checkInRemoved: "Check-in removed",
+  parkLocation: "Approximate park location",
+  peak: "peak",
+  playdateComments: "Playdate comments",
+  commentsHint: "Comments are loaded in the event detail screen. Add a quick comment here for this session.",
+  writeComment: "Write a comment",
+  postComment: "Post comment",
+  commentAdded: "Comment added",
+  commentAddedDesc: "Your comment was posted.",
+  commentLocal: "Comment saved locally",
+  commentLocalDesc: "The API was unavailable, so this is local for now.",
+  inviteOpened: "Invite to play opened",
+  following: "Following",
+  followingDesc: "Follow saved locally.",
+  invited: "Invited",
+  followed: "Following",
+};
+
+type CopyKey = keyof typeof HE;
 
 function relativeTime(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime();
@@ -344,6 +624,23 @@ function formatDateTime(iso: string): string {
   })}`;
 }
 
+function formatDistanceKm(valueKm: number): string {
+  if (!Number.isFinite(valueKm) || valueKm <= 0) return "0.1 km";
+  return `${valueKm < 1 ? valueKm.toFixed(1) : valueKm.toFixed(1)} km`;
+}
+
+function distanceKm(aLat: number, aLng: number, bLat: number, bLng: number): number {
+  const toRad = (v: number) => (v * Math.PI) / 180;
+  const earthRadiusKm = 6371;
+  const dLat = toRad(bLat - aLat);
+  const dLng = toRad(bLng - aLng);
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(toRad(aLat)) * Math.cos(toRad(bLat)) * Math.sin(dLng / 2) * Math.sin(dLng / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return earthRadiusKm * c;
+}
+
 function categoryToKind(category?: string): PostKind {
   switch ((category ?? "").toLowerCase()) {
     case "question":
@@ -368,9 +665,135 @@ function categoryToKind(category?: string): PostKind {
   }
 }
 
+function filterLabel(filter: FeedFilter, copy: (key: CopyKey) => string): string {
+  switch (filter) {
+    case "Nearby":
+      return copy("nearby");
+    case "Playdates":
+      return copy("playdates");
+    case "Questions":
+      return copy("questions");
+    case "Recommendations":
+      return copy("recommendations");
+    case "Dog Parks":
+      return copy("parks");
+    case "Lost & Found":
+      return copy("lostFound");
+    case "Events":
+      return copy("events");
+    case "Groups":
+      return copy("groups");
+  }
+}
+
+function filterIcon(filter: FeedFilter): keyof typeof Ionicons.glyphMap {
+  switch (filter) {
+    case "Nearby":
+      return "navigate-outline";
+    case "Playdates":
+      return "calendar-outline";
+    case "Questions":
+      return "help-circle-outline";
+    case "Recommendations":
+      return "star-outline";
+    case "Dog Parks":
+      return "leaf-outline";
+    case "Lost & Found":
+      return "alert-circle-outline";
+    case "Events":
+      return "sparkles-outline";
+    case "Groups":
+      return "people-outline";
+  }
+}
+
+function postKindLabel(kind: PostKind, isRTL: boolean): string {
+  if (!isRTL) return kind;
+  switch (kind) {
+    case "Cute moment":
+      return "רגע מתוק";
+    case "Question":
+      return "שאלה";
+    case "Recommendation":
+      return "המלצה";
+    case "Playdate":
+      return "מפגש";
+    case "Warning":
+      return "אזהרה";
+    case "Lost & Found":
+      return "אבדות ומציאות";
+    case "Event":
+      return "אירוע";
+  }
+}
+
+function visibilityLabel(visibility: Visibility, isRTL: boolean): string {
+  if (!isRTL) return visibility;
+  switch (visibility) {
+    case "Public":
+      return "ציבורי";
+    case "Nearby only":
+      return "קרוב אליי";
+    case "Friends only":
+      return "חברים בלבד";
+    case "Group only":
+      return "קבוצה בלבד";
+  }
+}
+
+function sizeLabel(size: DogSizeSuitability, isRTL: boolean): string {
+  if (!isRTL) return size;
+  switch (size) {
+    case "Small":
+      return "קטנים";
+    case "Medium":
+      return "בינוניים";
+    case "Large":
+      return "גדולים";
+    case "All":
+      return "כולם";
+  }
+}
+
+function energyLabel(level: EnergyLevel, isRTL: boolean): string {
+  if (!isRTL) return level;
+  switch (level) {
+    case "Calm":
+      return "רגועה";
+    case "Medium":
+      return "בינונית";
+    case "High":
+      return "גבוהה";
+  }
+}
+
+function ageLabel(age: string, isRTL: boolean): string {
+  if (!isRTL) return age;
+  const labels: Record<string, string> = {
+    Puppies: "גורים",
+    Adults: "בוגרים",
+    Seniors: "מבוגרים",
+    All: "כולם",
+  };
+  return labels[age] ?? age;
+}
+
+function activityLabel(activity: DogPark["activity"], isRTL: boolean): string {
+  if (!isRTL) return activity;
+  switch (activity) {
+    case "Low":
+      return "נמוכה";
+    case "Medium":
+      return "בינונית";
+    case "High":
+      return "גבוהה";
+  }
+}
+
 function filterMatchesPost(filter: FeedFilter, post: PostDto, meta?: PostMeta): boolean {
   const kind = meta?.kind ?? categoryToKind(post.category);
   if (filter === "Nearby") return true;
+  if (filter === "Groups") return true;
   if (filter === "Dog Parks") {
     return /park|fountain|dog run/i.test(`${post.content} ${meta?.location ?? ""}`);
   }
@@ -399,6 +822,8 @@ function PostCard({
   onPlaydateComing,
   rtlText,
   rtlRow,
+  isRTL,
+  copy,
   isLikePending,
   isDeletePending,
 }: {
@@ -413,6 +838,8 @@ function PostCard({
   onPlaydateComing: (post: PostDto) => void;
   rtlText: object;
   rtlRow: object;
+  isRTL: boolean;
+  copy: (key: CopyKey) => string;
   isLikePending?: boolean;
   isDeletePending?: boolean;
 }) {
@@ -438,27 +865,27 @@ function PostCard({
             {post.authorIsApprovedProvider && (
               <View style={styles.providerBadge}>
                 <Ionicons name="shield-checkmark" size={10} color={colors.textInverse} />
-                <Text style={styles.providerBadgeText}>Provider</Text>
+                <Text style={styles.providerBadgeText}>{copy("provider")}</Text>
               </View>
             )}
             <View style={[styles.kindBadge, kind === "Lost & Found" && styles.sosBadge]}>
-              <Text style={styles.kindBadgeText}>{kind}</Text>
+              <Text style={styles.kindBadgeText}>{postKindLabel(kind, isRTL)}</Text>
             </View>
           </View>
           <Text style={styles.timeText}>
             {relativeTime(post.createdAt)}
             {meta?.location ? ` · ${meta.location}` : ""}
-            {meta?.visibility ? ` · ${meta.visibility}` : ""}
+            {meta?.visibility ? ` · ${visibilityLabel(meta.visibility, isRTL)}` : ""}
           </Text>
         </View>
         {isMine ? (
           <Pressable
             disabled={isDeletePending}
             onPress={() =>
-              showGlobalAlertCompat("Delete post?", "", [
-                { text: "Cancel", style: "cancel" },
+              showGlobalAlertCompat(copy("deletePost"), "", [
+                { text: copy("cancel"), style: "cancel" },
                 {
-                  text: "Delete",
+                  text: copy("delete"),
                   style: "destructive",
                   onPress: () => onDelete(post.id),
                 },
@@ -480,15 +907,15 @@ function PostCard({
         <View style={styles.menu}>
           <Pressable onPress={() => { setMenuOpen(false); onHide(post.id); }} style={styles.menuItem}>
             <Ionicons name="eye-off-outline" size={16} color={colors.textSecondary} />
-            <Text style={styles.menuText}>Hide post</Text>
+            <Text style={styles.menuText}>{copy("hidePost")}</Text>
           </Pressable>
           <Pressable onPress={() => { setMenuOpen(false); onReport(post.id); }} style={styles.menuItem}>
             <Ionicons name="flag-outline" size={16} color={colors.warning} />
-            <Text style={styles.menuText}>Report post</Text>
+            <Text style={styles.menuText}>{copy("reportPost")}</Text>
           </Pressable>
           <Pressable onPress={() => { setMenuOpen(false); onBlock(post.userId); }} style={styles.menuItem}>
             <Ionicons name="ban-outline" size={16} color={colors.danger} />
-            <Text style={styles.menuText}>Block user</Text>
+            <Text style={styles.menuText}>{copy("blockUser")}</Text>
           </Pressable>
         </View>
       )}
@@ -504,13 +931,13 @@ function PostCard({
           </View>
           <View style={{ flex: 1 }}>
             <Text style={[styles.dogName, rtlText]}>{meta.dogName}</Text>
-            <Text style={[styles.dogSubtle, rtlText]}>Friendly local dog profile</Text>
+            <Text style={[styles.dogSubtle, rtlText]}>{copy("localDogProfile")}</Text>
           </View>
           <Pressable
-            onPress={() => showGlobalAlertCompat("Invite sent", `Invite to play with ${meta.dogName} opened.`)}
+            onPress={() => showGlobalAlertCompat(copy("invite"), copy("inviteOpened"))}
             style={styles.smallOutlineBtn}
           >
-            <Text style={styles.smallOutlineText}>Invite</Text>
+            <Text style={styles.smallOutlineText}>{copy("invite")}</Text>
           </Pressable>
         </View>
       )}
@@ -535,13 +962,13 @@ function PostCard({
       {kind === "Playdate" && (
         <View style={[styles.playdateInline, rtlRow]}>
           <View style={{ flex: 1 }}>
-            <Text style={[styles.inlineTitle, rtlText]}>Community playdate</Text>
+            <Text style={[styles.inlineTitle, rtlText]}>{copy("communityPlaydate")}</Text>
             <Text style={[styles.inlineSub, rtlText]}>
-              {meta?.location ?? "Local dog park"} · {Math.max(1, post.likeCount)} interested
+              {meta?.location ?? copy("parks")} · {Math.max(1, post.likeCount)} {copy("interested")}
             </Text>
           </View>
           <Pressable onPress={() => onPlaydateComing(post)} style={styles.primarySmallBtn}>
-            <Text style={styles.primarySmallText}>I'm coming</Text>
+            <Text style={styles.primarySmallText}>{copy("coming")}</Text>
           </Pressable>
         </View>
       )}
@@ -565,6 +992,7 @@ function PostCard({
           >
             {post.likeCount}
           </Text>
+          <Text style={styles.actionText}>{copy("like")}</Text>
         </Pressable>
         <Pressable
           style={[styles.actionBtn, rtlRow]}
@@ -576,6 +1004,7 @@ function PostCard({
             color={colors.textSecondary}
           />
           <Text style={styles.actionText}>{localCommentCount}</Text>
+          <Text style={styles.actionText}>{copy("comment")}</Text>
         </Pressable>
         <Pressable
           style={[styles.actionBtn, rtlRow]}
@@ -586,7 +1015,7 @@ function PostCard({
           }
         >
           <Ionicons name="share-social-outline" size={18} color={colors.textSecondary} />
-          <Text style={styles.actionText}>Share</Text>
+          <Text style={styles.actionText}>{copy("share")}</Text>
         </Pressable>
       </View>
 
@@ -605,19 +1034,27 @@ function PostCard({
 
 function Chip({
   label,
+  icon,
   active,
   onPress,
 }: {
   label: string;
+  icon: keyof typeof Ionicons.glyphMap;
   active?: boolean;
   onPress: () => void;
 }) {
+  const { colors } = useTheme();
   const styles = useCommunityStyles();
   return (
     <Pressable
       onPress={onPress}
       style={[styles.chip, active ? styles.chipActive : styles.chipInactive]}
     >
+      <Ionicons
+        name={icon}
+        size={14}
+        color={active ? colors.textInverse : colors.textSecondary}
+      />
       <Text style={[styles.chipText, active ? styles.chipTextActive : styles.chipTextInactive]}>
         {label}
       </Text>
@@ -628,11 +1065,16 @@ function Chip({
 export function CommunityScreen() {
   const navigation = useNavigation<any>();
   const { colors } = useTheme();
+  const insets = useSafeAreaInsets();
+  const hydrated = useAuthStore((s) => s.hydrated);
   const isLoggedIn = useAuthStore((s) => s.isLoggedIn);
   const user = useAuthStore((s) => s.user);
   const isAdmin = user?.role === "Admin";
   const { t, rtlText, rtlRow, rtlInput, isRTL } = useTranslation();
+  const fetchStorePets = usePetsStore((s) => s.fetchPets);
   const styles = useCommunityStyles();
+  const copy = useCallback((key: CopyKey) => (isRTL ? HE[key] : EN[key]), [isRTL]);
+  const { behavior: keyboardAvoidBehavior } = useKeyboardAvoidingState();
 
   const [mainTab, setMainTab] = useState<MainTab>("feed");
 
@@ -665,7 +1107,6 @@ export function CommunityScreen() {
   const [newGroupDesc, setNewGroupDesc] = useState("");
   const [newGroupIcon, setNewGroupIcon] = useState("");
   const [creatingGroup, setCreatingGroup] = useState(false);
-  const [joinedGroups, setJoinedGroups] = useState<Set<string>>(() => new Set());
   const [groupSearch, setGroupSearch] = useState("");
 
   const [refreshing, setRefreshing] = useState(false);
@@ -673,6 +1114,7 @@ export function CommunityScreen() {
   const composerInputRef = useRef<TextInput>(null);
   const likeLockRef = useRef<Set<string>>(new Set());
   const deleteLockRef = useRef<Set<string>>(new Set());
+  const locationPermissionAsked = useRef(false);
   const [likeBusy, setLikeBusy] = useState<Record<string, boolean>>({});
   const [deleteBusy, setDeleteBusy] = useState<Record<string, boolean>>({});
 
@@ -695,12 +1137,16 @@ export function CommunityScreen() {
   const [beacons, setBeacons] = useState<LiveBeaconDto[]>([]);
   const [beaconsLoading, setBeaconsLoading] = useState(false);
   const [myBeaconId, setMyBeaconId] = useState<string | null>(null);
+  const [parks, setParks] = useState<DogPark[]>(DEMO_PARKS);
+  const [parksLoading, setParksLoading] = useState(false);
+  const [parksUserLocation, setParksUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [checkingInPark, setCheckingInPark] = useState<DogPark | null>(null);
   const [selectedPark, setSelectedPark] = useState<DogPark | null>(null);
   const [parkCheckins, setParkCheckins] = useState<Record<string, boolean>>({});
-
-  const [events, setEvents] = useState<LocalEvent[]>(DEMO_EVENTS);
   const [dogProfilePet, setDogProfilePet] = useState<PetDto | null>(null);
+  const [invitedPetIds, setInvitedPetIds] = useState<Set<string>>(() => new Set());
+  const [followedPetIds, setFollowedPetIds] = useState<Set<string>>(() => new Set());
+  const [answerPost, setAnswerPost] = useState<PostDto | null>(null);
   const [playdateCommentsOpenFor, setPlaydateCommentsOpenFor] = useState<PlaydateEventDto | null>(null);
   const [playdateCommentText, setPlaydateCommentText] = useState("");
 
@@ -712,6 +1158,7 @@ export function CommunityScreen() {
 
   const selectedPet = pets.find((p) => p.id === selectedPetId) ?? pets[0] ?? null;
   const appRowDirection = rowDirectionForAppLayout(isRTL);
+  const bottomContentPadding = 16 + insets.bottom;
 
   const loadFeed = useCallback(
     async (p: number, replace: boolean) => {
@@ -739,7 +1186,7 @@ export function CommunityScreen() {
 
   const onRefreshFeed = useCallback(async () => {
     setRefreshing(true);
-    await Promise.all([loadFeed(1, true), loadPets(), loadPlaydates(), loadBeacons()]);
+    await Promise.all([loadFeed(1, true), loadPets(), loadPlaydates()]);
     setRefreshing(false);
   }, [loadFeed]);
 
@@ -756,11 +1203,18 @@ export function CommunityScreen() {
 
   const loadPets = useCallback(async () => {
     try {
-      const data = await petsApi.getMyPets();
+      const cachedPets = usePetsStore.getState().pets;
+      if (cachedPets.length > 0) {
+        setPets(cachedPets);
+        setSelectedPetId((current) => current ?? cachedPets[0]?.id ?? null);
+      }
+      await fetchStorePets();
+      const currentStorePets = usePetsStore.getState().pets;
+      const data = currentStorePets.length > 0 ? currentStorePets : await petsApi.getMyPets();
       setPets(data);
       setSelectedPetId((current) => current ?? data[0]?.id ?? null);
     } catch {}
-  }, []);
+  }, [fetchStorePets]);
 
   const loadPlaydates = useCallback(async () => {
     setPlaydatesLoading(true);
@@ -784,6 +1238,67 @@ export function CommunityScreen() {
     }
   }, []);
 
+  const loadDogParks = useCallback(async () => {
+    setParksLoading(true);
+    try {
+      let latitude = 32.0853;
+      let longitude = 34.7818;
+      try {
+        let status: string;
+        if (!locationPermissionAsked.current) {
+          const result = await Location.requestForegroundPermissionsAsync();
+          status = result.status;
+          locationPermissionAsked.current = true;
+        } else {
+          const result = await Location.getForegroundPermissionsAsync();
+          status = result.status;
+        }
+        if (status === "granted") {
+          const loc = await Location.getCurrentPositionAsync({});
+          latitude = loc.coords.latitude;
+          longitude = loc.coords.longitude;
+        }
+      } catch {
+        // Keep Tel Aviv fallback when location is unavailable.
+      }
+      setParksUserLocation({ latitude, longitude });
+      const nearby = await fetchNearbyDogParks({
+        latitude,
+        longitude,
+        language: isRTL ? "he" : "en",
+        radiusMeters: 8000,
+      });
+      if (nearby.length === 0) {
+        setParks(DEMO_PARKS);
+        return;
+      }
+      const mapped = nearby.slice(0, 12).map<DogPark>((park, index) => {
+        const km = distanceKm(latitude, longitude, park.latitude, park.longitude);
+        return {
+          id: park.placeId || `park-${index}`,
+          placeId: park.placeId,
+          name: park.name,
+          address: park.address,
+          latitude: park.latitude,
+          longitude: park.longitude,
+          distance: formatDistanceKm(km),
+          rating: park.rating > 0 ? park.rating : 4.2,
+          activity: km < 2 ? "High" : km < 4 ? "Medium" : "Low",
+          amenities: [copy("parks"), copy("checkIn")],
+          activeDogs: Math.max(0, Math.round((park.userRatingsTotal || 4) / 12)),
+          upcomingPlaydates: Math.max(0, Math.round((park.userRatingsTotal || 3) / 25)),
+          recentPosts: Math.max(1, Math.round((park.userRatingsTotal || 8) / 10)),
+          peakHours: "17:00-20:00",
+        };
+      });
+      setParks(mapped);
+    } catch {
+      setParks(DEMO_PARKS);
+    } finally {
+      setParksLoading(false);
+    }
+  }, [copy, isRTL]);
+
   const onRefreshGroups = useCallback(async () => {
     setGroupsRefreshing(true);
     try {
@@ -797,13 +1312,16 @@ export function CommunityScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      if (!isLoggedIn) return;
+      if (!hydrated || !isLoggedIn) return;
       loadPets();
       if (mainTab === "feed" || mainTab === "qa") loadFeed(1, true);
       if (mainTab === "groups") loadGroups();
       if (mainTab === "playdates" || mainTab === "events") loadPlaydates();
-      if (mainTab === "parks") loadBeacons();
-    }, [isLoggedIn, mainTab, loadFeed, loadGroups, loadPets, loadPlaydates, loadBeacons]),
+      if (mainTab === "parks") {
+        loadBeacons();
+        loadDogParks();
+      }
+    }, [hydrated, isLoggedIn, mainTab, loadFeed, loadGroups, loadPets, loadPlaydates, loadBeacons, loadDogParks]),
   );
 
   const filteredPosts = useMemo(() => {
@@ -837,14 +1355,14 @@ export function CommunityScreen() {
   const handlePublish = async () => {
     const content = newPostContent.trim();
     if ((!content && !pickedImageUri) || posting) {
-      showGlobalAlertCompat("Post needs content", "Write something or attach an image before publishing.");
+      showGlobalAlertCompat(copy("postNeedsContent"), copy("postNeedsContentDesc"));
       return;
     }
     if (newPostType === "Lost & Found" && !newPostLocation.trim()) {
-      showGlobalAlertCompat("Location recommended", "Lost & Found posts work best with an approximate area.");
+      showGlobalAlertCompat(copy("locationRecommended"), copy("locationRecommendedDesc"));
     }
     if (newPostType === "Playdate") {
-      showGlobalAlertCompat("Tip", "For full RSVP details, use Create Playdate too.");
+      showGlobalAlertCompat(copy("tip"), copy("playdateTip"));
     }
     setPosting(true);
     try {
@@ -889,13 +1407,13 @@ export function CommunityScreen() {
       setNewPostLocation("");
       setNewPostTags("");
       setComposerOpen(false);
-      showGlobalAlertCompat("Posted", "Your post is live in the community.");
+      showGlobalAlertCompat(copy("posted"), copy("postedDesc"));
     } catch {
       const id = `local-post-${Date.now()}`;
       const localPost: PostDto = {
         id,
         userId: user?.id ?? "local-user",
-        userName: user?.name ?? "You",
+        userName: user?.name ?? (isRTL ? "אני" : "You"),
         content,
         imageUrl: pickedImageUri ?? undefined,
         likeCount: 0,
@@ -921,7 +1439,7 @@ export function CommunityScreen() {
       setNewPostContent("");
       setPickedImageUri(null);
       setComposerOpen(false);
-      showGlobalAlertCompat("Saved locally", "The API was unavailable, so this post is visible in this session.");
+      showGlobalAlertCompat(copy("savedLocal"), copy("savedLocalPost"));
     } finally {
       setUploadingImage(false);
       setPosting(false);
@@ -1026,7 +1544,7 @@ export function CommunityScreen() {
       setNewGroupIcon("");
       showGlobalAlertCompat("", t("groupCreated"));
     } catch {
-      showGlobalAlertCompat(t("errorTitle"), "Failed to create group");
+      showGlobalAlertCompat(t("errorTitle"), t("postError"));
     }
     setCreatingGroup(false);
   };
@@ -1035,37 +1553,43 @@ export function CommunityScreen() {
     const title = newPlaydateTitle.trim();
     const location = newPlaydateLocation.trim();
     if (!title || !newPlaydateDate.trim() || !newPlaydateTime.trim() || !location) {
-      showGlobalAlertCompat("Missing details", "Title, date, time and location are required.");
+      showGlobalAlertCompat(copy("missingDetails"), copy("missingDetailsDesc"));
       return;
     }
     const scheduledFor = new Date(`${newPlaydateDate.trim()}T${newPlaydateTime.trim()}:00`);
     if (Number.isNaN(scheduledFor.getTime())) {
-      showGlobalAlertCompat("Invalid date", "Use date as YYYY-MM-DD and time as HH:mm.");
+      showGlobalAlertCompat(copy("invalidDate"), copy("invalidDateDesc"));
       return;
     }
     if (scheduledFor.getTime() <= Date.now()) {
-      showGlobalAlertCompat("Choose a future time", "Playdates cannot be created in the past.");
+      showGlobalAlertCompat(copy("futureTime"), copy("futureTimeDesc"));
       return;
     }
     setCreatingPlaydate(true);
     try {
+      const geocoded = await geocodeAddress({
+        query: location,
+        language: isRTL ? "he" : "en",
+      });
+      const latitude = geocoded?.latitude ?? 32.0853;
+      const longitude = geocoded?.longitude ?? 34.7818;
+      const city = geocoded?.components.city ?? (isRTL ? "תל אביב" : "Tel Aviv");
       const created = await playdatesApi.create({
         title,
         description:
           [
             newPlaydateDescription.trim(),
-            `Size: ${newPlaydateSize}`,
-            `Age: ${newPlaydateAge}`,
-            `Energy: ${newPlaydateEnergy}`,
-            newPlaydateApproval ? "Join mode: Requires organizer approval" : "Join mode: Open to everyone",
+            `${copy("sizeFit")}: ${sizeLabel(newPlaydateSize, isRTL)}`,
+            `${copy("ageFit")}: ${ageLabel(newPlaydateAge, isRTL)}`,
+            `${copy("energyLevel")}: ${energyLabel(newPlaydateEnergy, isRTL)}`,
+            newPlaydateApproval ? copy("requiresApproval") : copy("nearby"),
           ]
             .filter(Boolean)
             .join("\n"),
         locationName: location,
-        // TODO: Replace this approximate Tel Aviv fallback with a geocoded dog-park picker when backend/location support is available.
-        latitude: 32.0853,
-        longitude: 34.7818,
-        city: "Tel Aviv",
+        latitude,
+        longitude,
+        city,
         scheduledFor: scheduledFor.toISOString(),
         allowedSpecies: ["DOG"],
         maxPets: Number.parseInt(newPlaydateMax, 10) || undefined,
@@ -1075,18 +1599,18 @@ export function CommunityScreen() {
       setNewPlaydateTitle("");
       setNewPlaydateLocation("");
       setNewPlaydateDescription("");
-      showGlobalAlertCompat("Playdate created", "Dog owners can RSVP now.");
+      showGlobalAlertCompat(copy("playdateCreated"), copy("playdateCreatedDesc"));
     } catch {
       const local: PlaydateEventDto = {
         id: `local-playdate-${Date.now()}`,
         hostUserId: user?.id ?? "local-user",
-        hostUserName: user?.name ?? "You",
+        hostUserName: user?.name ?? (isRTL ? "אני" : "You"),
         title,
         description: newPlaydateDescription.trim() || null,
         locationName: location,
         latitude: 32.0853,
         longitude: 34.7818,
-        city: "Tel Aviv",
+        city: isRTL ? "תל אביב" : "Tel Aviv",
         scheduledFor: scheduledFor.toISOString(),
         endsAt: null,
         allowedSpecies: ["DOG"],
@@ -1100,7 +1624,7 @@ export function CommunityScreen() {
       };
       setPlaydates((prev) => [local, ...prev]);
       setPlaydateModalOpen(false);
-      showGlobalAlertCompat("Saved locally", "The API was unavailable, so this playdate is visible in this session.");
+      showGlobalAlertCompat(copy("savedLocal"), copy("playdateSavedLocal"));
     } finally {
       setCreatingPlaydate(false);
     }
@@ -1132,9 +1656,9 @@ export function CommunityScreen() {
     );
     try {
       await playdatesApi.rsvp(event.id, { status, petId: selectedPet?.id });
-      showGlobalAlertCompat("RSVP updated", `Marked as ${status}.`);
+      showGlobalAlertCompat(copy("eventUpdated"), status === "Going" ? copy("going") : status === "Maybe" ? copy("maybe") : copy("notGoing"));
     } catch {
-      showGlobalAlertCompat("RSVP saved locally", "The API was unavailable, so this update is local for now.");
+      showGlobalAlertCompat(copy("savedLocal"), copy("eventUpdatedDesc"));
     }
   };
 
@@ -1145,7 +1669,7 @@ export function CommunityScreen() {
         placeName: park.name,
         latitude: 32.0853,
         longitude: 34.7818,
-        city: "Tel Aviv",
+        city: isRTL ? "תל אביב" : "Tel Aviv",
         durationMinutes: 60,
         petIds: selectedPet ? [selectedPet.id] : pets.map((p) => p.id),
         species: "DOG",
@@ -1153,11 +1677,11 @@ export function CommunityScreen() {
       setMyBeaconId(beacon.id);
       setBeacons((prev) => [beacon, ...prev]);
       setParkCheckins((prev) => ({ ...prev, [park.id]: true }));
-      showGlobalAlertCompat("Checked in", "You checked in with your dog.");
+      showGlobalAlertCompat(copy("checkedIn"), copy("checkedInDesc"));
     } catch {
       setMyBeaconId(`local-beacon-${park.id}`);
       setParkCheckins((prev) => ({ ...prev, [park.id]: true }));
-      showGlobalAlertCompat("Checked in locally", "Beacon API was unavailable, so this check-in is local.");
+      showGlobalAlertCompat(copy("checkedInLocal"), copy("checkedInLocalDesc"));
     } finally {
       setCheckingInPark(null);
     }
@@ -1172,36 +1696,114 @@ export function CommunityScreen() {
       if (!id.startsWith("local-")) await palsApi.endBeacon(id);
       await loadBeacons();
     } catch {
-      showGlobalAlertCompat("Check-in removed", "Your local check-in was removed.");
+      showGlobalAlertCompat(copy("checkInRemoved"), "");
     }
   };
 
-  const handleJoinGroup = (groupId: string) => {
-    // TODO: Wire to a backend join/leave group endpoint when it exists.
-    setJoinedGroups((prev) => {
-      const next = new Set(prev);
-      if (next.has(groupId)) next.delete(groupId);
-      else next.add(groupId);
-      return next;
-    });
-    showGlobalAlertCompat("Group updated", "Membership is reflected locally until backend join support is added.");
-  };
-
-  const handleJoinEvent = (eventId: string) => {
-    setEvents((prev) =>
-      prev.map((event) =>
-        event.id === eventId
+  const handleJoinGroup = async (item: CommunityGroupDto) => {
+    const previousJoined = item.joinedByMe ?? false;
+    const previousCount = item.memberCount ?? 0;
+    const nextJoined = !previousJoined;
+    setGroups((prev) =>
+      prev.map((g) =>
+        g.id === item.id
           ? {
-              ...event,
-              joined: !event.joined,
-              attendingDogs: Math.max(0, event.attendingDogs + (event.joined ? -1 : 1)),
-              spotsLeft: Math.max(0, event.spotsLeft + (event.joined ? 1 : -1)),
+              ...g,
+              joinedByMe: nextJoined,
+              memberCount: nextJoined ? previousCount + 1 : Math.max(0, previousCount - 1),
             }
-          : event,
+          : g,
       ),
     );
-    showGlobalAlertCompat("Event updated", "Your event RSVP is saved locally.");
+    try {
+      const res = nextJoined
+        ? await communityApi.joinGroup(item.id)
+        : await communityApi.leaveGroup(item.id);
+      setGroups((prev) =>
+        prev.map((g) =>
+          g.id === item.id ? { ...g, joinedByMe: res.joined, memberCount: res.memberCount } : g,
+        ),
+      );
+      showGlobalAlertCompat(copy("groupUpdated"), copy("groupUpdatedDesc"));
+    } catch {
+      setGroups((prev) =>
+        prev.map((g) =>
+          g.id === item.id
+            ? { ...g, joinedByMe: previousJoined, memberCount: previousCount }
+            : g,
+        ),
+      );
+      showGlobalAlertCompat(copy("savedLocal"), copy("groupUpdatedDesc"));
+    }
   };
+
+  const handleJoinEvent = async (event: PlaydateEventDto) => {
+    const previous = event.myRsvpStatus;
+    const nextStatus: RsvpStatusValue = previous === "Going" ? "NotGoing" : "Going";
+    setPlaydates((prev) =>
+      prev.map((p) =>
+        p.id === event.id
+          ? {
+              ...p,
+              myRsvpStatus: nextStatus,
+              goingCount:
+                nextStatus === "Going" && previous !== "Going"
+                  ? p.goingCount + 1
+                  : nextStatus !== "Going" && previous === "Going"
+                    ? Math.max(0, p.goingCount - 1)
+                    : p.goingCount,
+            }
+          : p,
+      ),
+    );
+    try {
+      await playdatesApi.rsvp(event.id, { status: nextStatus, petId: selectedPet?.id });
+      showGlobalAlertCompat(copy("eventUpdated"), copy("eventUpdatedDesc"));
+    } catch {
+      setPlaydates((prev) =>
+        prev.map((p) =>
+          p.id === event.id
+            ? {
+                ...p,
+                myRsvpStatus: previous,
+                goingCount:
+                  nextStatus === "Going" && previous !== "Going"
+                    ? Math.max(0, p.goingCount - 1)
+                    : nextStatus !== "Going" && previous === "Going"
+                      ? p.goingCount + 1
+                      : p.goingCount,
+              }
+            : p,
+        ),
+      );
+      showGlobalAlertCompat(copy("savedLocal"), copy("eventUpdatedDesc"));
+    }
+  };
+
+  const handleInvitePet = (pet: PetDto) => {
+    setInvitedPetIds((prev) => new Set(prev).add(pet.id));
+    showGlobalAlertCompat(copy("invite"), copy("inviteOpened"));
+  };
+
+  const handleFollowPet = (pet: PetDto) => {
+    setFollowedPetIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(pet.id)) next.delete(pet.id);
+      else next.add(pet.id);
+      return next;
+    });
+    showGlobalAlertCompat(copy("following"), copy("followingDesc"));
+  };
+
+  if (!hydrated) {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={["top"]}>
+        <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+          <ActivityIndicator size="large" color={colors.text} />
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   if (!isLoggedIn) {
     return (
@@ -1219,6 +1821,7 @@ export function CommunityScreen() {
     <ScrollView
       horizontal
       showsHorizontalScrollIndicator={false}
+      style={[styles.categoryTabsScroll, { flexGrow: 0, flexShrink: 0 }]}
       contentContainerStyle={[
         styles.topTabsContent,
         { flexDirection: appRowDirection },
@@ -1228,16 +1831,16 @@ export function CommunityScreen() {
         const active = mainTab === tab;
         const label =
           tab === "feed"
-            ? "Feed"
+            ? copy("feed")
             : tab === "playdates"
-              ? "Playdates"
+              ? copy("playdates")
               : tab === "parks"
-                ? "Dog Parks"
+                ? copy("parks")
                 : tab === "groups"
-                  ? "Groups"
+                  ? copy("groups")
                   : tab === "qa"
-                    ? "Q&A"
-                    : "Events";
+                    ? copy("qa")
+                    : copy("events");
         const icon =
           tab === "feed"
             ? "newspaper-outline"
@@ -1254,10 +1857,16 @@ export function CommunityScreen() {
           <Pressable
             key={tab}
             onPress={() => setMainTab(tab)}
-            style={[styles.topTab, active ? styles.topTabActive : styles.topTabInactive]}
+            style={styles.topTab}
           >
-            <Ionicons name={icon as any} size={15} color={active ? colors.textInverse : colors.textSecondary} />
-            <Text style={[styles.topTabText, active && styles.topTabTextActive]}>
+            <View style={[styles.topTabCircle, active ? styles.topTabCircleActive : styles.topTabCircleInactive]}>
+              <Ionicons
+                name={icon as any}
+                size={28}
+                color={active ? colors.textInverse : colors.text}
+              />
+            </View>
+            <Text style={[styles.topTabText, active ? styles.topTabTextActive : undefined]}>
               {label}
             </Text>
           </Pressable>
@@ -1269,53 +1878,37 @@ export function CommunityScreen() {
   const renderHero = () => (
     <View style={styles.hero}>
       <View style={[styles.heroRow, rtlRow]}>
-        <View style={{ flex: 1 }}>
-          <Text style={[styles.heroTitle, rtlText]}>PawSquare</Text>
-          <Text style={[styles.heroSubtitle, rtlText]}>Your local dog community</Text>
-        </View>
         <View style={styles.heroIcon}>
-          <Ionicons name="paw" size={26} color={colors.textInverse} />
+          <Ionicons name="paw" size={24} color={colors.textInverse} />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={[styles.heroTitle, rtlText]}>{copy("title")}</Text>
+          <Text style={[styles.heroSubtitle, rtlText]}>{copy("subtitle")}</Text>
         </View>
       </View>
       <Text style={[styles.privacyNote, rtlText]}>
-        Exact location is only shared when you choose to join or create a playdate.
+        {copy("privacy")}
       </Text>
     </View>
   );
 
-  const renderFeedHeader = () => (
+  const renderFeedHeaderWithoutHero = () => (
     <>
-      {renderTopTabs()}
-      {renderHero()}
-      <View style={styles.searchCard}>
+      <View style={[styles.searchCard, { flexDirection: appRowDirection }]}>
         <Ionicons name="search" size={18} color={colors.textMuted} />
         <TextInput
           style={[styles.searchInput, rtlInput]}
           value={search}
           onChangeText={setSearch}
-          placeholder="Search posts, parks, dogs"
+          placeholder={copy("search")}
           placeholderTextColor={colors.textMuted}
         />
       </View>
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={[styles.filterContent, { flexDirection: appRowDirection }]}
-      >
-        {FEED_FILTERS.map((filter) => (
-          <Chip
-            key={filter}
-            label={filter}
-            active={activeFilter === filter}
-            onPress={() => setActiveFilter(filter)}
-          />
-        ))}
-      </ScrollView>
       {feedIsDemo && (
         <View style={styles.demoBanner}>
           <Ionicons name="information-circle-outline" size={16} color={colors.primary} />
           <Text style={[styles.demoBannerText, rtlText]}>
-            Showing demo community activity until real posts are available.
+            {copy("demoBanner")}
           </Text>
         </View>
       )}
@@ -1323,7 +1916,7 @@ export function CommunityScreen() {
         <View style={styles.demoBanner}>
           <Ionicons name="cloud-offline-outline" size={16} color={colors.primary} />
           <Text style={[styles.demoBannerText, rtlText]}>
-            Feed API is unavailable, so fallback posts are shown for this session.
+            {copy("apiFallback")}
           </Text>
         </View>
       )}
@@ -1331,17 +1924,17 @@ export function CommunityScreen() {
         <View style={[styles.quickActions, rtlRow]}>
           <Pressable onPress={() => setComposerOpen(true)} style={[styles.quickActionPrimary, rtlRow]}>
             <Ionicons name="create-outline" size={18} color={colors.textInverse} />
-            <Text style={styles.quickActionPrimaryText}>Create Post</Text>
+            <Text style={styles.quickActionPrimaryText}>{copy("createPost")}</Text>
           </Pressable>
           <Pressable onPress={() => setPlaydateModalOpen(true)} style={[styles.quickActionSecondary, rtlRow]}>
             <Ionicons name="calendar-outline" size={18} color={colors.text} />
-            <Text style={styles.quickActionSecondaryText}>Create Playdate</Text>
+            <Text style={styles.quickActionSecondaryText}>{copy("createPlaydate")}</Text>
           </Pressable>
         </View>
       </View>
       {pets.length > 0 && (
         <View style={styles.card}>
-          <Text style={[styles.sectionCardTitle, rtlText]}>Your dog profiles</Text>
+          <Text style={[styles.sectionCardTitle, rtlText]}>{copy("myDogs")}</Text>
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
@@ -1356,11 +1949,19 @@ export function CommunityScreen() {
                     <Ionicons name="paw" size={22} color={colors.textInverse} />
                   )}
                 </View>
-                <Text style={styles.dogProfileName} numberOfLines={1}>{pet.name}</Text>
-                <Text style={styles.dogProfileSub} numberOfLines={1}>{pet.breed ?? "Dog"} · age {pet.age}</Text>
+                <Text style={[styles.dogProfileName, rtlText]} numberOfLines={2}>{pet.name}</Text>
+                <Text style={[styles.dogProfileSub, rtlText]} numberOfLines={2}>
+                  {pet.breed ? formatBreedForDisplay(pet.breed, t) : copy("dog")} · {pet.age}
+                </Text>
               </Pressable>
             ))}
           </ScrollView>
+        </View>
+      )}
+      {pets.length === 0 && (
+        <View style={styles.card}>
+          <Text style={[styles.sectionCardTitle, rtlText]}>{copy("myDogs")}</Text>
+          <Text style={[styles.emptyInline, rtlText]}>{copy("noPets")}</Text>
         </View>
       )}
     </>
@@ -1392,11 +1993,11 @@ export function CommunityScreen() {
         </Pressable>
       );
     }
-    return <View style={{ height: 120 }} />;
+    return <View style={{ height: bottomContentPadding }} />;
   };
 
   const renderGroupCard = ({ item }: { item: CommunityGroupDto }) => {
-    const joined = joinedGroups.has(item.id);
+    const joined = item.joinedByMe ?? false;
     return (
     <Pressable
       onPress={() => navigation.navigate("GroupDetail", { group: item })}
@@ -1474,7 +2075,7 @@ export function CommunityScreen() {
         <Pressable
           onPress={(e) => {
             e.stopPropagation();
-            handleJoinGroup(item.id);
+            void handleJoinGroup(item);
           }}
           style={{
             backgroundColor: joined ? colors.successLight : colors.text,
@@ -1486,7 +2087,7 @@ export function CommunityScreen() {
           }}
         >
           <Text style={{ color: joined ? colors.success : colors.textInverse, fontSize: 13, fontWeight: "700" }}>
-            {joined ? "Joined" : t("joinGroup")}
+            {joined ? copy("joined") : copy("joinGroup")}
           </Text>
         </Pressable>
       </View>
@@ -1517,13 +2118,13 @@ export function CommunityScreen() {
         </View>
       </View>
       <Text style={[styles.contentText, rtlText]}>
-        {event.description || "Open dog playdate for friendly local dogs."}
+        {event.description || copy("openPlaydate")}
       </Text>
       <View style={[styles.metaWrap, { flexDirection: appRowDirection }]}>
         <Text style={styles.metaPill}>{event.locationName}</Text>
-        <Text style={styles.metaPill}>All sizes</Text>
-        <Text style={styles.metaPill}>{event.goingCount} going</Text>
-        {event.maxPets ? <Text style={styles.metaPill}>Max {event.maxPets}</Text> : null}
+        <Text style={styles.metaPill}>{copy("allSizes")}</Text>
+        <Text style={styles.metaPill}>{event.goingCount} {copy("going")}</Text>
+        {event.maxPets ? <Text style={styles.metaPill}>{copy("maxParticipants")} {event.maxPets}</Text> : null}
       </View>
       <View style={[styles.actionBar, rtlRow]}>
         {(["Going", "Maybe", "NotGoing"] as RsvpStatusValue[]).map((status) => {
@@ -1535,14 +2136,14 @@ export function CommunityScreen() {
               style={[styles.rsvpButton, active && styles.rsvpButtonActive]}
             >
               <Text style={[styles.rsvpText, active && styles.rsvpTextActive]}>
-                {status === "NotGoing" ? "Not going" : status}
+                {status === "Going" ? copy("going") : status === "Maybe" ? copy("maybe") : copy("notGoing")}
               </Text>
             </Pressable>
           );
         })}
         <Pressable onPress={() => setPlaydateCommentsOpenFor(event)} style={[styles.actionBtn, rtlRow]}>
           <Ionicons name="chatbubble-outline" size={17} color={colors.textSecondary} />
-          <Text style={styles.actionText}>Comments</Text>
+          <Text style={styles.actionText}>{copy("comments")}</Text>
         </Pressable>
       </View>
     </View>
@@ -1552,13 +2153,12 @@ export function CommunityScreen() {
     <ScrollView
       style={{ flex: 1 }}
       refreshControl={<RefreshControl refreshing={playdatesLoading} onRefresh={loadPlaydates} tintColor={colors.text} colors={[colors.text]} />}
-      contentContainerStyle={{ paddingBottom: 130 }}
+      contentContainerStyle={{ paddingBottom: bottomContentPadding }}
     >
-      {renderTopTabs()}
       <SectionHeader
-        title="Dog Playdates"
-        subtitle="Coordinate local meetups and RSVP with your dog."
-        actionLabel="Create Playdate"
+        title={copy("dogPlaydatesTitle")}
+        subtitle={copy("dogPlaydatesSub")}
+        actionLabel={copy("createPlaydate")}
         onAction={() => setPlaydateModalOpen(true)}
       />
       {playdatesLoading && playdates.length === 0 ? (
@@ -1568,8 +2168,8 @@ export function CommunityScreen() {
       ) : (
         <ListEmptyState
           icon="calendar-outline"
-          title="No playdates yet"
-          message="Create the first meetup for dogs nearby."
+          title={copy("noPlaydates")}
+          message={copy("noPlaydatesSub")}
         />
       )}
     </ScrollView>
@@ -1578,18 +2178,26 @@ export function CommunityScreen() {
   const renderParks = () => (
     <ScrollView
       style={{ flex: 1 }}
-      refreshControl={<RefreshControl refreshing={beaconsLoading} onRefresh={loadBeacons} tintColor={colors.text} colors={[colors.text]} />}
-      contentContainerStyle={{ paddingBottom: 130 }}
+      refreshControl={
+        <RefreshControl
+          refreshing={beaconsLoading || parksLoading}
+          onRefresh={async () => {
+            await Promise.all([loadBeacons(), loadDogParks()]);
+          }}
+          tintColor={colors.text}
+          colors={[colors.text]}
+        />
+      }
+      contentContainerStyle={{ paddingBottom: bottomContentPadding }}
     >
-      {renderTopTabs()}
       <SectionHeader
-        title="Dog Parks / Live Nearby"
-        subtitle="See live check-ins and discover friendly park activity."
-        actionLabel={myBeaconId ? "Remove Check-in" : "I am here"}
-        onAction={myBeaconId ? handleRemoveBeacon : () => handleParkCheckIn(DEMO_PARKS[0])}
+        title={copy("parksTitle")}
+        subtitle={copy("parksSub")}
+        actionLabel={myBeaconId ? copy("removeCheckIn") : copy("checkIn")}
+        onAction={myBeaconId ? handleRemoveBeacon : () => handleParkCheckIn(parks[0] ?? DEMO_PARKS[0])}
       />
       <View style={styles.card}>
-        <Text style={[styles.sectionCardTitle, rtlText]}>Active now</Text>
+        <Text style={[styles.sectionCardTitle, rtlText]}>{copy("activeNow")}</Text>
         {beacons.length > 0 ? (
           beacons.slice(0, 3).map((beacon) => (
             <Pressable
@@ -1601,7 +2209,7 @@ export function CommunityScreen() {
               <View style={{ flex: 1 }}>
                 <Text style={[styles.authorName, rtlText]}>{beacon.hostUserName}</Text>
                 <Text style={[styles.sectionCardSub, rtlText]}>
-                  {beacon.placeName} · active now
+                  {beacon.placeName} · {copy("activeNowShort")}
                 </Text>
               </View>
               <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
@@ -1609,11 +2217,14 @@ export function CommunityScreen() {
           ))
         ) : (
           <Text style={[styles.emptyInline, rtlText]}>
-            No live beacons yet. Check in to let nearby dog owners know you are around.
+            {copy("noBeacons")}
           </Text>
         )}
       </View>
-      {DEMO_PARKS.map((park) => {
+      {parksLoading && parks.length === 0 ? (
+        <ListSkeleton rows={3} variant="card" />
+      ) : parks.length > 0 ? (
+        parks.map((park) => {
         const checkedIn = !!parkCheckins[park.id];
         return (
           <View key={park.id} style={styles.card}>
@@ -1624,7 +2235,7 @@ export function CommunityScreen() {
               <View style={{ flex: 1 }}>
                 <Text style={[styles.sectionCardTitle, rtlText]}>{park.name}</Text>
                 <Text style={[styles.sectionCardSub, rtlText]}>
-                  {park.distance} · {park.rating.toFixed(1)} rating · {park.activity} activity
+                  {park.distance} · {park.rating.toFixed(1)} {copy("rating")} · {activityLabel(park.activity, isRTL)} {copy("activity")}
                 </Text>
               </View>
             </View>
@@ -1634,7 +2245,7 @@ export function CommunityScreen() {
               ))}
             </View>
             <Text style={[styles.sectionCardSub, rtlText]}>
-              {park.activeDogs + (checkedIn ? 1 : 0)} active dogs now · {park.upcomingPlaydates} upcoming playdates · {park.recentPosts} recent posts
+              {park.activeDogs + (checkedIn ? 1 : 0)} {copy("activeDogsNow")} · {park.upcomingPlaydates} {copy("upcomingPlaydates")} · {park.recentPosts} {copy("recentPosts")}
             </Text>
             <View style={[styles.actionBar, rtlRow]}>
               <Pressable
@@ -1643,11 +2254,11 @@ export function CommunityScreen() {
                 style={[styles.primarySmallBtn, checkingInPark?.id === park.id && { opacity: 0.6 }]}
               >
                 <Text style={styles.primarySmallText}>
-                  {checkedIn ? "Remove check-in" : "Check in"}
+                  {checkedIn ? copy("removeCheckIn") : copy("checkIn")}
                 </Text>
               </Pressable>
               <Pressable onPress={() => setSelectedPark(park)} style={styles.smallOutlineBtn}>
-                <Text style={styles.smallOutlineText}>View park</Text>
+                <Text style={styles.smallOutlineText}>{copy("viewPark")}</Text>
               </Pressable>
               <Pressable
                 onPress={() => {
@@ -1656,31 +2267,33 @@ export function CommunityScreen() {
                 }}
                 style={styles.smallOutlineBtn}
               >
-                <Text style={styles.smallOutlineText}>Create playdate</Text>
+                <Text style={styles.smallOutlineText}>{copy("createPlaydateInPark")}</Text>
               </Pressable>
             </View>
           </View>
         );
-      })}
+      })
+      ) : (
+        <ListEmptyState icon="leaf-outline" title={copy("parksTitle")} message={copy("noBeacons")} />
+      )}
     </ScrollView>
   );
 
   const renderGroups = () => (
     <View style={{ flex: 1 }}>
-      {renderTopTabs()}
       <SectionHeader
-        title="Community Groups"
-        subtitle="Find local interests, advice, breed groups and support circles."
+        title={copy("groupsTitle")}
+        subtitle={copy("groupsSub")}
         actionLabel={isAdmin ? "Create Group" : undefined}
         onAction={isAdmin ? () => setCreateModalOpen(true) : undefined}
       />
-      <View style={styles.searchCard}>
+      <View style={[styles.searchCard, { flexDirection: appRowDirection }]}>
         <Ionicons name="search" size={18} color={colors.textMuted} />
         <TextInput
           style={[styles.searchInput, rtlInput]}
           value={groupSearch}
           onChangeText={setGroupSearch}
-          placeholder="Search groups"
+          placeholder={copy("searchGroups")}
           placeholderTextColor={colors.textMuted}
         />
       </View>
@@ -1691,7 +2304,7 @@ export function CommunityScreen() {
           data={filteredGroups}
           keyExtractor={(item) => item.id}
           ListEmptyComponent={renderGroupsEmpty}
-          contentContainerStyle={{ paddingBottom: 120 }}
+          contentContainerStyle={{ paddingBottom: bottomContentPadding }}
           refreshControl={
             <RefreshControl
               refreshing={groupsRefreshing}
@@ -1710,13 +2323,12 @@ export function CommunityScreen() {
     <ScrollView
       style={{ flex: 1 }}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefreshFeed} tintColor={colors.text} colors={[colors.text]} />}
-      contentContainerStyle={{ paddingBottom: 130 }}
+      contentContainerStyle={{ paddingBottom: bottomContentPadding }}
     >
-      {renderTopTabs()}
       <SectionHeader
-        title="Q&A / Recommendations"
-        subtitle="Ask local dog owners for trainers, sitters, food and behavior advice."
-        actionLabel="Ask Question"
+        title={copy("qaTitle")}
+        subtitle={copy("qaSub")}
+        actionLabel={copy("askQuestion")}
         onAction={() => {
           setNewPostType("Question");
           setComposerOpen(true);
@@ -1726,20 +2338,20 @@ export function CommunityScreen() {
         <View key={post.id} style={styles.card}>
           <Text style={[styles.sectionCardTitle, rtlText]}>{post.content}</Text>
           <Text style={[styles.sectionCardSub, rtlText]}>
-            Asked by {post.userName} · {post.commentCount} answers
+            {copy("askedBy")} {post.userName} · {post.commentCount} {copy("answers")}
           </Text>
           <View style={[styles.metaWrap, { flexDirection: appRowDirection }]}>
-            <Text style={styles.metaPill}>Training</Text>
-            <Text style={styles.metaPill}>Best answer pending</Text>
-            <Text style={styles.metaPill}>Helpful {post.likeCount}</Text>
+            <Text style={styles.metaPill}>{copy("training")}</Text>
+            <Text style={styles.metaPill}>{copy("bestAnswerPending")}</Text>
+            <Text style={styles.metaPill}>{copy("helpful")} {post.likeCount}</Text>
           </View>
           <View style={[styles.actionBar, rtlRow]}>
-            <Pressable onPress={() => showGlobalAlertCompat("Answer", "Use the comments button on the feed post to answer.")}
+            <Pressable onPress={() => setAnswerPost(post)}
               style={styles.primarySmallBtn}>
-              <Text style={styles.primarySmallText}>Answer</Text>
+              <Text style={styles.primarySmallText}>{copy("answer")}</Text>
             </Pressable>
             <Pressable onPress={() => handleToggleLike(post.id)} style={styles.smallOutlineBtn}>
-              <Text style={styles.smallOutlineText}>Helpful</Text>
+              <Text style={styles.smallOutlineText}>{copy("helpful")}</Text>
             </Pressable>
           </View>
         </View>
@@ -1751,42 +2363,55 @@ export function CommunityScreen() {
     <ScrollView
       style={{ flex: 1 }}
       refreshControl={<RefreshControl refreshing={playdatesLoading} onRefresh={loadPlaydates} tintColor={colors.text} colors={[colors.text]} />}
-      contentContainerStyle={{ paddingBottom: 130 }}
+      contentContainerStyle={{ paddingBottom: bottomContentPadding }}
     >
-      {renderTopTabs()}
       <SectionHeader
-        title="Events / Local Activities"
-        subtitle="Weekend walks, puppy socials, adoption days and workshops."
-        actionLabel="Create Playdate"
+        title={copy("eventsTitle")}
+        subtitle={copy("eventsSub")}
+        actionLabel={copy("createPlaydate")}
         onAction={() => setPlaydateModalOpen(true)}
       />
-      {events.map((event) => (
-        <View key={event.id} style={styles.card}>
-          <View style={[styles.cardRow, rtlRow]}>
-            <View style={styles.iconBubble}>
-              <Ionicons name="sparkles-outline" size={19} color={colors.text} />
+      {playdatesLoading && playdates.length === 0 ? (
+        <ListSkeleton rows={3} variant="card" />
+      ) : playdates.length > 0 ? (
+        playdates.map((event) => {
+          const joined = event.myRsvpStatus === "Going";
+          const spotsLeft = Math.max(0, (event.maxPets ?? event.goingCount) - event.goingCount);
+          return (
+            <View key={event.id} style={styles.card}>
+              <View style={[styles.cardRow, rtlRow]}>
+                <View style={styles.iconBubble}>
+                  <Ionicons name="sparkles-outline" size={19} color={colors.text} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.sectionCardTitle, rtlText]}>{event.title}</Text>
+                  <Text style={[styles.sectionCardSub, rtlText]}>
+                    {event.hostUserName} · {formatDateTime(event.scheduledFor)}
+                  </Text>
+                </View>
+              </View>
+              <Text style={[styles.contentText, rtlText]}>{event.description || copy("openPlaydate")}</Text>
+              <View style={[styles.metaWrap, { flexDirection: appRowDirection }]}>
+                <Text style={styles.metaPill}>{event.locationName}</Text>
+                <Text style={styles.metaPill}>{event.maxPets ? `${event.maxPets} max` : copy("allSizes")}</Text>
+                <Text style={styles.metaPill}>{spotsLeft} {copy("spotsLeft")}</Text>
+                <Text style={styles.metaPill}>{event.goingCount} {copy("dogsAttending")}</Text>
+              </View>
+              <Pressable onPress={() => handleJoinEvent(event)} style={joined ? styles.smallOutlineBtn : styles.primarySmallBtn}>
+                <Text style={joined ? styles.smallOutlineText : styles.primarySmallText}>
+                  {joined ? copy("joined") : copy("joinEvent")}
+                </Text>
+              </Pressable>
             </View>
-            <View style={{ flex: 1 }}>
-              <Text style={[styles.sectionCardTitle, rtlText]}>{event.name}</Text>
-              <Text style={[styles.sectionCardSub, rtlText]}>
-                {event.organizer} · {formatDateTime(event.dateTime)}
-              </Text>
-            </View>
-          </View>
-          <Text style={[styles.contentText, rtlText]}>{event.description}</Text>
-          <View style={[styles.metaWrap, { flexDirection: appRowDirection }]}>
-            <Text style={styles.metaPill}>{event.location}</Text>
-            <Text style={styles.metaPill}>{event.price}</Text>
-            <Text style={styles.metaPill}>{event.spotsLeft} spots left</Text>
-            <Text style={styles.metaPill}>{event.attendingDogs} dogs attending</Text>
-          </View>
-          <Pressable onPress={() => handleJoinEvent(event.id)} style={event.joined ? styles.smallOutlineBtn : styles.primarySmallBtn}>
-            <Text style={event.joined ? styles.smallOutlineText : styles.primarySmallText}>
-              {event.joined ? "Joined" : "Join event"}
-            </Text>
-          </Pressable>
-        </View>
-      ))}
+          );
+        })
+      ) : (
+        <ListEmptyState
+          icon="sparkles-outline"
+          title={copy("noPlaydates")}
+          message={copy("eventsSub")}
+        />
+      )}
     </ScrollView>
   );
 
@@ -1815,24 +2440,31 @@ export function CommunityScreen() {
   );
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: colors.background, marginTop: -8 }} edges={["top"]}>
-      <BrandedAppHeader />
+    <SafeAreaView style={{ flex: 1, backgroundColor: colors.surface, marginTop: 0 }} edges={["top"]}>
+      <BrandedAppHeader style={{ paddingVertical: 6 }} />
+      <View style={{ flex: 1, backgroundColor: colors.surface, overflow: "hidden" }}>
+        {renderTopTabs()}
+        {renderHero()}
 
-      {mainTab === "feed" ? (        loading && posts.length === 0 ? (
-          <>
-            {renderFeedHeader()}
+        {mainTab === "feed" ? (        loading && posts.length === 0 ? (
+          <ScrollView
+            style={{ flex: 1 }}
+            contentContainerStyle={{ paddingBottom: bottomContentPadding }}
+            scrollEnabled={false}
+          >
+            {renderFeedHeaderWithoutHero()}
             <ListSkeleton rows={4} variant="card" />
-          </>
+          </ScrollView>
         ) : (
           <View style={{ flex: 1 }}>
-            {renderFeedHeader()}
             <FlatList
               style={{ flex: 1 }}
               data={filteredPosts}
               keyExtractor={(item) => item.id}
+              ListHeaderComponent={renderFeedHeaderWithoutHero}
               ListEmptyComponent={renderFeedEmpty}
               ListFooterComponent={renderFeedFooter}
-              contentContainerStyle={{ paddingBottom: 120 }}
+              contentContainerStyle={{ paddingBottom: bottomContentPadding, flexGrow: 1 }}
               keyboardShouldPersistTaps="handled"
               refreshControl={
                 <RefreshControl
@@ -1851,12 +2483,12 @@ export function CommunityScreen() {
                   onDelete={handleDelete}
                   onHide={(id) => {
                     setHiddenPostIds((prev) => new Set(prev).add(id));
-                    showGlobalAlertCompat("Post hidden", "This post was hidden from your feed.");
+                    showGlobalAlertCompat(copy("postHidden"), copy("postHiddenDesc"));
                   }}
-                  onReport={() => showGlobalAlertCompat("Report received", "Thanks for helping keep PawSquare safe.")}
+                  onReport={() => showGlobalAlertCompat(copy("reportReceived"), copy("reportReceivedDesc"))}
                   onBlock={(userId) => {
                     setBlockedUserIds((prev) => new Set(prev).add(userId));
-                    showGlobalAlertCompat("User blocked", "Posts from this user are hidden locally.");
+                    showGlobalAlertCompat(copy("userBlocked"), copy("userBlockedDesc"));
                   }}
                   onPlaydateComing={(post) => {
                     setPosts((prev) =>
@@ -1864,10 +2496,12 @@ export function CommunityScreen() {
                         p.id === post.id ? { ...p, likeCount: p.likeCount + 1, likedByMe: true } : p,
                       ),
                     );
-                    showGlobalAlertCompat("You're coming", "Marked your interest for this playdate post.");
+                    showGlobalAlertCompat(copy("youAreComing"), copy("youAreComingDesc"));
                   }}
                   rtlText={rtlText}
                   rtlRow={rtlRow}
+                  isRTL={isRTL}
+                  copy={copy}
                   isLikePending={!!likeBusy[item.id]}
                   isDeletePending={!!deleteBusy[item.id]}
                 />
@@ -1915,6 +2549,7 @@ export function CommunityScreen() {
           </Text>
         </Pressable>
       )}
+      </View>
 
       <CreatePostModal
         visible={composerOpen}
@@ -1927,6 +2562,7 @@ export function CommunityScreen() {
         styles={styles}
         rtlInput={rtlInput}
         isRTL={isRTL}
+        copy={copy}
         content={newPostContent}
         setContent={setNewPostContent}
         postType={newPostType}
@@ -1947,6 +2583,7 @@ export function CommunityScreen() {
         posting={posting}
         uploadingImage={uploadingImage}
         inputRef={composerInputRef}
+        keyboardAvoidBehavior={keyboardAvoidBehavior}
       />
 
       <CreatePlaydateModal
@@ -1956,6 +2593,7 @@ export function CommunityScreen() {
         styles={styles}
         rtlInput={rtlInput}
         isRTL={isRTL}
+        copy={copy}
         pets={pets}
         selectedPetId={selectedPetId}
         setSelectedPetId={setSelectedPetId}
@@ -1981,6 +2619,7 @@ export function CommunityScreen() {
         setRequiresApproval={setNewPlaydateApproval}
         creating={creatingPlaydate}
         onCreate={handleCreatePlaydate}
+        keyboardAvoidBehavior={keyboardAvoidBehavior}
       />
 
       <Modal
@@ -1989,18 +2628,36 @@ export function CommunityScreen() {
         animationType="slide"
         onRequestClose={() => setSelectedPark(null)}
       >
-        <Pressable style={styles.modalBackdrop} onPress={() => setSelectedPark(null)}>
+        <View style={styles.modalRoot}>
+        <Pressable style={styles.modalBackdropFill} onPress={() => setSelectedPark(null)} />
           <Pressable style={styles.detailSheet} onPress={(e) => e.stopPropagation()}>
             {selectedPark && (
               <>
                 <View style={styles.handle} />
                 <Text style={[styles.modalTitle, rtlText]}>{selectedPark.name}</Text>
                 <Text style={[styles.sectionCardSub, rtlText]}>
-                  {selectedPark.distance} · {selectedPark.rating.toFixed(1)} rating · peak {selectedPark.peakHours}
+                  {selectedPark.distance} · {selectedPark.rating.toFixed(1)} {copy("rating")} · {copy("peak")} {selectedPark.peakHours}
                 </Text>
                 <View style={styles.mapPlaceholder}>
-                  <Ionicons name="map-outline" size={42} color={colors.textMuted} />
-                  <Text style={styles.emptyInline}>Approximate park location</Text>
+                  <MapViewWrapper
+                    style={{ flex: 1 }}
+                    initialRegion={{
+                      latitude: selectedPark.latitude,
+                      longitude: selectedPark.longitude,
+                      latitudeDelta: 0.01,
+                      longitudeDelta: 0.01,
+                    }}
+                    pointerEvents="none"
+                  >
+                    <MarkerWrapper
+                      coordinate={{
+                        latitude: selectedPark.latitude,
+                        longitude: selectedPark.longitude,
+                      }}
+                      title={selectedPark.name}
+                      description={selectedPark.address ?? copy("parkLocation")}
+                    />
+                  </MapViewWrapper>
                 </View>
                 <View style={[styles.metaWrap, { flexDirection: appRowDirection }]}>
                   {selectedPark.amenities.map((amenity) => (
@@ -2008,7 +2665,7 @@ export function CommunityScreen() {
                   ))}
                 </View>
                 <Text style={[styles.contentText, rtlText]}>
-                  {selectedPark.activeDogs} active dogs now, {selectedPark.upcomingPlaydates} upcoming playdates and {selectedPark.recentPosts} recent posts.
+                  {selectedPark.activeDogs} {copy("activeDogsNow")}, {selectedPark.upcomingPlaydates} {copy("upcomingPlaydates")}, {selectedPark.recentPosts} {copy("recentPosts")}.
                 </Text>
                 <View style={[styles.actionBar, rtlRow]}>
                   <Pressable
@@ -2019,16 +2676,16 @@ export function CommunityScreen() {
                     }}
                     style={styles.primarySmallBtn}
                   >
-                    <Text style={styles.primarySmallText}>Create playdate</Text>
+                    <Text style={styles.primarySmallText}>{copy("createPlaydate")}</Text>
                   </Pressable>
                   <Pressable onPress={() => handleParkCheckIn(selectedPark)} style={styles.smallOutlineBtn}>
-                    <Text style={styles.smallOutlineText}>Check in</Text>
+                    <Text style={styles.smallOutlineText}>{copy("checkIn")}</Text>
                   </Pressable>
                 </View>
               </>
             )}
           </Pressable>
-        </Pressable>
+        </View>
       </Modal>
 
       <Modal
@@ -2037,10 +2694,16 @@ export function CommunityScreen() {
         animationType="slide"
         onRequestClose={() => setDogProfilePet(null)}
       >
-        <Pressable style={styles.modalBackdrop} onPress={() => setDogProfilePet(null)}>
+        <View style={styles.modalRoot}>
+        <Pressable style={styles.modalBackdropFill} onPress={() => setDogProfilePet(null)} />
           <Pressable style={styles.detailSheet} onPress={(e) => e.stopPropagation()}>
             {dogProfilePet && (
               <>
+                {(() => {
+                  const invited = invitedPetIds.has(dogProfilePet.id);
+                  const followed = followedPetIds.has(dogProfilePet.id);
+                  return (
+                    <>
                 <View style={styles.handle} />
                 <View style={styles.largeDogAvatar}>
                   {dogProfilePet.imageUrl ? (
@@ -2051,25 +2714,38 @@ export function CommunityScreen() {
                 </View>
                 <Text style={[styles.modalTitle, { textAlign: "center" }]}>{dogProfilePet.name}</Text>
                 <Text style={[styles.sectionCardSub, { textAlign: "center" }]}>
-                  {dogProfilePet.breed ?? "Dog"} · age {dogProfilePet.age}
+                  {dogProfilePet.breed ? formatBreedForDisplay(dogProfilePet.breed, t) : copy("dog")} · {dogProfilePet.age}
                 </Text>
                 <View style={[styles.metaWrap, { justifyContent: "center" }]}>
-                  <Text style={styles.metaPill}>Friendly</Text>
-                  <Text style={styles.metaPill}>Medium energy</Text>
-                  <Text style={styles.metaPill}>Favorite parks</Text>
+                  <Text style={styles.metaPill}>{copy("localDogProfile")}</Text>
+                  <Text style={styles.metaPill}>{copy("energyLevel")}: {energyLabel("Medium", isRTL)}</Text>
+                  <Text style={styles.metaPill}>{copy("parks")}</Text>
                 </View>
                 <View style={[styles.actionBar, { justifyContent: "center" }]}>
-                  <Pressable onPress={() => showGlobalAlertCompat("Invite", `Invite to play with ${dogProfilePet.name} opened.`)} style={styles.primarySmallBtn}>
-                    <Text style={styles.primarySmallText}>Invite to play</Text>
+                  <Pressable
+                    onPress={() => handleInvitePet(dogProfilePet)}
+                    style={invited ? styles.smallOutlineBtn : styles.primarySmallBtn}
+                  >
+                    <Text style={invited ? styles.smallOutlineText : styles.primarySmallText}>
+                      {invited ? copy("invited") : copy("invite")}
+                    </Text>
                   </Pressable>
-                  <Pressable onPress={() => showGlobalAlertCompat("Following", `You follow ${dogProfilePet.name} locally.`)} style={styles.smallOutlineBtn}>
-                    <Text style={styles.smallOutlineText}>Follow</Text>
+                  <Pressable
+                    onPress={() => handleFollowPet(dogProfilePet)}
+                    style={followed ? styles.primarySmallBtn : styles.smallOutlineBtn}
+                  >
+                    <Text style={followed ? styles.primarySmallText : styles.smallOutlineText}>
+                      {followed ? copy("followed") : copy("follow")}
+                    </Text>
                   </Pressable>
                 </View>
+                    </>
+                  );
+                })()}
               </>
             )}
           </Pressable>
-        </Pressable>
+        </View>
       </Modal>
 
       <Modal
@@ -2078,18 +2754,19 @@ export function CommunityScreen() {
         animationType="slide"
         onRequestClose={() => setPlaydateCommentsOpenFor(null)}
       >
-        <Pressable style={styles.modalBackdrop} onPress={() => setPlaydateCommentsOpenFor(null)}>
-          <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.keyboardSheet}>
+        <View style={styles.modalRoot}>
+        <Pressable style={styles.modalBackdropFill} onPress={() => setPlaydateCommentsOpenFor(null)} />
+          <KeyboardAvoidingView behavior={keyboardAvoidBehavior} style={styles.keyboardSheet}>
             <Pressable style={styles.detailSheet} onPress={(e) => e.stopPropagation()}>
               <View style={styles.handle} />
-              <Text style={[styles.modalTitle, rtlText]}>Playdate comments</Text>
+              <Text style={[styles.modalTitle, rtlText]}>{copy("playdateComments")}</Text>
               <Text style={[styles.emptyInline, rtlText]}>
-                Comments are loaded in the event detail screen. Add a quick comment here for this session.
+                {copy("commentsHint")}
               </Text>
               <TextInput
                 value={playdateCommentText}
                 onChangeText={setPlaydateCommentText}
-                placeholder="Write a comment"
+                placeholder={copy("writeComment")}
                 placeholderTextColor={colors.textMuted}
                 style={[styles.input, rtlInput]}
               />
@@ -2099,21 +2776,43 @@ export function CommunityScreen() {
                   if (!content || !playdateCommentsOpenFor) return;
                   try {
                     await playdatesApi.addComment(playdateCommentsOpenFor.id, content);
-                    showGlobalAlertCompat("Comment added", "Your comment was posted.");
+                    showGlobalAlertCompat(copy("commentAdded"), copy("commentAddedDesc"));
                   } catch {
-                    showGlobalAlertCompat("Comment saved locally", "The API was unavailable, so this is local for now.");
+                    showGlobalAlertCompat(copy("commentLocal"), copy("commentLocalDesc"));
                   }
                   setPlaydateCommentText("");
                   setPlaydateCommentsOpenFor(null);
                 }}
                 style={styles.primaryBtn}
               >
-                <Text style={styles.primaryBtnText}>Post comment</Text>
+                <Text style={styles.primaryBtnText}>{copy("postComment")}</Text>
               </Pressable>
             </Pressable>
           </KeyboardAvoidingView>
-        </Pressable>
+        </View>
       </Modal>
+
+      <CommentsBottomSheet
+        visible={!!answerPost}
+        onClose={() => setAnswerPost(null)}
+        postId={answerPost?.id ?? ""}
+        postAuthorId={answerPost?.userId ?? ""}
+        onCommentCountChange={(delta) => {
+          if (!answerPost) return;
+          setPosts((prev) =>
+            prev.map((post) =>
+              post.id === answerPost.id
+                ? { ...post, commentCount: Math.max(0, post.commentCount + delta) }
+                : post,
+            ),
+          );
+          setAnswerPost((post) =>
+            post
+              ? { ...post, commentCount: Math.max(0, post.commentCount + delta) }
+              : post,
+          );
+        }}
+      />
 
       {/* Create Group Modal (Admin only) */}
       <Modal
@@ -2313,6 +3012,7 @@ function CreatePostModal({
   styles,
   rtlInput,
   isRTL,
+  copy,
   content,
   setContent,
   postType,
@@ -2333,13 +3033,16 @@ function CreatePostModal({
   posting,
   uploadingImage,
   inputRef,
+  keyboardAvoidBehavior,
 }: {
   visible: boolean;
   onClose: () => void;
+  keyboardAvoidBehavior: KeyboardAvoidingViewProps["behavior"];
   colors: any;
   styles: ReturnType<typeof getStyles>;
   rtlInput: object;
   isRTL: boolean;
+  copy: (key: CopyKey) => string;
   content: string;
   setContent: (value: string) => void;
   postType: PostKind;
@@ -2363,13 +3066,14 @@ function CreatePostModal({
 }) {
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <Pressable style={styles.modalBackdrop} onPress={onClose}>
-        <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.keyboardSheet}>
+      <View style={styles.modalRoot}>
+        <Pressable style={styles.modalBackdropFill} onPress={onClose} />
+        <KeyboardAvoidingView behavior={keyboardAvoidBehavior} style={styles.keyboardSheet}>
           <Pressable style={styles.detailSheet} onPress={(e) => e.stopPropagation()}>
             <View style={styles.handle} />
-            <Text style={[styles.modalTitle, { textAlign: isRTL ? "right" : "left" }]}>Create Post</Text>
+            <Text style={[styles.modalTitle, { textAlign: isRTL ? "right" : "left" }]}>{copy("createPostTitle")}</Text>
             <ScrollView style={{ maxHeight: 520 }} keyboardShouldPersistTaps="handled">
-              <Text style={styles.label}>Post type</Text>
+              <Text style={[styles.label, { textAlign: isRTL ? "right" : "left" }]}>{copy("postType")}</Text>
               <View style={styles.modalChipWrap}>
                 {POST_TYPES.map((type) => (
                   <Pressable
@@ -2377,14 +3081,14 @@ function CreatePostModal({
                     onPress={() => setPostType(type)}
                     style={[styles.modalChip, postType === type && styles.modalChipActive]}
                   >
-                    <Text style={[styles.modalChipText, postType === type && styles.modalChipTextActive]}>{type}</Text>
+                    <Text style={[styles.modalChipText, postType === type && styles.modalChipTextActive]}>{postKindLabel(type, isRTL)}</Text>
                   </Pressable>
                 ))}
               </View>
-              <Text style={styles.label}>Dog</Text>
+              <Text style={[styles.label, { textAlign: isRTL ? "right" : "left" }]}>{copy("dog")}</Text>
               <View style={styles.modalChipWrap}>
                 {pets.length === 0 ? (
-                  <Text style={styles.emptyInline}>No pets found yet.</Text>
+                  <Text style={styles.emptyInline}>{copy("noPets")}</Text>
                 ) : pets.map((pet) => (
                   <Pressable
                     key={pet.id}
@@ -2398,7 +3102,7 @@ function CreatePostModal({
               <TextInput
                 ref={inputRef}
                 style={[styles.input, styles.textArea, rtlInput]}
-                placeholder="What is happening in your dog community?"
+                placeholder={copy("whatHappening")}
                 placeholderTextColor={colors.textMuted}
                 multiline
                 value={content}
@@ -2407,12 +3111,12 @@ function CreatePostModal({
               />
               <TextInput
                 style={[styles.input, rtlInput]}
-                placeholder="Location or dog park"
+                placeholder={copy("locationOrPark")}
                 placeholderTextColor={colors.textMuted}
                 value={location}
                 onChangeText={setLocation}
               />
-              <Text style={styles.label}>Visibility</Text>
+              <Text style={[styles.label, { textAlign: isRTL ? "right" : "left" }]}>{copy("visibility")}</Text>
               <View style={styles.modalChipWrap}>
                 {VISIBILITY_OPTIONS.map((option) => (
                   <Pressable
@@ -2420,20 +3124,20 @@ function CreatePostModal({
                     onPress={() => setVisibility(option)}
                     style={[styles.modalChip, visibility === option && styles.modalChipActive]}
                   >
-                    <Text style={[styles.modalChipText, visibility === option && styles.modalChipTextActive]}>{option}</Text>
+                    <Text style={[styles.modalChipText, visibility === option && styles.modalChipTextActive]}>{visibilityLabel(option, isRTL)}</Text>
                   </Pressable>
                 ))}
               </View>
               <TextInput
                 style={[styles.input, rtlInput]}
-                placeholder="Tags, comma separated"
+                placeholder={copy("tags")}
                 placeholderTextColor={colors.textMuted}
                 value={tags}
                 onChangeText={setTags}
               />
               <View style={styles.mediaRow}>
                 <Pressable disabled={posting || uploadingImage} onPress={handlePickPostImage} style={styles.smallOutlineBtn}>
-                  <Text style={styles.smallOutlineText}>Add image/video placeholder</Text>
+                  <Text style={styles.smallOutlineText}>{copy("addMedia")}</Text>
                 </Pressable>
               </View>
               {pickedImageUri && (
@@ -2447,7 +3151,7 @@ function CreatePostModal({
             </ScrollView>
             <View style={styles.modalActions}>
               <Pressable onPress={onClose} style={styles.composerCancel}>
-                <Text style={styles.composerCancelText}>Cancel</Text>
+                <Text style={styles.composerCancelText}>{copy("cancel")}</Text>
               </Pressable>
               <Pressable
                 onPress={handlePublish}
@@ -2457,13 +3161,13 @@ function CreatePostModal({
                 {posting || uploadingImage ? (
                   <ActivityIndicator size="small" color={colors.textInverse} />
                 ) : (
-                  <Text style={styles.publishText}>Post to Community</Text>
+                  <Text style={styles.publishText}>{copy("publishPost")}</Text>
                 )}
               </Pressable>
             </View>
           </Pressable>
         </KeyboardAvoidingView>
-      </Pressable>
+      </View>
     </Modal>
   );
 }
@@ -2475,6 +3179,7 @@ function CreatePlaydateModal({
   styles,
   rtlInput,
   isRTL,
+  copy,
   pets,
   selectedPetId,
   setSelectedPetId,
@@ -2500,13 +3205,16 @@ function CreatePlaydateModal({
   setRequiresApproval,
   creating,
   onCreate,
+  keyboardAvoidBehavior,
 }: {
   visible: boolean;
   onClose: () => void;
+  keyboardAvoidBehavior: KeyboardAvoidingViewProps["behavior"];
   colors: any;
   styles: ReturnType<typeof getStyles>;
   rtlInput: object;
   isRTL: boolean;
+  copy: (key: CopyKey) => string;
   pets: PetDto[];
   selectedPetId: string | null;
   setSelectedPetId: (value: string | null) => void;
@@ -2535,14 +3243,15 @@ function CreatePlaydateModal({
 }) {
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <Pressable style={styles.modalBackdrop} onPress={onClose}>
-        <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.keyboardSheet}>
+      <View style={styles.modalRoot}>
+        <Pressable style={styles.modalBackdropFill} onPress={onClose} />
+        <KeyboardAvoidingView behavior={keyboardAvoidBehavior} style={styles.keyboardSheet}>
           <Pressable style={styles.detailSheet} onPress={(e) => e.stopPropagation()}>
             <View style={styles.handle} />
-            <Text style={[styles.modalTitle, { textAlign: isRTL ? "right" : "left" }]}>Create Playdate</Text>
+            <Text style={[styles.modalTitle, { textAlign: isRTL ? "right" : "left" }]}>{copy("createPlaydateTitle")}</Text>
             <ScrollView style={{ maxHeight: 520 }} keyboardShouldPersistTaps="handled">
-              <TextInput style={[styles.input, rtlInput]} placeholder="Title" placeholderTextColor={colors.textMuted} value={title} onChangeText={setTitle} />
-              <Text style={styles.label}>Dog</Text>
+              <TextInput style={[styles.input, rtlInput]} placeholder={copy("titleField")} placeholderTextColor={colors.textMuted} value={title} onChangeText={setTitle} />
+              <Text style={[styles.label, { textAlign: isRTL ? "right" : "left" }]}>{copy("dog")}</Text>
               <View style={styles.modalChipWrap}>
                 {pets.map((pet) => (
                   <Pressable key={pet.id} onPress={() => setSelectedPetId(pet.id)} style={[styles.modalChip, selectedPetId === pet.id && styles.modalChipActive]}>
@@ -2551,94 +3260,133 @@ function CreatePlaydateModal({
                 ))}
               </View>
               <View style={styles.twoCol}>
-                <TextInput style={[styles.input, styles.colInput, rtlInput]} placeholder="YYYY-MM-DD" placeholderTextColor={colors.textMuted} value={date} onChangeText={setDate} />
-                <TextInput style={[styles.input, styles.colInput, rtlInput]} placeholder="HH:mm" placeholderTextColor={colors.textMuted} value={time} onChangeText={setTime} />
+                <View style={styles.colInput}>
+                  <DatePickerField
+                    value={date}
+                    onChange={setDate}
+                    placeholder={copy("dateField")}
+                    isRTL={isRTL}
+                    minimumDate={new Date()}
+                  />
+                </View>
+                <View style={styles.colInput}>
+                  <TimePickerField
+                    value={time}
+                    onChange={setTime}
+                    placeholder={copy("timeField")}
+                    isRTL={isRTL}
+                  />
+                </View>
               </View>
-              <TextInput style={[styles.input, rtlInput]} placeholder="Location / dog park" placeholderTextColor={colors.textMuted} value={location} onChangeText={setLocation} />
-              <Text style={styles.label}>Dog size suitability</Text>
+              <TextInput style={[styles.input, rtlInput]} placeholder={copy("locationOrPark")} placeholderTextColor={colors.textMuted} value={location} onChangeText={setLocation} />
+              <Text style={[styles.label, { textAlign: isRTL ? "right" : "left" }]}>{copy("sizeFit")}</Text>
               <View style={styles.modalChipWrap}>
                 {(["Small", "Medium", "Large", "All"] as DogSizeSuitability[]).map((option) => (
                   <Pressable key={option} onPress={() => setSize(option)} style={[styles.modalChip, size === option && styles.modalChipActive]}>
-                    <Text style={[styles.modalChipText, size === option && styles.modalChipTextActive]}>{option}</Text>
+                    <Text style={[styles.modalChipText, size === option && styles.modalChipTextActive]}>{sizeLabel(option, isRTL)}</Text>
                   </Pressable>
                 ))}
               </View>
-              <Text style={styles.label}>Dog age suitability</Text>
+              <Text style={[styles.label, { textAlign: isRTL ? "right" : "left" }]}>{copy("ageFit")}</Text>
               <View style={styles.modalChipWrap}>
                 {["Puppies", "Adults", "Seniors", "All"].map((option) => (
                   <Pressable key={option} onPress={() => setAge(option)} style={[styles.modalChip, age === option && styles.modalChipActive]}>
-                    <Text style={[styles.modalChipText, age === option && styles.modalChipTextActive]}>{option}</Text>
+                    <Text style={[styles.modalChipText, age === option && styles.modalChipTextActive]}>{ageLabel(option, isRTL)}</Text>
                   </Pressable>
                 ))}
               </View>
-              <Text style={styles.label}>Energy level</Text>
+              <Text style={[styles.label, { textAlign: isRTL ? "right" : "left" }]}>{copy("energyLevel")}</Text>
               <View style={styles.modalChipWrap}>
                 {(["Calm", "Medium", "High"] as EnergyLevel[]).map((option) => (
                   <Pressable key={option} onPress={() => setEnergy(option)} style={[styles.modalChip, energy === option && styles.modalChipActive]}>
-                    <Text style={[styles.modalChipText, energy === option && styles.modalChipTextActive]}>{option}</Text>
+                    <Text style={[styles.modalChipText, energy === option && styles.modalChipTextActive]}>{energyLabel(option, isRTL)}</Text>
                   </Pressable>
                 ))}
               </View>
-              <TextInput style={[styles.input, rtlInput]} placeholder="Max participants" placeholderTextColor={colors.textMuted} value={maxParticipants} onChangeText={setMaxParticipants} keyboardType="number-pad" />
-              <TextInput style={[styles.input, styles.textArea, rtlInput]} placeholder="Description" placeholderTextColor={colors.textMuted} value={description} onChangeText={setDescription} multiline />
+              <TextInput style={[styles.input, rtlInput]} placeholder={copy("maxParticipants")} placeholderTextColor={colors.textMuted} value={maxParticipants} onChangeText={setMaxParticipants} keyboardType="number-pad" />
+              <TextInput style={[styles.input, styles.textArea, rtlInput]} placeholder={copy("description")} placeholderTextColor={colors.textMuted} value={description} onChangeText={setDescription} multiline />
               <Pressable onPress={() => setRequiresApproval(!requiresApproval)} style={styles.checkRow}>
                 <Ionicons name={requiresApproval ? "checkbox" : "square-outline"} size={20} color={colors.text} />
-                <Text style={styles.checkText}>Requires organizer approval</Text>
+                <Text style={styles.checkText}>{copy("requiresApproval")}</Text>
               </Pressable>
             </ScrollView>
             <View style={styles.modalActions}>
               <Pressable onPress={onClose} style={styles.composerCancel}>
-                <Text style={styles.composerCancelText}>Cancel</Text>
+                <Text style={styles.composerCancelText}>{copy("cancel")}</Text>
               </Pressable>
               <Pressable onPress={onCreate} disabled={creating} style={[styles.publishBtn, creating && { opacity: 0.5 }]}>
-                {creating ? <ActivityIndicator size="small" color={colors.textInverse} /> : <Text style={styles.publishText}>Create Playdate</Text>}
+                {creating ? <ActivityIndicator size="small" color={colors.textInverse} /> : <Text style={styles.publishText}>{copy("createPlaydate")}</Text>}
               </Pressable>
             </View>
           </Pressable>
         </KeyboardAvoidingView>
-      </Pressable>
+      </View>
     </Modal>
   );
 }
 
 const getStyles = (colors: any) =>
   StyleSheet.create({
+    /** Pull category row closer to the navy header; strip uses page background. */
+    categoryTabsScroll: {
+      backgroundColor: colors.surface,
+      marginTop: 0,
+      flexShrink: 1,
+    },
     topTabsContent: {
-      paddingHorizontal: 16,
-      paddingTop: 14,
-      paddingBottom: 6,
-      gap: 8,
+      paddingHorizontal: 20,
+      paddingTop: 12,
+      paddingBottom: 8,
+      gap: 12,
+      alignItems: "flex-start",
     },
     topTab: {
-      flexDirection: "row",
       alignItems: "center",
-      gap: 6,
-      paddingHorizontal: 14,
-      paddingVertical: 10,
-      borderRadius: 18,
-      borderWidth: 1,
+      justifyContent: "flex-start",
+      minWidth: 76,
+      flexShrink: 0,
+      paddingVertical: 2,
     },
-    topTabActive: {
+    topTabCircle: {
+      width: 76,
+      height: 76,
+      borderRadius: 38,
+      borderWidth: 1,
+      alignItems: "center",
+      justifyContent: "center",
+      shadowColor: "#06256f",
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.08,
+      shadowRadius: 12,
+      elevation: 4,
+    },
+    topTabCircleActive: {
       backgroundColor: colors.text,
       borderColor: colors.text,
     },
-    topTabInactive: {
+    topTabCircleInactive: {
       backgroundColor: colors.surface,
       borderColor: colors.border,
     },
+    /** Inactive label — gray; active uses `topTabTextActive` only (never white). */
     topTabText: {
+      marginTop: 10,
       fontSize: 13,
-      fontWeight: "800",
+      fontWeight: "700",
       color: colors.textSecondary,
+      textAlign: "center",
+      lineHeight: 16,
+      maxWidth: 92,
     },
     topTabTextActive: {
-      color: colors.textInverse,
+      color: "#06256F",
+      fontWeight: "800",
     },
     hero: {
       marginHorizontal: 16,
-      marginTop: 10,
-      borderRadius: 24,
-      padding: 18,
+      marginTop: 6,
+      borderRadius: 22,
+      padding: 16,
       backgroundColor: colors.text,
       shadowColor: colors.shadow,
       shadowOffset: { width: 0, height: 10 },
@@ -2647,12 +3395,12 @@ const getStyles = (colors: any) =>
       elevation: 7,
     },
     heroRow: { flexDirection: "row", alignItems: "center", gap: 12 },
-    heroTitle: { color: colors.textInverse, fontSize: 28, fontWeight: "900" },
-    heroSubtitle: { color: "rgba(255,255,255,0.82)", fontSize: 14, marginTop: 3 },
+    heroTitle: { color: colors.textInverse, fontSize: 25, fontWeight: "900" },
+    heroSubtitle: { color: "rgba(255,255,255,0.84)", fontSize: 13, marginTop: 3, lineHeight: 19 },
     heroIcon: {
-      width: 54,
-      height: 54,
-      borderRadius: 18,
+      width: 48,
+      height: 48,
+      borderRadius: 16,
       backgroundColor: "rgba(255,255,255,0.16)",
       alignItems: "center",
       justifyContent: "center",
@@ -2660,8 +3408,8 @@ const getStyles = (colors: any) =>
     privacyNote: {
       color: "rgba(255,255,255,0.72)",
       fontSize: 12,
-      marginTop: 14,
-      lineHeight: 17,
+      marginTop: 10,
+      lineHeight: 18,
     },
     searchCard: {
       flexDirection: "row",
@@ -2670,8 +3418,9 @@ const getStyles = (colors: any) =>
       backgroundColor: colors.surface,
       borderRadius: 16,
       marginHorizontal: 16,
-      marginTop: 12,
+      marginTop: 10,
       paddingHorizontal: 14,
+      minHeight: 54,
       borderWidth: 1,
       borderColor: colors.border,
     },
@@ -2685,12 +3434,17 @@ const getStyles = (colors: any) =>
       paddingHorizontal: 16,
       paddingTop: 10,
       gap: 8,
+      paddingBottom: 2,
     },
     chip: {
-      paddingHorizontal: 14,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 6,
+      paddingHorizontal: 12,
       paddingVertical: 8,
       borderRadius: 999,
       borderWidth: 1,
+      minHeight: 36,
     },
     chipActive: { backgroundColor: colors.text, borderColor: colors.text },
     chipInactive: { backgroundColor: colors.surface, borderColor: colors.border },
@@ -2728,8 +3482,8 @@ const getStyles = (colors: any) =>
       backgroundColor: colors.surface,
       borderRadius: 16,
       marginHorizontal: 16,
-      marginTop: 12,
-      padding: 16,
+      marginTop: 10,
+      padding: 14,
       shadowColor: colors.shadow,
       shadowOffset: { width: 0, height: 2 },
       shadowOpacity: 0.06,
@@ -2777,7 +3531,7 @@ const getStyles = (colors: any) =>
     },
     kindBadgeText: { color: colors.text, fontSize: 10, fontWeight: "800" },
     timeText: { fontSize: 12, color: colors.textMuted, marginTop: 1 },
-    contentText: { fontSize: 15, color: colors.text, lineHeight: 22, marginTop: 12 },
+    contentText: { fontSize: 15, color: colors.text, lineHeight: 23, marginTop: 12 },
     dogMiniCard: {
       flexDirection: "row",
       alignItems: "center",
@@ -2798,11 +3552,12 @@ const getStyles = (colors: any) =>
     dogName: { color: colors.text, fontSize: 14, fontWeight: "800" },
     dogSubtle: { color: colors.textMuted, fontSize: 12 },
     dogProfileRail: {
-      gap: 10,
+      gap: 12,
       paddingTop: 12,
+      paddingBottom: 2,
     },
     dogProfileCard: {
-      width: 116,
+      width: 154,
       padding: 12,
       borderRadius: 18,
       backgroundColor: colors.surfaceTertiary,
@@ -2811,17 +3566,17 @@ const getStyles = (colors: any) =>
       alignItems: "center",
     },
     dogProfileAvatar: {
-      width: 54,
-      height: 54,
-      borderRadius: 27,
+      width: 78,
+      height: 78,
+      borderRadius: 39,
       overflow: "hidden",
       backgroundColor: colors.text,
       alignItems: "center",
       justifyContent: "center",
       marginBottom: 8,
     },
-    dogProfileName: { color: colors.text, fontSize: 14, fontWeight: "900" },
-    dogProfileSub: { color: colors.textMuted, fontSize: 11, marginTop: 2 },
+    dogProfileName: { color: colors.text, fontSize: 15, fontWeight: "900", textAlign: "center", lineHeight: 19 },
+    dogProfileSub: { color: colors.textMuted, fontSize: 12, marginTop: 3, textAlign: "center", lineHeight: 17 },
     postImage: {
       width: "100%",
       aspectRatio: 4 / 3,
@@ -2887,6 +3642,7 @@ const getStyles = (colors: any) =>
       paddingTop: 12,
       borderTopWidth: 1,
       borderTopColor: colors.borderLight,
+      flexWrap: "wrap",
     },
     actionBtn: { flexDirection: "row", alignItems: "center", gap: 6 },
     actionText: { fontSize: 13, fontWeight: "600", color: colors.textSecondary },
@@ -2983,26 +3739,31 @@ const getStyles = (colors: any) =>
       flexDirection: "row",
       alignItems: "center",
       gap: 10,
+      flexWrap: "wrap",
     },
     quickActionPrimary: {
       flex: 1,
+      minWidth: 140,
       flexDirection: "row",
       alignItems: "center",
       justifyContent: "center",
       gap: 8,
       backgroundColor: colors.text,
-      paddingVertical: 13,
+      paddingVertical: 12,
+      minHeight: 48,
       borderRadius: 14,
     },
     quickActionPrimaryText: { color: colors.textInverse, fontSize: 14, fontWeight: "900" },
     quickActionSecondary: {
       flex: 1,
+      minWidth: 140,
       flexDirection: "row",
       alignItems: "center",
       justifyContent: "center",
       gap: 8,
       backgroundColor: colors.primaryLight,
-      paddingVertical: 13,
+      paddingVertical: 12,
+      minHeight: 48,
       borderRadius: 14,
     },
     quickActionSecondaryText: { color: colors.text, fontSize: 14, fontWeight: "900" },
@@ -3011,8 +3772,9 @@ const getStyles = (colors: any) =>
       alignItems: "center",
       gap: 12,
       paddingHorizontal: 16,
-      paddingTop: 16,
+      paddingTop: 14,
       paddingBottom: 4,
+      flexWrap: "wrap",
     },
     sectionTitle: { color: colors.text, fontSize: 22, fontWeight: "900" },
     sectionSubtitle: { color: colors.textSecondary, fontSize: 13, lineHeight: 18, marginTop: 2 },
@@ -3048,6 +3810,8 @@ const getStyles = (colors: any) =>
       paddingVertical: 9,
       borderRadius: 12,
       alignSelf: "flex-start",
+      minHeight: 38,
+      justifyContent: "center",
     },
     primarySmallText: { color: colors.textInverse, fontSize: 12, fontWeight: "900" },
     smallOutlineBtn: {
@@ -3058,6 +3822,8 @@ const getStyles = (colors: any) =>
       paddingVertical: 8,
       borderRadius: 12,
       alignSelf: "flex-start",
+      minHeight: 38,
+      justifyContent: "center",
     },
     smallOutlineText: { color: colors.text, fontSize: 12, fontWeight: "800" },
     rsvpButton: {
@@ -3082,10 +3848,18 @@ const getStyles = (colors: any) =>
       backgroundColor: colors.success,
     },
     emptyInline: { color: colors.textMuted, fontSize: 13, lineHeight: 19, marginTop: 10 },
+    modalRoot: {
+      flex: 1,
+      justifyContent: "flex-end",
+    },
     modalBackdrop: {
       flex: 1,
       backgroundColor: colors.overlay,
       justifyContent: "flex-end",
+    },
+    modalBackdropFill: {
+      ...StyleSheet.absoluteFillObject,
+      backgroundColor: colors.overlay,
     },
     keyboardSheet: { flex: 1, justifyContent: "flex-end" },
     detailSheet: {
@@ -3146,8 +3920,7 @@ const getStyles = (colors: any) =>
       height: 140,
       borderRadius: 18,
       backgroundColor: colors.surfaceTertiary,
-      alignItems: "center",
-      justifyContent: "center",
+      overflow: "hidden",
       marginTop: 12,
       borderWidth: 1,
       borderColor: colors.border,

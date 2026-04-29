@@ -55,6 +55,7 @@ import type {
   CreateCommentDto,
   CreateCommunityGroupRequest,
   CommunityGroupDto,
+  GroupJoinResponse,
   GroupPostDto,
   CreateGroupPostRequest,
   GroupPostCommentDto,
@@ -403,6 +404,14 @@ export const communityApi = {
     apiClient
       .get<CommunityGroupDto[]>("/community/groups")
       .then((r) => r.data),
+  joinGroup: (id: string) =>
+    apiClient
+      .post<GroupJoinResponse>(`/community/groups/${id}/join`)
+      .then((r) => r.data),
+  leaveGroup: (id: string) =>
+    apiClient
+      .delete<GroupJoinResponse>(`/community/groups/${id}/join`)
+      .then((r) => r.data),
   createGroup: (data: CreateCommunityGroupRequest) =>
     apiClient
       .post<CommunityGroupDto>("/community/admin/groups", data)
@@ -708,7 +717,13 @@ export const palsApi = {
   startBeacon: (data: CreateLiveBeaconDto) =>
     apiClient.post<LiveBeaconDto>("/pals/beacons", data).then((r) => r.data),
   getActiveBeacons: (params?: { radiusKm?: number; species?: string }) =>
-    apiClient.get<LiveBeaconDto[]>("/pals/beacons/active", { params }).then((r) => r.data),
+    apiClient
+      .get<LiveBeaconDto[]>("/pals/beacons/active", {
+        params,
+        skipGlobalErrorToast: true,
+        backgroundRequest: true,
+      })
+      .then((r) => r.data),
   endBeacon: (id: string) => apiClient.delete(`/pals/beacons/${id}`),
 };
 

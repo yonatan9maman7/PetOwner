@@ -276,6 +276,7 @@ export async function fetchPlaceDetails(
 /* ─────────────────────── Reverse Geocoding ──────────────────────── */
 
 const GEOCODE_URL = "https://maps.googleapis.com/maps/api/geocode/json";
+const NEARBY_SEARCH_URL = "https://maps.googleapis.com/maps/api/place/nearbysearch/json";
 
 interface GoogleGeocodeResponse {
   status: string;
@@ -292,11 +293,43 @@ interface GoogleGeocodeResponse {
   error_message?: string;
 }
 
+interface GoogleNearbySearchResponse {
+  status: string;
+  results?: Array<{
+    place_id: string;
+    name: string;
+    vicinity?: string;
+    rating?: number;
+    user_ratings_total?: number;
+    types?: string[];
+    geometry?: { location?: { lat: number; lng: number } };
+  }>;
+  error_message?: string;
+}
+
 export interface ReverseGeocodeOptions {
   latitude: number;
   longitude: number;
   language?: "he" | "en";
   signal?: AbortSignal;
+}
+
+export interface NearbyDogParkResult {
+  placeId: string;
+  name: string;
+  address: string;
+  latitude: number;
+  longitude: number;
+  rating: number;
+  userRatingsTotal: number;
+  types: string[];
+}
+
+export interface NearbyDogParksOptions {
+  latitude: number;
+  longitude: number;
+  radiusMeters?: number;
+  language?: "he" | "en";
 }
 
 /**
@@ -335,6 +368,95 @@ export async function fetchReverseGeocode(
     if (__DEV__) {
       // eslint-disable-next-line no-console
       console.warn("[GooglePlaces] reverse geocode error", err);
+    }
+    return null;
+  }
+}
+
+/**
+ * Search nearby parks around coordinates using Google Places Nearby Search.
+ * Results are filtered toward dog-friendly places by keyword.
+ */
+export async function fetchNearbyDogParks(
+  options: NearbyDogParksOptions,
+): Promise<NearbyDogParkResult[]> {
+  if (!GOOGLE_PLACES_AVAILABLE) return [];
+  const params = new URLSearchParams({
+    location: `${options.latitude},${options.longitude}`,
+    radius: String(options.radiusMeters ?? 6000),
+    type: "park",
+    keyword: "dog park",
+    language: options.language ?? GOOGLE_PLACES_DEFAULT_LANGUAGE,
+    key: GOOGLE_PLACES_API_KEY,
+  });
+
+  try {
+    const res = await fetch(`${NEARBY_SEARCH_URL}?${params.toString()}`);
+    if (!res.ok) return [];
+    const data = (await res.json()) as GoogleNearbySearchResponse;
+    if (data.status !== "OK" && data.status !== "ZERO_RESULTS") {
+      if (__DEV__) {
+        // eslint-disable-next-line no-console
+        console.warn("[GooglePlaces] nearby search failed", data.status, data.error_message);
+      }
+      return [];
+    }
+    return (data.results ?? [])
+      .filter((r) => !!r.geometry?.location?.lat && !!r.geometry?.location?.lng)
+      .map((r) => ({
+        placeId: r.place_id,
+        name: r.name,
+        address: r.vicinity ?? "",
+        latitude: r.geometry!.location!.lat,
+        longitude: r.geometry!.location!.lng,
+        rating: Number.isFinite(r.rating) ? Number(r.rating) : 0,
+        userRatingsTotal: Number.isFinite(r.user_ratings_total) ? Number(r.user_ratings_total) : 0,
+        types: r.types ?? [],
+      }));
+  } catch (err) {
+    if (__DEV__) {
+      // eslint-disable-next-line no-console
+      console.warn("[GooglePlaces] nearby search error", err);
+    }
+    return [];
+  }
+}
+
+export interface GeocodeAddressOptions {
+  query: string;
+  language?: "he" | "en";
+}
+
+/**
+ * Geocode a free-text address/place name to coordinates and formatted address.
+ */
+export async function geocodeAddress(
+  options: GeocodeAddressOptions,
+): Promise<PlaceDetails | null> {
+  if (!GOOGLE_PLACES_AVAILABLE || !options.query.trim()) return null;
+  const params = new URLSearchParams({
+    address: options.query.trim(),
+    key: GOOGLE_PLACES_API_KEY,
+    language: options.language ?? GOOGLE_PLACES_DEFAULT_LANGUAGE,
+    components: `country:${GOOGLE_PLACES_COUNTRY}`,
+  });
+  try {
+    const res = await fetch(`${GEOCODE_URL}?${params.toString()}`);
+    if (!res.ok) return null;
+    const data = (await res.json()) as GoogleGeocodeResponse;
+    if (data.status !== "OK" || !data.results?.length) return null;
+    const result = data.results[0];
+    return {
+      placeId: result.place_id,
+      formattedAddress: result.formatted_address ?? options.query.trim(),
+      latitude: result.geometry?.location?.lat ?? 0,
+      longitude: result.geometry?.location?.lng ?? 0,
+      components: parseAddressComponents(result.address_components ?? []),
+    };
+  } catch (err) {
+    if (__DEV__) {
+      // eslint-disable-next-line no-console
+      console.warn("[GooglePlaces] geocode address error", err);
     }
     return null;
   }

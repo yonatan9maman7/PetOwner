@@ -1,7 +1,7 @@
 import { useState, useCallback } from "react";
 import {
   View, Text, Modal, Pressable, TextInput, ScrollView,
-  ActivityIndicator, StyleSheet, KeyboardAvoidingView, Platform,
+  ActivityIndicator, StyleSheet, KeyboardAvoidingView,
 } from "react-native";
 import { showGlobalAlertCompat } from "../../../components/global-modal";
 import { Ionicons } from "@expo/vector-icons";
@@ -9,6 +9,7 @@ import type { PalPetDto } from "../../../types/api";
 import { palsApi, petsApi } from "../../../api/client";
 import { useTheme } from "../../../theme/ThemeContext";
 import { useTranslation } from "../../../i18n";
+import { useKeyboardAvoidingState } from "../../../hooks/useKeyboardAvoidingState";
 
 const DURATION_OPTIONS = [
   { label: "beaconDuration30", value: 30 },
@@ -26,6 +27,7 @@ interface Props {
 export function StartBeaconSheet({ visible, onClose, onStarted }: Props) {
   const { colors } = useTheme();
   const { t, isRTL } = useTranslation();
+  const { behavior: keyboardAvoidBehavior } = useKeyboardAvoidingState();
 
   const [placeName, setPlaceName] = useState("");
   const [duration, setDuration] = useState(60);
@@ -83,7 +85,7 @@ export function StartBeaconSheet({ visible, onClose, onStarted }: Props) {
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <Pressable style={[styles.backdrop, { backgroundColor: "rgba(0,0,0,0.5)" }]} onPress={onClose} />
-      <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={{ justifyContent: "flex-end" }}>
+      <KeyboardAvoidingView behavior={keyboardAvoidBehavior} style={{ justifyContent: "flex-end" }}>
         <View style={[styles.sheet, { backgroundColor: colors.surface }]}>
           {/* Handle */}
           <View style={[styles.handle, { backgroundColor: colors.border }]} />

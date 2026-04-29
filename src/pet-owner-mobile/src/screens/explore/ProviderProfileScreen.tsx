@@ -27,6 +27,7 @@ import { useTranslation, rowDirectionForAppLayout } from "../../i18n";
 import { useAuthStore } from "../../store/authStore";
 import { useFavoritesStore } from "../../store/favoritesStore";
 import { useTheme } from "../../theme/ThemeContext";
+import { useKeyboardAvoidingState } from "../../hooks/useKeyboardAvoidingState";
 import * as Clipboard from "expo-clipboard";
 import { File, Paths } from "expo-file-system";
 import * as Sharing from "expo-sharing";
@@ -95,6 +96,7 @@ function HeroSection({
   onShare: () => void;
 }) {
   const [imgFailed, setImgFailed] = useState(false);
+  const insets = useSafeAreaInsets();
 
   return (
     <View style={s.heroOuter}>
@@ -121,7 +123,7 @@ function HeroSection({
       <View style={s.heroGradient} />
 
       {/* Floating header */}
-      <View style={[s.heroHeader, { paddingTop: Platform.OS === "ios" ? 50 : 14 }]}>
+      <View style={[s.heroHeader, { paddingTop: insets.top }]}>
         <GlassButton onPress={onBack} icon="arrow-back" />
         <View style={s.heroHeaderRight}>
           <GlassButton
@@ -203,6 +205,7 @@ export function ProviderProfileScreen() {
   const { colors } = useTheme();
   const { t, isRTL, rtlText } = useTranslation();
   const insets = useSafeAreaInsets();
+  const { behavior: keyboardAvoidBehavior } = useKeyboardAvoidingState();
 
   const isLoggedIn = useAuthStore((s) => s.isLoggedIn);
   const currentUserId = useAuthStore((s) => s.userId);
@@ -895,7 +898,7 @@ export function ProviderProfileScreen() {
       >
         <KeyboardAvoidingView
           style={s.modalOverlay}
-          behavior={Platform.OS === "ios" ? "padding" : undefined}
+          behavior={keyboardAvoidBehavior}
         >
           <Pressable style={s.modalBackdrop} onPress={closeDirectReviewModal}>
             <View style={[s.modalCard, { backgroundColor: colors.surface }]}>

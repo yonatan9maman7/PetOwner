@@ -6,7 +6,6 @@ import {
   ActivityIndicator,
   TextInput,
   KeyboardAvoidingView,
-  Platform,
 } from "react-native";
 import { showGlobalAlertCompat } from "../../components/global-modal";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -16,6 +15,7 @@ import { useAuthStore } from "../../store/authStore";
 import { authApi } from "../../api/client";
 import { useTranslation, rowDirectionForAppLayout } from "../../i18n";
 import { useTheme } from "../../theme/ThemeContext";
+import { useKeyboardAvoidingState } from "../../hooks/useKeyboardAvoidingState";
 import * as biometricService from "../../services/biometricService";
 
 export function ChangePasswordScreen() {
@@ -23,6 +23,7 @@ export function ChangePasswordScreen() {
   const userEmail = useAuthStore((s) => s.user?.email);
   const { t, isRTL } = useTranslation();
   const { colors } = useTheme();
+  const { behavior: keyboardAvoidBehavior } = useKeyboardAvoidingState();
 
   const [manualEmail, setManualEmail] = useState("");
   const [sending, setSending] = useState(false);
@@ -54,7 +55,7 @@ export function ChangePasswordScreen() {
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background, marginTop: -8 }} edges={["top"]}>
       <KeyboardAvoidingView
         style={{ flex: 1 }}
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        behavior={keyboardAvoidBehavior}
       >
         {/* Header */}
         <View

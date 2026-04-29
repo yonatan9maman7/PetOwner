@@ -42,6 +42,8 @@ public class CommunityController : ControllerBase
                     (g.TargetCity == null || g.TargetCity == normalizedCity)));
         }
 
+        var userId = GetUserId();
+
         var groups = await query
             .OrderBy(g => g.Name)
             .Select(g => new CommunityGroupDto(
@@ -53,11 +55,64 @@ public class CommunityController : ControllerBase
                 g.CreatedAt,
                 g.TargetCountry,
                 g.TargetCity,
-                g.Posts.Count
+                g.Posts.Count,
+                g.Members.Count,
+                g.Members.Any(m => m.UserId == userId)
             ))
             .ToListAsync();
 
         return Ok(groups);
+    }
+
+    [HttpPost("groups/{id:guid}/join")]
+    public async Task<IActionResult> JoinGroup(Guid id)
+    {
+        var userId = GetUserId();
+
+        var groupExists = await _db.CommunityGroups
+            .AnyAsync(g => g.Id == id && g.IsActive);
+        if (!groupExists)
+            return NotFound(new { message = "Group not found." });
+
+        var existing = await _db.GroupMembers
+            .FirstOrDefaultAsync(m => m.GroupId == id && m.UserId == userId);
+
+        if (existing is null)
+        {
+            _db.GroupMembers.Add(new GroupMember
+            {
+                Id = Guid.NewGuid(),
+                GroupId = id,
+                UserId = userId,
+                JoinedAt = DateTime.UtcNow
+            });
+            await _db.SaveChangesAsync();
+        }
+
+        var memberCount = await _db.GroupMembers.CountAsync(m => m.GroupId == id);
+        return Ok(new GroupJoinResponse(true, memberCount));
+    }
+
+    [HttpDelete("groups/{id:guid}/join")]
+    public async Task<IActionResult> LeaveGroup(Guid id)
+    {
+        var userId = GetUserId();
+
+        var groupExists = await _db.CommunityGroups.AnyAsync(g => g.Id == id);
+        if (!groupExists)
+            return NotFound(new { message = "Group not found." });
+
+        var existing = await _db.GroupMembers
+            .FirstOrDefaultAsync(m => m.GroupId == id && m.UserId == userId);
+
+        if (existing is not null)
+        {
+            _db.GroupMembers.Remove(existing);
+            await _db.SaveChangesAsync();
+        }
+
+        var memberCount = await _db.GroupMembers.CountAsync(m => m.GroupId == id);
+        return Ok(new GroupJoinResponse(false, memberCount));
     }
 
     // ── Public: Posts ────────────────────────────────────────
@@ -267,11 +322,15 @@ public class CommunityController : ControllerBase
     [Authorize(Roles = "Admin")]
     public async Task<IActionResult> AdminGetGroups()
     {
+        var userId = GetUserId();
+
         var groups = await _db.CommunityGroups
             .OrderByDescending(g => g.CreatedAt)
             .Select(g => new CommunityGroupDto(
                 g.Id, g.Name, g.Description, g.Icon, g.IsActive,
-                g.CreatedAt, g.TargetCountry, g.TargetCity, g.Posts.Count
+                g.CreatedAt, g.TargetCountry, g.TargetCity, g.Posts.Count,
+                g.Members.Count,
+                g.Members.Any(m => m.UserId == userId)
             ))
             .ToListAsync();
 
@@ -282,11 +341,15 @@ public class CommunityController : ControllerBase
     [Authorize(Roles = "Admin")]
     public async Task<IActionResult> AdminGetGroup(Guid id)
     {
+        var userId = GetUserId();
+
         var group = await _db.CommunityGroups
             .Where(g => g.Id == id)
             .Select(g => new CommunityGroupDto(
                 g.Id, g.Name, g.Description, g.Icon, g.IsActive,
-                g.CreatedAt, g.TargetCountry, g.TargetCity, g.Posts.Count
+                g.CreatedAt, g.TargetCountry, g.TargetCity, g.Posts.Count,
+                g.Members.Count,
+                g.Members.Any(m => m.UserId == userId)
             ))
             .FirstOrDefaultAsync();
 
@@ -318,7 +381,7 @@ public class CommunityController : ControllerBase
         return CreatedAtAction(nameof(AdminGetGroup), new { id = group.Id },
             new CommunityGroupDto(
                 group.Id, group.Name, group.Description, group.Icon, group.IsActive,
-                group.CreatedAt, group.TargetCountry, group.TargetCity, 0));
+                group.CreatedAt, group.TargetCountry, group.TargetCity, 0, 0, false));
     }
 
     [HttpPut("admin/groups/{id:guid}")]
@@ -338,11 +401,15 @@ public class CommunityController : ControllerBase
 
         await _db.SaveChangesAsync();
 
+        var userId = GetUserId();
         var postCount = await _db.GroupPosts.CountAsync(p => p.GroupId == id);
+        var memberCount = await _db.GroupMembers.CountAsync(m => m.GroupId == id);
+        var joinedByMe = await _db.GroupMembers.AnyAsync(m => m.GroupId == id && m.UserId == userId);
 
         return Ok(new CommunityGroupDto(
             group.Id, group.Name, group.Description, group.Icon, group.IsActive,
-            group.CreatedAt, group.TargetCountry, group.TargetCity, postCount));
+            group.CreatedAt, group.TargetCountry, group.TargetCity, postCount,
+            memberCount, joinedByMe));
     }
 
     [HttpDelete("admin/groups/{id:guid}")]

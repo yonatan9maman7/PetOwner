@@ -6,7 +6,6 @@ import {
   Pressable,
   TextInput,
   KeyboardAvoidingView,
-  Platform,
   ScrollView,
   ActivityIndicator,
 } from "react-native";
@@ -22,6 +21,7 @@ import { useActivitiesStore } from "../../../store/activitiesStore";
 import type { CreateActivityDto, PetActivityType } from "../../../types/api";
 import type { TranslationKey } from "../../../i18n";
 import { formInputStyle } from "../MyPets/helpers";
+import { useKeyboardAvoidingState } from "../../../hooks/useKeyboardAvoidingState";
 
 /** Activity types the modal supports creating. "Weight" is intentionally excluded
  *  — weight is tracked via the dedicated WeightSection in MyPets. */
@@ -110,6 +110,7 @@ export function AddActivityModal({
 }: AddActivityModalProps) {
   const { t, isRTL } = useTranslation();
   const { colors } = useTheme();
+  const { behavior: keyboardAvoidBehavior } = useKeyboardAvoidingState();
   const createActivity = useActivitiesStore((s) => s.createActivity);
   const [submitting, setSubmitting] = useState(false);
 
@@ -181,7 +182,7 @@ export function AddActivityModal({
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
       <View className="flex-1 justify-end bg-black/50">
         <Pressable className="absolute bottom-0 left-0 right-0 top-0" onPress={onClose} accessibilityRole="button" />
-        <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"}>
+        <KeyboardAvoidingView behavior={keyboardAvoidBehavior}>
           <View
             className="min-h-[60%] max-h-[90%] rounded-t-3xl px-5 pt-4"
             style={{ backgroundColor: colors.surface }}

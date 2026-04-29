@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { View, Text, Pressable, ScrollView, KeyboardAvoidingView, Platform } from "react-native";
+import { View, Text, Pressable, ScrollView, KeyboardAvoidingView } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -8,6 +8,7 @@ import { useTheme } from "../../../../theme/ThemeContext";
 import type { PetDto } from "../../../../types/api";
 import { getSpeciesEmoji, TILE_CONFIG, SECTION_SCROLL_TAB_BAR_CLEARANCE } from "../constants";
 import type { Section } from "../types";
+import { useKeyboardAvoidingState } from "../../../../hooks/useKeyboardAvoidingState";
 
 type NonNullSection = Exclude<Section, null>;
 
@@ -31,6 +32,7 @@ export function SectionShell({
   const { t, isRTL } = useTranslation();
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
+  const { behavior: keyboardAvoidBehavior } = useKeyboardAvoidingState();
 
   const sectionMeta: {
     icon: keyof typeof Ionicons.glyphMap;
@@ -44,7 +46,7 @@ export function SectionShell({
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background, marginTop: -8 }} edges={["top"]}>
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={keyboardAvoidBehavior}>
         <View
           style={{
             backgroundColor: sectionMeta.color,

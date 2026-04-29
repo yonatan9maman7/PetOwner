@@ -20,7 +20,7 @@ import { useTranslation } from "../i18n";
 import { useTheme } from "../theme/ThemeContext";
 
 /** Sits just above the tab bar. */
-const TAB_BAR_OFFSET = 100;
+const TAB_BAR_OFFSET = 72;
 
 function getFocusedRouteName(state: any): string | undefined {
   if (!state?.routes?.length) return undefined;

@@ -1,4 +1,5 @@
 import { View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   createBottomTabNavigator,
   BottomTabBar,
@@ -116,25 +117,21 @@ function TabBarWithSos(props: BottomTabBarProps) {
   );
 }
 
+/** Standard tab row height used by @react-navigation/bottom-tabs (UIKit). */
+const TAB_BAR_CONTENT_HEIGHT = 50;
+
 function useTabBarStyle() {
   const { colors } = useTheme();
+  const insets = useSafeAreaInsets();
+  const paddingTop = 6;
+  const paddingBottom = insets.bottom;
   return {
-    position: "absolute" as const,
-    bottom: 30,
-    left: 20,
-    right: 20,
-    height: 70,
-    borderRadius: 35,
-    borderTopWidth: 0,
-    backgroundColor: colors.tabBar,
-    paddingTop: 8,
-    paddingBottom: 8,
-    zIndex: 9999,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.3,
-    shadowRadius: 15,
-    elevation: 25,
+    backgroundColor: colors.text,
+    borderTopWidth: 1,
+    borderTopColor: colors.text,
+    paddingTop,
+    paddingBottom,
+    height: TAB_BAR_CONTENT_HEIGHT + paddingTop + paddingBottom,
   };
 }
 
@@ -296,6 +293,9 @@ export function AppNavigator() {
         },
         tabBarIconStyle: {
           marginBottom: -2,
+        },
+        tabBarItemStyle: {
+          justifyContent: "center",
         },
         tabBarStyle,
       }}

@@ -28,14 +28,12 @@ import { showApiErrorToast } from "../../services/apiErrorToast";
 import { LanguageToggle } from "../../components/LanguageToggle";
 import { authApi } from "../../api/client";
 import { useTheme } from "../../theme/ThemeContext";
+import { useKeyboardAvoidingState } from "../../hooks/useKeyboardAvoidingState";
 import * as biometricService from "../../services/biometricService";
 
 WebBrowser.maybeCompleteAuthSession();
 
 const LOGIN_HERO_LOGO = require("../../../assets/petcare-logo-transparent.png");
-
-const KEYBOARD_AVOID_BEHAVIOR: "padding" | "height" =
-  Platform.OS === "ios" ? "padding" : "height";
 
 /* ─── LoginScreen (root) ─────────────────────────────────────────── */
 
@@ -99,6 +97,7 @@ function LoginForm() {
   const { t, isHebrew, rtlText, rtlStyle, rtlRow, rtlInput, alignCls, trailingFormLinkAlign } =
     useTranslation();
   const { colors } = useTheme();
+  const { behavior: keyboardAvoidBehavior } = useKeyboardAvoidingState();
 
   const [_googleRequest, googleResponse, promptGoogleAsync] = Google.useAuthRequest({
     iosClientId: process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID,
@@ -439,7 +438,7 @@ function LoginForm() {
 
       <KeyboardAvoidingView
         style={{ flex: 1 }}
-        behavior={KEYBOARD_AVOID_BEHAVIOR}
+        behavior={keyboardAvoidBehavior}
         keyboardVerticalOffset={0}
       >
         <ScrollView

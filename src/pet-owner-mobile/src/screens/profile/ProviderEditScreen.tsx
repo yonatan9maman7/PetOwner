@@ -9,6 +9,7 @@ import {
   Platform,
   ActivityIndicator,
   KeyboardAvoidingView,
+  type KeyboardAvoidingViewProps,
   Modal,
   Image,
   StyleSheet,
@@ -38,6 +39,7 @@ import { ProviderType, type AvailabilitySlotDto, type DogSize } from "../../type
 import { pickImageWithSource } from "../../utils/imagePicker";
 import { getNormalizedApiError } from "../../utils/apiUtils";
 import { showApiErrorToast } from "../../services/apiErrorToast";
+import { useKeyboardAvoidingState } from "../../hooks/useKeyboardAvoidingState";
 
 const NAVY = "#001a5a";
 const DEFAULT_LAT = 32.0809;
@@ -61,6 +63,18 @@ const SERVICE_NAME_TO_TYPE: Record<string, number> = {
   HouseSitting: 7,
   DoggyDayCare: 8,
 };
+
+/** API `ServiceRateDto` uses `serviceType` (JSON camelCase); legacy may send `service`. */
+function resolveServiceTypeIndex(rate: {
+  serviceType?: string | number;
+  service?: string;
+}): number | undefined {
+  const raw = rate.serviceType ?? rate.service;
+  if (raw === undefined || raw === null) return undefined;
+  if (typeof raw === "number" && Number.isInteger(raw) && raw >= 0 && raw <= 8) return raw;
+  const mapped = SERVICE_NAME_TO_TYPE[String(raw)];
+  return mapped;
+}
 
 const DAYS: TranslationKey[] = [
   "daySun", "dayMon", "dayTue", "dayWed", "dayThu", "dayFri", "daySat",
@@ -283,12 +297,14 @@ function AddPackageModal({
   onSave,
   t,
   isRTL,
+  keyboardAvoidBehavior,
 }: {
   visible: boolean;
   onClose: () => void;
   onSave: (pkg: { title: string; price: string; description: string }) => void;
   t: (key: TranslationKey) => string;
   isRTL: boolean;
+  keyboardAvoidBehavior: KeyboardAvoidingViewProps["behavior"];
 }) {
   const { colors } = useTheme();
   const modalInsets = useSafeAreaInsets();
@@ -312,9 +328,7 @@ function AddPackageModal({
           justifyContent: "flex-end",
         }}
       >
-        <KeyboardAvoidingView
-          behavior={Platform.OS === "ios" ? "padding" : undefined}
-        >
+        <KeyboardAvoidingView behavior={keyboardAvoidBehavior}>
           <Pressable
             onPress={(e) => e.stopPropagation()}
             style={{
@@ -795,6 +809,7 @@ export function ProviderEditScreen() {
   const { t, isRTL, rtlText, rtlInput } = useTranslation();
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
+  const { behavior: keyboardAvoidBehavior } = useKeyboardAvoidingState();
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -857,8 +872,11 @@ export function ProviderEditScreen() {
         if (!active) return;
 
         setProviderStatus(profile.status || "Approved");
+        const apiProviderType = profile.providerType ?? profile.type;
         setProviderKind(
-          profile.type === ProviderType.Business ? ProviderType.Business : ProviderType.Individual,
+          apiProviderType === ProviderType.Business || apiProviderType === "Business"
+            ? ProviderType.Business
+            : ProviderType.Individual,
         );
         setBusinessName((profile.businessName ?? "").trim());
         setProfileImageUrl(profile.profileImageUrl ?? null);
@@ -878,10 +896,8 @@ export function ProviderEditScreen() {
         );
 
         const loaded = buildInitialServiceStates();
-        for (const rate of profile.serviceRates) {
-          const serviceKey = rate.service;
-          if (serviceKey == null) continue;
-          const typeNum = SERVICE_NAME_TO_TYPE[serviceKey];
+        for (const rate of profile.serviceRates ?? []) {
+          const typeNum = resolveServiceTypeIndex(rate);
           if (typeNum != null) {
             const existingPkgs: ServicePackage[] = (rate.packages || []).map(
               (p: any) => ({
@@ -1250,7 +1266,7 @@ export function ProviderEditScreen() {
 
       <KeyboardAvoidingView
         style={{ flex: 1 }}
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        behavior={keyboardAvoidBehavior}
       >
             {/* Scrollable form */}
             <ScrollView
@@ -1987,6 +2003,7 @@ export function ProviderEditScreen() {
         }}
         t={t}
         isRTL={isRTL}
+        keyboardAvoidBehavior={keyboardAvoidBehavior}
       />
     </View>
   );

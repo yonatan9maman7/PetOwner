@@ -1,6 +1,6 @@
 import "./global.css";
 import { useEffect, useRef } from "react";
-import { DevSettings, I18nManager, Platform, View, LogBox } from "react-native";
+import { DevSettings, I18nManager, Keyboard, Platform, View, LogBox } from "react-native";
 import { NavigationContainer, DefaultTheme, DarkTheme } from "@react-navigation/native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
@@ -65,7 +65,15 @@ function AppInner() {
 
   return (
     <>
-      <NavigationContainer ref={navigationRef} theme={navTheme}>
+      <NavigationContainer
+        ref={navigationRef}
+        theme={navTheme}
+        onStateChange={() => {
+          if (Platform.OS !== "web") {
+            Keyboard.dismiss();
+          }
+        }}
+      >
         <AppNavigator />
         <StatusBar style={isDark ? "light" : "dark"} />
       </NavigationContainer>

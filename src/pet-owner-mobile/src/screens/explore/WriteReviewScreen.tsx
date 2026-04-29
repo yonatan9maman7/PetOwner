@@ -6,7 +6,6 @@ import {
   Pressable,
   ScrollView,
   KeyboardAvoidingView,
-  Platform,
   ActivityIndicator,
 } from "react-native";
 import { showGlobalAlertCompat } from "../../components/global-modal";
@@ -24,6 +23,7 @@ import { bookingsApi } from "../../api/client";
 import { StarRatingInput } from "./components/StarRatingInput";
 import { InlineError } from "../../components/shared";
 import { formInputStyle } from "../pets/MyPets/helpers";
+import { useKeyboardAvoidingState } from "../../hooks/useKeyboardAvoidingState";
 
 function errMsg(msg: string | undefined, tr: (k: TranslationKey) => string): string {
   if (!msg) return "";
@@ -76,6 +76,8 @@ export function WriteReviewScreen() {
     resolver,
     defaultValues: { rating: 0, comment: "" },
   });
+
+  const { behavior: keyboardAvoidBehavior } = useKeyboardAvoidingState();
 
   useEffect(() => {
     if (bookingIdParam) {
@@ -183,7 +185,7 @@ export function WriteReviewScreen() {
         <View style={{ width: 24 }} />
       </View>
 
-      <KeyboardAvoidingView className="flex-1" behavior={Platform.OS === "ios" ? "padding" : undefined}>
+      <KeyboardAvoidingView className="flex-1" behavior={keyboardAvoidBehavior}>
         {resolvingBooking ? (
           <View className="flex-1 items-center justify-center">
             <ActivityIndicator size="large" color={colors.primary} />

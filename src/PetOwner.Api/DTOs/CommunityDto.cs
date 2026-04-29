@@ -13,8 +13,12 @@ public record CommunityGroupDto(
     DateTime CreatedAt,
     string? TargetCountry,
     string? TargetCity,
-    int PostCount
+    int PostCount,
+    int MemberCount,
+    bool JoinedByMe
 );
+
+public record GroupJoinResponse(bool Joined, int MemberCount);
 
 public record CreateCommunityGroupRequest(
     [Required, MaxLength(200)] string Name,

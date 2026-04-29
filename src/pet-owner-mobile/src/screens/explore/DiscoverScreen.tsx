@@ -10,7 +10,8 @@ import {
   Keyboard,
   Image,
   ActivityIndicator,
-  useWindowDimensions,
+  Platform,
+  type ViewStyle,
 } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -34,10 +35,6 @@ interface CategoryChip {
   icon: string;
 }
 
-const STATIC_CHIPS: CategoryChip[] = [
-  { id: "all", labelKey: "chipAll", icon: "apps", label: "" },
-];
-
 type DiscoverNavParams = {
   providerTypeFilter?: ProviderType;
   /** When set (e.g. from Explore FAB), pins match the same viewport as the map. */
@@ -53,6 +50,50 @@ const INDIVIDUAL_SERVICE_CHIP_IDS = new Set([
   "house sitting",
   "doggy day care",
 ]);
+
+/**
+ * Map API `getServiceTypes()` strings (English) to i18n keys — aligned with
+ * [`ExploreScreen.tsx`](./ExploreScreen.tsx) `SERVICE_I18N_MAP`.
+ */
+const SERVICE_I18N_MAP: Record<string, TranslationKey> = {
+  boarding: "serviceBoarding",
+  "dog walker": "serviceDogWalking",
+  "dog walking": "serviceDogWalking",
+  "drop-in visit": "serviceDropInVisit",
+  "drop in visit": "serviceDropInVisit",
+  "pet insurance": "serviceInsurance",
+  "pet sitter": "servicePetSitting",
+  "pet sitting": "servicePetSitting",
+  "pet store": "servicePetStore",
+  "pet trainer": "serviceTraining",
+  training: "serviceTraining",
+  insurance: "serviceInsurance",
+  "house sitting": "serviceHouseSitting",
+  "doggy day care": "serviceDoggyDayCare",
+  grooming: "serviceGrooming",
+  "pet grooming": "serviceGrooming",
+  vet: "chipVet",
+  "vet clinic": "chipVet",
+  veterinary: "chipVet",
+  clinic: "chipVet",
+};
+
+function serviceLabelKeyFromApiName(svc: string): TranslationKey | undefined {
+  const normalized = svc.toLowerCase().trim().replace(/\s+/g, " ");
+  return SERVICE_I18N_MAP[normalized];
+}
+
+function formatCategoryLine(
+  servicesCsv: string,
+  t: (key: TranslationKey) => string,
+  isRTL: boolean,
+): string {
+  const first = servicesCsv.split(",")[0]?.trim() ?? "";
+  if (!first) return "";
+  const key = serviceLabelKeyFromApiName(first);
+  const text = key ? t(key) : first;
+  return isRTL ? text : text.toUpperCase();
+}
 
 /** Normalize pin type (API may send enum string with different casing or legacy numeric JSON). */
 function mapPinProviderType(p: MapPinDto): ProviderType {
@@ -121,10 +162,16 @@ function ProviderHeroArea({
 
 /* ─── Rating badge ─── */
 
-function FloatingRatingBadge({ rating }: { rating?: number }) {
+function FloatingRatingBadge({
+  rating,
+  style,
+}: {
+  rating?: number;
+  style?: ViewStyle;
+}) {
   if (rating == null) return null;
   return (
-    <View style={c.floatingRating}>
+    <View style={[c.floatingRating, style]}>
       <Ionicons name="star" size={13} color="#F59E0B" />
       <Text style={c.floatingRatingText}>{rating.toFixed(1)}</Text>
     </View>
@@ -143,7 +190,6 @@ export function DiscoverScreen() {
   const { colors } = useTheme();
   const { t, isRTL, rtlText, rtlInput } = useTranslation();
   const insets = useSafeAreaInsets();
-  const { width: screenWidth } = useWindowDimensions();
   const inputRef = useRef<TextInput>(null);
 
   const [searchQuery, setSearchQuery] = useState("");
@@ -213,11 +259,16 @@ export function DiscoverScreen() {
       providerTypeFilter === ProviderType.Business
         ? serviceTypes.filter((svc) => !INDIVIDUAL_SERVICE_CHIP_IDS.has(svc.toLowerCase()))
         : serviceTypes;
-    const dynamic: CategoryChip[] = typesForChips.map((svc) => ({
-      id: svc.toLowerCase(),
-      label: svc,
-      icon: serviceIcon(svc),
-    }));
+    const dynamic: CategoryChip[] = typesForChips.map((svc) => {
+      const id = svc.toLowerCase();
+      const labelKey = serviceLabelKeyFromApiName(svc);
+      return {
+        id,
+        label: svc,
+        labelKey,
+        icon: serviceIcon(svc),
+      };
+    });
     return [
       { id: "all", labelKey: "chipAll" as TranslationKey, icon: "apps", label: "" },
       ...dynamic,
@@ -269,7 +320,10 @@ export function DiscoverScreen() {
     navigation.goBack();
   }, [navigation]);
 
-  const styles = useMemo(() => createStyles(colors), [colors]);
+  const styles = useMemo(
+    () => createStyles(colors, Platform.OS === "android"),
+    [colors],
+  );
 
   const renderCard = useCallback(
     ({ item, index }: { item: MapPinDto; index: number }) => (
@@ -288,11 +342,25 @@ export function DiscoverScreen() {
           {/* Hero image area */}
           <View style={c.heroContainer}>
             <ProviderHeroArea pin={item} index={index} />
-            <FloatingRatingBadge rating={item.averageRating} />
+            <FloatingRatingBadge
+              rating={item.averageRating}
+              style={
+                isRTL
+                  ? { left: undefined, right: 14 }
+                  : { right: undefined, left: 14 }
+              }
+            />
             {item.isEmergencyService && (
-              <View style={c.emergencyBadge}>
+              <View
+                style={[
+                  c.emergencyBadge,
+                  isRTL
+                    ? { right: undefined, left: 14 }
+                    : { left: undefined, right: 14 },
+                ]}
+              >
                 <Ionicons name="medkit" size={11} color="#fff" />
-                <Text style={c.emergencyBadgeText}>Emergency</Text>
+                <Text style={c.emergencyBadgeText}>{t("emergency")}</Text>
               </View>
             )}
           </View>
@@ -302,7 +370,7 @@ export function DiscoverScreen() {
             {/* Category + distance row */}
             <View style={[c.topMetaRow, isRTL && c.rowReverse]}>
               <Text style={[styles.categoryLabel, rtlText]} numberOfLines={1}>
-                {item.services.split(",")[0]?.toUpperCase() ?? ""}
+                {formatCategoryLine(item.services, t, isRTL)}
               </Text>
               {item.minRate > 0 && (
                 <View style={[c.distancePill, isRTL && c.rowReverse]}>
@@ -529,7 +597,7 @@ function serviceIcon(svc: string): string {
 
 /* ═══════════ THEME-AWARE STYLES ═══════════ */
 
-function createStyles(colors: ThemeColors) {
+function createStyles(colors: ThemeColors, isAndroid: boolean) {
   return StyleSheet.create({
     title: {
       fontSize: 26,
@@ -565,7 +633,7 @@ function createStyles(colors: ThemeColors) {
       paddingVertical: 10,
       borderRadius: 28,
       backgroundColor: colors.surfaceTertiary,
-      marginRight: 10,
+      marginEnd: 10,
     },
     chipActive: {
       backgroundColor: colors.text,
@@ -582,11 +650,19 @@ function createStyles(colors: ThemeColors) {
       backgroundColor: colors.surface,
       borderRadius: 20,
       overflow: "hidden",
+      ...(isAndroid
+        ? {
+            borderWidth: 1,
+            borderColor: colors.border,
+            elevation: 12,
+          }
+        : {
+            elevation: 8,
+          }),
       shadowColor: colors.shadow,
       shadowOffset: { width: 0, height: 8 },
       shadowOpacity: 0.06,
       shadowRadius: 24,
-      elevation: 8,
     },
     categoryLabel: {
       fontSize: 10,

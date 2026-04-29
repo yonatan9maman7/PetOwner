@@ -6,7 +6,6 @@ import {
   TouchableOpacity,
   ScrollView,
   KeyboardAvoidingView,
-  Platform,
   Image,
   ActivityIndicator,
 } from "react-native";
@@ -19,6 +18,7 @@ import { authApi } from "../../api/client";
 import { useTranslation, rowDirectionForAppLayout } from "../../i18n";
 import { useTheme } from "../../theme/ThemeContext";
 import { pickImageWithSource } from "../../utils/imagePicker";
+import { useKeyboardAvoidingState } from "../../hooks/useKeyboardAvoidingState";
 
 function InputLabel({ text }: { text: string }) {
   const { isRTL } = useTranslation();
@@ -43,6 +43,7 @@ export function AccountEditScreen() {
   const user = useAuthStore((s) => s.user);
   const { t, isRTL } = useTranslation();
   const { colors } = useTheme();
+  const { behavior: keyboardAvoidBehavior } = useKeyboardAvoidingState();
 
   const [name, setName] = useState(user?.name ?? "");
   const [email, setEmail] = useState(user?.email ?? "");
@@ -154,7 +155,7 @@ export function AccountEditScreen() {
 
       <KeyboardAvoidingView
         style={{ flex: 1 }}
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        behavior={keyboardAvoidBehavior}
       >
         <ScrollView
           contentContainerStyle={{ padding: 20, paddingBottom: 100 }}

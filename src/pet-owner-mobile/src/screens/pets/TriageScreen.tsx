@@ -29,6 +29,7 @@ import {
 import * as Location from "expo-location";
 import { useTranslation, rowDirectionForAppLayout } from "../../i18n";
 import { useTheme } from "../../theme/ThemeContext";
+import { useKeyboardAvoidingState } from "../../hooks/useKeyboardAvoidingState";
 import { triageApi, petsApi } from "../../api/client";
 import { getSpeciesEmoji } from "./MyPets/constants";
 import { PetSpecies } from "../../types/api";
@@ -119,6 +120,7 @@ export function TriageScreen() {
     useTranslation();
   const { colors } = useTheme();
   const scrollRef = useRef<ScrollView>(null);
+  const { behavior: keyboardAvoidBehavior } = useKeyboardAvoidingState();
 
   const [pets, setPets] = useState<PetDto[]>([]);
   const [petsLoading, setPetsLoading] = useState(true);
@@ -491,7 +493,7 @@ export function TriageScreen() {
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background, marginTop: -8 }} edges={["top"]}>
       <KeyboardAvoidingView
         style={{ flex: 1 }}
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        behavior={keyboardAvoidBehavior}
       >
         {sosEmergencyMode && (
           <View
