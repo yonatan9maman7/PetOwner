@@ -1,4 +1,5 @@
 import type { ProviderApplicationPayload } from "../../types/api";
+import { ServiceType } from "../../types/api";
 import type { OnboardingFormValues } from "./schemas";
 import {
   servicesForProviderType,
@@ -48,7 +49,7 @@ export function formToPayload(values: OnboardingFormValues): ProviderApplication
   const isBusiness = values.providerType === 1;
 
   let selectedServices: ProviderApplicationPayload["selectedServices"] = [];
-  let primaryServiceType = 6; // PetStore default for Business
+  let primaryServiceType = ServiceType.PetStore;
 
   if (!isBusiness) {
     const enabledServices = servicesForProviderType(0).filter(
@@ -57,7 +58,7 @@ export function formToPayload(values: OnboardingFormValues): ProviderApplication
     selectedServices = enabledServices.map((svc) => {
       const state = values.services[String(svc.serviceType)];
       return {
-        serviceType: svc.serviceType,
+        serviceType: svc.serviceTypeName,
         rate: Number(state.rate),
         pricingUnit: svc.pricingUnit,
         packages: state.packages
@@ -69,7 +70,7 @@ export function formToPayload(values: OnboardingFormValues): ProviderApplication
           })),
       };
     });
-    primaryServiceType = selectedServices[0]?.serviceType ?? 0;
+    primaryServiceType = selectedServices[0]?.serviceType ?? ServiceType.DogWalking;
   }
 
   const needsDogPrefs = [...DOG_CARE_SERVICE_TYPES].some(

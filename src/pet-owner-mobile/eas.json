@@ -1,6 +1,6 @@
 {
   "cli": {
-    "version": ">= 16.0.0"
+    "version": ">= 10.0.0"
   },
   "build": {
     "development": {
@@ -17,6 +17,9 @@
       "distribution": "internal",
       "android": {
         "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://petowner-production.up.railway.app"
       }
     },
     "production": {

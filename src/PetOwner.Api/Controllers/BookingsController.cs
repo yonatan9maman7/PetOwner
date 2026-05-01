@@ -37,8 +37,16 @@ public class BookingsController : ControllerBase
     {
         var ownerId = GetUserId();
 
-        if (request.EndDate <= request.StartDate)
-            return BadRequest(new { message = "EndDate must be after StartDate." });
+        if (request.PetIds is null || request.PetIds.Count == 0)
+            return BadRequest(new { message = "At least one pet must be selected for a booking." });
+
+        var requestedPetIds = request.PetIds
+            .Where(id => id != Guid.Empty)
+            .Distinct()
+            .ToList();
+
+        if (requestedPetIds.Count == 0)
+            return BadRequest(new { message = "At least one valid pet must be selected for a booking." });
 
         var provider = await _db.ProviderProfiles
             .Include(p => p.User)
@@ -54,26 +62,72 @@ public class BookingsController : ControllerBase
         if (serviceRate is null)
             return BadRequest(new { message = $"This provider does not offer {ServiceTypeCatalog.ToDisplayName(request.ServiceType)}." });
 
-        var totalPrice = CalculateTotalPrice(serviceRate, request.StartDate, request.EndDate);
+        var bookingStart = request.StartDate.ToUniversalTime();
+        var bookingEnd = serviceRate.FixedDurationMinutes is > 0
+            ? bookingStart.AddMinutes(serviceRate.FixedDurationMinutes.Value)
+            : request.EndDate.ToUniversalTime();
+
+        if (bookingEnd <= bookingStart)
+            return BadRequest(new { message = "EndDate must be after StartDate." });
+
+        var pets = await _db.Pets
+            .Where(p => p.UserId == ownerId && requestedPetIds.Contains(p.Id))
+            .ToListAsync();
+
+        if (pets.Count != requestedPetIds.Count)
+            return BadRequest(new { message = "One or more selected pets were not found for this owner." });
+
+        if (request.ServiceType is ServiceType.DogWalking or ServiceType.DoggyDayCare
+            && pets.Any(p => p.Species != PetSpecies.Dog))
+            return BadRequest(new { message = "This service is exclusively for dogs." });
+
+        var activeBookings = await _db.Bookings
+            .Include(b => b.BookingPets)
+            .Where(b => b.ProviderProfileId == provider.UserId
+                && b.Service == request.ServiceType
+                && (b.Status == BookingStatus.Pending || b.Status == BookingStatus.Confirmed))
+            .ToListAsync();
+
+        var bufferedNewEnd = bookingEnd.AddMinutes(serviceRate.BufferTimeMinutes);
+        var overlappingBookings = activeBookings
+            .Where(b => b.StartDate < bufferedNewEnd
+                && b.EndDate.AddMinutes(serviceRate.BufferTimeMinutes) > bookingStart)
+            .ToList();
+
+        var currentConcurrentBookings = overlappingBookings.Count;
+        if (currentConcurrentBookings + 1 > serviceRate.MaxConcurrentBookings)
+            return BadRequest(new { message = "The provider is fully booked at this time." });
+
+        var currentPetCount = overlappingBookings.Sum(b => b.BookingPets.Count);
+        if (currentPetCount + requestedPetIds.Count > serviceRate.MaxPetCapacity)
+            return BadRequest(new { message = "The provider does not have enough pet capacity for this time slot." });
+
+        var totalPrice = CalculateTotalPrice(serviceRate, bookingStart, bookingEnd);
 
         if (totalPrice <= 0)
             return BadRequest(new { message = "Calculated price must be greater than zero." });
 
         var owner = await _db.Users.FindAsync(ownerId);
+        var bookingId = Guid.NewGuid();
 
         var booking = new Booking
         {
-            Id = Guid.NewGuid(),
+            Id = bookingId,
             OwnerId = ownerId,
             ProviderProfileId = provider.UserId,
             Service = request.ServiceType,
-            StartDate = request.StartDate.ToUniversalTime(),
-            EndDate = request.EndDate.ToUniversalTime(),
+            StartDate = bookingStart,
+            EndDate = bookingEnd,
             TotalPrice = totalPrice,
             Status = BookingStatus.Pending,
             PaymentStatus = PaymentStatus.Pending,
             CreatedAt = DateTime.UtcNow,
             Notes = request.Notes?.Trim(),
+            BookingPets = pets.Select(p => new BookingPet
+            {
+                BookingId = bookingId,
+                PetId = p.Id,
+            }).ToList(),
         };
 
         _db.Bookings.Add(booking);
@@ -265,6 +319,8 @@ public class BookingsController : ControllerBase
             PricingUnit.PerNight => rate.Rate * Math.Max(1, (end.Date - start.Date).Days),
             PricingUnit.PerHour => rate.Rate * (decimal)Math.Max(0, (end - start).TotalHours),
             PricingUnit.PerVisit => rate.Rate,
+            PricingUnit.PerSession when rate.FixedDurationMinutes is > 0 =>
+                rate.Rate * (decimal)Math.Max(0, (end - start).TotalHours),
             PricingUnit.PerSession => rate.Rate,
             PricingUnit.PerPackage => rate.Rate,
             _ => 0m,

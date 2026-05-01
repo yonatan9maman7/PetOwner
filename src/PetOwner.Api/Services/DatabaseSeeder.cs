@@ -45,7 +45,7 @@ public class DatabaseSeeder
         (ServiceType.DropInVisit, "Drop-in Visit", PricingUnit.PerVisit, 30, 80),
         (ServiceType.Training, "Pet Trainer", PricingUnit.PerSession, 100, 300),
         (ServiceType.Insurance, "Pet Insurance", PricingUnit.PerPackage, 150, 500),
-        (ServiceType.PetStore, "Pet Store", PricingUnit.PerVisit, 20, 200),
+        (ServiceType.PetStore, "Pet Store", PricingUnit.PerPackage, 20, 200),
     ];
 
     /// <summary>

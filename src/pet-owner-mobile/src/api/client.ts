@@ -74,6 +74,7 @@ import type {
   HealthPassportShareDto,
   CreateBookingRequest,
   BookingDto,
+  ServiceType,
   CreateContactInquiryRequest,
   ContactInquiryAdminDto,
   FavoriteProviderDto,
@@ -199,6 +200,13 @@ export const mapApi = {
   getProviderProfile: (providerId: string) =>
     apiClient
       .get<ProviderPublicProfileDto>(`/providers/${providerId}/profile`, {
+        backgroundRequest: true,
+      })
+      .then((r) => r.data),
+  getProviderAvailability: (providerId: string, date: string, serviceType: ServiceType) =>
+    apiClient
+      .get<string[]>(`/providers/${providerId}/availability/${date}`, {
+        params: { serviceType },
         backgroundRequest: true,
       })
       .then((r) => r.data),

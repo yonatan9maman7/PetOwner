@@ -7,6 +7,10 @@ public class ProviderServiceRate
     public ServiceType Service { get; set; }
     public decimal Rate { get; set; }
     public PricingUnit Unit { get; set; }
+    public int? FixedDurationMinutes { get; set; }
+    public int BufferTimeMinutes { get; set; } = 0;
+    public int MaxConcurrentBookings { get; set; } = 1;
+    public int MaxPetCapacity { get; set; } = 1;
 
     public ProviderProfile ProviderProfile { get; set; } = null!;
     public ICollection<ServicePackage> Packages { get; set; } = new List<ServicePackage>();

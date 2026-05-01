@@ -5,6 +5,7 @@ namespace PetOwner.Api.DTOs;
 public record CreateBookingRequest(
     Guid ProviderId,
     ServiceType ServiceType,
+    List<Guid> PetIds,
     DateTime StartDate,
     DateTime EndDate,
     string? Notes = null

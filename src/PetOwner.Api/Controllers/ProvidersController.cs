@@ -24,6 +24,25 @@ public class ProvidersController : ControllerBase
     private readonly INotificationService _notifications;
     private readonly IProviderShareCardService _shareCard;
 
+    private static readonly IReadOnlySet<ServiceType> IndividualAllowedServices = new HashSet<ServiceType>
+    {
+        ServiceType.DogWalking,
+        ServiceType.Boarding,
+        ServiceType.DropInVisit,
+        ServiceType.Training,
+        ServiceType.HouseSitting,
+        ServiceType.DoggyDayCare,
+    };
+
+    private static readonly IReadOnlySet<ServiceType> BusinessAllowedServices = new HashSet<ServiceType>
+    {
+        ServiceType.PetSitting,
+        ServiceType.Insurance,
+        ServiceType.PetStore,
+    };
+
+    private static readonly TimeZoneInfo ProviderLocalTimeZone = ResolveProviderLocalTimeZone();
+
     public ProvidersController(
         ApplicationDbContext db,
         IBlobService blobService,
@@ -77,6 +96,12 @@ public class ProvidersController : ControllerBase
             : user.Name;
 
         var selectedServiceTypes = request.SelectedServices.Select(s => s.ServiceType).ToList();
+        var providerTypeError = ValidateProviderTypeServices(
+            request.Type,
+            selectedServiceTypes.Append(request.ServiceType).Distinct().ToList());
+        if (providerTypeError is not null)
+            return providerTypeError;
+
         var dogPrefError = ValidateDogWalkingBoardingPrefs(selectedServiceTypes, request.AcceptedDogSizes, request.MaxDogsCapacity);
         if (dogPrefError is not null)
             return dogPrefError;
@@ -234,6 +259,83 @@ public class ProvidersController : ControllerBase
         return Ok(new { message = "Availability updated.", isAvailableNow = profile.IsAvailableNow });
     }
 
+    [HttpGet("{providerId:guid}/availability/{date}")]
+    public async Task<IActionResult> GetProviderAvailability(
+        Guid providerId,
+        DateOnly date,
+        [FromQuery] ServiceType serviceType)
+    {
+        var dayOfWeek = (int)date.DayOfWeek;
+
+        var rate = await _db.ProviderServiceRates
+            .AsNoTracking()
+            .FirstOrDefaultAsync(r => r.ProviderProfileId == providerId && r.Service == serviceType);
+
+        if (rate is null)
+            return BadRequest(new { message = $"This provider does not offer {ServiceTypeCatalog.ToDisplayName(serviceType)}." });
+
+        var rawSlots = await _db.AvailabilitySlots
+            .AsNoTracking()
+            .Where(s => s.ProviderId == providerId && s.DayOfWeek == dayOfWeek)
+            .OrderBy(s => s.StartTime)
+            .ToListAsync();
+
+        if (rawSlots.Count == 0)
+            return Ok(new List<string>());
+
+        var bufferMinutes = Math.Max(0, rate.BufferTimeMinutes);
+        var maxConcurrentBookings = Math.Max(1, rate.MaxConcurrentBookings);
+        var slotDurationMinutes = rate.FixedDurationMinutes is > 0
+            ? rate.FixedDurationMinutes.Value
+            : 15;
+
+        var localDayStart = date.ToDateTime(TimeOnly.MinValue);
+        var localDayEnd = date.AddDays(1).ToDateTime(TimeOnly.MinValue);
+        var dayStartUtc = TimeZoneInfo.ConvertTimeToUtc(localDayStart, ProviderLocalTimeZone).AddMinutes(-bufferMinutes);
+        var dayEndUtc = TimeZoneInfo.ConvertTimeToUtc(localDayEnd, ProviderLocalTimeZone).AddMinutes(bufferMinutes);
+        var nowUtc = DateTime.UtcNow;
+
+        var activeBookings = await _db.Bookings
+            .AsNoTracking()
+            .Where(b => b.ProviderProfileId == providerId
+                && b.Service == serviceType
+                && (b.Status == BookingStatus.Pending || b.Status == BookingStatus.Confirmed)
+                && b.StartDate < dayEndUtc
+                && b.EndDate > dayStartUtc)
+            .ToListAsync();
+
+        var availableTimes = new List<string>();
+        foreach (var rawSlot in rawSlots)
+        {
+            for (var slotStart = rawSlot.StartTime;
+                 slotStart < rawSlot.EndTime;
+                 slotStart = slotStart.Add(TimeSpan.FromMinutes(15)))
+            {
+                var slotEnd = slotStart.Add(TimeSpan.FromMinutes(slotDurationMinutes));
+                if (slotEnd > rawSlot.EndTime)
+                    continue;
+
+                var candidateStartLocal = date.ToDateTime(TimeOnly.FromTimeSpan(slotStart));
+                var candidateEndLocal = date.ToDateTime(TimeOnly.FromTimeSpan(slotEnd));
+                var candidateStartUtc = TimeZoneInfo.ConvertTimeToUtc(candidateStartLocal, ProviderLocalTimeZone);
+                var candidateEndUtc = TimeZoneInfo.ConvertTimeToUtc(candidateEndLocal, ProviderLocalTimeZone);
+                if (candidateStartUtc <= nowUtc)
+                    continue;
+
+                var bufferedCandidateEndUtc = candidateEndUtc.AddMinutes(bufferMinutes);
+
+                var overlappingCount = activeBookings.Count(b =>
+                    b.StartDate < bufferedCandidateEndUtc
+                    && b.EndDate.AddMinutes(bufferMinutes) > candidateStartUtc);
+
+                if (overlappingCount + 1 <= maxConcurrentBookings)
+                    availableTimes.Add(slotStart.ToString(@"hh\:mm", CultureInfo.InvariantCulture));
+            }
+        }
+
+        return Ok(availableTimes.Distinct().ToList());
+    }
+
     [Authorize]
     [HttpPut("me")]
     public async Task<IActionResult> UpdateProfile([FromBody] UpdateProfileDto request)
@@ -256,6 +358,10 @@ public class ProvidersController : ControllerBase
             return NotFound(new { message = "Location not found." });
 
         var updateServiceTypes = request.SelectedServices.Select(s => s.ServiceType).ToList();
+        var providerTypeError = ValidateProviderTypeServices(profile.Type, updateServiceTypes);
+        if (providerTypeError is not null)
+            return providerTypeError;
+
         var updatePrefError = ValidateDogWalkingBoardingPrefs(updateServiceTypes, request.AcceptedDogSizes, request.MaxDogsCapacity);
         if (updatePrefError is not null)
             return updatePrefError;
@@ -924,11 +1030,50 @@ public class ProvidersController : ControllerBase
     private Guid GetUserId() =>
         Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
 
+    private static TimeZoneInfo ResolveProviderLocalTimeZone()
+    {
+        foreach (var id in new[] { "Asia/Jerusalem", "Israel Standard Time" })
+        {
+            try
+            {
+                return TimeZoneInfo.FindSystemTimeZoneById(id);
+            }
+            catch (TimeZoneNotFoundException)
+            {
+            }
+            catch (InvalidTimeZoneException)
+            {
+            }
+        }
+
+        return TimeZoneInfo.Local;
+    }
+
     private static bool NeedsDogSizesAndCapacity(IEnumerable<ServiceType> serviceTypes) =>
         serviceTypes.Any(s => s is ServiceType.DogWalking
             or ServiceType.Boarding
             or ServiceType.HouseSitting
             or ServiceType.DoggyDayCare);
+
+    private IActionResult? ValidateProviderTypeServices(
+        ProviderType providerType,
+        IReadOnlyCollection<ServiceType> selectedServices)
+    {
+        var allowedServices = providerType == ProviderType.Business
+            ? BusinessAllowedServices
+            : IndividualAllowedServices;
+
+        var disallowedServices = selectedServices
+            .Where(serviceType => !allowedServices.Contains(serviceType))
+            .Distinct()
+            .ToList();
+
+        if (disallowedServices.Count == 0)
+            return null;
+
+        var serviceNames = string.Join(", ", disallowedServices.Select(ServiceTypeCatalog.ToDisplayName));
+        return BadRequest(new { message = $"{providerType} providers cannot offer: {serviceNames}." });
+    }
 
     private IActionResult? ValidateDogWalkingBoardingPrefs(
         IReadOnlyCollection<ServiceType> selectedServices,

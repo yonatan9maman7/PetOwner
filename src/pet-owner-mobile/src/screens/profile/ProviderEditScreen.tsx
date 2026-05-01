@@ -35,7 +35,7 @@ import {
   DOG_CARE_SERVICE_TYPES,
   type ServiceDef,
 } from "../../features/provider-onboarding/constants";
-import { ProviderType, type AvailabilitySlotDto, type DogSize } from "../../types/api";
+import { ProviderType, ServiceType, type AvailabilitySlotDto, type DogSize } from "../../types/api";
 import { pickImageWithSource } from "../../utils/imagePicker";
 import { getNormalizedApiError } from "../../utils/apiUtils";
 import { showApiErrorToast } from "../../services/apiErrorToast";
@@ -1088,7 +1088,7 @@ export function ProviderEditScreen() {
       }).map((svc) => {
         const st = serviceStates[svc.serviceType];
         return {
-          serviceType: svc.serviceType,
+          serviceType: svc.serviceTypeName,
           rate: Number(st.rate),
           pricingUnit: svc.pricingUnit,
           packages: st.packages.map((p) => ({
@@ -1137,7 +1137,7 @@ export function ProviderEditScreen() {
         }
         const firstService = selectedServices[0];
         const applyPayloadServices = isBusiness ? [] : selectedServices;
-        const primaryServiceType = isBusiness ? 6 : (firstService?.serviceType ?? 0);
+        const primaryServiceType = isBusiness ? ServiceType.PetStore : (firstService?.serviceType ?? ServiceType.DogWalking);
         await providerApi.apply({
           type: isBusiness ? 1 : 0,
           businessName: isBusiness ? businessName.trim() : undefined,

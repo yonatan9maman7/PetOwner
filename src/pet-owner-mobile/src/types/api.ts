@@ -167,6 +167,10 @@ export interface ServiceRateDto {
   rate: number;
   /** C# `PricingUnit` (PerHour, PerVisit, etc.); not the display `unit` string. */
   pricingUnit?: string | number;
+  fixedDurationMinutes?: number | null;
+  bufferTimeMinutes?: number;
+  maxConcurrentBookings?: number;
+  maxPetCapacity?: number;
   /** Display hint only; not always present on `ProviderPublicProfile` rates. */
   unit?: string;
   packages?: { id?: string; title: string; price: number; description?: string }[];
@@ -665,7 +669,7 @@ export interface ServicePackagePayload {
 }
 
 export interface ServiceRatePayload {
-  serviceType: number;
+  serviceType: ServiceType;
   rate: number;
   pricingUnit: number;
   packages?: ServicePackagePayload[];
@@ -690,7 +694,7 @@ export interface UpdateProfileDto {
 export interface ProviderApplicationPayload {
   type: number;
   businessName?: string;
-  serviceType: number;
+  serviceType: ServiceType;
   city: string;
   street: string;
   buildingNumber: string;
@@ -882,7 +886,8 @@ export interface HealthPassportShareDto {
 
 export interface CreateBookingRequest {
   providerId: string;
-  serviceType: number;
+  serviceType: ServiceType;
+  petIds: string[];
   startDate: string;
   endDate: string;
   notes?: string;

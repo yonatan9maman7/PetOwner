@@ -39,4 +39,5 @@ public class Pet
     public ICollection<WeightLog> WeightLogs { get; set; } = new List<WeightLog>();
     public ICollection<TeletriageSession> TeletriageSessions { get; set; } = new List<TeletriageSession>();
     public ICollection<Activity> Activities { get; set; } = new List<Activity>();
+    public ICollection<BookingPet> BookingPets { get; set; } = new List<BookingPet>();
 }

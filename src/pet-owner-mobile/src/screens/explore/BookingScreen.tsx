@@ -7,6 +7,7 @@ import {
   TextInput,
   ActivityIndicator,
   Platform,
+  Image,
 } from "react-native";
 import { showGlobalAlertCompat } from "../../components/global-modal";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -14,22 +15,34 @@ import { Ionicons } from "@expo/vector-icons";
 import { CommonActions, useNavigation, useRoute } from "@react-navigation/native";
 import { useTranslation, rowDirectionForAppLayout } from "../../i18n";
 import { useTheme } from "../../theme/ThemeContext";
-import { bookingsApi } from "../../api/client";
-import type { ProviderPublicProfileDto } from "../../types/api";
+import { bookingsApi, mapApi } from "../../api/client";
+import { PetSpecies, ServiceType, type PetDto, type ProviderPublicProfileDto } from "../../types/api";
 import { SmartCalendarPicker } from "../../components/shared/SmartCalendarPicker";
 import { TimeSlotSelector } from "../../components/shared/TimeSlotSelector";
 import { usePetsStore } from "../../store/petsStore";
 
-const SERVICE_TYPE_NAMES: Record<number, string> = {
-  0: "Dog Walking",
-  1: "Pet Sitting",
-  2: "Boarding",
-  3: "Drop-in Visit",
-  4: "Training",
-  5: "Insurance",
-  6: "Pet Store",
-  7: "House Sitting",
-  8: "Doggy Day Care",
+const SERVICE_TYPE_BY_ORDINAL: Record<number, ServiceType> = {
+  0: ServiceType.DogWalking,
+  1: ServiceType.PetSitting,
+  2: ServiceType.Boarding,
+  3: ServiceType.DropInVisit,
+  4: ServiceType.Training,
+  5: ServiceType.Insurance,
+  6: ServiceType.PetStore,
+  7: ServiceType.HouseSitting,
+  8: ServiceType.DoggyDayCare,
+};
+
+const SERVICE_TYPE_NAMES: Record<ServiceType, string> = {
+  [ServiceType.DogWalking]: "Dog Walking",
+  [ServiceType.PetSitting]: "Pet Sitting",
+  [ServiceType.Boarding]: "Boarding",
+  [ServiceType.DropInVisit]: "Drop-in Visit",
+  [ServiceType.Training]: "Training",
+  [ServiceType.Insurance]: "Insurance",
+  [ServiceType.PetStore]: "Pet Store",
+  [ServiceType.HouseSitting]: "House Sitting",
+  [ServiceType.DoggyDayCare]: "Doggy Day Care",
 };
 
 const PRICING_UNIT_LABELS: Record<number, string> = {
@@ -82,9 +95,16 @@ function getBillingMode(rate: any): BillingMode {
   if (unit === "night" || unit === "nights") return "perNight";
 
   if (raw === undefined || raw === null || raw === "") {
-    const n = serviceTypeToNumber(rate);
-    if (n === 0 || n === 1 || n === 8) return "perHour";
-    if (n === 2) return "perNight";
+    const serviceType = resolveServiceType(rate);
+    if (
+      serviceType === ServiceType.DogWalking ||
+      serviceType === ServiceType.PetSitting ||
+      serviceType === ServiceType.HouseSitting ||
+      serviceType === ServiceType.DoggyDayCare
+    ) {
+      return "perHour";
+    }
+    if (serviceType === ServiceType.Boarding) return "perNight";
   }
   return "flat";
 }
@@ -102,6 +122,8 @@ function calculateBookingTotal(
   rate: number,
   start: Date,
   end: Date,
+  fixedDurationMinutes?: number | null,
+  pricingUnit?: string | number,
 ): number {
   switch (mode) {
     case "perNight":
@@ -112,8 +134,32 @@ function calculateBookingTotal(
       return Math.round(total * 100) / 100;
     }
     default:
+      if (fixedDurationMinutes && fixedDurationMinutes > 0) {
+        const rawUnit = String(pricingUnit ?? "").replace(/\s+/g, "").toLowerCase();
+        if (rawUnit === "persession" || rawUnit === "3") {
+          const total = rate * (fixedDurationMinutes / 60);
+          return Math.round(total * 100) / 100;
+        }
+      }
       return rate;
   }
+}
+
+function getFixedDurationMinutes(rate: any): number | null {
+  const raw = rate?.fixedDurationMinutes ?? rate?.FixedDurationMinutes;
+  const value = typeof raw === "number" ? raw : Number(raw);
+  return Number.isFinite(value) && value > 0 ? value : null;
+}
+
+function isDogPet(pet: PetDto): boolean {
+  const raw = pet.species as PetSpecies | string | number;
+  return raw === PetSpecies.Dog || String(raw).toLowerCase() === "dog" || String(raw) === "1";
+}
+
+function petSpeciesLabel(pet: PetDto): string {
+  const raw = pet.species as PetSpecies | string | number;
+  if (typeof raw === "string" && raw.length > 0) return raw;
+  return PetSpecies[raw as PetSpecies] ?? "Pet";
 }
 
 /**
@@ -125,12 +171,20 @@ function resolveBookingRange(
   startTime: string,
   endDate: string,
   endTime: string,
+  fixedDurationMinutes?: number | null,
 ): { start: Date; end: Date } | null {
-  if (!startDate || !startTime || !endTime) return null;
-  const resolvedEndDate = endDate || startDate;
+  if (!startDate || !startTime) return null;
   const start = new Date(combineDateAndTime(startDate, startTime));
+  if (isNaN(start.getTime())) return null;
+
+  if (fixedDurationMinutes && fixedDurationMinutes > 0) {
+    return { start, end: new Date(start.getTime() + fixedDurationMinutes * 60000) };
+  }
+
+  if (!endTime) return null;
+  const resolvedEndDate = endDate || startDate;
   let end = new Date(combineDateAndTime(resolvedEndDate, endTime));
-  if (isNaN(start.getTime()) || isNaN(end.getTime())) return null;
+  if (isNaN(end.getTime())) return null;
   if (end <= start) {
     end = new Date(end.getTime() + 86400000);
   }
@@ -138,23 +192,32 @@ function resolveBookingRange(
   return { start, end };
 }
 
-/** PetOwner.Data `ServiceType` enum ordinal — used when JSON sends string names */
-function serviceTypeToNumber(rate: any): number {
+/** Resolve API `ServiceType` to the exact PascalCase enum string expected by the backend. */
+function resolveServiceType(rate: any): ServiceType | null {
   if (typeof rate?.serviceType === "number" && !Number.isNaN(rate.serviceType)) {
-    return rate.serviceType;
+    return SERVICE_TYPE_BY_ORDINAL[rate.serviceType] ?? null;
   }
+
   const label = rate?.service ?? rate?.serviceType;
-  if (typeof label !== "string") return 0;
-  const lower = label.toLowerCase().trim();
-  const entry = Object.entries(SERVICE_TYPE_NAMES).find(
-    ([, name]) => name.toLowerCase() === lower,
+  if (typeof label !== "string") return null;
+
+  const trimmed = label.trim();
+  const numeric = Number(trimmed);
+  if (Number.isInteger(numeric)) return SERVICE_TYPE_BY_ORDINAL[numeric] ?? null;
+
+  const enumMatch = Object.values(ServiceType).find((type) => type === trimmed);
+  if (enumMatch) return enumMatch;
+
+  const compact = trimmed.replace(/[\s-]/g, "").toLowerCase();
+  const compactEnumMatch = Object.values(ServiceType).find(
+    (type) => type.toLowerCase() === compact,
   );
-  if (entry) return Number(entry[0]);
-  const compact = label.replace(/[\s-]/g, "");
-  const enumHit = Object.entries(SERVICE_TYPE_NAMES).find(
-    ([, name]) => name.replace(/\s+/g, "").toLowerCase() === compact.toLowerCase(),
+  if (compactEnumMatch) return compactEnumMatch;
+
+  const displayMatch = Object.entries(SERVICE_TYPE_NAMES).find(
+    ([, displayName]) => displayName.replace(/[\s-]/g, "").toLowerCase() === compact,
   );
-  return enumHit ? Number(enumHit[0]) : 0;
+  return displayMatch ? displayMatch[0] as ServiceType : null;
 }
 
 /** Reset current stack, then switch to Profile -> MyBookings (outgoing). */
@@ -199,30 +262,6 @@ function navigateToMyBookingsOutgoing(navigation: { getParent: () => any }) {
   (navigation as any).navigate("MyBookings", { tab: "outgoing" });
 }
 
-/** Parse "HH:mm" or "HH:mm:ss" → total minutes from midnight */
-function parseTimeMinutes(t: string): number {
-  const parts = t.split(":");
-  return Number(parts[0]) * 60 + Number(parts[1]);
-}
-
-/** Check whether a HH:mm time falls within any of the provider's slots for the given date */
-function isTimeWithinSlots(
-  time: string,
-  dateStr: string,
-  availabilitySlots: ProviderPublicProfileDto["availabilitySlots"],
-): boolean {
-  if (!time || !dateStr || availabilitySlots.length === 0) return true;
-  const dow = new Date(`${dateStr}T12:00:00`).getDay();
-  const minutes = parseTimeMinutes(time);
-  return availabilitySlots
-    .filter((s) => s.dayOfWeek === dow)
-    .some((s) => {
-      const start = parseTimeMinutes(s.startTime);
-      const end = parseTimeMinutes(s.endTime);
-      return minutes >= start && minutes < end;
-    });
-}
-
 export function BookingScreen() {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
@@ -234,10 +273,11 @@ export function BookingScreen() {
 
   const pets = usePetsStore((s) => s.pets);
   const petsLoading = usePetsStore((s) => s.loading);
+  const fetchPets = usePetsStore((s) => s.fetchPets);
 
   useEffect(() => {
-    void usePetsStore.getState().fetchPets();
-  }, []);
+    if (pets.length === 0) void fetchPets();
+  }, [fetchPets, pets.length]);
 
   const showPetsLoading = petsLoading && pets.length === 0;
   const hasPets = pets.length > 0;
@@ -249,14 +289,108 @@ export function BookingScreen() {
   const [endTime, setEndTime] = useState("");
   const [notes, setNotes] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [startAvailableTimes, setStartAvailableTimes] = useState<string[]>([]);
+  const [startAvailabilityLoading, setStartAvailabilityLoading] = useState(false);
+  const [endAvailableTimes, setEndAvailableTimes] = useState<string[]>([]);
+  const [endAvailabilityLoading, setEndAvailabilityLoading] = useState(false);
+  const [selectedPetIds, setSelectedPetIds] = useState<string[]>([]);
   const submitLockRef = useRef(false);
 
   const selectedRate = selectedRateIdx !== null ? profile.serviceRates[selectedRateIdx] : null;
   const sr = selectedRate as any;
+  const selectedServiceType = useMemo(
+    () => (selectedRate ? resolveServiceType(sr) : null),
+    [selectedRate, sr],
+  );
+  const selectedBillingMode = useMemo(
+    () => (sr ? getBillingMode(sr) : null),
+    [sr],
+  );
+  const fixedDurationMinutes = useMemo(
+    () => (sr ? getFixedDurationMinutes(sr) : null),
+    [sr],
+  );
+  const isFixedDuration = fixedDurationMinutes !== null;
+  const isDogOnlyService = selectedServiceType === ServiceType.DogWalking
+    || selectedServiceType === ServiceType.DoggyDayCare;
+
+  useEffect(() => {
+    if (!isDogOnlyService) return;
+    setSelectedPetIds((ids) =>
+      ids.filter((id) => pets.some((pet) => pet.id === id && isDogPet(pet))),
+    );
+  }, [isDogOnlyService, pets]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    setStartAvailableTimes([]);
+    if (!startDate || !selectedServiceType) {
+      setStartAvailabilityLoading(false);
+      return;
+    }
+
+    setStartAvailabilityLoading(true);
+    mapApi
+      .getProviderAvailability(profile.providerId, startDate, selectedServiceType)
+      .then((times) => {
+        if (!cancelled) setStartAvailableTimes(times);
+      })
+      .catch(() => {
+        if (!cancelled) setStartAvailableTimes([]);
+      })
+      .finally(() => {
+        if (!cancelled) setStartAvailabilityLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [profile.providerId, selectedServiceType, startDate]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    setEndAvailableTimes([]);
+    if (isFixedDuration || selectedBillingMode !== "perNight" || !endDate || !selectedServiceType) {
+      setEndAvailabilityLoading(false);
+      return;
+    }
+
+    setEndAvailabilityLoading(true);
+    mapApi
+      .getProviderAvailability(profile.providerId, endDate, selectedServiceType)
+      .then((times) => {
+        if (!cancelled) setEndAvailableTimes(times);
+      })
+      .catch(() => {
+        if (!cancelled) setEndAvailableTimes([]);
+      })
+      .finally(() => {
+        if (!cancelled) setEndAvailabilityLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [profile.providerId, isFixedDuration, selectedBillingMode, selectedServiceType, endDate]);
+
+  useEffect(() => {
+    if (
+      startTime &&
+      selectedServiceType &&
+      !startAvailabilityLoading &&
+      !startAvailableTimes.includes(startTime)
+    ) {
+      setStartTime("");
+      setEndTime("");
+    }
+  }, [selectedServiceType, startAvailabilityLoading, startAvailableTimes, startTime]);
 
   /** End-time slots must be after start only on the same calendar day; multi-day boarding allows early pickup on the last day. */
   const endTimeDisableAtOrBefore = useMemo(() => {
     if (!sr) return undefined;
+    if (fixedDurationMinutes) return undefined;
     const mode = getBillingMode(sr);
     if (mode === "perNight") {
       const resolvedEnd = endDate || startDate;
@@ -264,35 +398,56 @@ export function BookingScreen() {
       return undefined;
     }
     return startTime || undefined;
-  }, [sr, startTime, startDate, endDate]);
+  }, [sr, fixedDurationMinutes, startTime, startDate, endDate]);
 
   /** True when a prefill time was requested but falls outside this provider's working hours */
   const prefillTimeInvalid = useMemo(() => {
-    if (!prefillTime || !prefillDate) return false;
-    return !isTimeWithinSlots(prefillTime, prefillDate, profile.availabilitySlots ?? []);
-  }, [prefillTime, prefillDate, profile.availabilitySlots]);
+    if (!prefillTime || !prefillDate || prefillDate !== startDate || startAvailabilityLoading) return false;
+    return selectedServiceType !== null && !startAvailableTimes.includes(prefillTime);
+  }, [prefillTime, prefillDate, startDate, startAvailabilityLoading, selectedServiceType, startAvailableTimes]);
 
-  /** True when the currently selected start time is outside the provider's slots for startDate */
+  /** True when the selected start time is no longer returned by real-time availability. */
   const startTimeInvalid = useMemo(() => {
-    if (!startTime || !startDate) return false;
-    return !isTimeWithinSlots(startTime, startDate, profile.availabilitySlots ?? []);
-  }, [startTime, startDate, profile.availabilitySlots]);
+    if (!startTime || !startDate || !selectedServiceType || startAvailabilityLoading) return false;
+    return !startAvailableTimes.includes(startTime);
+  }, [startTime, startDate, selectedServiceType, startAvailabilityLoading, startAvailableTimes]);
+
+  const togglePetSelection = (petId: string) => {
+    setSelectedPetIds((ids) =>
+      ids.includes(petId)
+        ? ids.filter((id) => id !== petId)
+        : [...ids, petId],
+    );
+  };
 
   const estimatedPrice = useMemo(() => {
     if (!selectedRate || !startDate || !startTime) return null;
     const billingMode = getBillingMode(sr);
-    if (billingMode === "perNight" && (!endDate || !endTime)) return null;
-    if (billingMode !== "perNight" && !endTime) return null;
-    const range = resolveBookingRange(startDate, startTime, endDate, endTime);
+    if (!fixedDurationMinutes) {
+      if (billingMode === "perNight" && (!endDate || !endTime)) return null;
+      if (billingMode !== "perNight" && !endTime) return null;
+    }
+    const range = resolveBookingRange(startDate, startTime, endDate, endTime, fixedDurationMinutes);
     if (!range) return null;
-    const total = calculateBookingTotal(billingMode, sr?.rate ?? 0, range.start, range.end);
+    const total = calculateBookingTotal(
+      billingMode,
+      sr?.rate ?? 0,
+      range.start,
+      range.end,
+      fixedDurationMinutes,
+      sr?.pricingUnit ?? sr?.PricingUnit,
+    );
     return total > 0 ? total : null;
-  }, [selectedRate, startDate, startTime, endDate, endTime]);
+  }, [selectedRate, sr, startDate, startTime, endDate, endTime, fixedDurationMinutes]);
 
   const handleSubmit = async () => {
     if (submitting) return;
     if (selectedRateIdx === null) {
       showGlobalAlertCompat(t("errorTitle"), t("selectServiceFirst"));
+      return;
+    }
+    if (selectedPetIds.length === 0) {
+      showGlobalAlertCompat(t("errorTitle"), "Please select at least one pet.");
       return;
     }
     if (!startDate || !startTime) {
@@ -304,22 +459,31 @@ export function BookingScreen() {
       return;
     }
     const billingMode = getBillingMode(sr);
-    if (billingMode === "perNight" && (!endDate || !endTime)) {
-      showGlobalAlertCompat(t("errorTitle"), t("invalidDates"));
-      return;
+    if (!fixedDurationMinutes) {
+      if (billingMode === "perNight" && (!endDate || !endTime)) {
+        showGlobalAlertCompat(t("errorTitle"), t("invalidDates"));
+        return;
+      }
+      if (billingMode !== "perNight" && !endTime) {
+        showGlobalAlertCompat(t("errorTitle"), t("invalidDates"));
+        return;
+      }
     }
-    if (billingMode !== "perNight" && !endTime) {
-      showGlobalAlertCompat(t("errorTitle"), t("invalidDates"));
-      return;
-    }
-    const range = resolveBookingRange(startDate, startTime, endDate, endTime);
+    const range = resolveBookingRange(startDate, startTime, endDate, endTime, fixedDurationMinutes);
     if (!range) {
       showGlobalAlertCompat(t("errorTitle"), t("invalidDates"));
       return;
     }
     const startISO = range.start.toISOString();
     const endISO = range.end.toISOString();
-    const clientTotal = calculateBookingTotal(billingMode, sr?.rate ?? 0, range.start, range.end);
+    const clientTotal = calculateBookingTotal(
+      billingMode,
+      sr?.rate ?? 0,
+      range.start,
+      range.end,
+      fixedDurationMinutes,
+      sr?.pricingUnit ?? sr?.PricingUnit,
+    );
     if (clientTotal <= 0) {
       showGlobalAlertCompat(t("errorTitle"), t("invalidDates"));
       return;
@@ -330,9 +494,16 @@ export function BookingScreen() {
     setSubmitting(true);
     try {
       // Server recomputes `totalPrice` from the same start/end window and provider rate; keep client range in sync with the estimate above.
+      const serviceType = resolveServiceType(sr);
+      if (!serviceType) {
+        showGlobalAlertCompat(t("errorTitle"), t("selectServiceFirst"));
+        return;
+      }
+
       await bookingsApi.create({
         providerId: profile.providerId,
-        serviceType: serviceTypeToNumber(sr),
+        serviceType,
+        petIds: selectedPetIds,
         startDate: startISO,
         endDate: endISO,
         notes: notes.trim() || undefined,
@@ -441,7 +612,8 @@ export function BookingScreen() {
             {t("selectService")}
           </Text>
           {profile.serviceRates.map((rate: any, idx: number) => {
-            const name = rate.service ?? SERVICE_TYPE_NAMES[rate.serviceType] ?? `Service ${rate.serviceType}`;
+            const serviceType = resolveServiceType(rate);
+            const name = rate.service ?? (serviceType ? SERVICE_TYPE_NAMES[serviceType] : `Service ${rate.serviceType}`);
             const unit = rate.unit ?? PRICING_UNIT_LABELS[rate.pricingUnit] ?? "";
             const selected = selectedRateIdx === idx;
 
@@ -487,6 +659,100 @@ export function BookingScreen() {
               </Pressable>
             );
           })}
+        </View>
+
+        {/* Pet Selection */}
+        <View
+          className="rounded-2xl p-5 mb-5"
+          style={{
+            backgroundColor: colors.surface,
+            shadowColor: colors.shadow,
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: 0.04,
+            shadowRadius: 8,
+            elevation: 2,
+          }}
+        >
+          <Text style={[rtlText, { color: colors.text, fontSize: 16, fontWeight: "700", marginBottom: 6 }]}>
+            Select pets
+          </Text>
+          {isDogOnlyService ? (
+            <Text style={[rtlText, { color: colors.textMuted, fontSize: 12, marginBottom: 12 }]}>
+              This service is only for dogs.
+            </Text>
+          ) : null}
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{
+              gap: 10,
+              flexDirection: rowDirectionForAppLayout(isRTL),
+              paddingVertical: 2,
+            }}
+          >
+            {pets.map((pet) => {
+              const isSelected = selectedPetIds.includes(pet.id);
+              const disabled = isDogOnlyService && !isDogPet(pet);
+              return (
+                <Pressable
+                  key={pet.id}
+                  onPress={() => {
+                    if (disabled) {
+                      showGlobalAlertCompat(t("errorTitle"), "This service is only for dogs.");
+                      return;
+                    }
+                    togglePetSelection(pet.id);
+                  }}
+                  style={{
+                    width: 112,
+                    borderRadius: 16,
+                    borderWidth: 2,
+                    borderColor: isSelected ? colors.primary : colors.borderLight,
+                    backgroundColor: isSelected ? colors.primaryLight : colors.surfaceTertiary,
+                    padding: 12,
+                    alignItems: "center",
+                    opacity: disabled ? 0.38 : 1,
+                  }}
+                >
+                  <View
+                    style={{
+                      width: 54,
+                      height: 54,
+                      borderRadius: 27,
+                      backgroundColor: colors.surface,
+                      alignItems: "center",
+                      justifyContent: "center",
+                      overflow: "hidden",
+                      marginBottom: 8,
+                    }}
+                  >
+                    {pet.imageUrl ? (
+                      <Image source={{ uri: pet.imageUrl }} style={{ width: 54, height: 54 }} />
+                    ) : (
+                      <Ionicons name="paw" size={26} color={disabled ? colors.textMuted : colors.primary} />
+                    )}
+                  </View>
+                  <Text
+                    numberOfLines={1}
+                    style={{ color: colors.text, fontSize: 13, fontWeight: "700", textAlign: "center", maxWidth: 88 }}
+                  >
+                    {pet.name}
+                  </Text>
+                  <Text style={{ color: colors.textMuted, fontSize: 11, marginTop: 2 }}>
+                    {petSpeciesLabel(pet)}
+                  </Text>
+                  {isSelected ? (
+                    <Ionicons
+                      name="checkmark-circle"
+                      size={18}
+                      color={colors.primary}
+                      style={{ position: "absolute", top: 6, right: 6 }}
+                    />
+                  ) : null}
+                </Pressable>
+              );
+            })}
+          </ScrollView>
         </View>
 
         {/* Date & Time */}
@@ -545,17 +811,34 @@ export function BookingScreen() {
                 {t("startTime")}
               </Text>
               <TimeSlotSelector
-                availabilitySlots={profile.availabilitySlots ?? []}
+                availableTimes={startAvailableTimes}
                 selectedDate={startDate}
                 selectedTime={startTime}
                 onTimeSelect={setStartTime}
-                filterPastSlotsForToday
+                loading={startAvailabilityLoading}
               />
             </>
           ) : null}
 
-          {/* End date — only show for multi-day pricing units (Boarding = 1, PerNight = 1) */}
-          {sr && (sr.pricingUnit === 1 || sr.unit === "night") ? (
+          {fixedDurationMinutes ? (
+            <View
+              style={{
+                flexDirection: rowDirectionForAppLayout(isRTL),
+                alignItems: "center",
+                gap: 8,
+                backgroundColor: colors.primaryLight,
+                borderRadius: 12,
+                paddingHorizontal: 14,
+                paddingVertical: 12,
+                marginTop: 18,
+              }}
+            >
+              <Ionicons name="time-outline" size={18} color={colors.primary} />
+              <Text style={[rtlText, { color: colors.primary, fontSize: 14, fontWeight: "700", flex: 1 }]}>
+                משך הטיול: {fixedDurationMinutes} דקות
+              </Text>
+            </View>
+          ) : sr && (sr.pricingUnit === 1 || sr.unit === "night") ? (
             <>
               <Text style={[rtlText, { color: colors.text, fontSize: 16, fontWeight: "700", marginTop: 22, marginBottom: 14 }]}>
                 {t("endDate")}
@@ -574,10 +857,11 @@ export function BookingScreen() {
                     {t("endTime")}
                   </Text>
                   <TimeSlotSelector
-                    availabilitySlots={profile.availabilitySlots ?? []}
+                    availableTimes={endAvailableTimes}
                     selectedDate={endDate}
                     selectedTime={endTime}
                     onTimeSelect={setEndTime}
+                    loading={endAvailabilityLoading}
                     disableTimesAtOrBefore={endTimeDisableAtOrBefore}
                   />
                 </>
@@ -591,13 +875,14 @@ export function BookingScreen() {
                   {t("endTime")}
                 </Text>
                 <TimeSlotSelector
-                  availabilitySlots={profile.availabilitySlots ?? []}
+                  availableTimes={startAvailableTimes}
                   selectedDate={startDate}
                   selectedTime={endTime}
                   onTimeSelect={(t) => {
                     setEndTime(t);
                     setEndDate(startDate);
                   }}
+                  loading={startAvailabilityLoading}
                   disableTimesAtOrBefore={endTimeDisableAtOrBefore}
                 />
               </>

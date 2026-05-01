@@ -1,11 +1,9 @@
-import { useMemo } from "react";
-import { View, Text, Pressable } from "react-native";
-import type { PublicAvailabilitySlotDto } from "../../types/api";
+import { View, Text, Pressable, ActivityIndicator } from "react-native";
 import { useTheme } from "../../theme/ThemeContext";
 
 interface Props {
-  /** Provider's availability slots */
-  availabilitySlots: PublicAvailabilitySlotDto[];
+  /** Exact available time strings returned by the API for the selected date/service. */
+  availableTimes?: string[];
   /** The date the user selected (YYYY-MM-DD) — used to find relevant day-of-week slots */
   selectedDate: string;
   /** Currently selected time string (HH:mm) */
@@ -14,18 +12,13 @@ interface Props {
   onTimeSelect: (time: string) => void;
   /** Optional label shown above the grid */
   label?: string;
-  /** Slot interval in minutes (default: 60) */
-  intervalMinutes?: number;
+  /** True while the parent is loading real-time availability from the API. */
+  loading?: boolean;
   /**
    * When set (HH:mm), slots at or before this time are disabled — e.g. same-calendar-day end
    * must be strictly after start.
    */
   disableTimesAtOrBefore?: string;
-  /**
-   * When true and `selectedDate` is today (local), slots that start before the current local
-   * time are disabled — for start time on "today".
-   */
-  filterPastSlotsForToday?: boolean;
 }
 
 /** Parse "HH:mm" or "HH:mm:ss" → total minutes from midnight */
@@ -34,83 +27,21 @@ function parseTimeMinutes(t: string): number {
   return Number(parts[0]) * 60 + Number(parts[1]);
 }
 
-/** Format total minutes → "HH:mm" */
-function formatSlot(minutes: number): string {
-  const h = Math.floor(minutes / 60);
-  const m = minutes % 60;
-  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
-}
-
-/** Returns dayOfWeek (0=Sun) for a YYYY-MM-DD string */
-function dowFromDate(dateStr: string): number {
-  if (!dateStr) return -1;
-  return new Date(`${dateStr}T12:00:00`).getDay();
-}
-
-/** Local calendar today as YYYY-MM-DD */
-function todayISO(): string {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-}
-
-/** Builds the list of time slots for the selected date, respecting provider working hours */
-function buildTimeSlots(
-  availabilitySlots: PublicAvailabilitySlotDto[],
-  selectedDate: string,
-  intervalMinutes: number,
-): string[] {
-  if (!selectedDate) return [];
-
-  const dow = dowFromDate(selectedDate);
-  const relevantSlots = availabilitySlots.filter((s) => s.dayOfWeek === dow);
-
-  // Fallback: if provider has no slots at all, show standard 08:00–20:00 hourly
-  const ranges =
-    relevantSlots.length > 0
-      ? relevantSlots.map((s) => ({
-          start: parseTimeMinutes(s.startTime),
-          end: parseTimeMinutes(s.endTime),
-        }))
-      : [{ start: 8 * 60, end: 20 * 60 }];
-
-  const slots: string[] = [];
-  for (const { start, end } of ranges) {
-    for (let t = start; t < end; t += intervalMinutes) {
-      slots.push(formatSlot(t));
-    }
-  }
-  return slots;
-}
-
 export function TimeSlotSelector({
-  availabilitySlots,
+  availableTimes,
   selectedDate,
   selectedTime,
   onTimeSelect,
   label,
-  intervalMinutes = 60,
+  loading = false,
   disableTimesAtOrBefore,
-  filterPastSlotsForToday,
 }: Props) {
   const { colors } = useTheme();
-
-  const slots = useMemo(
-    () => buildTimeSlots(availabilitySlots, selectedDate, intervalMinutes),
-    [availabilitySlots, selectedDate, intervalMinutes],
-  );
+  const slots = availableTimes ?? [];
 
   const cutoffMinutes =
     disableTimesAtOrBefore && disableTimesAtOrBefore.includes(":")
       ? parseTimeMinutes(disableTimesAtOrBefore)
-      : null;
-
-  const todayStr = todayISO();
-  const pastCutoffMinutes =
-    filterPastSlotsForToday && selectedDate === todayStr
-      ? (() => {
-          const n = new Date();
-          return n.getHours() * 60 + n.getMinutes();
-        })()
       : null;
 
   if (!selectedDate) {
@@ -119,6 +50,14 @@ export function TimeSlotSelector({
         <Text style={{ color: colors.textMuted, fontSize: 13, textAlign: "center" }}>
           Select a date first
         </Text>
+      </View>
+    );
+  }
+
+  if (loading) {
+    return (
+      <View style={{ paddingVertical: 16, alignItems: "center" }}>
+        <ActivityIndicator color={colors.primary} />
       </View>
     );
   }
@@ -153,9 +92,7 @@ export function TimeSlotSelector({
           const slotM = parseTimeMinutes(slot);
           const disabledByEndRule =
             cutoffMinutes !== null && slotM <= cutoffMinutes;
-          const disabledByPast =
-            pastCutoffMinutes !== null && slotM < pastCutoffMinutes;
-          const disabled = disabledByEndRule || disabledByPast;
+          const disabled = disabledByEndRule;
           return (
             <Pressable
               key={slot}

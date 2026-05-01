@@ -31,6 +31,7 @@ public class ApplicationDbContext : DbContext
     public DbSet<Notification> Notifications => Set<Notification>();
     public DbSet<ProviderServiceRate> ProviderServiceRates => Set<ProviderServiceRate>();
     public DbSet<Booking> Bookings => Set<Booking>();
+    public DbSet<BookingPet> BookingPets => Set<BookingPet>();
     public DbSet<CommunityGroup> CommunityGroups => Set<CommunityGroup>();
     public DbSet<GroupMember> GroupMembers => Set<GroupMember>();
     public DbSet<GroupPost> GroupPosts => Set<GroupPost>();
@@ -73,6 +74,7 @@ public class ApplicationDbContext : DbContext
         ConfigureConversation(modelBuilder);
         ConfigureNotification(modelBuilder);
         ConfigureBooking(modelBuilder);
+        ConfigureBookingPet(modelBuilder);
         ConfigureCommunityGroup(modelBuilder);
         ConfigureGroupMember(modelBuilder);
         ConfigureGroupPost(modelBuilder);
@@ -329,6 +331,15 @@ public class ApplicationDbContext : DbContext
                 .IsRequired()
                 .HasConversion<string>()
                 .HasMaxLength(20);
+
+            entity.Property(r => r.BufferTimeMinutes)
+                .HasDefaultValue(0);
+
+            entity.Property(r => r.MaxConcurrentBookings)
+                .HasDefaultValue(1);
+
+            entity.Property(r => r.MaxPetCapacity)
+                .HasDefaultValue(1);
 
             entity.HasIndex(r => new { r.ProviderProfileId, r.Service })
                 .IsUnique();
@@ -935,6 +946,26 @@ public class ApplicationDbContext : DbContext
             entity.HasOne(b => b.ProviderProfile)
                 .WithMany()
                 .HasForeignKey(b => b.ProviderProfileId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+    }
+
+    private static void ConfigureBookingPet(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<BookingPet>(entity =>
+        {
+            entity.HasKey(bp => new { bp.BookingId, bp.PetId });
+
+            entity.HasIndex(bp => bp.PetId);
+
+            entity.HasOne(bp => bp.Booking)
+                .WithMany(b => b.BookingPets)
+                .HasForeignKey(bp => bp.BookingId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(bp => bp.Pet)
+                .WithMany(p => p.BookingPets)
+                .HasForeignKey(bp => bp.PetId)
                 .OnDelete(DeleteBehavior.Restrict);
         });
     }
