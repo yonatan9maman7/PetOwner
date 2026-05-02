@@ -24,6 +24,8 @@ import * as Location from "expo-location";
 import { useAuthStore } from "../../store/authStore";
 import { usePetsStore } from "../../store/petsStore";
 import { useTranslation, rowDirectionForAppLayout } from "../../i18n";
+import { CommunityDashboard } from "./components/CommunityDashboard";
+import { CommunitySearchModal } from "./components/CommunitySearchModal";
 import { useTheme } from "../../theme/ThemeContext";
 import { AuthPlaceholder } from "../../components/AuthPlaceholder";
 import { BrandedAppHeader } from "../../components/BrandedAppHeader";
@@ -43,7 +45,10 @@ import {
 } from "../../api/client";
 import type {
   PostDto,
+  CreatePostDto,
   CommunityGroupDto,
+  CommunityDashboardDto,
+  CommunitySearchPostHitDto,
   PlaydateEventDto,
   LiveBeaconDto,
   PetDto,
@@ -53,10 +58,11 @@ import { pickImageWithSource } from "../../utils/imagePicker";
 import { formatBreedForDisplay } from "../pets/addPetHelpers";
 import { fetchNearbyDogParks, geocodeAddress } from "../../api/googlePlaces";
 import { useKeyboardAvoidingState } from "../../hooks/useKeyboardAvoidingState";
+import { formatCommunityDistanceKm, formatCommunityRelativeTime } from "./utils/formatCommunity";
 
 const PAGE_SIZE = 20;
 
-type MainTab = "feed" | "playdates" | "parks" | "groups" | "qa" | "events";
+type MainTab = "feed" | "playdates" | "parks" | "groups" | "qa" | "events" | "lostSos";
 type FeedFilter =
   | "Nearby"
   | "Playdates"
@@ -181,6 +187,9 @@ const DEMO_POSTS: PostDto[] = [
     content: "מיקה מחפשת חברים למשחק היום בגינת פארק הירקון בשעה 18:30. מי מצטרף?",
     likeCount: 18,
     commentCount: 4,
+    helpfulCount: 3,
+    markedHelpfulByMe: false,
+    savedByMe: false,
     likedByMe: false,
     createdAt: new Date(Date.now() - 22 * 60_000).toISOString(),
     authorRole: "Owner",
@@ -194,6 +203,9 @@ const DEMO_POSTS: PostDto[] = [
     content: "מישהו מכיר מאלף טוב ללברדור אנרגטי באזור תל אביב?",
     likeCount: 9,
     commentCount: 7,
+    helpfulCount: 1,
+    markedHelpfulByMe: false,
+    savedByMe: false,
     likedByMe: false,
     createdAt: new Date(Date.now() - 75 * 60_000).toISOString(),
     authorRole: "Owner",
@@ -207,6 +219,9 @@ const DEMO_POSTS: PostDto[] = [
     content: "עדכון מגינת דובנוב: הברזייה חזרה לעבוד.",
     likeCount: 31,
     commentCount: 3,
+    helpfulCount: 8,
+    markedHelpfulByMe: true,
+    savedByMe: false,
     likedByMe: true,
     createdAt: new Date(Date.now() - 3 * 60 * 60_000).toISOString(),
     authorRole: "Owner",
@@ -220,6 +235,9 @@ const DEMO_POSTS: PostDto[] = [
     content: "מחפשים מפגש כלבים קטנים ביום שישי.",
     likeCount: 14,
     commentCount: 5,
+    helpfulCount: 2,
+    markedHelpfulByMe: false,
+    savedByMe: false,
     likedByMe: false,
     createdAt: new Date(Date.now() - 8 * 60 * 60_000).toISOString(),
     authorRole: "Owner",
@@ -233,6 +251,9 @@ const DEMO_POSTS: PostDto[] = [
     content: "כלב אבד באזור דיזנגוף סנטר, אשמח לעזרה.",
     likeCount: 42,
     commentCount: 11,
+    helpfulCount: 6,
+    markedHelpfulByMe: false,
+    savedByMe: false,
     likedByMe: false,
     createdAt: new Date(Date.now() - 26 * 60 * 60_000).toISOString(),
     authorRole: "Owner",
@@ -383,6 +404,7 @@ const HE = {
   training: "אילוף",
   bestAnswerPending: "תשובה מומלצת ממתינה",
   helpful: "מועיל",
+  savePost: "שמור",
   answer: "ענה",
   answerHint: "אפשר לענות דרך כפתור התגובות בפוסט.",
   eventsTitle: "אירועים ופעילויות",
@@ -536,6 +558,7 @@ const EN: Record<keyof typeof HE, string> = {
   training: "Training",
   bestAnswerPending: "Best answer pending",
   helpful: "Helpful",
+  savePost: "Save",
   answer: "Answer",
   answerHint: "Use the comments button on the feed post to answer.",
   eventsTitle: "Events / Local Activities",
@@ -597,16 +620,6 @@ const EN: Record<keyof typeof HE, string> = {
 
 type CopyKey = keyof typeof HE;
 
-function relativeTime(iso: string): string {
-  const diff = Date.now() - new Date(iso).getTime();
-  const mins = Math.floor(diff / 60_000);
-  if (mins < 1) return "now";
-  if (mins < 60) return `${mins}m`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h`;
-  return `${Math.floor(hrs / 24)}d`;
-}
-
 function initials(name: string): string {
   return name
     .split(" ")
@@ -624,9 +637,11 @@ function formatDateTime(iso: string): string {
   })}`;
 }
 
-function formatDistanceKm(valueKm: number): string {
-  if (!Number.isFinite(valueKm) || valueKm <= 0) return "0.1 km";
-  return `${valueKm < 1 ? valueKm.toFixed(1) : valueKm.toFixed(1)} km`;
+function formatDistanceKm(valueKm: number, language: "he" | "en"): string {
+  if (!Number.isFinite(valueKm) || valueKm <= 0) {
+    return language === "he" ? "0.1 ק״מ" : "0.1 km";
+  }
+  return formatCommunityDistanceKm(valueKm, language);
 }
 
 function distanceKm(aLat: number, aLng: number, bLat: number, bLng: number): number {
@@ -815,6 +830,8 @@ function PostCard({
   meta,
   currentUserId,
   onToggleLike,
+  onToggleHelpful,
+  onToggleSave,
   onDelete,
   onHide,
   onReport,
@@ -831,6 +848,8 @@ function PostCard({
   meta?: PostMeta;
   currentUserId: string | null;
   onToggleLike: (id: string) => void;
+  onToggleHelpful: (id: string) => void;
+  onToggleSave: (id: string) => void;
   onDelete: (id: string) => void;
   onHide: (id: string) => void;
   onReport: (id: string) => void;
@@ -844,6 +863,7 @@ function PostCard({
   isDeletePending?: boolean;
 }) {
   const { colors } = useTheme();
+  const { language } = useTranslation();
   const styles = useCommunityStyles();
 
   const isMine = currentUserId === post.userId;
@@ -873,7 +893,7 @@ function PostCard({
             </View>
           </View>
           <Text style={styles.timeText}>
-            {relativeTime(post.createdAt)}
+            {formatCommunityRelativeTime(post.createdAt, language)}
             {meta?.location ? ` · ${meta.location}` : ""}
             {meta?.visibility ? ` · ${visibilityLabel(meta.visibility, isRTL)}` : ""}
           </Text>
@@ -1005,6 +1025,23 @@ function PostCard({
           />
           <Text style={styles.actionText}>{localCommentCount}</Text>
           <Text style={styles.actionText}>{copy("comment")}</Text>
+        </Pressable>
+        <Pressable style={[styles.actionBtn, rtlRow]} onPress={() => onToggleHelpful(post.id)}>
+          <Ionicons
+            name={post.markedHelpfulByMe ? "bulb" : "bulb-outline"}
+            size={18}
+            color={post.markedHelpfulByMe ? colors.text : colors.textSecondary}
+          />
+          <Text style={styles.actionText}>{post.helpfulCount}</Text>
+          <Text style={styles.actionText}>{copy("helpful")}</Text>
+        </Pressable>
+        <Pressable style={[styles.actionBtn, rtlRow]} onPress={() => onToggleSave(post.id)}>
+          <Ionicons
+            name={post.savedByMe ? "bookmark" : "bookmark-outline"}
+            size={18}
+            color={post.savedByMe ? colors.text : colors.textSecondary}
+          />
+          <Text style={styles.actionText}>{copy("savePost")}</Text>
         </Pressable>
         <Pressable
           style={[styles.actionBtn, rtlRow]}
@@ -1149,6 +1186,14 @@ export function CommunityScreen() {
   const [answerPost, setAnswerPost] = useState<PostDto | null>(null);
   const [playdateCommentsOpenFor, setPlaydateCommentsOpenFor] = useState<PlaydateEventDto | null>(null);
   const [playdateCommentText, setPlaydateCommentText] = useState("");
+  const [communitySearchOpen, setCommunitySearchOpen] = useState(false);
+  const [communitySearchQuery, setCommunitySearchQuery] = useState("");
+  const [communityDashboard, setCommunityDashboard] = useState<CommunityDashboardDto | null>(null);
+  const [searchRemoteLoading, setSearchRemoteLoading] = useState(false);
+  const [searchRemote, setSearchRemote] = useState<{
+    posts: CommunitySearchPostHitDto[];
+    groups: CommunityGroupDto[];
+  } | null>(null);
 
   useEffect(() => {
     if (!composerOpen) return;
@@ -1160,12 +1205,20 @@ export function CommunityScreen() {
   const appRowDirection = rowDirectionForAppLayout(isRTL);
   const bottomContentPadding = 16 + insets.bottom;
 
+  const loadDashboard = useCallback(async () => {
+    try {
+      setCommunityDashboard(await communityApi.getDashboard());
+    } catch {
+      setCommunityDashboard(null);
+    }
+  }, []);
+
   const loadFeed = useCallback(
     async (p: number, replace: boolean) => {
       if (replace) setLoading(true);
       setFeedError(false);
       try {
-        const data = await postsApi.getFeed(p, PAGE_SIZE);
+        const data = await postsApi.getFeed(p, PAGE_SIZE, { ranked: true });
         const nextPosts = data.length > 0 ? data : DEMO_POSTS;
         setPosts((prev) => (replace ? nextPosts : [...prev, ...nextPosts]));
         setFeedIsDemo(data.length === 0);
@@ -1186,9 +1239,9 @@ export function CommunityScreen() {
 
   const onRefreshFeed = useCallback(async () => {
     setRefreshing(true);
-    await Promise.all([loadFeed(1, true), loadPets(), loadPlaydates()]);
+    await Promise.all([loadFeed(1, true), loadPets(), loadPlaydates(), loadDashboard()]);
     setRefreshing(false);
-  }, [loadFeed]);
+  }, [loadFeed, loadDashboard]);
 
   const loadGroups = useCallback(async () => {
     setGroupsLoading(true);
@@ -1281,7 +1334,7 @@ export function CommunityScreen() {
           address: park.address,
           latitude: park.latitude,
           longitude: park.longitude,
-          distance: formatDistanceKm(km),
+          distance: formatDistanceKm(km, isRTL ? "he" : "en"),
           rating: park.rating > 0 ? park.rating : 4.2,
           activity: km < 2 ? "High" : km < 4 ? "Medium" : "Low",
           amenities: [copy("parks"), copy("checkIn")],
@@ -1314,15 +1367,49 @@ export function CommunityScreen() {
     useCallback(() => {
       if (!hydrated || !isLoggedIn) return;
       loadPets();
-      if (mainTab === "feed" || mainTab === "qa") loadFeed(1, true);
+      void loadDashboard();
+      if (mainTab === "feed" || mainTab === "qa" || mainTab === "lostSos") loadFeed(1, true);
       if (mainTab === "groups") loadGroups();
       if (mainTab === "playdates" || mainTab === "events") loadPlaydates();
       if (mainTab === "parks") {
         loadBeacons();
         loadDogParks();
       }
-    }, [hydrated, isLoggedIn, mainTab, loadFeed, loadGroups, loadPets, loadPlaydates, loadBeacons, loadDogParks]),
+    }, [
+      hydrated,
+      isLoggedIn,
+      mainTab,
+      loadFeed,
+      loadDashboard,
+      loadGroups,
+      loadPets,
+      loadPlaydates,
+      loadBeacons,
+      loadDogParks,
+    ]),
   );
+
+  useEffect(() => {
+    const q = communitySearchQuery.trim();
+    if (!communitySearchOpen || q.length < 2) {
+      setSearchRemote(null);
+      setSearchRemoteLoading(false);
+      return;
+    }
+    const handle = setTimeout(() => {
+      void (async () => {
+        setSearchRemoteLoading(true);
+        try {
+          setSearchRemote(await communityApi.search(q));
+        } catch {
+          setSearchRemote(null);
+        } finally {
+          setSearchRemoteLoading(false);
+        }
+      })();
+    }, 380);
+    return () => clearTimeout(handle);
+  }, [communitySearchQuery, communitySearchOpen]);
 
   const filteredPosts = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -1346,11 +1433,78 @@ export function CommunityScreen() {
     [posts, postMetaById],
   );
 
+  const searchPostsForModal = useMemo(() => {
+    const fromHits = (searchRemote?.posts ?? []).map<PostDto>((h) => ({
+      id: h.id,
+      userId: "",
+      userName: h.name,
+      content: h.content,
+      likeCount: 0,
+      commentCount: 0,
+      helpfulCount: 0,
+      likedByMe: false,
+      markedHelpfulByMe: false,
+      savedByMe: false,
+      createdAt: h.createdAt,
+      authorRole: "Owner",
+      authorIsApprovedProvider: false,
+    }));
+    const seen = new Set<string>();
+    const out: PostDto[] = [];
+    for (const p of fromHits) {
+      if (seen.has(p.id)) continue;
+      seen.add(p.id);
+      out.push(p);
+    }
+    for (const p of posts) {
+      if (seen.has(p.id)) continue;
+      seen.add(p.id);
+      out.push(p);
+    }
+    return out;
+  }, [searchRemote, posts]);
+
+  const searchGroupsForModal = useMemo(() => {
+    const remote = searchRemote?.groups ?? [];
+    const seen = new Set(remote.map((g) => g.id));
+    return [...remote, ...groups.filter((g) => !seen.has(g.id))];
+  }, [searchRemote, groups]);
+
   const filteredGroups = useMemo(() => {
     const q = groupSearch.trim().toLowerCase();
     if (!q) return groups;
     return groups.filter((g) => `${g.name} ${g.description ?? ""}`.toLowerCase().includes(q));
   }, [groups, groupSearch]);
+
+  const sosFeedPosts = useMemo(
+    () =>
+      posts.filter((p) => {
+        const c = (p.category ?? "").toLowerCase();
+        return c.includes("sos") || c.includes("lost");
+      }),
+    [posts],
+  );
+
+  const activeDogsNearbyCount = useMemo(
+    () => beacons.reduce((n, b) => n + Math.max(1, b.pets?.length ?? 0), 0),
+    [beacons],
+  );
+
+  const activeParksNearbyCount = useMemo(
+    () =>
+      parks.filter(
+        (p) =>
+          (p.upcomingPlaydates ?? 0) > 0 ||
+          p.activity === "High" ||
+          !!parkCheckins[p.id],
+      ).length,
+    [parks, parkCheckins],
+  );
+
+  const dashboardActiveDogs = communityDashboard?.activeDogsNearby ?? activeDogsNearbyCount;
+  const dashboardOpenQuestions = communityDashboard?.openQuestions ?? questionPosts.length;
+  const dashboardActiveParks = communityDashboard?.activeDogParks ?? activeParksNearbyCount;
+  const dashboardSos = communityDashboard?.sosAlerts ?? sosFeedPosts.length;
 
   const handlePublish = async () => {
     const content = newPostContent.trim();
@@ -1385,12 +1539,43 @@ export function CommunityScreen() {
                 : newPostType === "Event"
                   ? "event"
                   : undefined;
-      const post = await postsApi.create({
-        content,
+
+      let latitude: number | undefined;
+      let longitude: number | undefined;
+      if (category === "lost_and_found" && newPostLocation.trim()) {
+        const geo = await geocodeAddress({
+          query: newPostLocation.trim(),
+          language: isRTL ? "he" : "en",
+        });
+        if (geo) {
+          latitude = geo.latitude;
+          longitude = geo.longitude;
+        }
+      }
+
+      const tagsCsv =
+        newPostTags
+          .split(",")
+          .map((tag) => tag.trim())
+          .filter(Boolean)
+          .join(",") || undefined;
+
+      const payload: CreatePostDto = {
+        content: content.trim() || (pickedImageUri ? " " : ""),
         imageUrl,
+        latitude,
+        longitude,
         city: newPostLocation.trim() || undefined,
         category,
-      } as any);
+        relatedPetId: selectedPet?.id,
+        tagsCsv,
+      };
+      if (category === "lost_and_found") {
+        payload.sosNotifyRadiusKm = 5;
+        payload.dogName = selectedPet?.name;
+      }
+
+      const post = await postsApi.create(payload);
       setPosts((prev) => [post, ...prev]);
       setPostMetaById((prev) => ({
         ...prev,
@@ -1418,6 +1603,9 @@ export function CommunityScreen() {
         imageUrl: pickedImageUri ?? undefined,
         likeCount: 0,
         commentCount: 0,
+        helpfulCount: 0,
+        markedHelpfulByMe: false,
+        savedByMe: false,
         likedByMe: false,
         createdAt: new Date().toISOString(),
         authorRole: user?.role ?? "Owner",
@@ -1503,6 +1691,62 @@ export function CommunityScreen() {
       });
     }
   }, []);
+
+  const handleToggleHelpful = useCallback(async (id: string) => {
+    const demo = id.startsWith("demo-") || id.startsWith("local-");
+    if (demo) {
+      setPosts((prev) =>
+        prev.map((p) =>
+          p.id === id
+            ? {
+                ...p,
+                markedHelpfulByMe: !p.markedHelpfulByMe,
+                helpfulCount: Math.max(0, p.helpfulCount + (p.markedHelpfulByMe ? -1 : 1)),
+              }
+            : p,
+        ),
+      );
+      return;
+    }
+    try {
+      const r = await postsApi.toggleHelpful(id);
+      setPosts((prev) =>
+        prev.map((p) =>
+          p.id === id ? { ...p, markedHelpfulByMe: r.marked, helpfulCount: r.helpfulCount } : p,
+        ),
+      );
+    } catch {
+      /* error toast from global API interceptor */
+    }
+  }, []);
+
+  const handleToggleSave = useCallback(async (id: string) => {
+    const demo = id.startsWith("demo-") || id.startsWith("local-");
+    if (demo) {
+      setPosts((prev) => prev.map((p) => (p.id === id ? { ...p, savedByMe: !p.savedByMe } : p)));
+      return;
+    }
+    try {
+      const r = await postsApi.toggleSave(id);
+      setPosts((prev) => prev.map((p) => (p.id === id ? { ...p, savedByMe: r.saved } : p)));
+    } catch {
+      /* error toast from global API interceptor */
+    }
+  }, []);
+
+  const handleReportPost = useCallback(
+    async (id: string) => {
+      if (!id.startsWith("demo-") && !id.startsWith("local-")) {
+        try {
+          await postsApi.reportPost(id);
+        } catch {
+          /* error toast from global API interceptor */
+        }
+      }
+      showGlobalAlertCompat(copy("reportReceived"), copy("reportReceivedDesc"));
+    },
+    [copy],
+  );
 
   const handleDelete = useCallback(async (id: string) => {
     if (deleteLockRef.current.has(id)) return;
@@ -1667,8 +1911,8 @@ export function CommunityScreen() {
     try {
       const beacon = await palsApi.startBeacon({
         placeName: park.name,
-        latitude: 32.0853,
-        longitude: 34.7818,
+        latitude: park.latitude,
+        longitude: park.longitude,
         city: isRTL ? "תל אביב" : "Tel Aviv",
         durationMinutes: 60,
         petIds: selectedPet ? [selectedPet.id] : pets.map((p) => p.id),
@@ -1677,6 +1921,18 @@ export function CommunityScreen() {
       setMyBeaconId(beacon.id);
       setBeacons((prev) => [beacon, ...prev]);
       setParkCheckins((prev) => ({ ...prev, [park.id]: true }));
+      try {
+        await communityApi.startParkCheckIn({
+          placeId: park.placeId ?? park.id,
+          placeName: park.name,
+          latitude: park.latitude,
+          longitude: park.longitude,
+          petId: selectedPet?.id,
+          durationMinutes: 75,
+        });
+      } catch {
+        /* park check-in API optional */
+      }
       showGlobalAlertCompat(copy("checkedIn"), copy("checkedInDesc"));
     } catch {
       setMyBeaconId(`local-beacon-${park.id}`);
@@ -1694,6 +1950,11 @@ export function CommunityScreen() {
     setParkCheckins({});
     try {
       if (!id.startsWith("local-")) await palsApi.endBeacon(id);
+      try {
+        await communityApi.endParkCheckIn();
+      } catch {
+        /* ignore */
+      }
       await loadBeacons();
     } catch {
       showGlobalAlertCompat(copy("checkInRemoved"), "");
@@ -1818,61 +2079,95 @@ export function CommunityScreen() {
   }
 
   const renderTopTabs = () => (
-    <ScrollView
-      horizontal
-      showsHorizontalScrollIndicator={false}
-      style={[styles.categoryTabsScroll, { flexGrow: 0, flexShrink: 0 }]}
-      contentContainerStyle={[
-        styles.topTabsContent,
-        { flexDirection: appRowDirection },
-      ]}
-    >
-      {(["feed", "playdates", "parks", "groups", "qa", "events"] as MainTab[]).map((tab) => {
-        const active = mainTab === tab;
-        const label =
-          tab === "feed"
-            ? copy("feed")
-            : tab === "playdates"
-              ? copy("playdates")
-              : tab === "parks"
-                ? copy("parks")
-                : tab === "groups"
-                  ? copy("groups")
-                  : tab === "qa"
-                    ? copy("qa")
-                    : copy("events");
-        const icon =
-          tab === "feed"
-            ? "newspaper-outline"
-            : tab === "playdates"
-              ? "calendar-outline"
-              : tab === "parks"
-                ? "location-outline"
-                : tab === "groups"
-                  ? "people-outline"
-                  : tab === "qa"
-                    ? "help-circle-outline"
-                    : "sparkles-outline";
-        return (
-          <Pressable
-            key={tab}
-            onPress={() => setMainTab(tab)}
-            style={styles.topTab}
-          >
-            <View style={[styles.topTabCircle, active ? styles.topTabCircleActive : styles.topTabCircleInactive]}>
-              <Ionicons
-                name={icon as any}
-                size={28}
-                color={active ? colors.textInverse : colors.text}
-              />
-            </View>
-            <Text style={[styles.topTabText, active ? styles.topTabTextActive : undefined]}>
-              {label}
-            </Text>
-          </Pressable>
-        );
-      })}
-    </ScrollView>
+    <View style={{ flexGrow: 0, flexShrink: 0 }}>
+      <View
+        style={{
+          flexDirection: appRowDirection,
+          alignItems: "center",
+          justifyContent: "space-between",
+          paddingHorizontal: 12,
+          paddingBottom: 6,
+        }}
+      >
+        <Pressable
+          onPress={() => setCommunitySearchOpen(true)}
+          hitSlop={10}
+          style={{
+            flexDirection: appRowDirection,
+            alignItems: "center",
+            gap: 8,
+            backgroundColor: colors.surfaceSecondary,
+            paddingHorizontal: 14,
+            paddingVertical: 10,
+            borderRadius: 12,
+            borderWidth: 1,
+            borderColor: colors.borderLight,
+          }}
+        >
+          <Ionicons name="search" size={18} color={colors.text} />
+          <Text style={{ fontSize: 13, fontWeight: "700", color: colors.textMuted }}>{t("cm_search_title")}</Text>
+        </Pressable>
+      </View>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={[styles.categoryTabsScroll, { flexGrow: 0, flexShrink: 0 }]}
+        contentContainerStyle={[
+          styles.topTabsContent,
+          { flexDirection: appRowDirection },
+        ]}
+      >
+        {(["feed", "playdates", "parks", "groups", "qa", "events", "lostSos"] as MainTab[]).map((tab) => {
+          const active = mainTab === tab;
+          const label =
+            tab === "feed"
+              ? t("cm_tab_feed")
+              : tab === "playdates"
+                ? t("cm_tab_meetups")
+                : tab === "parks"
+                  ? t("cm_tab_parks")
+                  : tab === "groups"
+                    ? t("cm_tab_groups")
+                    : tab === "qa"
+                      ? t("cm_tab_qa")
+                      : tab === "events"
+                        ? t("cm_tab_events")
+                        : t("cm_tab_lost_sos");
+          const icon =
+            tab === "feed"
+              ? "newspaper-outline"
+              : tab === "playdates"
+                ? "calendar-outline"
+                : tab === "parks"
+                  ? "location-outline"
+                  : tab === "groups"
+                    ? "people-outline"
+                    : tab === "qa"
+                      ? "help-circle-outline"
+                      : tab === "events"
+                        ? "sparkles-outline"
+                        : "warning-outline";
+          return (
+            <Pressable
+              key={tab}
+              onPress={() => setMainTab(tab)}
+              style={styles.topTab}
+            >
+              <View style={[styles.topTabCircle, active ? styles.topTabCircleActive : styles.topTabCircleInactive]}>
+                <Ionicons
+                  name={icon as any}
+                  size={28}
+                  color={active ? colors.textInverse : colors.text}
+                />
+              </View>
+              <Text style={[styles.topTabText, active ? styles.topTabTextActive : undefined]} numberOfLines={2}>
+                {label}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </ScrollView>
+    </View>
   );
 
   const renderHero = () => (
@@ -2439,11 +2734,85 @@ export function CommunityScreen() {
     </View>
   );
 
+  const upcomingMeetupsPreview = useMemo(() => {
+    return [...playdates]
+      .sort((a, b) => new Date(a.scheduledFor).getTime() - new Date(b.scheduledFor).getTime())
+      .slice(0, 5);
+  }, [playdates]);
+
+  const renderLostSos = () => (
+    <ScrollView
+      style={{ flex: 1 }}
+      refreshControl={
+        <RefreshControl refreshing={refreshing} onRefresh={onRefreshFeed} tintColor={colors.text} colors={[colors.text]} />
+      }
+      contentContainerStyle={{ paddingBottom: bottomContentPadding }}
+    >
+      <SectionHeader title={t("cm_lost_sos_title")} subtitle={t("cm_lost_sos_subtitle")} />
+      {loading && sosFeedPosts.length === 0 ? (
+        <ListSkeleton rows={3} variant="card" />
+      ) : sosFeedPosts.length > 0 ? (
+        sosFeedPosts.map((item) => (
+          <PostCard
+            key={item.id}
+            post={item}
+            meta={postMetaById[item.id]}
+            currentUserId={user?.id ?? null}
+            onToggleLike={handleToggleLike}
+            onToggleHelpful={handleToggleHelpful}
+            onToggleSave={handleToggleSave}
+            onDelete={handleDelete}
+            onHide={(id) => {
+              setHiddenPostIds((prev) => new Set(prev).add(id));
+              showGlobalAlertCompat(copy("postHidden"), copy("postHiddenDesc"));
+            }}
+            onReport={handleReportPost}
+            onBlock={(userId) => {
+              setBlockedUserIds((prev) => new Set(prev).add(userId));
+              showGlobalAlertCompat(copy("userBlocked"), copy("userBlockedDesc"));
+            }}
+            onPlaydateComing={(post) => {
+              setPosts((prev) =>
+                prev.map((p) =>
+                  p.id === post.id ? { ...p, likeCount: p.likeCount + 1, likedByMe: true } : p,
+                ),
+              );
+              showGlobalAlertCompat(copy("youAreComing"), copy("youAreComingDesc"));
+            }}
+            rtlText={rtlText}
+            rtlRow={rtlRow}
+            isRTL={isRTL}
+            copy={copy}
+            isLikePending={!!likeBusy[item.id]}
+            isDeletePending={!!deleteBusy[item.id]}
+          />
+        ))
+      ) : (
+        <ListEmptyState icon="warning-outline" title={t("cm_lost_sos_title")} message={t("cm_lost_sos_empty")} />
+      )}
+    </ScrollView>
+  );
+
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.surface, marginTop: 0 }} edges={["top"]}>
       <BrandedAppHeader style={{ paddingVertical: 6 }} />
       <View style={{ flex: 1, backgroundColor: colors.surface, overflow: "hidden" }}>
         {renderTopTabs()}
+        <CommunityDashboard
+          t={t}
+          rtlText={rtlText}
+          rowDirection={rowDirectionForAppLayout(isRTL)}
+          activeDogsNearby={dashboardActiveDogs}
+          upcomingMeetups={upcomingMeetupsPreview}
+          apiUpcomingMeetupCount={communityDashboard?.upcomingMeetups ?? null}
+          openQuestionsCount={dashboardOpenQuestions}
+          activeParksCount={dashboardActiveParks}
+          sosCount={dashboardSos}
+          onPressMeetups={() => setMainTab("playdates")}
+          onPressParks={() => setMainTab("parks")}
+          onPressQuestions={() => setMainTab("qa")}
+          onPressSos={() => setMainTab("lostSos")}
+        />
         {renderHero()}
 
         {mainTab === "feed" ? (        loading && posts.length === 0 ? (
@@ -2480,12 +2849,14 @@ export function CommunityScreen() {
                   meta={postMetaById[item.id]}
                   currentUserId={user?.id ?? null}
                   onToggleLike={handleToggleLike}
+                  onToggleHelpful={handleToggleHelpful}
+                  onToggleSave={handleToggleSave}
                   onDelete={handleDelete}
                   onHide={(id) => {
                     setHiddenPostIds((prev) => new Set(prev).add(id));
                     showGlobalAlertCompat(copy("postHidden"), copy("postHiddenDesc"));
                   }}
-                  onReport={() => showGlobalAlertCompat(copy("reportReceived"), copy("reportReceivedDesc"))}
+                  onReport={handleReportPost}
                   onBlock={(userId) => {
                     setBlockedUserIds((prev) => new Set(prev).add(userId));
                     showGlobalAlertCompat(copy("userBlocked"), copy("userBlockedDesc"));
@@ -2509,6 +2880,8 @@ export function CommunityScreen() {
             />
           </View>
         )
+      ) : mainTab === "lostSos" ? (
+        renderLostSos()
       ) : mainTab === "playdates" ? (
         renderPlaydates()
       ) : mainTab === "parks" ? (
@@ -2550,6 +2923,25 @@ export function CommunityScreen() {
         </Pressable>
       )}
       </View>
+
+      <CommunitySearchModal
+        visible={communitySearchOpen}
+        onClose={() => {
+          setCommunitySearchOpen(false);
+          setCommunitySearchQuery("");
+        }}
+        t={t}
+        rtlText={rtlText}
+        rtlInput={rtlInput}
+        rowDirection={rowDirectionForAppLayout(isRTL)}
+        query={communitySearchQuery}
+        onQueryChange={setCommunitySearchQuery}
+        posts={searchPostsForModal}
+        groups={searchGroupsForModal}
+        meetups={playdates}
+        parks={parks.map((p) => ({ id: p.id, name: p.name }))}
+        loading={searchRemoteLoading}
+      />
 
       <CreatePostModal
         visible={composerOpen}

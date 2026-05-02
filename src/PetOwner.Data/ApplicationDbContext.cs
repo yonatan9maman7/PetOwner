@@ -34,6 +34,12 @@ public class ApplicationDbContext : DbContext
     public DbSet<BookingPet> BookingPets => Set<BookingPet>();
     public DbSet<CommunityGroup> CommunityGroups => Set<CommunityGroup>();
     public DbSet<GroupMember> GroupMembers => Set<GroupMember>();
+    public DbSet<UserCommunityPrefs> UserCommunityPrefs => Set<UserCommunityPrefs>();
+    public DbSet<DogParkCheckIn> DogParkCheckIns => Set<DogParkCheckIn>();
+    public DbSet<PostHelpfulMark> PostHelpfulMarks => Set<PostHelpfulMark>();
+    public DbSet<CommunitySavedPost> CommunitySavedPosts => Set<CommunitySavedPost>();
+    public DbSet<CommunityReport> CommunityReports => Set<CommunityReport>();
+    public DbSet<CommunitySosSighting> CommunitySosSightings => Set<CommunitySosSighting>();
     public DbSet<GroupPost> GroupPosts => Set<GroupPost>();
     public DbSet<GroupPostLike> GroupPostLikes => Set<GroupPostLike>();
     public DbSet<GroupPostComment> GroupPostComments => Set<GroupPostComment>();
@@ -77,6 +83,12 @@ public class ApplicationDbContext : DbContext
         ConfigureBookingPet(modelBuilder);
         ConfigureCommunityGroup(modelBuilder);
         ConfigureGroupMember(modelBuilder);
+        ConfigureUserCommunityPrefs(modelBuilder);
+        ConfigureDogParkCheckIn(modelBuilder);
+        ConfigurePostHelpfulMark(modelBuilder);
+        ConfigureCommunitySavedPost(modelBuilder);
+        ConfigureCommunityReport(modelBuilder);
+        ConfigureCommunitySosSighting(modelBuilder);
         ConfigureGroupPost(modelBuilder);
         ConfigureFavoriteProvider(modelBuilder);
         ConfigureVaccination(modelBuilder);
@@ -748,7 +760,13 @@ public class ApplicationDbContext : DbContext
             entity.Property(p => p.ImageUrl).HasMaxLength(500);
             entity.Property(p => p.LikeCount).HasDefaultValue(0);
             entity.Property(p => p.CommentCount).HasDefaultValue(0);
+            entity.Property(p => p.HelpfulCount).HasDefaultValue(0);
             entity.Property(p => p.CreatedAt).HasDefaultValueSql("GETUTCDATE()");
+
+            entity.Property(p => p.Title).HasMaxLength(200);
+            entity.Property(p => p.TagsCsv).HasMaxLength(500);
+            entity.Property(p => p.DogName).HasMaxLength(120);
+            entity.Property(p => p.ContactPhone).HasMaxLength(40);
 
             entity.Property(p => p.City).HasMaxLength(100);
             entity.Property(p => p.Category).HasMaxLength(50);
@@ -758,6 +776,10 @@ public class ApplicationDbContext : DbContext
                 .HasForeignKey(p => p.UserId)
                 .OnDelete(DeleteBehavior.Cascade);
 
+            entity.HasOne(p => p.RelatedPet)
+                .WithMany(pet => pet.RelatedCommunityPosts)
+                .HasForeignKey(p => p.RelatedPetId)
+                .OnDelete(DeleteBehavior.SetNull);
         });
 
         modelBuilder.Entity<PostLike>(entity =>
@@ -1001,6 +1023,9 @@ public class ApplicationDbContext : DbContext
             entity.Property(g => g.TargetCity)
                 .HasMaxLength(100);
 
+            entity.Property(g => g.GroupKind).HasMaxLength(40).HasDefaultValue("Location");
+            entity.Property(g => g.RulesText).HasMaxLength(4000);
+
             entity.HasIndex(g => new { g.TargetCountry, g.TargetCity });
         });
     }
@@ -1025,6 +1050,112 @@ public class ApplicationDbContext : DbContext
             entity.HasOne(m => m.User)
                 .WithMany(u => u.GroupMemberships)
                 .HasForeignKey(m => m.UserId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+    }
+
+    private static void ConfigureUserCommunityPrefs(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<UserCommunityPrefs>(entity =>
+        {
+            entity.HasKey(p => p.UserId);
+            entity.Property(p => p.DmPolicy).HasMaxLength(20).HasDefaultValue("Everyone");
+            entity.HasOne(p => p.User)
+                .WithOne(u => u.CommunityPrefs)
+                .HasForeignKey<UserCommunityPrefs>(p => p.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+    }
+
+    private static void ConfigureDogParkCheckIn(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<DogParkCheckIn>(entity =>
+        {
+            entity.HasKey(c => c.Id);
+            entity.Property(c => c.Id).HasDefaultValueSql("NEWSEQUENTIALID()");
+            entity.Property(c => c.PlaceId).HasMaxLength(256);
+            entity.Property(c => c.PlaceName).HasMaxLength(200);
+            entity.Property(c => c.StartedAt).HasDefaultValueSql("GETUTCDATE()");
+            entity.HasIndex(c => new { c.UserId, c.ExpiresAt });
+            entity.HasIndex(c => c.ExpiresAt);
+            entity.HasOne(c => c.User)
+                .WithMany(u => u.DogParkCheckIns)
+                .HasForeignKey(c => c.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(c => c.Pet)
+                .WithMany(p => p.DogParkCheckIns)
+                .HasForeignKey(c => c.PetId)
+                .OnDelete(DeleteBehavior.SetNull);
+        });
+    }
+
+    private static void ConfigurePostHelpfulMark(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<PostHelpfulMark>(entity =>
+        {
+            entity.HasKey(h => new { h.PostId, h.UserId });
+            entity.Property(h => h.CreatedAt).HasDefaultValueSql("GETUTCDATE()");
+            entity.HasOne(h => h.Post)
+                .WithMany(p => p.HelpfulMarks)
+                .HasForeignKey(h => h.PostId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(h => h.User)
+                .WithMany(u => u.PostHelpfulMarks)
+                .HasForeignKey(h => h.UserId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+    }
+
+    private static void ConfigureCommunitySavedPost(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<CommunitySavedPost>(entity =>
+        {
+            entity.HasKey(s => new { s.UserId, s.PostId });
+            entity.Property(s => s.SavedAt).HasDefaultValueSql("GETUTCDATE()");
+            entity.HasOne(s => s.User)
+                .WithMany(u => u.SavedCommunityPosts)
+                .HasForeignKey(s => s.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(s => s.Post)
+                .WithMany(p => p.SavedByUsers)
+                .HasForeignKey(s => s.PostId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+    }
+
+    private static void ConfigureCommunityReport(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<CommunityReport>(entity =>
+        {
+            entity.HasKey(r => r.Id);
+            entity.Property(r => r.Id).HasDefaultValueSql("NEWSEQUENTIALID()");
+            entity.Property(r => r.TargetType).HasMaxLength(40).IsRequired();
+            entity.Property(r => r.Reason).HasMaxLength(500);
+            entity.Property(r => r.Status).HasMaxLength(40).HasDefaultValue("Open");
+            entity.Property(r => r.CreatedAt).HasDefaultValueSql("GETUTCDATE()");
+            entity.HasOne(r => r.Reporter)
+                .WithMany(u => u.CommunityReports)
+                .HasForeignKey(r => r.ReporterUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+    }
+
+    private static void ConfigureCommunitySosSighting(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<CommunitySosSighting>(entity =>
+        {
+            entity.HasKey(s => s.Id);
+            entity.Property(s => s.Id).HasDefaultValueSql("NEWSEQUENTIALID()");
+            entity.Property(s => s.Note).HasMaxLength(500);
+            entity.Property(s => s.CreatedAt).HasDefaultValueSql("GETUTCDATE()");
+            entity.HasIndex(s => new { s.PostId, s.CreatedAt });
+            entity.HasOne(s => s.Post)
+                .WithMany(p => p.SosSightings)
+                .HasForeignKey(s => s.PostId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(s => s.User)
+                .WithMany(u => u.SosSightings)
+                .HasForeignKey(s => s.UserId)
                 .OnDelete(DeleteBehavior.Restrict);
         });
     }
@@ -1404,6 +1535,12 @@ public class ApplicationDbContext : DbContext
             entity.Property(e => e.CancellationReason).HasMaxLength(500);
             entity.Property(e => e.CreatedAt).HasDefaultValueSql("GETUTCDATE()");
 
+            entity.Property(e => e.MeetupType).HasMaxLength(60);
+            entity.Property(e => e.DogSizeCsv).HasMaxLength(200);
+            entity.Property(e => e.AgeFilterCsv).HasMaxLength(200);
+            entity.Property(e => e.EnergyLevel).HasMaxLength(40);
+            entity.Property(e => e.MeetupVisibility).HasMaxLength(20).HasDefaultValue("Public");
+
             entity.HasIndex(e => new { e.ScheduledFor, e.CancelledAt });
             // Spatial index on GeoLocation is created via raw SQL in migration AddPlaydateGeoLocation
 
@@ -1411,6 +1548,11 @@ public class ApplicationDbContext : DbContext
                 .WithMany()
                 .HasForeignKey(e => e.HostUserId)
                 .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasOne(e => e.LinkedCommunityGroup)
+                .WithMany()
+                .HasForeignKey(e => e.LinkedCommunityGroupId)
+                .OnDelete(DeleteBehavior.SetNull);
         });
 
         modelBuilder.Entity<PlaydateRsvp>(entity =>

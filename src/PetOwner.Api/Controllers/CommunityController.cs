@@ -57,7 +57,10 @@ public class CommunityController : ControllerBase
                 g.TargetCity,
                 g.Posts.Count,
                 g.Members.Count,
-                g.Members.Any(m => m.UserId == userId)
+                g.Members.Any(m => m.UserId == userId),
+                g.GroupKind,
+                g.IsPublic,
+                g.RulesText
             ))
             .ToListAsync();
 
@@ -113,6 +116,98 @@ public class CommunityController : ControllerBase
 
         var memberCount = await _db.GroupMembers.CountAsync(m => m.GroupId == id);
         return Ok(new GroupJoinResponse(false, memberCount));
+    }
+
+    [HttpGet("dashboard")]
+    public async Task<IActionResult> GetDashboard()
+    {
+        var now = DateTime.UtcNow;
+        var soon = now.AddDays(14);
+
+        var upcomingMeetups = await _db.PlaydateEvents.CountAsync(e =>
+            e.CancelledAt == null && e.ScheduledFor >= now && e.ScheduledFor <= soon);
+
+        var openQuestions = await _db.Posts.CountAsync(p => p.Category == "question");
+
+        var sosAlerts = await _db.Posts.CountAsync(p =>
+            p.Category != null &&
+            (p.Category.Contains("sos") || p.Category.Contains("lost")) &&
+            p.SosResolvedAt == null);
+
+        var activeDogParks = await _db.DogParkCheckIns.CountAsync(c => c.ExpiresAt >= now);
+
+        var activeBeacons = await _db.PlaydateBeacons.CountAsync(b => b.ExpiresAt >= now);
+        var activeDogsNearby = activeBeacons * 2 + await _db.DogParkCheckIns.CountAsync(c => c.ExpiresAt >= now && c.PetId != null);
+
+        return Ok(new CommunityDashboardDto(activeDogsNearby, upcomingMeetups, openQuestions, activeDogParks, sosAlerts));
+    }
+
+    [HttpGet("search")]
+    public async Task<IActionResult> Search([FromQuery] string q, [FromQuery] int limit = 12)
+    {
+        var userId = GetUserId();
+        limit = Math.Clamp(limit, 1, 40);
+        if (string.IsNullOrWhiteSpace(q))
+            return Ok(new { posts = Array.Empty<object>(), groups = Array.Empty<object>() });
+
+        var term = q.Trim();
+        var posts = await _db.Posts.AsNoTracking()
+            .Where(p => p.Content.Contains(term) || (p.Title != null && p.Title.Contains(term)))
+            .OrderByDescending(p => p.CreatedAt)
+            .Take(limit)
+            .Select(p => new { p.Id, p.Content, p.User.Name, p.CreatedAt })
+            .ToListAsync();
+
+        var groups = await _db.CommunityGroups.AsNoTracking()
+            .Where(g => g.IsActive && (g.Name.Contains(term) || g.Description.Contains(term)))
+            .OrderBy(g => g.Name)
+            .Take(limit)
+            .Select(g => new CommunityGroupDto(
+                g.Id, g.Name, g.Description, g.Icon, g.IsActive, g.CreatedAt,
+                g.TargetCountry, g.TargetCity, g.Posts.Count, g.Members.Count,
+                g.Members.Any(m => m.UserId == userId),
+                g.GroupKind, g.IsPublic, g.RulesText))
+            .ToListAsync();
+
+        return Ok(new { posts, groups });
+    }
+
+    [HttpPost("park-check-ins")]
+    public async Task<IActionResult> StartParkCheckIn([FromBody] StartParkCheckInDto dto)
+    {
+        var userId = GetUserId();
+        var mins = Math.Clamp(dto.DurationMinutes, 60, 90);
+        var now = DateTime.UtcNow;
+        var existing = await _db.DogParkCheckIns
+            .Where(c => c.UserId == userId && c.ExpiresAt >= now)
+            .ToListAsync();
+        _db.DogParkCheckIns.RemoveRange(existing);
+
+        _db.DogParkCheckIns.Add(new DogParkCheckIn
+        {
+            Id = Guid.NewGuid(),
+            UserId = userId,
+            PetId = dto.PetId,
+            PlaceId = dto.PlaceId.Trim(),
+            PlaceName = dto.PlaceName.Trim(),
+            Latitude = dto.Latitude,
+            Longitude = dto.Longitude,
+            StartedAt = now,
+            ExpiresAt = now.AddMinutes(mins)
+        });
+        await _db.SaveChangesAsync();
+        return Ok(new { ok = true, expiresAt = now.AddMinutes(mins) });
+    }
+
+    [HttpDelete("park-check-ins/me")]
+    public async Task<IActionResult> EndMyParkCheckIn()
+    {
+        var userId = GetUserId();
+        var now = DateTime.UtcNow;
+        var rows = await _db.DogParkCheckIns.Where(c => c.UserId == userId && c.ExpiresAt >= now).ToListAsync();
+        _db.DogParkCheckIns.RemoveRange(rows);
+        await _db.SaveChangesAsync();
+        return NoContent();
     }
 
     // ── Public: Posts ────────────────────────────────────────
@@ -330,7 +425,10 @@ public class CommunityController : ControllerBase
                 g.Id, g.Name, g.Description, g.Icon, g.IsActive,
                 g.CreatedAt, g.TargetCountry, g.TargetCity, g.Posts.Count,
                 g.Members.Count,
-                g.Members.Any(m => m.UserId == userId)
+                g.Members.Any(m => m.UserId == userId),
+                g.GroupKind,
+                g.IsPublic,
+                g.RulesText
             ))
             .ToListAsync();
 
@@ -349,7 +447,10 @@ public class CommunityController : ControllerBase
                 g.Id, g.Name, g.Description, g.Icon, g.IsActive,
                 g.CreatedAt, g.TargetCountry, g.TargetCity, g.Posts.Count,
                 g.Members.Count,
-                g.Members.Any(m => m.UserId == userId)
+                g.Members.Any(m => m.UserId == userId),
+                g.GroupKind,
+                g.IsPublic,
+                g.RulesText
             ))
             .FirstOrDefaultAsync();
 
@@ -381,7 +482,8 @@ public class CommunityController : ControllerBase
         return CreatedAtAction(nameof(AdminGetGroup), new { id = group.Id },
             new CommunityGroupDto(
                 group.Id, group.Name, group.Description, group.Icon, group.IsActive,
-                group.CreatedAt, group.TargetCountry, group.TargetCity, 0, 0, false));
+                group.CreatedAt, group.TargetCountry, group.TargetCity, 0, 0, false,
+                group.GroupKind, group.IsPublic, group.RulesText));
     }
 
     [HttpPut("admin/groups/{id:guid}")]
@@ -409,7 +511,8 @@ public class CommunityController : ControllerBase
         return Ok(new CommunityGroupDto(
             group.Id, group.Name, group.Description, group.Icon, group.IsActive,
             group.CreatedAt, group.TargetCountry, group.TargetCity, postCount,
-            memberCount, joinedByMe));
+            memberCount, joinedByMe,
+            group.GroupKind, group.IsPublic, group.RulesText));
     }
 
     [HttpDelete("admin/groups/{id:guid}")]

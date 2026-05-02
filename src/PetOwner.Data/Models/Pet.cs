@@ -40,4 +40,6 @@ public class Pet
     public ICollection<TeletriageSession> TeletriageSessions { get; set; } = new List<TeletriageSession>();
     public ICollection<Activity> Activities { get; set; } = new List<Activity>();
     public ICollection<BookingPet> BookingPets { get; set; } = new List<BookingPet>();
+    public ICollection<Post> RelatedCommunityPosts { get; set; } = new List<Post>();
+    public ICollection<DogParkCheckIn> DogParkCheckIns { get; set; } = new List<DogParkCheckIn>();
 }

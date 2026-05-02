@@ -418,6 +418,31 @@ export function GroupDetailScreen() {
             >
               {group.description}
             </Text>
+            {(group.rulesText?.trim()?.length ?? 0) > 0 && (
+              <Text
+                style={{
+                  fontSize: 13,
+                  color: colors.text,
+                  marginTop: 10,
+                  textAlign: isRTL ? "right" : "left",
+                  lineHeight: 18,
+                }}
+              >
+                <Text style={{ fontWeight: "800" }}>{t("cm_group_rules")}: </Text>
+                {group.rulesText}
+              </Text>
+            )}
+            <Text
+              style={{
+                fontSize: 12,
+                color: colors.textMuted,
+                marginTop: 8,
+                textAlign: isRTL ? "right" : "left",
+              }}
+            >
+              {group.groupKind}
+              {typeof group.isPublic === "boolean" ? ` · ${group.isPublic ? t("cm_group_public") : t("cm_group_private")}` : ""}
+            </Text>
           </View>
         </View>
       </View>

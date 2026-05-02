@@ -4,10 +4,12 @@ public class Post
 {
     public Guid Id { get; set; }
     public Guid UserId { get; set; }
+    public string? Title { get; set; }
     public string Content { get; set; } = null!;
     public string? ImageUrl { get; set; }
     public int LikeCount { get; set; }
     public int CommentCount { get; set; }
+    public int HelpfulCount { get; set; }
     public DateTime CreatedAt { get; set; }
 
     public double? Latitude { get; set; }
@@ -15,9 +17,23 @@ public class Post
     public string? City { get; set; }
     public string? Category { get; set; }
 
+    public Guid? RelatedPetId { get; set; }
+    public string? TagsCsv { get; set; }
+    public bool IsAnonymous { get; set; }
+
+    public int? SosNotifyRadiusKm { get; set; }
+    public DateTime? SosResolvedAt { get; set; }
+    public string? DogName { get; set; }
+    public string? ContactPhone { get; set; }
+    public DateTime? LastSeenAt { get; set; }
+
     public User User { get; set; } = null!;
+    public Pet? RelatedPet { get; set; }
     public ICollection<PostLike> Likes { get; set; } = new List<PostLike>();
     public ICollection<PostComment> Comments { get; set; } = new List<PostComment>();
+    public ICollection<PostHelpfulMark> HelpfulMarks { get; set; } = new List<PostHelpfulMark>();
+    public ICollection<CommunitySavedPost> SavedByUsers { get; set; } = new List<CommunitySavedPost>();
+    public ICollection<CommunitySosSighting> SosSightings { get; set; } = new List<CommunitySosSighting>();
 }
 
 public class PostLike

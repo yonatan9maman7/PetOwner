@@ -15,8 +15,32 @@ public record CommunityGroupDto(
     string? TargetCity,
     int PostCount,
     int MemberCount,
-    bool JoinedByMe
+    bool JoinedByMe,
+    string GroupKind,
+    bool IsPublic,
+    string? RulesText
 );
+
+public record CommunityDashboardDto(
+    int ActiveDogsNearby,
+    int UpcomingMeetups,
+    int OpenQuestions,
+    int ActiveDogParks,
+    int SosAlerts);
+
+public record StartParkCheckInDto(
+    string PlaceId,
+    string PlaceName,
+    double Latitude,
+    double Longitude,
+    Guid? PetId,
+    int DurationMinutes = 75);
+
+public record UserCommunityPrefsDto(
+    bool ShowExactLocation,
+    string DmPolicy,
+    bool AllowMeetupInvites,
+    bool ShowDogInCommunity);
 
 public record GroupJoinResponse(bool Joined, int MemberCount);
 

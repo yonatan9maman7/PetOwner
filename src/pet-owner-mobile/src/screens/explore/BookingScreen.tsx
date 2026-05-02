@@ -447,7 +447,7 @@ export function BookingScreen() {
       return;
     }
     if (selectedPetIds.length === 0) {
-      showGlobalAlertCompat(t("errorTitle"), "Please select at least one pet.");
+      showGlobalAlertCompat(t("errorTitle"), t("bookingSelectPetRequired"));
       return;
     }
     if (!startDate || !startTime) {
@@ -674,11 +674,11 @@ export function BookingScreen() {
           }}
         >
           <Text style={[rtlText, { color: colors.text, fontSize: 16, fontWeight: "700", marginBottom: 6 }]}>
-            Select pets
+            {t("bookingSelectPets")}
           </Text>
           {isDogOnlyService ? (
             <Text style={[rtlText, { color: colors.textMuted, fontSize: 12, marginBottom: 12 }]}>
-              This service is only for dogs.
+              {t("bookingDogServiceOnlyDogs")}
             </Text>
           ) : null}
           <ScrollView
@@ -698,7 +698,7 @@ export function BookingScreen() {
                   key={pet.id}
                   onPress={() => {
                     if (disabled) {
-                      showGlobalAlertCompat(t("errorTitle"), "This service is only for dogs.");
+                      showGlobalAlertCompat(t("errorTitle"), t("bookingDogServiceOnlyDogs"));
                       return;
                     }
                     togglePetSelection(pet.id);
@@ -810,13 +810,19 @@ export function BookingScreen() {
               <Text style={[rtlText, { color: colors.text, fontSize: 14, fontWeight: "700", marginTop: 18, marginBottom: 10 }]}>
                 {t("startTime")}
               </Text>
-              <TimeSlotSelector
-                availableTimes={startAvailableTimes}
-                selectedDate={startDate}
-                selectedTime={startTime}
-                onTimeSelect={setStartTime}
-                loading={startAvailabilityLoading}
-              />
+              {!selectedServiceType ? (
+                <Text style={[rtlText, { color: colors.textMuted, fontSize: 13, paddingVertical: 10 }]}>
+                  {t("bookingSelectServiceForTimes")}
+                </Text>
+              ) : (
+                <TimeSlotSelector
+                  availableTimes={startAvailableTimes}
+                  selectedDate={startDate}
+                  selectedTime={startTime}
+                  onTimeSelect={setStartTime}
+                  loading={startAvailabilityLoading}
+                />
+              )}
             </>
           ) : null}
 

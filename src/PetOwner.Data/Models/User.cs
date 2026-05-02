@@ -31,4 +31,10 @@ public class User
     public ICollection<UserPushToken> PushTokens { get; set; } = [];
     public UserNotificationPrefs? NotificationPrefs { get; set; }
     public PlaydatePrefs? PlaydatePrefs { get; set; }
+    public UserCommunityPrefs? CommunityPrefs { get; set; }
+    public ICollection<DogParkCheckIn> DogParkCheckIns { get; set; } = [];
+    public ICollection<PostHelpfulMark> PostHelpfulMarks { get; set; } = [];
+    public ICollection<CommunitySavedPost> SavedCommunityPosts { get; set; } = [];
+    public ICollection<CommunityReport> CommunityReports { get; set; } = [];
+    public ICollection<CommunitySosSighting> SosSightings { get; set; } = [];
 }

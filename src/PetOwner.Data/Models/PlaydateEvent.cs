@@ -19,6 +19,17 @@ public class PlaydateEvent
     public DateTime? CancelledAt { get; set; }
     public string? CancellationReason { get; set; }
 
+    public string? MeetupType { get; set; }
+    public int? DurationMinutes { get; set; }
+    public string? DogSizeCsv { get; set; }
+    public string? AgeFilterCsv { get; set; }
+    public string? EnergyLevel { get; set; }
+    public bool VaccinatedOnly { get; set; }
+    /// <summary>Public or GroupOnly</summary>
+    public string MeetupVisibility { get; set; } = "Public";
+    public Guid? LinkedCommunityGroupId { get; set; }
+    public CommunityGroup? LinkedCommunityGroup { get; set; }
+
     public User Host { get; set; } = null!;
     public ICollection<PlaydateRsvp> Rsvps { get; set; } = new List<PlaydateRsvp>();
     public ICollection<PlaydateEventComment> Comments { get; set; } = new List<PlaydateEventComment>();

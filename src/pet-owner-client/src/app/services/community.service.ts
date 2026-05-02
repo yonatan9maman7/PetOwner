@@ -15,6 +15,9 @@ export interface CommunityGroup {
   postCount: number;
   memberCount: number;
   joinedByMe: boolean;
+  groupKind: string;
+  isPublic: boolean;
+  rulesText: string | null;
 }
 
 export interface CreateGroupPayload {

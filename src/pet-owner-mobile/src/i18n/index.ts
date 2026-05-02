@@ -1,5 +1,7 @@
 import { I18nManager, Platform } from "react-native";
 import { useAuthStore } from "../store/authStore";
+import communityHe from "../screens/community/i18n/he.json";
+import communityEn from "../screens/community/i18n/en.json";
 
 export type Language = "he" | "en";
 
@@ -119,6 +121,10 @@ const he = {
     "כדי להזמין שירות, עליך להוסיף לפחות חיית מחמד אחת לפרופיל שלך.",
   addPetNow: "הוסף חיה עכשיו",
   selectServiceFirst: "יש לבחור שירות תחילה",
+  bookingSelectPets: "בחר חיות מחמד",
+  bookingSelectPetRequired: "נא לבחור לפחות חיית מחמד אחת.",
+  bookingDogServiceOnlyDogs: "שירות זה מיועד לכלבים בלבד.",
+  bookingSelectServiceForTimes: "בחר שירות תחילה כדי לראות שעות פנויות.",
   invalidDates: "תאריך הסיום חייב להיות אחרי תאריך ההתחלה",
   myBookings: "ההזמנות שלי",
   noBookings: "אין הזמנות עדיין",
@@ -1407,6 +1413,10 @@ const en: Record<keyof typeof he, string> = {
     "To book a service, you must add at least one pet to your profile.",
   addPetNow: "Add a Pet Now",
   selectServiceFirst: "Please select a service first",
+  bookingSelectPets: "Select pets",
+  bookingSelectPetRequired: "Please select at least one pet.",
+  bookingDogServiceOnlyDogs: "This service is only for dogs.",
+  bookingSelectServiceForTimes: "Select a service first to see available times.",
   invalidDates: "End date must be after start date",
   myBookings: "My Bookings",
   noBookings: "No bookings yet",
@@ -2578,9 +2588,12 @@ const en: Record<keyof typeof he, string> = {
   achStarSitter: "Star Sitter",
 };
 
-const translations = { he, en };
+const heMerged = { ...he, ...communityHe };
+const enMerged = { ...en, ...communityEn };
 
-export type TranslationKey = keyof typeof he;
+export type TranslationKey = keyof typeof heMerged;
+
+const translations = { he: heMerged, en: enMerged };
 
 /** Resolve a translation key for an explicit language (e.g. PDF export). */
 export function translateKey(language: Language, key: TranslationKey): string {

@@ -280,8 +280,11 @@ public class ProvidersController : ControllerBase
             .OrderBy(s => s.StartTime)
             .ToListAsync();
 
-        if (rawSlots.Count == 0)
-            return Ok(new List<string>());
+        // When no weekly rows exist, mirror the legacy mobile fallback window (08:00–20:00 local)
+        // so owners still see bookable times while providers finish onboarding their schedule.
+        IReadOnlyList<(TimeSpan Start, TimeSpan End)> workingWindows = rawSlots.Count > 0
+            ? rawSlots.Select(s => (s.StartTime, s.EndTime)).ToList()
+            : [(TimeSpan.FromHours(8), TimeSpan.FromHours(20))];
 
         var bufferMinutes = Math.Max(0, rate.BufferTimeMinutes);
         var maxConcurrentBookings = Math.Max(1, rate.MaxConcurrentBookings);
@@ -305,14 +308,14 @@ public class ProvidersController : ControllerBase
             .ToListAsync();
 
         var availableTimes = new List<string>();
-        foreach (var rawSlot in rawSlots)
+        foreach (var window in workingWindows)
         {
-            for (var slotStart = rawSlot.StartTime;
-                 slotStart < rawSlot.EndTime;
+            for (var slotStart = window.Start;
+                 slotStart < window.End;
                  slotStart = slotStart.Add(TimeSpan.FromMinutes(15)))
             {
                 var slotEnd = slotStart.Add(TimeSpan.FromMinutes(slotDurationMinutes));
-                if (slotEnd > rawSlot.EndTime)
+                if (slotEnd > window.End)
                     continue;
 
                 var candidateStartLocal = date.ToDateTime(TimeOnly.FromTimeSpan(slotStart));
@@ -329,12 +332,16 @@ public class ProvidersController : ControllerBase
                     && b.EndDate.AddMinutes(bufferMinutes) > candidateStartUtc);
 
                 if (overlappingCount + 1 <= maxConcurrentBookings)
-                    availableTimes.Add(slotStart.ToString(@"hh\:mm", CultureInfo.InvariantCulture));
+                    availableTimes.Add(FormatAvailabilityHm(slotStart));
             }
         }
 
         return Ok(availableTimes.Distinct().ToList());
     }
+
+    /// <summary>24h clock "HH:mm" for a same-day <see cref="TimeSpan"/> (provider working hours).</summary>
+    private static string FormatAvailabilityHm(TimeSpan timeOfDay) =>
+        TimeOnly.FromTimeSpan(timeOfDay).ToString("HH:mm", CultureInfo.InvariantCulture);
 
     [Authorize]
     [HttpPut("me")]

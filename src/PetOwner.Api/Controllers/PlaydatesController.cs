@@ -378,6 +378,29 @@ public class PlaydatesController : ControllerBase
         catch { }
     }
 
+    [HttpGet("{id:guid}/compatibility")]
+    public async Task<IActionResult> GetCompatibility(Guid id, [FromQuery] Guid petId)
+    {
+        var pet = await _db.Pets.AsNoTracking().FirstOrDefaultAsync(p => p.Id == petId);
+        if (pet is null) return NotFound(new { message = "Pet not found." });
+
+        var e = await _db.PlaydateEvents.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id);
+        if (e is null) return NotFound(new { message = "Event not found." });
+
+        var score = 65;
+        if (e.VaccinatedOnly && pet.Sterilization == SterilizationStatus.Neutered)
+            score += 5;
+        if (!string.IsNullOrEmpty(e.DogSizeCsv) && pet.DogSize != null &&
+            e.DogSizeCsv.Contains(pet.DogSize.ToString()!, StringComparison.OrdinalIgnoreCase))
+            score += 20;
+        if (!string.IsNullOrEmpty(e.AllowedSpeciesCsv) &&
+            e.AllowedSpeciesCsv.Contains(pet.Species.ToString(), StringComparison.OrdinalIgnoreCase))
+            score += 10;
+
+        score = Math.Clamp(score, 0, 100);
+        return Ok(new { score });
+    }
+
     private static PlaydateEventDto MapEvent(
         Guid id, Guid hostUserId, string hostUserName, string title, string? desc,
         string locationName, double lat, double lng, string? city,

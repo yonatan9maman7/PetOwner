@@ -133,6 +133,52 @@ public class NotificationService : INotificationService
         }
     }
 
+    public async Task NotifyUsersNearLocationAsync(
+        double latitude,
+        double longitude,
+        double radiusKm,
+        string type,
+        string title,
+        string message,
+        Guid? relatedEntityId = null)
+    {
+        if (latitude is < -90 or > 90 || longitude is < -180 or > 180)
+            return;
+
+        var r = Math.Clamp(radiusKm, 0.5, 100);
+        var latDiff = r / 111.0;
+        var lngDiff = r / (111.0 * Math.Cos(latitude * Math.PI / 180.0));
+
+        var candidates = await _db.Users.AsNoTracking()
+            .Where(u => u.IsActive
+                        && u.Location != null
+                        && u.Location.GeoLocation != null
+                        && u.Location.GeoLocation!.Y >= latitude - latDiff
+                        && u.Location.GeoLocation.Y <= latitude + latDiff
+                        && u.Location.GeoLocation.X >= longitude - lngDiff
+                        && u.Location.GeoLocation.X <= longitude + lngDiff)
+            .Select(u => new { u.Id, Lat = u.Location!.GeoLocation!.Y, Lng = u.Location.GeoLocation!.X })
+            .ToListAsync();
+
+        foreach (var c in candidates)
+        {
+            var d = HaversineKm(latitude, longitude, c.Lat, c.Lng);
+            if (d > r) continue;
+            await CreateAsync(c.Id, type, title, message, relatedEntityId);
+        }
+    }
+
+    private static double HaversineKm(double lat1, double lon1, double lat2, double lon2)
+    {
+        const double R = 6371.0;
+        var dLat = (lat2 - lat1) * Math.PI / 180.0;
+        var dLng = (lon2 - lon1) * Math.PI / 180.0;
+        var a = Math.Sin(dLat / 2) * Math.Sin(dLat / 2)
+              + Math.Cos(lat1 * Math.PI / 180.0) * Math.Cos(lat2 * Math.PI / 180.0)
+              * Math.Sin(dLng / 2) * Math.Sin(dLng / 2);
+        return 2 * R * Math.Asin(Math.Sqrt(a));
+    }
+
     // ── Helpers ────────────────────────────────────────────────────────────────
 
     private async Task SendExpoPushAsync(
@@ -181,10 +227,10 @@ public class NotificationService : INotificationService
             or "BOOKING_CANCELLED" or "PAYMENT_RECEIVED"
                 => prefs.Bookings,
 
-            "GROUP_POST" or "POST_COMMENT" or "POST_LIKE"
+            "GROUP_POST" or "POST_COMMENT" or "POST_LIKE" or "SOS_ALERT"
                 => prefs.Community,
 
-            "TRIAGE_RESULT" or "VACCINE_DUE" or "SOS_ALERT"
+            "TRIAGE_RESULT" or "VACCINE_DUE"
                 => prefs.Triage,
 
             "PROMOTION" or "ANNOUNCEMENT"

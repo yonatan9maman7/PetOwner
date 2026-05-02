@@ -55,6 +55,10 @@ import type {
   CreateCommentDto,
   CreateCommunityGroupRequest,
   CommunityGroupDto,
+  CommunityDashboardDto,
+  CommunitySearchResponseDto,
+  StartParkCheckInDto,
+  UserCommunityPrefsDto,
   GroupJoinResponse,
   GroupPostDto,
   CreateGroupPostRequest,
@@ -332,6 +336,13 @@ export const providerApi = {
 };
 
 export const usersApi = {
+  getCommunityPrefs: () =>
+    apiClient
+      .get<UserCommunityPrefsDto>("/users/me/community-prefs", { backgroundRequest: true })
+      .then((r) => r.data),
+  updateCommunityPrefs: (data: UserCommunityPrefsDto) =>
+    apiClient.put<UserCommunityPrefsDto>("/users/me/community-prefs", data).then((r) => r.data),
+
   /** Owner-side stats dashboard. */
   getStats: (range: StatRange = "all") =>
     apiClient
@@ -371,10 +382,27 @@ export const triageApi = {
 };
 
 export const postsApi = {
-  getFeed: (page = 1, pageSize = 20, category?: string) =>
+  getFeed: (
+    page = 1,
+    pageSize = 20,
+    opts?: {
+      category?: string;
+      ranked?: boolean;
+      lat?: number;
+      lng?: number;
+      radiusKm?: number;
+    },
+  ) =>
     apiClient
       .get<PostDto[]>("/posts/feed", {
-        params: { page, pageSize, ...(category ? { category } : {}) },
+        params: {
+          page,
+          pageSize,
+          ...(opts?.category ? { category: opts.category } : {}),
+          ...(opts?.ranked ? { ranked: true } : {}),
+          ...(opts?.lat != null && opts?.lng != null ? { lat: opts.lat, lng: opts.lng } : {}),
+          ...(opts?.radiusKm != null ? { radiusKm: opts.radiusKm } : {}),
+        },
       })
       .then((r) => r.data),
   create: (data: CreatePostDto) =>
@@ -384,6 +412,18 @@ export const postsApi = {
     apiClient
       .post<{ liked: boolean; likeCount: number }>(`/posts/${id}/like`)
       .then((r) => r.data),
+  toggleHelpful: (id: string) =>
+    apiClient
+      .post<{ marked: boolean; helpfulCount: number }>(`/posts/${id}/helpful`)
+      .then((r) => r.data),
+  toggleSave: (id: string) =>
+    apiClient.post<{ saved: boolean }>(`/posts/${id}/save`).then((r) => r.data),
+  reportPost: (id: string, reason?: string) =>
+    apiClient.post<{ ok: boolean }>(`/posts/${id}/report`, { reason }).then((r) => r.data),
+  resolveSos: (id: string) =>
+    apiClient.post<{ resolved: boolean }>(`/posts/${id}/sos/resolve`).then((r) => r.data),
+  addSosSighting: (id: string, data: { latitude: number; longitude: number; note?: string }) =>
+    apiClient.post(`/posts/${id}/sos/sighting`, data),
   getComments: (postId: string) =>
     apiClient
       .get<CommentDto[]>(`/posts/${postId}/comments`)
@@ -408,6 +448,18 @@ export const postsApi = {
 };
 
 export const communityApi = {
+  getDashboard: () =>
+    apiClient
+      .get<CommunityDashboardDto>("/community/dashboard", { backgroundRequest: true })
+      .then((r) => r.data),
+  search: (q: string, limit = 12) =>
+    apiClient
+      .get<CommunitySearchResponseDto>("/community/search", { params: { q, limit } })
+      .then((r) => r.data),
+  startParkCheckIn: (data: StartParkCheckInDto) =>
+    apiClient.post<{ ok: boolean; expiresAt: string }>("/community/park-check-ins", data).then((r) => r.data),
+  endParkCheckIn: () => apiClient.delete("/community/park-check-ins/me"),
+
   getGroups: () =>
     apiClient
       .get<CommunityGroupDto[]>("/community/groups")
@@ -738,6 +790,10 @@ export const palsApi = {
 export const playdatesApi = {
   list: (params?: { radiusKm?: number; from?: string; to?: string }) =>
     apiClient.get<PlaydateEventDto[]>("/playdates", { params }).then((r) => r.data),
+  getCompatibility: (id: string, petId: string) =>
+    apiClient
+      .get<{ score: number }>(`/playdates/${id}/compatibility`, { params: { petId } })
+      .then((r) => r.data),
   getById: (id: string) =>
     apiClient.get<PlaydateEventDetailDto>(`/playdates/${id}`).then((r) => r.data),
   create: (data: CreatePlaydateEventDto) =>

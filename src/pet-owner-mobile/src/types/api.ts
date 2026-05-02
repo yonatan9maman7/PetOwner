@@ -568,11 +568,20 @@ export interface PostDto {
   imageUrl?: string;
   likeCount: number;
   commentCount: number;
+  helpfulCount: number;
   likedByMe: boolean;
+  markedHelpfulByMe: boolean;
+  savedByMe: boolean;
   createdAt: string;
   authorRole: string;
   authorIsApprovedProvider: boolean;
   category?: string;
+  title?: string;
+  relatedPetId?: string;
+  relatedPetName?: string;
+  relatedPetImageUrl?: string;
+  sosResolvedAt?: string | null;
+  isAnonymous?: boolean;
 }
 
 export interface CreatePostDto {
@@ -581,6 +590,15 @@ export interface CreatePostDto {
   latitude?: number;
   longitude?: number;
   city?: string;
+  category?: string;
+  title?: string;
+  relatedPetId?: string;
+  tagsCsv?: string;
+  isAnonymous?: boolean;
+  sosNotifyRadiusKm?: number;
+  dogName?: string;
+  contactPhone?: string;
+  lastSeenAt?: string;
 }
 
 export interface CommentDto {
@@ -621,6 +639,46 @@ export interface CommunityGroupDto {
   postCount: number;
   memberCount: number;
   joinedByMe: boolean;
+  groupKind: string;
+  isPublic: boolean;
+  rulesText?: string | null;
+}
+
+export interface CommunityDashboardDto {
+  activeDogsNearby: number;
+  upcomingMeetups: number;
+  openQuestions: number;
+  activeDogParks: number;
+  sosAlerts: number;
+}
+
+export interface UserCommunityPrefsDto {
+  showExactLocation: boolean;
+  dmPolicy: string;
+  allowMeetupInvites: boolean;
+  showDogInCommunity: boolean;
+}
+
+/** Matches `GET /community/search` post rows (anonymous projection). */
+export interface CommunitySearchPostHitDto {
+  id: string;
+  content: string;
+  name: string;
+  createdAt: string;
+}
+
+export interface CommunitySearchResponseDto {
+  posts: CommunitySearchPostHitDto[];
+  groups: CommunityGroupDto[];
+}
+
+export interface StartParkCheckInDto {
+  placeId: string;
+  placeName: string;
+  latitude: number;
+  longitude: number;
+  petId?: string | null;
+  durationMinutes?: number;
 }
 
 export interface GroupJoinResponse {

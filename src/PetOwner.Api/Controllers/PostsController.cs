@@ -30,7 +30,8 @@ public class PostsController : ControllerBase
         [FromQuery] double? lat = null,
         [FromQuery] double? lng = null,
         [FromQuery] double? radiusKm = null,
-        [FromQuery] string? category = null)
+        [FromQuery] string? category = null,
+        [FromQuery] bool ranked = false)
     {
         var userId = GetUserId();
         pageSize = Math.Clamp(pageSize, 1, 50);
@@ -50,21 +51,82 @@ public class PostsController : ControllerBase
                 p.Longitude >= lng.Value - lngDiff && p.Longitude <= lng.Value + lngDiff);
         }
 
-        var posts = await query
+        if (ranked)
+        {
+            var materialized = await query
+                .OrderByDescending(p => p.CreatedAt)
+                .Take(400)
+                .Select(p => new PostDto(
+                    p.Id,
+                    p.UserId,
+                    p.IsAnonymous ? "Anonymous" : p.User.Name,
+                    p.Content,
+                    p.ImageUrl,
+                    p.LikeCount,
+                    p.CommentCount,
+                    p.HelpfulCount,
+                    p.Likes.Any(l => l.UserId == userId),
+                    p.HelpfulMarks.Any(h => h.UserId == userId),
+                    p.SavedByUsers.Any(s => s.UserId == userId),
+                    p.CreatedAt,
+                    p.User.Role,
+                    p.User.ProviderProfile != null && p.User.ProviderProfile.Status == ProviderStatus.Approved,
+                    p.Category,
+                    p.Title,
+                    p.RelatedPetId,
+                    p.RelatedPet != null ? p.RelatedPet.Name : null,
+                    p.RelatedPet != null ? p.RelatedPet.ImageUrl : null,
+                    p.SosResolvedAt,
+                    p.IsAnonymous))
+                .ToListAsync();
+
+            static int SosRank(string? c)
+            {
+                var x = (c ?? "").ToLowerInvariant();
+                if (x.Contains("sos") || x.Contains("lost")) return 3;
+                return 0;
+            }
+
+            var posts = materialized
+                .OrderByDescending(p => SosRank(p.Category))
+                .ThenByDescending(p => p.LikeCount + p.HelpfulCount)
+                .ThenByDescending(p => p.CreatedAt)
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .ToList();
+
+            return Ok(posts);
+        }
+
+        var postsNormal = await query
             .OrderByDescending(p => p.CreatedAt)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
             .Select(p => new PostDto(
-                p.Id, p.UserId, p.User.Name, p.Content, p.ImageUrl,
-                p.LikeCount, p.CommentCount,
+                p.Id,
+                p.UserId,
+                p.IsAnonymous ? "Anonymous" : p.User.Name,
+                p.Content,
+                p.ImageUrl,
+                p.LikeCount,
+                p.CommentCount,
+                p.HelpfulCount,
                 p.Likes.Any(l => l.UserId == userId),
+                p.HelpfulMarks.Any(h => h.UserId == userId),
+                p.SavedByUsers.Any(s => s.UserId == userId),
                 p.CreatedAt,
                 p.User.Role,
                 p.User.ProviderProfile != null && p.User.ProviderProfile.Status == ProviderStatus.Approved,
-                p.Category))
+                p.Category,
+                p.Title,
+                p.RelatedPetId,
+                p.RelatedPet != null ? p.RelatedPet.Name : null,
+                p.RelatedPet != null ? p.RelatedPet.ImageUrl : null,
+                p.SosResolvedAt,
+                p.IsAnonymous))
             .ToListAsync();
 
-        return Ok(posts);
+        return Ok(postsNormal);
     }
 
     [HttpPost]
@@ -78,25 +140,66 @@ public class PostsController : ControllerBase
         var post = new Post
         {
             UserId = userId,
+            Title = dto.Title?.Trim(),
             Content = dto.Content?.Trim() ?? string.Empty,
             ImageUrl = dto.ImageUrl?.Trim(),
             Latitude = dto.Latitude,
             Longitude = dto.Longitude,
             City = dto.City?.Trim(),
+            Category = dto.Category?.Trim(),
+            RelatedPetId = dto.RelatedPetId,
+            TagsCsv = dto.TagsCsv?.Trim(),
+            IsAnonymous = dto.IsAnonymous,
+            SosNotifyRadiusKm = dto.SosNotifyRadiusKm,
+            DogName = dto.DogName?.Trim(),
+            ContactPhone = dto.ContactPhone?.Trim(),
+            LastSeenAt = dto.LastSeenAt.HasValue
+                ? DateTime.SpecifyKind(dto.LastSeenAt.Value.ToUniversalTime(), DateTimeKind.Utc)
+                : null,
         };
 
         _db.Posts.Add(post);
         await _db.SaveChangesAsync();
 
+        var cat = (post.Category ?? "").ToLowerInvariant();
+        if ((cat.Contains("sos") || cat.Contains("lost")) && post.Latitude.HasValue && post.Longitude.HasValue)
+        {
+            var km = post.SosNotifyRadiusKm ?? 5;
+            await _notifications.NotifyUsersNearLocationAsync(
+                post.Latitude.Value,
+                post.Longitude.Value,
+                km,
+                "SOS_ALERT",
+                "SOS / Lost dog alert",
+                post.Content.Length > 120 ? post.Content[..120] + "…" : post.Content,
+                post.Id);
+        }
+
         var created = await _db.Posts
             .AsNoTracking()
             .Where(p => p.Id == post.Id)
             .Select(p => new PostDto(
-                p.Id, p.UserId, p.User.Name, p.Content, p.ImageUrl,
-                0, 0, false, p.CreatedAt,
+                p.Id,
+                p.UserId,
+                p.IsAnonymous ? "Anonymous" : p.User.Name,
+                p.Content,
+                p.ImageUrl,
+                p.LikeCount,
+                p.CommentCount,
+                p.HelpfulCount,
+                p.Likes.Any(l => l.UserId == userId),
+                p.HelpfulMarks.Any(h => h.UserId == userId),
+                p.SavedByUsers.Any(s => s.UserId == userId),
+                p.CreatedAt,
                 p.User.Role,
                 p.User.ProviderProfile != null && p.User.ProviderProfile.Status == ProviderStatus.Approved,
-                p.Category))
+                p.Category,
+                p.Title,
+                p.RelatedPetId,
+                p.RelatedPet != null ? p.RelatedPet.Name : null,
+                p.RelatedPet != null ? p.RelatedPet.ImageUrl : null,
+                p.SosResolvedAt,
+                p.IsAnonymous))
             .FirstAsync();
 
         return CreatedAtAction(nameof(GetFeed), null, created);
@@ -295,6 +398,110 @@ public class PostsController : ControllerBase
 
         await _db.SaveChangesAsync();
         return Ok(new { liked = existing is null, likeCount = comment.LikeCount });
+    }
+
+    [HttpPost("{id:guid}/helpful")]
+    public async Task<IActionResult> ToggleHelpful(Guid id)
+    {
+        var userId = GetUserId();
+        var post = await _db.Posts.FirstOrDefaultAsync(p => p.Id == id);
+        if (post is null) return NotFound(new { message = "Post not found." });
+
+        var existing = await _db.PostHelpfulMarks.FirstOrDefaultAsync(h => h.PostId == id && h.UserId == userId);
+        if (existing is not null)
+        {
+            _db.PostHelpfulMarks.Remove(existing);
+            post.HelpfulCount = Math.Max(0, post.HelpfulCount - 1);
+        }
+        else
+        {
+            _db.PostHelpfulMarks.Add(new PostHelpfulMark
+            {
+                PostId = id,
+                UserId = userId,
+                CreatedAt = DateTime.UtcNow
+            });
+            post.HelpfulCount++;
+        }
+
+        await _db.SaveChangesAsync();
+        return Ok(new { marked = existing is null, helpfulCount = post.HelpfulCount });
+    }
+
+    [HttpPost("{id:guid}/save")]
+    public async Task<IActionResult> ToggleSave(Guid id)
+    {
+        var userId = GetUserId();
+        var existing = await _db.CommunitySavedPosts.FirstOrDefaultAsync(s => s.PostId == id && s.UserId == userId);
+        if (existing is not null)
+        {
+            _db.CommunitySavedPosts.Remove(existing);
+            await _db.SaveChangesAsync();
+            return Ok(new { saved = false });
+        }
+
+        _db.CommunitySavedPosts.Add(new CommunitySavedPost
+        {
+            UserId = userId,
+            PostId = id,
+            SavedAt = DateTime.UtcNow
+        });
+        await _db.SaveChangesAsync();
+        return Ok(new { saved = true });
+    }
+
+    [HttpPost("{id:guid}/report")]
+    public async Task<IActionResult> ReportPost(Guid id, [FromBody] CommunityReportRequest dto)
+    {
+        var userId = GetUserId();
+        if (!await _db.Posts.AnyAsync(p => p.Id == id))
+            return NotFound(new { message = "Post not found." });
+
+        _db.CommunityReports.Add(new CommunityReport
+        {
+            Id = Guid.NewGuid(),
+            ReporterUserId = userId,
+            TargetType = "Post",
+            TargetId = id,
+            Reason = dto.Reason?.Trim() ?? "",
+            Status = "Open",
+            CreatedAt = DateTime.UtcNow
+        });
+        await _db.SaveChangesAsync();
+        return Ok(new { ok = true });
+    }
+
+    [HttpPost("{id:guid}/sos/resolve")]
+    public async Task<IActionResult> ResolveSos(Guid id)
+    {
+        var userId = GetUserId();
+        var post = await _db.Posts.FirstOrDefaultAsync(p => p.Id == id && p.UserId == userId);
+        if (post is null) return NotFound(new { message = "Post not found." });
+
+        post.SosResolvedAt = DateTime.UtcNow;
+        await _db.SaveChangesAsync();
+        return Ok(new { resolved = true });
+    }
+
+    [HttpPost("{id:guid}/sos/sighting")]
+    public async Task<IActionResult> SosSighting(Guid id, [FromBody] SosSightingRequest dto)
+    {
+        var userId = GetUserId();
+        if (!await _db.Posts.AnyAsync(p => p.Id == id))
+            return NotFound(new { message = "Post not found." });
+
+        _db.CommunitySosSightings.Add(new CommunitySosSighting
+        {
+            Id = Guid.NewGuid(),
+            PostId = id,
+            UserId = userId,
+            Latitude = dto.Latitude,
+            Longitude = dto.Longitude,
+            Note = dto.Note?.Trim(),
+            CreatedAt = DateTime.UtcNow
+        });
+        await _db.SaveChangesAsync();
+        return Ok(new { ok = true });
     }
 
     // ── Helpers ────────────────────────────────────────────────────────────────

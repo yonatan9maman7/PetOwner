@@ -115,6 +115,50 @@ public class UsersController : ControllerBase
         return Ok(MapToDto(prefs));
     }
 
+    /// <summary>Community privacy preferences (exact location, DMs, meetup invites, dog visibility).</summary>
+    [HttpGet("me/community-prefs")]
+    public async Task<IActionResult> GetCommunityPrefs()
+    {
+        var userId = GetUserId();
+        var p = await _db.UserCommunityPrefs.FirstOrDefaultAsync(x => x.UserId == userId);
+        if (p is null)
+        {
+            p = new UserCommunityPrefs { UserId = userId };
+            _db.UserCommunityPrefs.Add(p);
+            await _db.SaveChangesAsync();
+        }
+
+        return Ok(new UserCommunityPrefsDto(
+            p.ShowExactLocation,
+            p.DmPolicy,
+            p.AllowMeetupInvites,
+            p.ShowDogInCommunity));
+    }
+
+    [HttpPut("me/community-prefs")]
+    public async Task<IActionResult> UpdateCommunityPrefs([FromBody] UserCommunityPrefsDto dto)
+    {
+        var userId = GetUserId();
+        var p = await _db.UserCommunityPrefs.FirstOrDefaultAsync(x => x.UserId == userId);
+        if (p is null)
+        {
+            p = new UserCommunityPrefs { UserId = userId };
+            _db.UserCommunityPrefs.Add(p);
+        }
+
+        p.ShowExactLocation = dto.ShowExactLocation;
+        p.DmPolicy = string.IsNullOrWhiteSpace(dto.DmPolicy) ? "Everyone" : dto.DmPolicy.Trim();
+        p.AllowMeetupInvites = dto.AllowMeetupInvites;
+        p.ShowDogInCommunity = dto.ShowDogInCommunity;
+
+        await _db.SaveChangesAsync();
+        return Ok(new UserCommunityPrefsDto(
+            p.ShowExactLocation,
+            p.DmPolicy,
+            p.AllowMeetupInvites,
+            p.ShowDogInCommunity));
+    }
+
     // ── My Stats (Owner) ───────────────────────────────────────────────────────
 
     /// <summary>
