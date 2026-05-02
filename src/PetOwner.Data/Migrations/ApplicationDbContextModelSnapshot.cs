@@ -986,6 +986,8 @@ namespace PetOwner.Data.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("CommunityPostId");
+
                     b.HasIndex("UserId");
 
                     b.ToTable("Pets");
@@ -2285,7 +2287,7 @@ namespace PetOwner.Data.Migrations
                     b.HasOne("PetOwner.Data.Models.Booking", "Booking")
                         .WithMany("BookingPets")
                         .HasForeignKey("BookingId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.HasOne("PetOwner.Data.Models.Pet", "Pet")
@@ -2315,13 +2317,13 @@ namespace PetOwner.Data.Migrations
                     b.HasOne("PetOwner.Data.Models.Post", "Post")
                         .WithMany("SavedByUsers")
                         .HasForeignKey("PostId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.HasOne("PetOwner.Data.Models.User", "User")
                         .WithMany("SavedCommunityPosts")
                         .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.Navigation("Post");
@@ -2334,7 +2336,7 @@ namespace PetOwner.Data.Migrations
                     b.HasOne("PetOwner.Data.Models.Post", "Post")
                         .WithMany("SosSightings")
                         .HasForeignKey("PostId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.HasOne("PetOwner.Data.Models.User", "User")
@@ -2388,7 +2390,7 @@ namespace PetOwner.Data.Migrations
                     b.HasOne("PetOwner.Data.Models.User", "User")
                         .WithMany("DogParkCheckIns")
                         .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.Navigation("Pet");
@@ -2570,6 +2572,11 @@ namespace PetOwner.Data.Migrations
 
             modelBuilder.Entity("PetOwner.Data.Models.Pet", b =>
                 {
+                    b.HasOne("PetOwner.Data.Models.Post", null)
+                        .WithMany()
+                        .HasForeignKey("CommunityPostId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("PetOwner.Data.Models.User", "User")
                         .WithMany("Pets")
                         .HasForeignKey("UserId")
@@ -2680,7 +2687,7 @@ namespace PetOwner.Data.Migrations
                     b.HasOne("PetOwner.Data.Models.Pet", "RelatedPet")
                         .WithMany("RelatedCommunityPosts")
                         .HasForeignKey("RelatedPetId")
-                        .OnDelete(DeleteBehavior.SetNull);
+                        .OnDelete(DeleteBehavior.Restrict);
 
                     b.HasOne("PetOwner.Data.Models.User", "User")
                         .WithMany("Posts")
@@ -2743,7 +2750,7 @@ namespace PetOwner.Data.Migrations
                     b.HasOne("PetOwner.Data.Models.Post", "Post")
                         .WithMany("HelpfulMarks")
                         .HasForeignKey("PostId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.HasOne("PetOwner.Data.Models.User", "User")
@@ -2762,7 +2769,7 @@ namespace PetOwner.Data.Migrations
                     b.HasOne("PetOwner.Data.Models.Post", "Post")
                         .WithMany("Likes")
                         .HasForeignKey("PostId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.HasOne("PetOwner.Data.Models.User", "User")

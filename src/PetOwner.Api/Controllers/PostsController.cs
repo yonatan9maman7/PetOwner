@@ -212,6 +212,16 @@ public class PostsController : ControllerBase
         var post = await _db.Posts.FirstOrDefaultAsync(p => p.Id == id && p.UserId == userId);
         if (post is null) return NotFound(new { message = "Post not found." });
 
+        // FKs use ON DELETE NO ACTION — delete dependents before removing the post.
+        await _db.PostLikes.Where(l => l.PostId == id).ExecuteDeleteAsync();
+        await _db.PostHelpfulMarks.Where(h => h.PostId == id).ExecuteDeleteAsync();
+        await _db.CommunitySosSightings.Where(s => s.PostId == id).ExecuteDeleteAsync();
+        await _db.CommunitySavedPosts.Where(s => s.PostId == id).ExecuteDeleteAsync();
+
+        await _db.Pets
+            .Where(p => p.CommunityPostId == id)
+            .ExecuteUpdateAsync(s => s.SetProperty(p => p.CommunityPostId, (Guid?)null));
+
         _db.Posts.Remove(post);
         await _db.SaveChangesAsync();
         return NoContent();

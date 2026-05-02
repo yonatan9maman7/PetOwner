@@ -6,11 +6,42 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace PetOwner.Data.Migrations
 {
     /// <inheritdoc />
-    public partial class CommunityRedesignExtensions : Migration
+    public partial class UnifiedSmartSchedulingAndCommunityRedesign : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
+            migrationBuilder.DropForeignKey(
+                name: "FK_PostLikes_Posts_PostId",
+                table: "PostLikes");
+
+            migrationBuilder.AddColumn<int>(
+                name: "BufferTimeMinutes",
+                table: "ProviderServiceRates",
+                type: "int",
+                nullable: false,
+                defaultValue: 0);
+
+            migrationBuilder.AddColumn<int>(
+                name: "FixedDurationMinutes",
+                table: "ProviderServiceRates",
+                type: "int",
+                nullable: true);
+
+            migrationBuilder.AddColumn<int>(
+                name: "MaxConcurrentBookings",
+                table: "ProviderServiceRates",
+                type: "int",
+                nullable: false,
+                defaultValue: 1);
+
+            migrationBuilder.AddColumn<int>(
+                name: "MaxPetCapacity",
+                table: "ProviderServiceRates",
+                type: "int",
+                nullable: false,
+                defaultValue: 1);
+
             migrationBuilder.AddColumn<string>(
                 name: "ContactPhone",
                 table: "Posts",
@@ -155,6 +186,30 @@ namespace PetOwner.Data.Migrations
                 nullable: true);
 
             migrationBuilder.CreateTable(
+                name: "BookingPets",
+                columns: table => new
+                {
+                    BookingId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
+                    PetId = table.Column<Guid>(type: "uniqueidentifier", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_BookingPets", x => new { x.BookingId, x.PetId });
+                    table.ForeignKey(
+                        name: "FK_BookingPets_Bookings_BookingId",
+                        column: x => x.BookingId,
+                        principalTable: "Bookings",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Restrict);
+                    table.ForeignKey(
+                        name: "FK_BookingPets_Pets_PetId",
+                        column: x => x.PetId,
+                        principalTable: "Pets",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Restrict);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "CommunityReports",
                 columns: table => new
                 {
@@ -193,13 +248,13 @@ namespace PetOwner.Data.Migrations
                         column: x => x.PostId,
                         principalTable: "Posts",
                         principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
+                        onDelete: ReferentialAction.Restrict);
                     table.ForeignKey(
                         name: "FK_CommunitySavedPosts_Users_UserId",
                         column: x => x.UserId,
                         principalTable: "Users",
                         principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
+                        onDelete: ReferentialAction.Restrict);
                 });
 
             migrationBuilder.CreateTable(
@@ -222,7 +277,7 @@ namespace PetOwner.Data.Migrations
                         column: x => x.PostId,
                         principalTable: "Posts",
                         principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
+                        onDelete: ReferentialAction.Restrict);
                     table.ForeignKey(
                         name: "FK_CommunitySosSightings_Users_UserId",
                         column: x => x.UserId,
@@ -259,7 +314,7 @@ namespace PetOwner.Data.Migrations
                         column: x => x.UserId,
                         principalTable: "Users",
                         principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
+                        onDelete: ReferentialAction.Restrict);
                 });
 
             migrationBuilder.CreateTable(
@@ -278,7 +333,7 @@ namespace PetOwner.Data.Migrations
                         column: x => x.PostId,
                         principalTable: "Posts",
                         principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
+                        onDelete: ReferentialAction.Restrict);
                     table.ForeignKey(
                         name: "FK_PostHelpfulMarks_Users_UserId",
                         column: x => x.UserId,
@@ -317,6 +372,16 @@ namespace PetOwner.Data.Migrations
                 name: "IX_PlaydateEvents_LinkedCommunityGroupId",
                 table: "PlaydateEvents",
                 column: "LinkedCommunityGroupId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Pets_CommunityPostId",
+                table: "Pets",
+                column: "CommunityPostId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_BookingPets_PetId",
+                table: "BookingPets",
+                column: "PetId");
 
             migrationBuilder.CreateIndex(
                 name: "IX_CommunityReports_ReporterUserId",
@@ -359,6 +424,14 @@ namespace PetOwner.Data.Migrations
                 column: "UserId");
 
             migrationBuilder.AddForeignKey(
+                name: "FK_Pets_Posts_CommunityPostId",
+                table: "Pets",
+                column: "CommunityPostId",
+                principalTable: "Posts",
+                principalColumn: "Id",
+                onDelete: ReferentialAction.Restrict);
+
+            migrationBuilder.AddForeignKey(
                 name: "FK_PlaydateEvents_CommunityGroups_LinkedCommunityGroupId",
                 table: "PlaydateEvents",
                 column: "LinkedCommunityGroupId",
@@ -367,24 +440,43 @@ namespace PetOwner.Data.Migrations
                 onDelete: ReferentialAction.SetNull);
 
             migrationBuilder.AddForeignKey(
+                name: "FK_PostLikes_Posts_PostId",
+                table: "PostLikes",
+                column: "PostId",
+                principalTable: "Posts",
+                principalColumn: "Id",
+                onDelete: ReferentialAction.Restrict);
+
+            migrationBuilder.AddForeignKey(
                 name: "FK_Posts_Pets_RelatedPetId",
                 table: "Posts",
                 column: "RelatedPetId",
                 principalTable: "Pets",
                 principalColumn: "Id",
-                onDelete: ReferentialAction.SetNull);
+                onDelete: ReferentialAction.Restrict);
         }
 
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.DropForeignKey(
+                name: "FK_Pets_Posts_CommunityPostId",
+                table: "Pets");
+
+            migrationBuilder.DropForeignKey(
                 name: "FK_PlaydateEvents_CommunityGroups_LinkedCommunityGroupId",
                 table: "PlaydateEvents");
 
             migrationBuilder.DropForeignKey(
+                name: "FK_PostLikes_Posts_PostId",
+                table: "PostLikes");
+
+            migrationBuilder.DropForeignKey(
                 name: "FK_Posts_Pets_RelatedPetId",
                 table: "Posts");
+
+            migrationBuilder.DropTable(
+                name: "BookingPets");
 
             migrationBuilder.DropTable(
                 name: "CommunityReports");
@@ -411,6 +503,26 @@ namespace PetOwner.Data.Migrations
             migrationBuilder.DropIndex(
                 name: "IX_PlaydateEvents_LinkedCommunityGroupId",
                 table: "PlaydateEvents");
+
+            migrationBuilder.DropIndex(
+                name: "IX_Pets_CommunityPostId",
+                table: "Pets");
+
+            migrationBuilder.DropColumn(
+                name: "BufferTimeMinutes",
+                table: "ProviderServiceRates");
+
+            migrationBuilder.DropColumn(
+                name: "FixedDurationMinutes",
+                table: "ProviderServiceRates");
+
+            migrationBuilder.DropColumn(
+                name: "MaxConcurrentBookings",
+                table: "ProviderServiceRates");
+
+            migrationBuilder.DropColumn(
+                name: "MaxPetCapacity",
+                table: "ProviderServiceRates");
 
             migrationBuilder.DropColumn(
                 name: "ContactPhone",
@@ -495,6 +607,14 @@ namespace PetOwner.Data.Migrations
             migrationBuilder.DropColumn(
                 name: "RulesText",
                 table: "CommunityGroups");
+
+            migrationBuilder.AddForeignKey(
+                name: "FK_PostLikes_Posts_PostId",
+                table: "PostLikes",
+                column: "PostId",
+                principalTable: "Posts",
+                principalColumn: "Id",
+                onDelete: ReferentialAction.Cascade);
         }
     }
 }

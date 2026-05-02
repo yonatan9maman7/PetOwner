@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import {
   View,
   Text,
@@ -14,6 +14,7 @@ import {
   TextInput,
   KeyboardAvoidingView,
 } from "react-native";
+import { captureRef } from "react-native-view-shot";
 import { showGlobalAlertCompat } from "../../components/global-modal";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
@@ -29,7 +30,6 @@ import { useFavoritesStore } from "../../store/favoritesStore";
 import { useTheme } from "../../theme/ThemeContext";
 import { useKeyboardAvoidingState } from "../../hooks/useKeyboardAvoidingState";
 import * as Clipboard from "expo-clipboard";
-import { File, Paths } from "expo-file-system";
 import * as Sharing from "expo-sharing";
 import { appProviderProfileDeepLink, publicProviderProfileUrl } from "../../config/publicLinks";
 import { mapApi } from "../../api/client";
@@ -45,6 +45,7 @@ import {
   DOG_SIZE_ORDER,
 } from "../../features/provider-onboarding/dogSizeConstants";
 import { ReviewCard } from "./components/ReviewCard";
+import { ProviderShareCardCaptureView } from "./components/ProviderShareCardCaptureView";
 
 const DAY_KEYS = ["daySun", "dayMon", "dayTue", "dayWed", "dayThu", "dayFri", "daySat"] as const;
 
@@ -221,6 +222,13 @@ export function ProviderProfileScreen() {
   const [profile, setProfile] = useState<ProviderPublicProfileDto | null>(null);
   const [loading, setLoading] = useState(true);
   const [shareCardBusy, setShareCardBusy] = useState(false);
+  const [shareCaptureKey, setShareCaptureKey] = useState(0);
+  const shareCardRef = useRef<View>(null);
+  const shareLayoutResolverRef = useRef<(() => void) | null>(null);
+
+  const onShareCardLayoutReady = useCallback(() => {
+    shareLayoutResolverRef.current?.();
+  }, []);
   const [directReviewOpen, setDirectReviewOpen] = useState(false);
   const [directRating, setDirectRating] = useState(0);
   const [directComment, setDirectComment] = useState("");
@@ -327,17 +335,43 @@ export function ProviderProfileScreen() {
   };
 
   const handleShare = async () => {
-    if (shareCardBusy) return;
+    if (shareCardBusy || !profile) return;
     setShareCardBusy(true);
     try {
-      const png = await mapApi.getProviderShareCard(providerId);
-      const filename = `po-provider-share-${providerId}.png`;
-      const out = new File(Paths.cache, filename);
-      if (out.exists) out.delete();
-      out.create();
-      out.write(new Uint8Array(png));
+      if (profile.profileImageUrl) {
+        await Image.prefetch(profile.profileImageUrl).catch(() => undefined);
+      }
 
-      const name = profile?.name?.trim() || "Provider";
+      await new Promise<void>((resolve) => {
+        let done = false;
+        const finish = () => {
+          if (done) return;
+          done = true;
+          shareLayoutResolverRef.current = null;
+          resolve();
+        };
+        shareLayoutResolverRef.current = finish;
+        setShareCaptureKey((k) => k + 1);
+        setTimeout(finish, 14_000);
+      });
+
+      await new Promise<void>((resolve) => {
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+      });
+
+      const cardView = shareCardRef.current;
+      if (!cardView) {
+        showGlobalAlertCompat(t("errorTitle"), t("shareProviderCardFailed"));
+        return;
+      }
+
+      const pngUri = await captureRef(cardView, {
+        format: "png",
+        quality: 0.92,
+        result: "tmpfile",
+      });
+
+      const name = profile.name?.trim() || "Provider";
       const web = publicProviderProfileUrl(providerId);
       const app = appProviderProfileDeepLink(providerId);
       const caption = `${t("shareProviderCardLine1")} ${name}.\n${web}\n${t("shareProviderCardLineApp")} ${app}`;
@@ -345,7 +379,7 @@ export function ProviderProfileScreen() {
       if (Platform.OS === "ios") {
         await Share.share({
           message: caption,
-          url: out.uri,
+          url: pngUri,
           title: name,
         });
         return;
@@ -357,7 +391,7 @@ export function ProviderProfileScreen() {
         showGlobalAlertCompat(t("errorTitle"), t("shareProviderNotSupported"));
         return;
       }
-      await Sharing.shareAsync(out.uri, {
+      await Sharing.shareAsync(pngUri, {
         mimeType: "image/png",
         UTI: "public.png",
         dialogTitle: t("shareProviderCardDialogTitle"),
@@ -365,6 +399,7 @@ export function ProviderProfileScreen() {
     } catch {
       showGlobalAlertCompat(t("errorTitle"), t("shareProviderCardFailed"));
     } finally {
+      setShareCaptureKey(0);
       setShareCardBusy(false);
     }
   };
@@ -480,6 +515,24 @@ export function ProviderProfileScreen() {
   /* ─── Render ─── */
   return (
     <View style={[s.flex, { backgroundColor: colors.background }]}>
+      {shareCaptureKey > 0 ? (
+        <View
+          pointerEvents="none"
+          collapsable={false}
+          style={s.shareCardOffscreen}
+        >
+          <ProviderShareCardCaptureView
+            ref={shareCardRef}
+            sessionKey={shareCaptureKey}
+            profile={profile}
+            isRTL={isRTL}
+            newOnPetOwnerLabel={t("shareProviderCardNewOnPetOwner")}
+            reviewsWord={t("reviews")}
+            onReady={onShareCardLayoutReady}
+          />
+        </View>
+      ) : null}
+
       <ScrollView
         style={s.flex}
         contentContainerStyle={{ paddingBottom: 160 }}
@@ -979,6 +1032,14 @@ export function ProviderProfileScreen() {
 
 const s = StyleSheet.create({
   flex: { flex: 1 },
+
+  shareCardOffscreen: {
+    position: "absolute",
+    left: -5000,
+    top: 0,
+    opacity: 1,
+    zIndex: -1,
+  },
 
   /* ─── Auth / loading screens ─── */
   topBar: {

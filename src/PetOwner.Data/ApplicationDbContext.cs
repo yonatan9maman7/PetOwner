@@ -428,6 +428,13 @@ public class ApplicationDbContext : DbContext
                 .WithMany(u => u.Pets)
                 .HasForeignKey(p => p.UserId)
                 .OnDelete(DeleteBehavior.Cascade);
+
+            // SOS lost-pet optional link to a community Post — Restrict avoids cycles with Post.RelatedPet → Pet (both under User).
+            entity.HasOne<Post>()
+                .WithMany()
+                .HasForeignKey(p => p.CommunityPostId)
+                .IsRequired(false)
+                .OnDelete(DeleteBehavior.Restrict);
         });
     }
 
@@ -776,10 +783,11 @@ public class ApplicationDbContext : DbContext
                 .HasForeignKey(p => p.UserId)
                 .OnDelete(DeleteBehavior.Cascade);
 
+            // SQL Server: User → Post (Cascade) + User → Pet (Cascade) + Post ↔ Pet must not use cascading deletes on this FK.
             entity.HasOne(p => p.RelatedPet)
                 .WithMany(pet => pet.RelatedCommunityPosts)
                 .HasForeignKey(p => p.RelatedPetId)
-                .OnDelete(DeleteBehavior.SetNull);
+                .OnDelete(DeleteBehavior.Restrict);
         });
 
         modelBuilder.Entity<PostLike>(entity =>
@@ -790,7 +798,7 @@ public class ApplicationDbContext : DbContext
             entity.HasOne(pl => pl.Post)
                 .WithMany(p => p.Likes)
                 .HasForeignKey(pl => pl.PostId)
-                .OnDelete(DeleteBehavior.Cascade);
+                .OnDelete(DeleteBehavior.Restrict);
 
             entity.HasOne(pl => pl.User)
                 .WithMany()
@@ -980,10 +988,11 @@ public class ApplicationDbContext : DbContext
 
             entity.HasIndex(bp => bp.PetId);
 
+            // SQL Server: avoid multiple cascade paths (e.g. via User → Pet / User → Booking graphs).
             entity.HasOne(bp => bp.Booking)
                 .WithMany(b => b.BookingPets)
                 .HasForeignKey(bp => bp.BookingId)
-                .OnDelete(DeleteBehavior.Cascade);
+                .OnDelete(DeleteBehavior.Restrict);
 
             entity.HasOne(bp => bp.Pet)
                 .WithMany(p => p.BookingPets)
@@ -1078,10 +1087,12 @@ public class ApplicationDbContext : DbContext
             entity.Property(c => c.StartedAt).HasDefaultValueSql("GETUTCDATE()");
             entity.HasIndex(c => new { c.UserId, c.ExpiresAt });
             entity.HasIndex(c => c.ExpiresAt);
+            // SQL Server: User → DogParkCheckIn (Cascade) + User → Pet (Cascade) + Pet → DogParkCheckIn (SetNull)
+            // counts as multiple cascade paths to the same table.
             entity.HasOne(c => c.User)
                 .WithMany(u => u.DogParkCheckIns)
                 .HasForeignKey(c => c.UserId)
-                .OnDelete(DeleteBehavior.Cascade);
+                .OnDelete(DeleteBehavior.Restrict);
             entity.HasOne(c => c.Pet)
                 .WithMany(p => p.DogParkCheckIns)
                 .HasForeignKey(c => c.PetId)
@@ -1098,7 +1109,7 @@ public class ApplicationDbContext : DbContext
             entity.HasOne(h => h.Post)
                 .WithMany(p => p.HelpfulMarks)
                 .HasForeignKey(h => h.PostId)
-                .OnDelete(DeleteBehavior.Cascade);
+                .OnDelete(DeleteBehavior.Restrict);
             entity.HasOne(h => h.User)
                 .WithMany(u => u.PostHelpfulMarks)
                 .HasForeignKey(h => h.UserId)
@@ -1112,14 +1123,15 @@ public class ApplicationDbContext : DbContext
         {
             entity.HasKey(s => new { s.UserId, s.PostId });
             entity.Property(s => s.SavedAt).HasDefaultValueSql("GETUTCDATE()");
+            // SQL Server: User → Post (Cascade) + User → SavedPost + Post → SavedPost would be multiple cascade paths.
             entity.HasOne(s => s.User)
                 .WithMany(u => u.SavedCommunityPosts)
                 .HasForeignKey(s => s.UserId)
-                .OnDelete(DeleteBehavior.Cascade);
+                .OnDelete(DeleteBehavior.Restrict);
             entity.HasOne(s => s.Post)
                 .WithMany(p => p.SavedByUsers)
                 .HasForeignKey(s => s.PostId)
-                .OnDelete(DeleteBehavior.Cascade);
+                .OnDelete(DeleteBehavior.Restrict);
         });
     }
 
@@ -1152,7 +1164,7 @@ public class ApplicationDbContext : DbContext
             entity.HasOne(s => s.Post)
                 .WithMany(p => p.SosSightings)
                 .HasForeignKey(s => s.PostId)
-                .OnDelete(DeleteBehavior.Cascade);
+                .OnDelete(DeleteBehavior.Restrict);
             entity.HasOne(s => s.User)
                 .WithMany(u => u.SosSightings)
                 .HasForeignKey(s => s.UserId)
