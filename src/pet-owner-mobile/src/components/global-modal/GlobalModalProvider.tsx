@@ -12,6 +12,9 @@ interface QueueItem extends ShowModalOptions {
 
 const GlobalModalContext = createContext<GlobalModalApi | null>(null);
 
+/** Defer `onPress` until after hide so RN `Modal` + navigation/auth updates don't race (e.g. logout). */
+const MODAL_CLOSE_ACTION_DELAY_MS = 300;
+
 export function GlobalModalProvider({ children }: { children: React.ReactNode }) {
   const insets = useSafeAreaInsets();
   const language = useAuthStore((s) => s.language);
@@ -104,14 +107,26 @@ export function GlobalModalProvider({ children }: { children: React.ReactNode })
   );
 
   const handlePressButton = useCallback(
-    async (button: ModalButton) => {
-      try {
-        await button.onPress?.();
-      } finally {
-        if (button.autoClose !== false) {
-          hideModal();
-        }
+    (button: ModalButton) => {
+      const runAction = () => {
+        void Promise.resolve(button.onPress?.()).catch((e) => {
+          if (__DEV__) {
+            console.warn("[GlobalModal] button onPress error", e);
+          }
+        });
+      };
+
+      if (button.autoClose !== false) {
+        hideModal();
+        setTimeout(runAction, MODAL_CLOSE_ACTION_DELAY_MS);
+        return;
       }
+
+      void Promise.resolve(button.onPress?.()).catch((e) => {
+        if (__DEV__) {
+          console.warn("[GlobalModal] button onPress error", e);
+        }
+      });
     },
     [hideModal],
   );

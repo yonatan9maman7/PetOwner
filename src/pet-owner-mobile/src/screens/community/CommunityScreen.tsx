@@ -15,6 +15,7 @@ import {
   type KeyboardAvoidingViewProps,
   Share,
   StatusBar,
+  useWindowDimensions,
 } from "react-native";
 import { showGlobalAlertCompat } from "../../components/global-modal";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
@@ -1203,6 +1204,7 @@ export function CommunityScreen() {
 
   const selectedPet = pets.find((p) => p.id === selectedPetId) ?? pets[0] ?? null;
   const appRowDirection = rowDirectionForAppLayout(isRTL);
+  const { width: windowWidth } = useWindowDimensions();
   const bottomContentPadding = 16 + insets.bottom;
 
   const loadDashboard = useCallback(async () => {
@@ -2084,15 +2086,34 @@ export function CommunityScreen() {
         style={{
           flexDirection: appRowDirection,
           alignItems: "center",
-          justifyContent: "space-between",
+          gap: 8,
           paddingHorizontal: 12,
           paddingBottom: 6,
         }}
       >
+        <View style={{ flexShrink: 0, maxWidth: windowWidth * 0.52, minWidth: 0 }}>
+          <CommunityDashboard
+            t={t}
+            rtlText={rtlText}
+            rowDirection={rowDirectionForAppLayout(isRTL)}
+            activeDogsNearby={dashboardActiveDogs}
+            upcomingMeetups={upcomingMeetupsPreview}
+            apiUpcomingMeetupCount={communityDashboard?.upcomingMeetups ?? null}
+            openQuestionsCount={dashboardOpenQuestions}
+            activeParksCount={dashboardActiveParks}
+            sosCount={dashboardSos}
+            onPressMeetups={() => setMainTab("playdates")}
+            onPressParks={() => setMainTab("parks")}
+            onPressQuestions={() => setMainTab("qa")}
+            onPressSos={() => setMainTab("lostSos")}
+          />
+        </View>
         <Pressable
           onPress={() => setCommunitySearchOpen(true)}
           hitSlop={10}
           style={{
+            flex: 1,
+            minWidth: 0,
             flexDirection: appRowDirection,
             alignItems: "center",
             gap: 8,
@@ -2105,7 +2126,12 @@ export function CommunityScreen() {
           }}
         >
           <Ionicons name="search" size={18} color={colors.text} />
-          <Text style={{ fontSize: 13, fontWeight: "700", color: colors.textMuted }}>{t("cm_search_title")}</Text>
+          <Text
+            style={{ flexShrink: 1, fontSize: 13, fontWeight: "700", color: colors.textMuted }}
+            numberOfLines={1}
+          >
+            {t("cm_search_title")}
+          </Text>
         </Pressable>
       </View>
       <ScrollView
@@ -2798,21 +2824,6 @@ export function CommunityScreen() {
       <BrandedAppHeader style={{ paddingVertical: 6 }} />
       <View style={{ flex: 1, backgroundColor: colors.surface, overflow: "hidden" }}>
         {renderTopTabs()}
-        <CommunityDashboard
-          t={t}
-          rtlText={rtlText}
-          rowDirection={rowDirectionForAppLayout(isRTL)}
-          activeDogsNearby={dashboardActiveDogs}
-          upcomingMeetups={upcomingMeetupsPreview}
-          apiUpcomingMeetupCount={communityDashboard?.upcomingMeetups ?? null}
-          openQuestionsCount={dashboardOpenQuestions}
-          activeParksCount={dashboardActiveParks}
-          sosCount={dashboardSos}
-          onPressMeetups={() => setMainTab("playdates")}
-          onPressParks={() => setMainTab("parks")}
-          onPressQuestions={() => setMainTab("qa")}
-          onPressSos={() => setMainTab("lostSos")}
-        />
         {renderHero()}
 
         {mainTab === "feed" ? (        loading && posts.length === 0 ? (
@@ -3776,9 +3787,9 @@ const getStyles = (colors: any) =>
     },
     hero: {
       marginHorizontal: 16,
-      marginTop: 6,
+      marginTop: 4,
       borderRadius: 22,
-      padding: 16,
+      padding: 14,
       backgroundColor: colors.text,
       shadowColor: colors.shadow,
       shadowOffset: { width: 0, height: 10 },

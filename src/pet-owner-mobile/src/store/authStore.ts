@@ -183,10 +183,18 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   logout: async () => {
-    await stopHubsAsync();
-    await storage.remove("auth_token");
-    await storage.remove("user_id");
-    await storage.remove("requires_phone");
+    try {
+      await stopHubsAsync();
+    } catch {
+      // Non-fatal — local session must still clear.
+    }
+    try {
+      await storage.remove("auth_token");
+      await storage.remove("user_id");
+      await storage.remove("requires_phone");
+    } catch {
+      // Non-fatal — still drop in-memory session.
+    }
     // Wipe biometric credentials on explicit logout — security signal.
     import("../services/biometricService").then((m) => m.disable().catch(() => {}));
     set({ token: null, userId: null, user: null, isLoggedIn: false, requiresPhone: false });

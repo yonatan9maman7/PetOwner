@@ -8,6 +8,7 @@ import {
   ScrollView,
   ActivityIndicator,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import type { TranslationKey } from "../../../i18n";
 import { useTheme } from "../../../theme/ThemeContext";
@@ -89,12 +90,26 @@ export function CommunitySearchModal({
 
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
-      <View style={{ flex: 1, backgroundColor: colors.background, paddingTop: 8 }}>
-        <View style={{ flexDirection: rowDirection, alignItems: "center", paddingHorizontal: 12, gap: 8 }}>
-          <Pressable onPress={onClose} hitSlop={12} style={{ padding: 8 }}>
-            <Ionicons name="close" size={26} color={colors.text} />
+      <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={["top", "left", "right", "bottom"]}>
+        <View
+          style={{
+            flexDirection: rowDirection,
+            alignItems: "center",
+            paddingHorizontal: 12,
+            paddingTop: 4,
+            paddingBottom: 4,
+            minHeight: 48,
+            gap: 8,
+          }}
+        >
+          <Pressable onPress={onClose} hitSlop={16} accessibilityRole="button">
+            <View style={{ padding: 8 }}>
+              <Ionicons name="close" size={26} color={colors.text} />
+            </View>
           </Pressable>
-          <Text style={[{ flex: 1, fontSize: 18, fontWeight: "800", color: colors.text }, rtlText]}>{t("cm_search_title")}</Text>
+          <Text style={[{ flex: 1, fontSize: 18, fontWeight: "800", color: colors.text }, rtlText]} numberOfLines={1}>
+            {t("cm_search_title")}
+          </Text>
         </View>
         <View
           style={{
@@ -170,7 +185,7 @@ export function CommunitySearchModal({
             </>
           ) : null}
         </ScrollView>
-      </View>
+      </SafeAreaView>
     </Modal>
   );
 }

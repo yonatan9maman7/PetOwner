@@ -21,9 +21,40 @@ import { useTheme } from "../../theme/ThemeContext";
 import { useKeyboardAvoidingState } from "../../hooks/useKeyboardAvoidingState";
 import type { ChatMessageDto } from "../../types/api";
 
+const READ_RECEIPT_BLUE = "#34B7F1";
+
 function formatTime(dateStr: string): string {
   const d = new Date(dateStr);
-  return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  return d.toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit" });
+}
+
+function sameLocalCalendarDay(a: Date, b: Date): boolean {
+  return (
+    a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate()
+  );
+}
+
+function isSameCalendarDay(aIso: string, bIso: string): boolean {
+  return sameLocalCalendarDay(new Date(aIso), new Date(bIso));
+}
+
+/** Hebrew labels: היום / אתמול / DD/MM/YYYY (local calendar). */
+function formatDateSeparator(dateStr: string): string {
+  const d = new Date(dateStr);
+  const now = new Date();
+  if (sameLocalCalendarDay(d, now)) {
+    return "היום";
+  }
+  const yesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+  if (sameLocalCalendarDay(d, yesterday)) {
+    return "אתמול";
+  }
+  const dd = String(d.getDate()).padStart(2, "0");
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const yyyy = d.getFullYear();
+  return `${dd}/${mm}/${yyyy}`;
 }
 
 export function ChatRoomScreen() {
@@ -86,8 +117,21 @@ export function ChatRoomScreen() {
     }
   };
 
-  const renderMessage = ({ item }: { item: ChatMessageDto }) => {
+  const renderMessage = ({
+    item,
+    index,
+  }: {
+    item: ChatMessageDto;
+    index: number;
+  }) => {
     const isSent = item.senderId === currentUserId;
+    // `activeMessages` is oldest → newest; show a pill on the first loaded row or when the day changes vs older neighbor.
+    const showDateSeparator =
+      index === 0 ||
+      !isSameCalendarDay(item.sentAt, activeMessages[index - 1]!.sentAt);
+
+    const mutedOnPrimary = isSent ? "rgba(255,255,255,0.65)" : colors.textMuted;
+
     return (
       <View
         style={{
@@ -96,12 +140,42 @@ export function ChatRoomScreen() {
           alignItems: isSent ? "flex-end" : "flex-start",
         }}
       >
+        {showDateSeparator ? (
+          <View
+            style={{
+              width: "100%",
+              alignItems: "center",
+              marginBottom: 10,
+            }}
+          >
+            <View
+              style={{
+                paddingHorizontal: 12,
+                paddingVertical: 4,
+                borderRadius: 999,
+                backgroundColor: isSent ? "rgba(52, 183, 241, 0.12)" : "rgba(100, 116, 139, 0.14)",
+              }}
+            >
+              <Text
+                style={{
+                  fontSize: 11,
+                  fontWeight: "600",
+                  color: colors.textMuted,
+                }}
+              >
+                {formatDateSeparator(item.sentAt)}
+              </Text>
+            </View>
+          </View>
+        ) : null}
+
         <View
           style={{
             maxWidth: "75%",
             borderRadius: 16,
-            paddingHorizontal: 16,
-            paddingVertical: 10,
+            paddingHorizontal: 14,
+            paddingTop: 10,
+            paddingBottom: 8,
             borderBottomRightRadius: isSent ? 4 : 16,
             borderBottomLeftRadius: isSent ? 16 : 4,
             backgroundColor: isSent ? colors.primary : colors.surfaceSecondary,
@@ -119,10 +193,35 @@ export function ChatRoomScreen() {
           >
             {item.content}
           </Text>
+
+          {isSent ? (
+            <View
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                alignSelf: "flex-end",
+                marginTop: 4,
+                gap: 4,
+              }}
+            >
+              {/* Same child order for LTR/RTL: RN mirrors row in RTL so receipt sits visually left of time. */}
+              <Text style={{ fontSize: 11, color: mutedOnPrimary }}>
+                {formatTime(item.sentAt)}
+              </Text>
+              <Ionicons
+                name={item.isRead ? "checkmark-done" : "checkmark"}
+                size={14}
+                color={item.isRead ? READ_RECEIPT_BLUE : mutedOnPrimary}
+              />
+            </View>
+          ) : (
+            <View style={{ marginTop: 4, alignSelf: "flex-start" }}>
+              <Text style={{ fontSize: 11, color: mutedOnPrimary }}>
+                {formatTime(item.sentAt)}
+              </Text>
+            </View>
+          )}
         </View>
-        <Text style={{ fontSize: 11, color: colors.textMuted, marginTop: 4, paddingHorizontal: 4 }}>
-          {formatTime(item.sentAt)}
-        </Text>
       </View>
     );
   };

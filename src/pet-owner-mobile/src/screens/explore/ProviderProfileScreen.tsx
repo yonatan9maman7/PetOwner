@@ -359,6 +359,8 @@ export function ProviderProfileScreen() {
         requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
       });
 
+      await new Promise<void>((resolve) => setTimeout(resolve, 420));
+
       const cardView = shareCardRef.current;
       if (!cardView) {
         showGlobalAlertCompat(t("errorTitle"), t("shareProviderCardFailed"));
