@@ -151,6 +151,15 @@ function formatMapPinRating(rating: unknown): string | null {
   return Number.isFinite(n) ? n.toFixed(1) : null;
 }
 
+/** Best-effort city/locality from a freeform address (e.g. "Street, City"). */
+function cityHintFromParkAddress(address: string | undefined | null): string | undefined {
+  const raw = address?.trim();
+  if (!raw) return undefined;
+  const parts = raw.split(",").map((p) => p.trim()).filter(Boolean);
+  if (parts.length >= 2) return parts[parts.length - 1];
+  return undefined;
+}
+
 /* ──────── Avatar with SVG fallback ──────── */
 
 function AvatarImage({ uri }: { uri?: string | null }) {
@@ -225,9 +234,16 @@ export function ExploreScreen() {
    * the native bridge and is a known MapKit crash trigger on Expo Go.
    */
   const pinsAbortRef = useRef<AbortController | null>(null);
+  /** `route.params.focusProviderId` navigation: avoid duplicate unfiltered fetches and re-animations. */
+  const focusProviderParamPrevRef = useRef<string | undefined>(undefined);
+  const focusProviderFetchInFlightRef = useRef(false);
+  const focusProviderAnimatedForRef = useRef<string | null>(null);
 
   /* Service types from API */
   const [serviceTypes, setServiceTypes] = useState<string[]>([]);
+  const [serviceTypesError, setServiceTypesError] = useState(false);
+  /** Location permission / one-shot location errors (non-blocking banner / toast). */
+  const [locationHint, setLocationHint] = useState<"none" | "denied">("none");
 
   /* Filter state */
   const [searchText, setSearchText] = useState("");
@@ -386,6 +402,18 @@ export function ExploreScreen() {
     }, []),
   );
 
+  useFocusEffect(
+    useCallback(() => {
+      Location.getForegroundPermissionsAsync()
+        .then(({ status }) => {
+          if (status === "granted") {
+            setLocationHint("none");
+          }
+        })
+        .catch(() => {});
+    }, []),
+  );
+
   useEffect(() => {
     showDogParksOnlyRef.current = showDogParksOnly;
   }, [showDogParksOnly]);
@@ -404,16 +432,20 @@ export function ExploreScreen() {
         if (!exploreScreenFocusedRef.current) return;
         setDogParks(data);
       })
-      .catch(() => {
+      .catch((error) => {
         if (gen !== dogParksFetchGenRef.current) return;
         if (!exploreScreenFocusedRef.current) return;
         setDogParks([]);
+        if (axios.isCancel(error) || (error as Error)?.name === "CanceledError") return;
+        showApiErrorToast(getNormalizedApiError(error), {
+          title: t("genericErrorTitle"),
+        });
       });
 
     return () => {
       ctrl.abort();
     };
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     mapDiag("selection.change", {
@@ -425,7 +457,17 @@ export function ExploreScreen() {
 
   /* ─── Load service types ─── */
   useEffect(() => {
-    mapApi.getServiceTypes().then(setServiceTypes).catch(() => {});
+    setServiceTypesError(false);
+    mapApi
+      .getServiceTypes()
+      .then((types) => {
+        setServiceTypes(types);
+        setServiceTypesError(false);
+      })
+      .catch(() => {
+        setServiceTypes([]);
+        setServiceTypesError(true);
+      });
   }, []);
 
   /* ─── Playdate pin layer ─── */
@@ -453,10 +495,18 @@ export function ExploreScreen() {
 
     mapApi
       .fetchPlaydatePins({ latitude: lat, longitude: lng, radiusKm: radius }, ctrl.signal)
-      .then(setPlaydatePins)
-      .catch(() => {});
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [playdateMode, userLat, userLng, filterRadiusKm]);
+      .then((data) => {
+        if (!exploreScreenFocusedRef.current) return;
+        setPlaydatePins(data);
+      })
+      .catch((error) => {
+        if (axios.isCancel(error) || (error as Error)?.name === "CanceledError") return;
+        if (!exploreScreenFocusedRef.current) return;
+        showApiErrorToast(getNormalizedApiError(error), {
+          title: t("genericErrorTitle"),
+        });
+      });
+  }, [playdateMode, userLat, userLng, filterRadiusKm, t]);
 
   /* ─── Request location ─── */
   useEffect(() => {
@@ -464,7 +514,11 @@ export function ExploreScreen() {
     (async () => {
       try {
         const { status } = await Location.requestForegroundPermissionsAsync();
-        if (status !== "granted") return;
+        if (status !== "granted") {
+          setLocationHint("denied");
+          return;
+        }
+        setLocationHint("none");
 
         // Subscribe to position updates so the blue dot + circle stay live.
         sub = await Location.watchPositionAsync(
@@ -717,13 +771,24 @@ export function ExploreScreen() {
 
   /* ─── Focus on a specific provider (e.g. from ProviderProfileScreen Navigate button) ─── */
   useEffect(() => {
-    const focusProviderId = route.params?.focusProviderId as string | undefined;
-    if (!focusProviderId) return;
+    const id = route.params?.focusProviderId as string | undefined;
+    if (!id) {
+      focusProviderParamPrevRef.current = undefined;
+      focusProviderFetchInFlightRef.current = false;
+      focusProviderAnimatedForRef.current = null;
+      return;
+    }
 
-    const tryFocus = (pinsToSearch: MapPinDto[]) => {
-      const pin = pinsToSearch.find((p) => p.providerId === focusProviderId);
-      if (pin) {
-        setSelectedPin(pin);
+    if (focusProviderParamPrevRef.current !== id) {
+      focusProviderParamPrevRef.current = id;
+      focusProviderFetchInFlightRef.current = false;
+      focusProviderAnimatedForRef.current = null;
+    }
+
+    const applyFocusedPin = (pin: MapPinDto) => {
+      setSelectedPin(pin);
+      if (focusProviderAnimatedForRef.current !== id) {
+        focusProviderAnimatedForRef.current = id;
         beginProgrammaticMapMove();
         mapRef.current?.animateToRegion?.(
           {
@@ -737,33 +802,44 @@ export function ExploreScreen() {
       }
     };
 
-    if (pins.length > 0) {
-      tryFocus(pins);
-    } else {
-      // Pins not yet loaded — fetch without filters and then focus (same gen guard as fetchPins)
-      const gen = ++pinsFetchGenRef.current;
-      setLoading(true);
-      mapApi
-        .fetchPins()
-        .then((data) => {
-          if (gen !== pinsFetchGenRef.current) return;
-          if (!exploreScreenFocusedRef.current) return;
-          commitPins(data);
-          tryFocus(data);
-        })
-        .catch((error) => {
-          if (gen !== pinsFetchGenRef.current) return;
-          if (!(axios.isAxiosError(error) && error.response?.status === 401)) {
-            showApiErrorToast(getNormalizedApiError(error), {
-              title: t("genericErrorTitle"),
-            });
-          }
-        })
-        .finally(() => {
-          if (gen === pinsFetchGenRef.current) setLoading(false);
-        });
+    const hit = pins.find((p) => p.providerId === id);
+    if (hit) {
+      applyFocusedPin(hit);
+      return;
     }
-  }, [route.params?.focusProviderId, t, beginProgrammaticMapMove, commitPins]);
+
+    if (focusProviderFetchInFlightRef.current) return;
+    focusProviderFetchInFlightRef.current = true;
+
+    const gen = ++pinsFetchGenRef.current;
+    pinsAbortRef.current?.abort();
+    const ctrl = new AbortController();
+    pinsAbortRef.current = ctrl;
+    setLoading(true);
+    mapApi
+      .fetchPins(undefined, ctrl.signal)
+      .then((data) => {
+        focusProviderFetchInFlightRef.current = false;
+        if (gen !== pinsFetchGenRef.current) return;
+        if (!exploreScreenFocusedRef.current) return;
+        commitPins(data);
+        const p = data.find((x) => x.providerId === id);
+        if (p) applyFocusedPin(p);
+      })
+      .catch((error) => {
+        focusProviderFetchInFlightRef.current = false;
+        if (gen !== pinsFetchGenRef.current) return;
+        if (axios.isCancel(error) || (error as Error)?.name === "CanceledError") return;
+        if (!(axios.isAxiosError(error) && error.response?.status === 401)) {
+          showApiErrorToast(getNormalizedApiError(error), {
+            title: t("genericErrorTitle"),
+          });
+        }
+      })
+      .finally(() => {
+        if (gen === pinsFetchGenRef.current) setLoading(false);
+      });
+  }, [route.params?.focusProviderId, pins, t, beginProgrammaticMapMove, commitPins]);
 
   /* ─── Service pill toggle (same as web) ─── */
   const toggleServiceFilter = useCallback(
@@ -1017,7 +1093,7 @@ export function ExploreScreen() {
             placeName: park.name,
             latitude: park.latitude,
             longitude: park.longitude,
-            city: isRTL ? "תל אביב" : "Tel Aviv",
+            city: cityHintFromParkAddress(park.address),
             durationMinutes: 60,
             petIds: petIdsForBeacon,
             species: "DOG",
@@ -1029,8 +1105,8 @@ export function ExploreScreen() {
 
         if (beaconOk || communityOk) {
           showGlobalAlertCompat(
-            isRTL ? "צ'ק-אין" : "Check-in",
-            isRTL ? "הצ'ק-אין נרשם בהצלחה." : "Your check-in was saved.",
+            t("dogParkCheckInSuccessTitle"),
+            t("dogParkCheckInSuccessMessage"),
           );
         } else {
           showApiErrorToast(
@@ -1047,7 +1123,7 @@ export function ExploreScreen() {
         setDogParkCheckInLoading(false);
       }
     },
-    [hasPets, isLoggedIn, navigation, pets, isRTL, t],
+    [hasPets, isLoggedIn, navigation, pets, t],
   );
 
   /* ═════════════════════ RENDER ═════════════════════ */
@@ -1271,6 +1347,20 @@ export function ExploreScreen() {
             )}
           </View>
 
+          {locationHint === "denied" && (
+            <Text
+              style={{
+                marginTop: 10,
+                fontSize: 12,
+                lineHeight: 17,
+                color: colors.textSecondary,
+                textAlign: isRTL ? "right" : "left",
+              }}
+            >
+              {t("mapLocationDeniedHint")}
+            </Text>
+          )}
+
           {/* Active filter chips (compact summary) */}
           {playdateMode && (
             <View style={{ paddingTop: 10 }}>
@@ -1313,7 +1403,9 @@ export function ExploreScreen() {
                 }}
               >
                 <Ionicons name="leaf" size={12} color="#fff" />
-                <Text style={{ fontSize: 11, fontWeight: "700", color: "#fff" }}>גינות כלבים</Text>
+                <Text style={{ fontSize: 11, fontWeight: "700", color: "#fff" }}>
+                  {t("dogParksLayerTitle")}
+                </Text>
                 <Pressable onPress={() => setShowDogParksOnly(false)} hitSlop={6}>
                   <Ionicons name="close-circle" size={14} color="#fff" />
                 </Pressable>
@@ -1393,7 +1485,7 @@ export function ExploreScreen() {
           >
             <Ionicons name="leaf-outline" size={40} color="#16a34a" />
             <Text className="text-base font-semibold mt-3" style={{ color: colors.textSecondary, textAlign: "center" }}>
-              {isRTL ? "אין גינות כלבים זמינות מהשרת." : "No dog parks returned from the server."}
+              {t("dogParksNoneAvailable")}
             </Text>
           </View>
         </View>
@@ -1415,7 +1507,11 @@ export function ExploreScreen() {
           try {
             setLocating(true);
             const { status } = await Location.requestForegroundPermissionsAsync();
-            if (status !== "granted") return;
+            if (status !== "granted") {
+              setLocationHint("denied");
+              return;
+            }
+            setLocationHint("none");
             const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
             const { latitude, longitude } = loc.coords;
             setUserLat(latitude);
@@ -1427,6 +1523,15 @@ export function ExploreScreen() {
               600,
             );
           } catch {
+            showApiErrorToast(
+              {
+                message: t("mapLocationErrorHint"),
+                isConnectivityError: false,
+                isAuthError: false,
+                isServerError: false,
+              },
+              { title: t("genericErrorTitle") },
+            );
           } finally {
             setLocating(false);
           }
@@ -1713,7 +1818,7 @@ export function ExploreScreen() {
             </Text>
             {selectedPlaydate.goingCount > 0 && (
               <Text style={{ fontSize: 12, color: colors.textMuted, marginTop: 2 }}>
-                {selectedPlaydate.goingCount} going
+                {t("goingCount").replace("{{n}}", String(selectedPlaydate.goingCount))}
               </Text>
             )}
             <Pressable
@@ -1768,7 +1873,9 @@ export function ExploreScreen() {
                 >
                   <Ionicons name="leaf" size={22} color="#fff" />
                 </View>
-                <Text style={{ fontSize: 12, fontWeight: "700", color: "#16a34a" }}>גינות כלבים</Text>
+                <Text style={{ fontSize: 12, fontWeight: "700", color: "#16a34a" }}>
+                  {t("dogParksLayerTitle")}
+                </Text>
               </View>
               <Pressable onPress={() => setSelectedDogPark(null)} hitSlop={8}>
                 <Ionicons name="close" size={22} color={colors.textMuted} />
@@ -1814,7 +1921,9 @@ export function ExploreScreen() {
                   alignItems: "center",
                 }}
               >
-                <Text style={{ fontSize: 14, fontWeight: "700", color: colors.text }}>נווט</Text>
+                <Text style={{ fontSize: 14, fontWeight: "700", color: colors.text }}>
+                  {t("navigateAction")}
+                </Text>
               </Pressable>
               <Pressable
                 onPress={() => void handleDogParkCheckIn(selectedDogPark)}
@@ -1833,7 +1942,9 @@ export function ExploreScreen() {
                 {dogParkCheckInLoading ? (
                   <ActivityIndicator color="#fff" />
                 ) : (
-                  <Text style={{ fontSize: 14, fontWeight: "700", color: "#fff" }}>צ'ק-אין</Text>
+                  <Text style={{ fontSize: 14, fontWeight: "700", color: "#fff" }}>
+                    {t("dogParkCheckInButton")}
+                  </Text>
                 )}
               </Pressable>
             </View>
@@ -2242,7 +2353,7 @@ export function ExploreScreen() {
                       textAlign: isRTL ? "right" : "left",
                     }}
                   >
-                    גינות כלבים
+                    {t("dogParksLayerTitle")}
                   </Text>
                   {showDogParksOnly && <Ionicons name="checkmark-circle" size={16} color="#fff" />}
                 </Pressable>
@@ -2250,6 +2361,18 @@ export function ExploreScreen() {
 
               {/* ── Service type (multi-select) ── */}
               <View>
+                {serviceTypesError && (
+                  <Text
+                    style={{
+                      fontSize: 12,
+                      color: colors.textSecondary,
+                      marginBottom: 10,
+                      textAlign: isRTL ? "right" : "left",
+                    }}
+                  >
+                    {t("serviceTypesUnavailable")}
+                  </Text>
+                )}
                 <Text style={filterLabel(isRTL, colors)}>
                   {t("filterByService")}
                 </Text>

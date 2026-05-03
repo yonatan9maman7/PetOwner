@@ -1,4 +1,5 @@
 import { useState, useCallback, useMemo, useRef, useEffect } from "react";
+import axios from "axios";
 import {
   View,
   Text,
@@ -24,6 +25,8 @@ import Animated, {
 import { useTranslation, type TranslationKey } from "../../i18n";
 import { useTheme, type ThemeColors } from "../../theme/ThemeContext";
 import { mapApi } from "../../api/client";
+import { getNormalizedApiError } from "../../utils/apiUtils";
+import { showApiErrorToast } from "../../services/apiErrorToast";
 import { ProviderType, type MapPinDto, type MapSearchFilters } from "../../types/api";
 
 /* ─── Category chip definitions ─── */
@@ -197,8 +200,12 @@ export function DiscoverScreen() {
   const [isSearchFocused, setIsSearchFocused] = useState(false);
   const [providers, setProviders] = useState<MapPinDto[]>([]);
   const [serviceTypes, setServiceTypes] = useState<string[]>([]);
+  const [serviceTypesError, setServiceTypesError] = useState(false);
+  const [providersLoadFailed, setProvidersLoadFailed] = useState(false);
   const [loading, setLoading] = useState(true);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const providersAbortRef = useRef<AbortController | null>(null);
+  const providersFetchGenRef = useRef(0);
 
   const buildFilters = useCallback(
     (search?: string): MapSearchFilters | undefined => {
@@ -226,27 +233,62 @@ export function DiscoverScreen() {
 
   const loadProviders = useCallback(
     (search?: string) => {
+      providersAbortRef.current?.abort();
+      const controller = new AbortController();
+      providersAbortRef.current = controller;
+      const gen = ++providersFetchGenRef.current;
       setLoading(true);
       mapApi
-        .fetchPins(buildFilters(search))
+        .fetchPins(buildFilters(search), controller.signal)
         .then((pins) => {
+          if (gen !== providersFetchGenRef.current) return;
+          let next = pins;
           if (providerTypeFilter === ProviderType.Business) {
-            return pins.filter((p) => mapPinProviderType(p) === ProviderType.Business);
+            next = pins.filter((p) => mapPinProviderType(p) === ProviderType.Business);
+          } else if (providerTypeFilter === ProviderType.Individual) {
+            next = pins.filter((p) => mapPinProviderType(p) === ProviderType.Individual);
           }
-          if (providerTypeFilter === ProviderType.Individual) {
-            return pins.filter((p) => mapPinProviderType(p) === ProviderType.Individual);
-          }
-          return pins;
+          setProviders(next);
+          setProvidersLoadFailed(false);
         })
-        .then(setProviders)
-        .catch(() => setProviders([]))
-        .finally(() => setLoading(false));
+        .catch((error) => {
+          if (gen !== providersFetchGenRef.current) return;
+          if (axios.isCancel(error) || (error as Error)?.name === "CanceledError") {
+            return;
+          }
+          setProvidersLoadFailed(true);
+          if (!(axios.isAxiosError(error) && error.response?.status === 401)) {
+            showApiErrorToast(getNormalizedApiError(error), {
+              title: t("genericErrorTitle"),
+            });
+          }
+        })
+        .finally(() => {
+          if (gen === providersFetchGenRef.current) {
+            setLoading(false);
+          }
+        });
     },
-    [buildFilters, providerTypeFilter],
+    [buildFilters, providerTypeFilter, t],
   );
 
   useEffect(() => {
-    mapApi.getServiceTypes().then(setServiceTypes).catch(() => {});
+    mapApi
+      .getServiceTypes()
+      .then((types) => {
+        setServiceTypes(types);
+        setServiceTypesError(false);
+      })
+      .catch(() => {
+        setServiceTypes([]);
+        setServiceTypesError(true);
+      });
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      providersAbortRef.current?.abort();
+    };
   }, []);
 
   useEffect(() => {
@@ -305,7 +347,7 @@ export function DiscoverScreen() {
   const filteredProviders = useMemo(() => {
     if (selectedCategory === "all") return providers;
     return providers.filter((p) =>
-      p.services.toLowerCase().includes(selectedCategory),
+      (p.services ?? "").toLowerCase().includes(selectedCategory),
     );
   }, [providers, selectedCategory]);
 
@@ -367,10 +409,10 @@ export function DiscoverScreen() {
 
           {/* Content area */}
           <View style={c.cardContent}>
-            {/* Category + distance row */}
+            {/* Category + starting rate row */}
             <View style={[c.topMetaRow, isRTL && c.rowReverse]}>
               <Text style={[styles.categoryLabel, rtlText]} numberOfLines={1}>
-                {formatCategoryLine(item.services, t, isRTL)}
+                {formatCategoryLine(item.services ?? "", t, isRTL)}
               </Text>
               {item.minRate > 0 && (
                 <View style={[c.distancePill, isRTL && c.rowReverse]}>
@@ -421,15 +463,43 @@ export function DiscoverScreen() {
   );
 
   const ListEmpty = useMemo(
-    () =>
-      loading ? (
-        <View style={c.emptyWrap}>
-          <ActivityIndicator size="large" color={colors.primary} />
-          <Text style={[styles.emptySubtitle, { marginTop: 12 }]}>
-            {t("loadingProviders")}
-          </Text>
-        </View>
-      ) : (
+    () => {
+      if (loading) {
+        return (
+          <View style={c.emptyWrap}>
+            <ActivityIndicator size="large" color={colors.primary} />
+            <Text style={[styles.emptySubtitle, { marginTop: 12 }]}>
+              {t("loadingProviders")}
+            </Text>
+          </View>
+        );
+      }
+      if (providersLoadFailed && providers.length === 0) {
+        return (
+          <View style={c.emptyWrap}>
+            <View style={[c.emptyIcon, { backgroundColor: colors.surfaceSecondary }]}>
+              <Ionicons name="cloud-offline-outline" size={40} color={colors.textMuted} />
+            </View>
+            <Text style={[styles.emptyTitle]}>{t("providersLoadFailed")}</Text>
+            <Text style={[styles.emptySubtitle]}>{t("providersLoadFailedHint")}</Text>
+            <Pressable
+              onPress={() => loadProviders(searchQuery)}
+              style={{
+                marginTop: 16,
+                paddingHorizontal: 20,
+                paddingVertical: 12,
+                borderRadius: 12,
+                backgroundColor: colors.text,
+              }}
+            >
+              <Text style={{ fontSize: 15, fontWeight: "700", color: colors.textInverse }}>
+                {t("retry")}
+              </Text>
+            </Pressable>
+          </View>
+        );
+      }
+      return (
         <View style={c.emptyWrap}>
           <View style={[c.emptyIcon, { backgroundColor: colors.surfaceSecondary }]}>
             <Ionicons name="search-outline" size={40} color={colors.textMuted} />
@@ -439,8 +509,22 @@ export function DiscoverScreen() {
             {t("noBusinessesFoundSubtitle")}
           </Text>
         </View>
-      ),
-    [colors, loading, styles, t],
+      );
+    },
+    [
+      colors.primary,
+      colors.surfaceSecondary,
+      colors.text,
+      colors.textInverse,
+      colors.textMuted,
+      loading,
+      loadProviders,
+      providers.length,
+      providersLoadFailed,
+      searchQuery,
+      styles,
+      t,
+    ],
   );
 
   return (
@@ -512,6 +596,19 @@ export function DiscoverScreen() {
 
       {/* ── Category chips ── */}
       <View style={c.chipWrapper}>
+        {serviceTypesError && (
+          <Text
+            style={{
+              fontSize: 12,
+              color: colors.textSecondary,
+              marginBottom: 8,
+              paddingHorizontal: 4,
+              textAlign: isRTL ? "right" : "left",
+            }}
+          >
+            {t("serviceTypesUnavailable")}
+          </Text>
+        )}
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}

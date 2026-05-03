@@ -3,7 +3,7 @@
     "name": "pet-owner-mobile",
     "slug": "pet-owner-mobile",
     "scheme": "petowner",
-    "version": "1.0.2",
+    "version": "1.0.3",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -28,7 +28,7 @@
     },
     "android": {
       "package": "com.petowner.app",
-      "versionCode": 3,
+      "versionCode": 4,
       "softwareKeyboardLayoutMode": "resize",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",

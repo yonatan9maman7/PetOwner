@@ -467,6 +467,21 @@ const HE = {
   followingDesc: "העקיבה נשמרה מקומית.",
   invited: "הוזמן",
   followed: "עוקב",
+  postKindCuteMoment: "רגע מתוק",
+  postKindQuestion: "שאלה",
+  postKindRecommendation: "המלצה",
+  postKindPlaydate: "מפגש",
+  postKindWarning: "אזהרה",
+  postKindLostFound: "אבדות ומציאות",
+  postKindEvent: "אירוע",
+  visibilityPublic: "ציבורי",
+  visibilityNearbyOnly: "קרוב אליי",
+  visibilityFriendsOnly: "חברים בלבד",
+  visibilityGroupOnly: "קבוצה בלבד",
+  sizeSmall: "קטנים",
+  sizeMedium: "בינוניים",
+  sizeLarge: "גדולים",
+  sizeAll: "כולם",
 } as const;
 
 const EN: Record<keyof typeof HE, string> = {
@@ -621,6 +636,21 @@ const EN: Record<keyof typeof HE, string> = {
   followingDesc: "Follow saved locally.",
   invited: "Invited",
   followed: "Following",
+  postKindCuteMoment: "Cute moment",
+  postKindQuestion: "Question",
+  postKindRecommendation: "Recommendation",
+  postKindPlaydate: "Playdate",
+  postKindWarning: "Warning",
+  postKindLostFound: "Lost & Found",
+  postKindEvent: "Event",
+  visibilityPublic: "Public",
+  visibilityNearbyOnly: "Nearby only",
+  visibilityFriendsOnly: "Friends only",
+  visibilityGroupOnly: "Group only",
+  sizeSmall: "Small",
+  sizeMedium: "Medium",
+  sizeLarge: "Large",
+  sizeAll: "All",
 };
 
 type CopyKey = keyof typeof HE;
@@ -728,7 +758,24 @@ function filterIcon(filter: FeedFilter): keyof typeof Ionicons.glyphMap {
 }
 
 function postKindLabel(kind: PostKind, isRTL: boolean): string {
-  if (!isRTL) return kind;
+  if (!isRTL) {
+    switch (kind) {
+      case "Cute moment":
+        return EN.postKindCuteMoment;
+      case "Question":
+        return EN.postKindQuestion;
+      case "Recommendation":
+        return EN.postKindRecommendation;
+      case "Playdate":
+        return EN.postKindPlaydate;
+      case "Warning":
+        return EN.postKindWarning;
+      case "Lost & Found":
+        return EN.postKindLostFound;
+      case "Event":
+        return EN.postKindEvent;
+    }
+  }
   switch (kind) {
     case "Cute moment":
       return "רגע מתוק";
@@ -748,7 +795,18 @@ function postKindLabel(kind: PostKind, isRTL: boolean): string {
 }
 
 function visibilityLabel(visibility: Visibility, isRTL: boolean): string {
-  if (!isRTL) return visibility;
+  if (!isRTL) {
+    switch (visibility) {
+      case "Public":
+        return EN.visibilityPublic;
+      case "Nearby only":
+        return EN.visibilityNearbyOnly;
+      case "Friends only":
+        return EN.visibilityFriendsOnly;
+      case "Group only":
+        return EN.visibilityGroupOnly;
+    }
+  }
   switch (visibility) {
     case "Public":
       return "ציבורי";
@@ -762,7 +820,18 @@ function visibilityLabel(visibility: Visibility, isRTL: boolean): string {
 }
 
 function sizeLabel(size: DogSizeSuitability, isRTL: boolean): string {
-  if (!isRTL) return size;
+  if (!isRTL) {
+    switch (size) {
+      case "Small":
+        return EN.sizeSmall;
+      case "Medium":
+        return EN.sizeMedium;
+      case "Large":
+        return EN.sizeLarge;
+      case "All":
+        return EN.sizeAll;
+    }
+  }
   switch (size) {
     case "Small":
       return "קטנים";
@@ -1302,6 +1371,12 @@ export function CommunityScreen() {
       setCommunityDashboard(null);
     }
   }, []);
+
+  useEffect(() => {
+    if (hydrated && isLoggedIn) {
+      void loadDashboard();
+    }
+  }, [hydrated, isLoggedIn, loadDashboard]);
 
   const loadFeed = useCallback(
     async (p: number, replace: boolean) => {
@@ -2320,7 +2395,18 @@ export function CommunityScreen() {
             return (
               <Pressable
                 key={tab}
-                onPress={() => setMainTab(tab)}
+                onPress={() => {
+                  setMainTab(tab);
+                  if (tab === "groups" && groups.length === 0) void loadGroups();
+                  if (tab === "playdates" || tab === "events") void loadPlaydates();
+                  if (tab === "parks") {
+                    void loadBeacons();
+                    void loadDogParks();
+                  }
+                  if (tab === "feed" || tab === "qa" || tab === "lostSos") {
+                    if (posts.length === 0) void loadFeed(1, true);
+                  }
+                }}
                 style={styles.topTab}
               >
                 <View style={styles.topTabCircleWrap}>
@@ -2888,7 +2974,9 @@ export function CommunityScreen() {
               <Text style={[styles.contentText, rtlText]}>{event.description || copy("openPlaydate")}</Text>
               <View style={[styles.metaWrap, { flexDirection: appRowDirection }]}>
                 <Text style={styles.metaPill}>{event.locationName}</Text>
-                <Text style={styles.metaPill}>{event.maxPets ? `${event.maxPets} max` : copy("allSizes")}</Text>
+                <Text style={styles.metaPill}>
+                  {event.maxPets ? `${event.maxPets} ${copy("maxParticipants")}` : copy("allSizes")}
+                </Text>
                 <Text style={styles.metaPill}>{spotsLeft} {copy("spotsLeft")}</Text>
                 <Text style={styles.metaPill}>{event.goingCount} {copy("dogsAttending")}</Text>
               </View>

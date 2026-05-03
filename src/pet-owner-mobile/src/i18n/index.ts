@@ -1244,6 +1244,18 @@ const he = {
   navigateAction: "נווט",
   websiteAction: "אתר",
   loadingProviders: "טוען ספקים...",
+  providersLoadFailed: "לא ניתן לטעון את רשימת הספקים",
+  providersLoadFailedHint: "משוך לרענון או הקש כאן לניסיון חוזר.",
+  serviceTypesUnavailable:
+    "לא ניתן לטעון את סוגי השירות. הסינון לפי שירות עשוי להיות חלקי.",
+  mapLocationDeniedHint:
+    "לא ניתנה גישה למיקום. המפה זמינה; ניתן לאשר גישה בהגדרות המכשיר.",
+  mapLocationErrorHint: "לא הצלחנו לאתר את המיקום. נסה שוב.",
+  dogParksLayerTitle: "גינות כלבים",
+  dogParkCheckInButton: "צ'ק-אין",
+  dogParksNoneAvailable: "אין גינות כלבים זמינות מהשרת כרגע.",
+  dogParkCheckInSuccessTitle: "נרשמת בהצלחה",
+  dogParkCheckInSuccessMessage: "הצ'ק-אין נרשם בהצלחה.",
   providerFrom: "מ-",
 
   myStats: "הסטטיסטיקה שלי",
@@ -2539,6 +2551,18 @@ const en: Record<keyof typeof he, string> = {
   navigateAction: "Navigate",
   websiteAction: "Website",
   loadingProviders: "Loading providers...",
+  providersLoadFailed: "Couldn't load the provider list",
+  providersLoadFailedHint: "Pull to refresh or tap below to try again.",
+  serviceTypesUnavailable:
+    "Couldn't load service types. Category filters may be incomplete.",
+  mapLocationDeniedHint:
+    "Location permission wasn't granted. You can still use the map; enable location in device settings to see yourself on the map.",
+  mapLocationErrorHint: "We couldn't get your location. Please try again.",
+  dogParksLayerTitle: "Dog parks",
+  dogParkCheckInButton: "Check in",
+  dogParksNoneAvailable: "No dog parks are available from the server right now.",
+  dogParkCheckInSuccessTitle: "Check-in",
+  dogParkCheckInSuccessMessage: "Your check-in was saved.",
   providerFrom: "From ",
 
   myStats: "My Stats",
