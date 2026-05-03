@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
   KeyboardAvoidingView,
   Image,
+  Platform,
 } from "react-native";
 import { showGlobalAlertCompat } from "../../components/global-modal";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -82,6 +83,9 @@ export function ReportLostScreen() {
   const fetchPets = usePetsStore((s) => s.fetchPets);
   const reportLost = usePetsStore((s) => s.reportLost);
   const mapRef = useRef<any>(null);
+  const initialCoordsRef = useRef<{ latitude: number; longitude: number } | null>(
+    null,
+  );
 
   const goBackToMyPets = useCallback(() => {
     navigation.dispatch(
@@ -121,6 +125,7 @@ export function ReportLostScreen() {
             latitude: loc.coords.latitude,
             longitude: loc.coords.longitude,
           };
+          initialCoordsRef.current = coord;
           setMarkerCoord(coord);
           setMapRegion({ ...coord, latitudeDelta: 0.02, longitudeDelta: 0.02 });
         }
@@ -165,6 +170,21 @@ export function ReportLostScreen() {
         }
       });
     }
+  }, []);
+
+  const handleAddressSearchClear = useCallback(() => {
+    const base = initialCoordsRef.current ?? {
+      latitude: TEL_AVIV.latitude,
+      longitude: TEL_AVIV.longitude,
+    };
+    setMarkerCoord(base);
+    const nextRegion = {
+      ...base,
+      latitudeDelta: 0.02,
+      longitudeDelta: 0.02,
+    };
+    setMapRegion(nextRegion);
+    mapRef.current?.animateToRegion?.(nextRegion, 400);
   }, []);
 
   const pickImage = useCallback(async () => {
@@ -431,13 +451,20 @@ export function ReportLostScreen() {
             )}
 
             {/* ── Location search + map ── */}
-            <View style={{ marginTop: 8 }}>
+            <View
+              style={{
+                marginTop: 8,
+                zIndex: 120,
+                elevation: Platform.OS === "android" ? 18 : undefined,
+              }}
+            >
               <AddressAutocomplete
                 label={t("lastSeenLocation")}
                 required
                 value={lastSeenLocation}
                 onChangeText={setLastSeenLocation}
                 onSelect={handleAddressSelect}
+                onClear={handleAddressSearchClear}
                 placeholder={t("lastSeenLocationPlaceholder")}
                 isRTL={isRTL}
                 type="geocode"
@@ -452,6 +479,7 @@ export function ReportLostScreen() {
                 marginBottom: 6,
                 fontSize: 12,
                 color: colors.textSecondary,
+                zIndex: 1,
               }}
             >
               {t("tapMapToMark")}
@@ -463,6 +491,7 @@ export function ReportLostScreen() {
                 overflow: "hidden",
                 borderWidth: 1,
                 borderColor: colors.border,
+                zIndex: 1,
               }}
             >
               {locLoading ? (

@@ -1,5 +1,5 @@
-import { useEffect, useState, useCallback } from "react";
-import { View, Pressable, ScrollView, RefreshControl, Text } from "react-native";
+import { useEffect, useState, useCallback, useRef } from "react";
+import { View, Pressable, ScrollView, RefreshControl, Text, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
@@ -7,7 +7,7 @@ import { useAuthStore } from "../../../store/authStore";
 import { useMyPetsUiStore } from "../../../store/myPetsUiStore";
 import { useTranslation, rowDirectionForAppLayout } from "../../../i18n";
 import { usePetsStore } from "../../../store/petsStore";
-import { medicalApi, triageApi } from "../../../api/client";
+import { medicalApi, postsApi, triageApi } from "../../../api/client";
 import * as Print from "expo-print";
 import * as Sharing from "expo-sharing";
 import { generateHealthPassportHtml } from "../../../utils/HealthPassportPdf";
@@ -27,6 +27,7 @@ import { VaultSection } from "./sections/VaultSection";
 import { TriageSection } from "./sections/TriageSection";
 import { PetAvatarSwitcher } from "./components/PetAvatarSwitcher";
 import { PetPassportCard } from "./components/PetPassportCard";
+import { LostPetAlertBanner } from "./components/LostPetAlertBanner";
 import { VaccineAlertBanner } from "./components/VaccineAlertBanner";
 import { HealthHubList } from "./components/HealthHubList";
 import { useActivePetSummary } from "./hooks/useActivePetSummary";
@@ -34,6 +35,12 @@ import type { Section } from "./types";
 import { getNormalizedApiError } from "../../../utils/apiUtils";
 import { showApiErrorToast } from "../../../services/apiErrorToast";
 import { showGlobalAlertCompat } from "../../../components/global-modal";
+import {
+  CelebrationConfettiBurst,
+  type CelebrationConfettiBurstRef,
+} from "../../../components/CelebrationConfettiBurst";
+
+const MARK_FOUND_SOS_CELEBRATION_DELAY_MS = 1750;
 
 export function MyPetsScreen() {
   const isLoggedIn = useAuthStore((s) => s.isLoggedIn);
@@ -47,6 +54,8 @@ export function MyPetsScreen() {
   const [shareModalPetId, setShareModalPetId] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [sectionReloadNonce, setSectionReloadNonce] = useState(0);
+  const [markFoundBusy, setMarkFoundBusy] = useState(false);
+  const markFoundConfettiRef = useRef<CelebrationConfettiBurstRef>(null);
 
   useEffect(() => {
     if (isLoggedIn) usePetsStore.getState().fetchPets();
@@ -75,6 +84,35 @@ export function MyPetsScreen() {
       setRefreshing(false);
     }
   }, []);
+
+  const handleMarkFoundFromBanner = useCallback(
+    (pet: PetDto) => {
+      showGlobalAlertCompat(t("markFoundBtn"), `${t("markFound")}?`, [
+        { text: t("cancel"), style: "cancel" },
+        {
+          text: t("markFoundBtn"),
+          onPress: async () => {
+            setMarkFoundBusy(true);
+            try {
+              markFoundConfettiRef.current?.burst();
+              await new Promise<void>((resolve) =>
+                setTimeout(resolve, MARK_FOUND_SOS_CELEBRATION_DELAY_MS),
+              );
+              await usePetsStore.getState().markFound(pet.id);
+              if (pet.communityPostId) {
+                await postsApi.resolveSos(pet.communityPostId).catch(() => {});
+              }
+            } catch {
+              showGlobalAlertCompat(t("errorTitle"), t("profileSaveError"));
+            } finally {
+              setMarkFoundBusy(false);
+            }
+          },
+        },
+      ]);
+    },
+    [t],
+  );
 
   const handleDelete = (pet: PetDto) => {
     const allPets = usePetsStore.getState().pets;
@@ -215,6 +253,14 @@ export function MyPetsScreen() {
             onAddPress={() => navigation.navigate("AddPet")}
           />
 
+          {activePet?.isLost ? (
+            <LostPetAlertBanner
+              isRTL={isRTL}
+              loading={markFoundBusy}
+              onMarkFoundPress={() => handleMarkFoundFromBanner(activePet)}
+            />
+          ) : null}
+
           {/* Passport card */}
           {activePet && (
             <View style={{ marginTop: 14 }}>
@@ -248,6 +294,9 @@ export function MyPetsScreen() {
       {shareModalPetId && (
         <ShareHealthPassportModal petId={shareModalPetId} visible onClose={() => setShareModalPetId(null)} />
       )}
+      <View pointerEvents="box-none" style={StyleSheet.absoluteFillObject}>
+        <CelebrationConfettiBurst ref={markFoundConfettiRef} />
+      </View>
     </SafeAreaView>
   );
 }

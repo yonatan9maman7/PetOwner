@@ -357,6 +357,8 @@ public class DatabaseSeeder
 
         await _db.SaveChangesAsync();
 
+        await EnsureDogParksSeededAsync();
+
         _logger.LogInformation(
             "Demo ecosystem seeded: {P} providers, {O} owners, {Pets} pets, {B} bookings, {R} reviews, {GP} group posts, {SP} social posts",
             providerUsers.Length, ownerUsers.Length, totalPets,
@@ -364,6 +366,67 @@ public class DatabaseSeeder
 
         return (providerUsers.Length, ownerUsers.Length, totalPets,
             bookings.Count, reviews.Count, groupPosts.Count, socialPosts.Count);
+    }
+
+    /// <summary>
+    /// Idempotent catalog rows for Tel Aviv / Ramat Gan (Explore map dog-park layer).
+    /// </summary>
+    public async Task<int> EnsureDogParksSeededAsync()
+    {
+        // Fixed IDs so re-seeding never duplicates rows.
+        DogPark[] seeds =
+        [
+            new()
+            {
+                Id = Guid.Parse("a1b2c3d4-e5f6-4789-a012-000000000001"),
+                Name = "גינת כלבים — גן מאיר (Meir Park)",
+                Address = "גן מאיר, תל אביב-יפו",
+                Latitude = 32.0719,
+                Longitude = 34.7745,
+                IsActive = true,
+            },
+            new()
+            {
+                Id = Guid.Parse("a1b2c3d4-e5f6-4789-a012-000000000002"),
+                Name = "גינת כלבים — פארק הירקון (Yarkon Park)",
+                Address = "פארק הירקון, תל אביב-יפו",
+                Latitude = 32.0992,
+                Longitude = 34.8114,
+                IsActive = true,
+            },
+            new()
+            {
+                Id = Guid.Parse("a1b2c3d4-e5f6-4789-a012-000000000003"),
+                Name = "גינת כלבים — גינת דובנוב",
+                Address = "רח׳ דובנוב, תל אביב-יפו",
+                Latitude = 32.0795,
+                Longitude = 34.7763,
+                IsActive = true,
+            },
+            new()
+            {
+                Id = Guid.Parse("a1b2c3d4-e5f6-4789-a012-000000000004"),
+                Name = "גינת כלבים — פארק הלאומי רמת גן",
+                Address = "פארק הלאומי, רמת גן",
+                Latitude = 32.0884,
+                Longitude = 34.8248,
+                IsActive = true,
+            },
+        ];
+
+        var added = 0;
+        foreach (var park in seeds)
+        {
+            if (await _db.DogParks.AnyAsync(p => p.Id == park.Id))
+                continue;
+            _db.DogParks.Add(park);
+            added++;
+        }
+
+        if (added > 0)
+            await _db.SaveChangesAsync();
+
+        return added;
     }
 
     public async Task<int> SeedProvidersAsync()

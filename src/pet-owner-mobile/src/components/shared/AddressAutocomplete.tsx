@@ -25,6 +25,7 @@ import {
 } from "react";
 import {
   ActivityIndicator,
+  Platform,
   Pressable,
   Text,
   TextInput,
@@ -95,6 +96,8 @@ export interface AddressAutocompleteProps {
   absoluteDropdown?: boolean;
   /** Inline error text (e.g. validation), shown below the input in red. */
   errorText?: string;
+  /** Called after clearing the search (X); use to reset parent map/coordinate state. */
+  onClear?: () => void;
   /** Disable the trailing leading icon entirely. */
   hideLeadingIcon?: boolean;
   /** Disable the auto-issued required-asterisk render even when label set. */
@@ -118,6 +121,7 @@ export function AddressAutocomplete({
   maxResultsHeight = 260,
   absoluteDropdown = true,
   errorText,
+  onClear,
   hideLeadingIcon,
   hideRequiredMark,
 }: AddressAutocompleteProps) {
@@ -190,11 +194,13 @@ export function AddressAutocomplete({
   );
 
   const handleClear = useCallback(() => {
-    suppressNextSearchRef.current = true;
     onChangeText("");
+    sessionRef.current = createPlacesSession();
     setPredictions([]);
+    setSearching(false);
     abortRef.current?.abort();
-  }, [onChangeText]);
+    onClear?.();
+  }, [onChangeText, onClear]);
 
   const handleSelect = useCallback(
     async (prediction: PlacePrediction) => {
@@ -361,6 +367,7 @@ export function AddressAutocomplete({
             borderColor: colors.borderLight ?? colors.border,
             maxHeight: maxResultsHeight,
             overflow: "hidden",
+            paddingVertical: 4,
             shadowColor: colors.shadow ?? "#000",
             shadowOffset: { width: 0, height: 6 },
             shadowOpacity: 0.12,
@@ -408,7 +415,8 @@ function SuggestionRow({
         alignItems: "center",
         gap: 12,
         paddingHorizontal: 14,
-        paddingVertical: 12,
+        paddingVertical: 14,
+        minHeight: 62,
         borderBottomWidth: isLast ? 0 : 1,
         borderBottomColor: colors.borderLight ?? colors.border,
         backgroundColor: pressed
@@ -428,15 +436,17 @@ function SuggestionRow({
       >
         <Ionicons name="location-sharp" size={14} color={colors.primary} />
       </View>
-      <View style={{ flex: 1 }}>
+      <View style={{ flex: 1, overflow: "visible" }}>
         <Text
           numberOfLines={1}
           style={{
             fontSize: 14,
             fontWeight: "700",
+            lineHeight: 21,
             color: colors.text,
             textAlign: isRTL ? "right" : "left",
             writingDirection: isRTL ? "rtl" : "ltr",
+            ...(Platform.OS === "android" ? { includeFontPadding: false } : {}),
           }}
         >
           {prediction.mainText}
@@ -445,11 +455,14 @@ function SuggestionRow({
           <Text
             numberOfLines={1}
             style={{
-              marginTop: 2,
+              marginTop: 3,
               fontSize: 12,
+              lineHeight: 18,
               color: colors.textMuted,
+              paddingBottom: 2,
               textAlign: isRTL ? "right" : "left",
               writingDirection: isRTL ? "rtl" : "ltr",
+              ...(Platform.OS === "android" ? { includeFontPadding: false } : {}),
             }}
           >
             {prediction.secondaryText}

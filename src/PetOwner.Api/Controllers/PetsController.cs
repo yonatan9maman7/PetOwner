@@ -219,7 +219,7 @@ public class PetsController : ControllerBase
             "sos_resolved",
             "NOTIFICATIONS.SOS_RESOLVED_TITLE",
             "NOTIFICATIONS.SOS_RESOLVED",
-            pet.Id);
+            pet.CommunityPostId ?? pet.Id);
 
         return Ok(MapToDto(pet));
     }

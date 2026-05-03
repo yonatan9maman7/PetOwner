@@ -8,9 +8,10 @@ import {
   KeyboardAvoidingView,
   BackHandler,
   Keyboard,
+  Platform,
 } from "react-native";
 import { showGlobalAlertCompat } from "../../components/global-modal";
-import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useChatStore } from "../../store/chatStore";
 import { useAuthStore } from "../../store/authStore";
@@ -70,8 +71,16 @@ export function ChatRoomScreen() {
   const currentUserId = useAuthStore((s) => s.userId);
   const activeMessages = useChatStore((s) => s.activeMessages);
   const [text, setText] = useState("");
-  const { behavior: keyboardAvoidBehavior, keyboardVisible } = useKeyboardAvoidingState();
+  const { keyboardVisible } = useKeyboardAvoidingState();
   const insets = useSafeAreaInsets();
+  const keyboardAvoidBehavior =
+    Platform.OS === "ios" ? ("padding" as const) : undefined;
+  /** When the IME is open, KAV (iOS) / window resize (Android) already lift content — avoid stacking home-indicator padding. */
+  const inputContainerPaddingBottom = keyboardVisible
+    ? 8
+    : Platform.OS === "ios"
+      ? insets.bottom
+      : 10;
   const listRef = useRef<FlatList>(null);
 
   const handleBack = useCallback(() => {
@@ -227,11 +236,17 @@ export function ChatRoomScreen() {
   };
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: colors.background, marginTop: -8 }} edges={["top"]}>
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={keyboardAvoidBehavior}
-        keyboardVerticalOffset={0}
+    <View style={{ flex: 1, backgroundColor: colors.background, marginTop: -8 }}>
+      <View
+        style={{
+          paddingTop: insets.top,
+          backgroundColor: colors.surface,
+          shadowColor: colors.shadow,
+          shadowOffset: { width: 0, height: 2 },
+          shadowOpacity: 0.06,
+          shadowRadius: 8,
+          elevation: 3,
+        }}
       >
         <View
           style={{
@@ -240,11 +255,6 @@ export function ChatRoomScreen() {
             alignItems: "center",
             paddingHorizontal: 16,
             backgroundColor: colors.surface,
-            shadowColor: colors.shadow,
-            shadowOffset: { width: 0, height: 2 },
-            shadowOpacity: 0.06,
-            shadowRadius: 8,
-            elevation: 3,
           }}
         >
           <TouchableOpacity
@@ -268,7 +278,13 @@ export function ChatRoomScreen() {
             {otherUserName}
           </Text>
         </View>
+      </View>
 
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={keyboardAvoidBehavior}
+        keyboardVerticalOffset={0}
+      >
         <FlatList
           ref={listRef}
           style={{ flex: 1 }}
@@ -284,11 +300,10 @@ export function ChatRoomScreen() {
           }}
         />
 
-        {/* Avoid SafeAreaView bottom here: it stacks with KeyboardAvoidingView and leaves a gap above the keyboard on iOS. */}
         <View
           style={{
             backgroundColor: colors.surface,
-            paddingBottom: keyboardVisible ? 0 : Math.max(insets.bottom, 8),
+            paddingBottom: inputContainerPaddingBottom,
           }}
         >
           <View
@@ -352,6 +367,6 @@ export function ChatRoomScreen() {
           </View>
         </View>
       </KeyboardAvoidingView>
-    </SafeAreaView>
+    </View>
   );
 }

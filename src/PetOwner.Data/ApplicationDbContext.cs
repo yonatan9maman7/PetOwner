@@ -36,6 +36,7 @@ public class ApplicationDbContext : DbContext
     public DbSet<GroupMember> GroupMembers => Set<GroupMember>();
     public DbSet<UserCommunityPrefs> UserCommunityPrefs => Set<UserCommunityPrefs>();
     public DbSet<DogParkCheckIn> DogParkCheckIns => Set<DogParkCheckIn>();
+    public DbSet<DogPark> DogParks => Set<DogPark>();
     public DbSet<PostHelpfulMark> PostHelpfulMarks => Set<PostHelpfulMark>();
     public DbSet<CommunitySavedPost> CommunitySavedPosts => Set<CommunitySavedPost>();
     public DbSet<CommunityReport> CommunityReports => Set<CommunityReport>();
@@ -85,6 +86,7 @@ public class ApplicationDbContext : DbContext
         ConfigureGroupMember(modelBuilder);
         ConfigureUserCommunityPrefs(modelBuilder);
         ConfigureDogParkCheckIn(modelBuilder);
+        ConfigureDogPark(modelBuilder);
         ConfigurePostHelpfulMark(modelBuilder);
         ConfigureCommunitySavedPost(modelBuilder);
         ConfigureCommunityReport(modelBuilder);
@@ -1097,6 +1099,22 @@ public class ApplicationDbContext : DbContext
                 .WithMany(p => p.DogParkCheckIns)
                 .HasForeignKey(c => c.PetId)
                 .OnDelete(DeleteBehavior.SetNull);
+        });
+    }
+
+    private static void ConfigureDogPark(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<DogPark>(entity =>
+        {
+            entity.HasKey(p => p.Id);
+            entity.Property(p => p.Id).HasDefaultValueSql("NEWSEQUENTIALID()");
+            entity.Property(p => p.Name).IsRequired().HasMaxLength(200);
+            entity.Property(p => p.Address).IsRequired().HasMaxLength(500);
+            entity.Property(p => p.Latitude).HasColumnType("float");
+            entity.Property(p => p.Longitude).HasColumnType("float");
+            entity.Property(p => p.IsActive).HasDefaultValue(true);
+            entity.HasIndex(p => p.IsActive);
+            entity.HasIndex(p => new { p.Latitude, p.Longitude });
         });
     }
 

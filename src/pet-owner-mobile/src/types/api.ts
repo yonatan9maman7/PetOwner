@@ -130,6 +130,16 @@ export interface LostPetDto {
   ownerName: string;
 }
 
+/** GET /api/parks — catalog dog parks for Explore map. */
+export interface DogParkDto {
+  id: string;
+  name: string;
+  address: string;
+  latitude: number;
+  longitude: number;
+  isActive: boolean;
+}
+
 export interface MapPinDto {
   providerId: string;
   name: string;

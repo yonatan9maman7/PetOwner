@@ -228,6 +228,7 @@ public class NotificationService : INotificationService
                 => prefs.Bookings,
 
             "GROUP_POST" or "POST_COMMENT" or "POST_LIKE" or "SOS_ALERT"
+                or "sos" or "sos_resolved"
                 => prefs.Community,
 
             "TRIAGE_RESULT" or "VACCINE_DUE"

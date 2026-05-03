@@ -15,17 +15,15 @@ import {
   type KeyboardAvoidingViewProps,
   Share,
   StatusBar,
-  useWindowDimensions,
 } from "react-native";
 import { showGlobalAlertCompat } from "../../components/global-modal";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
-import { useFocusEffect, useNavigation } from "@react-navigation/native";
+import { useFocusEffect, useNavigation, useRoute } from "@react-navigation/native";
 import * as Location from "expo-location";
 import { useAuthStore } from "../../store/authStore";
 import { usePetsStore } from "../../store/petsStore";
 import { useTranslation, rowDirectionForAppLayout } from "../../i18n";
-import { CommunityDashboard } from "./components/CommunityDashboard";
 import { CommunitySearchModal } from "./components/CommunitySearchModal";
 import { useTheme } from "../../theme/ThemeContext";
 import { AuthPlaceholder } from "../../components/AuthPlaceholder";
@@ -60,8 +58,14 @@ import { formatBreedForDisplay } from "../pets/addPetHelpers";
 import { fetchNearbyDogParks, geocodeAddress } from "../../api/googlePlaces";
 import { useKeyboardAvoidingState } from "../../hooks/useKeyboardAvoidingState";
 import { formatCommunityDistanceKm, formatCommunityRelativeTime } from "./utils/formatCommunity";
+import {
+  CelebrationConfettiBurst,
+  type CelebrationConfettiBurstRef,
+} from "../../components/CelebrationConfettiBurst";
 
 const PAGE_SIZE = 20;
+/** Post-confetti delay before SOS resolve API (matches UX spec ~1.5–2s). */
+const MARK_FOUND_SOS_CELEBRATION_DELAY_MS = 1750;
 
 type MainTab = "feed" | "playdates" | "parks" | "groups" | "qa" | "events" | "lostSos";
 type FeedFilter =
@@ -806,6 +810,14 @@ function activityLabel(activity: DogPark["activity"], isRTL: boolean): string {
   }
 }
 
+/** Active SOS-style lost post: Lost & Found category, not yet resolved on the server. */
+function isActiveSosLostPost(post: PostDto, kind: PostKind): boolean {
+  if (kind !== "Lost & Found" || post.sosResolvedAt) return false;
+  const cat = (post.category ?? "").toLowerCase();
+  if (cat.includes("sos") || cat.includes("lost")) return true;
+  return post.content.includes("🆘") || /SOS:/i.test(post.content);
+}
+
 function filterMatchesPost(filter: FeedFilter, post: PostDto, meta?: PostMeta): boolean {
   const kind = meta?.kind ?? categoryToKind(post.category);
   if (filter === "Nearby") return true;
@@ -844,6 +856,8 @@ function PostCard({
   copy,
   isLikePending,
   isDeletePending,
+  onSosResolved,
+  celebrateMarkFoundBurst,
 }: {
   post: PostDto;
   meta?: PostMeta;
@@ -862,17 +876,61 @@ function PostCard({
   copy: (key: CopyKey) => string;
   isLikePending?: boolean;
   isDeletePending?: boolean;
+  onSosResolved?: (postId: string, resolvedAtIso: string) => void;
+  /** Same confetti burst as Add Pet success; fires before SOS API after confirm. */
+  celebrateMarkFoundBurst?: () => void;
 }) {
   const { colors } = useTheme();
-  const { language } = useTranslation();
+  const { language, t } = useTranslation();
   const styles = useCommunityStyles();
+  const markFound = usePetsStore((s) => s.markFound);
+  const fetchPets = usePetsStore((s) => s.fetchPets);
 
   const isMine = currentUserId === post.userId;
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [localCommentCount, setLocalCommentCount] = useState(post.commentCount);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [sosResolving, setSosResolving] = useState(false);
   const kind = meta?.kind ?? categoryToKind(post.category);
+  const showOwnerSosResolve =
+    isMine &&
+    isActiveSosLostPost(post, kind);
+
+  const handleOwnerMarkFoundFromSos = () => {
+    if (sosResolving) return;
+    showGlobalAlertCompat(t("sosMarkFoundCloseReport"), `${t("markFound")}?`, [
+      { text: t("cancel"), style: "cancel" },
+      {
+        text: t("markFoundBtn"),
+        onPress: async () => {
+          setSosResolving(true);
+          try {
+            celebrateMarkFoundBurst?.();
+            await new Promise<void>((resolve) =>
+              setTimeout(resolve, MARK_FOUND_SOS_CELEBRATION_DELAY_MS),
+            );
+            await fetchPets().catch(() => {});
+            const petId =
+              post.relatedPetId ??
+              usePetsStore
+                .getState()
+                .pets.find((p) => p.communityPostId === post.id)?.id ??
+              null;
+            if (petId) {
+              await markFound(petId);
+            }
+            await postsApi.resolveSos(post.id);
+            onSosResolved?.(post.id, new Date().toISOString());
+          } catch {
+            showGlobalAlertCompat(t("errorTitle"), t("profileSaveError"));
+          } finally {
+            setSosResolving(false);
+          }
+        },
+      },
+    ]);
+  };
 
   return (
     <View style={styles.card}>
@@ -979,6 +1037,32 @@ function PostCard({
           />
         </>
       )}
+
+      {showOwnerSosResolve ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={t("sosMarkFoundCloseReport")}
+          onPress={handleOwnerMarkFoundFromSos}
+          disabled={sosResolving}
+          style={[
+            styles.sosMarkFoundWrap,
+            styles.sosMarkFoundFullBtn,
+            { flexDirection: isRTL ? "row-reverse" : "row" },
+            sosResolving ? styles.sosMarkFoundFullBtnDisabled : null,
+          ]}
+        >
+          {sosResolving ? (
+            <ActivityIndicator color="#fff" />
+          ) : (
+            <>
+              <Ionicons name="checkmark-circle" size={22} color="#fff" />
+              <Text style={[styles.sosMarkFoundFullBtnText, rtlText]}>
+                {t("sosMarkFoundCloseReport")}
+              </Text>
+            </>
+          )}
+        </Pressable>
+      ) : null}
 
       {kind === "Playdate" && (
         <View style={[styles.playdateInline, rtlRow]}>
@@ -1101,7 +1185,12 @@ function Chip({
 }
 
 export function CommunityScreen() {
+  const sosMarkFoundConfettiRef = useRef<CelebrationConfettiBurstRef>(null);
+  const burstMarkFoundCelebrate = useCallback(() => {
+    sosMarkFoundConfettiRef.current?.burst();
+  }, []);
   const navigation = useNavigation<any>();
+  const route = useRoute<any>();
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const hydrated = useAuthStore((s) => s.hydrated);
@@ -1204,7 +1293,6 @@ export function CommunityScreen() {
 
   const selectedPet = pets.find((p) => p.id === selectedPetId) ?? pets[0] ?? null;
   const appRowDirection = rowDirectionForAppLayout(isRTL);
-  const { width: windowWidth } = useWindowDimensions();
   const bottomContentPadding = 16 + insets.bottom;
 
   const loadDashboard = useCallback(async () => {
@@ -1237,6 +1325,31 @@ export function CommunityScreen() {
       }
     },
     [],
+  );
+
+  useFocusEffect(
+    useCallback(() => {
+      const focusPostId = route.params?.focusPostId as string | undefined;
+      if (!focusPostId) return undefined;
+      let cancelled = false;
+      (async () => {
+        try {
+          const post = await postsApi.getPost(focusPostId);
+          if (cancelled) return;
+          setMainTab("lostSos");
+          setAnswerPost(post);
+        } catch {
+          if (!cancelled) setMainTab("lostSos");
+        } finally {
+          if (!cancelled) {
+            navigation.setParams({ focusPostId: undefined });
+          }
+        }
+      })();
+      return () => {
+        cancelled = true;
+      };
+    }, [navigation, route.params?.focusPostId]),
   );
 
   const onRefreshFeed = useCallback(async () => {
@@ -1502,6 +1615,12 @@ export function CommunityScreen() {
       ).length,
     [parks, parkCheckins],
   );
+
+  const upcomingMeetupsPreview = useMemo(() => {
+    return [...playdates]
+      .sort((a, b) => new Date(a.scheduledFor).getTime() - new Date(b.scheduledFor).getTime())
+      .slice(0, 5);
+  }, [playdates]);
 
   const dashboardActiveDogs = communityDashboard?.activeDogsNearby ?? activeDogsNearbyCount;
   const dashboardOpenQuestions = communityDashboard?.openQuestions ?? questionPosts.length;
@@ -1911,18 +2030,7 @@ export function CommunityScreen() {
   const handleParkCheckIn = async (park: DogPark) => {
     setCheckingInPark(park);
     try {
-      const beacon = await palsApi.startBeacon({
-        placeName: park.name,
-        latitude: park.latitude,
-        longitude: park.longitude,
-        city: isRTL ? "תל אביב" : "Tel Aviv",
-        durationMinutes: 60,
-        petIds: selectedPet ? [selectedPet.id] : pets.map((p) => p.id),
-        species: "DOG",
-      });
-      setMyBeaconId(beacon.id);
-      setBeacons((prev) => [beacon, ...prev]);
-      setParkCheckins((prev) => ({ ...prev, [park.id]: true }));
+      let communityOk = false;
       try {
         await communityApi.startParkCheckIn({
           placeId: park.placeId ?? park.id,
@@ -1932,14 +2040,39 @@ export function CommunityScreen() {
           petId: selectedPet?.id,
           durationMinutes: 75,
         });
+        communityOk = true;
       } catch {
-        /* park check-in API optional */
+        /* server park check-in failed — still try live beacon */
       }
-      showGlobalAlertCompat(copy("checkedIn"), copy("checkedInDesc"));
-    } catch {
-      setMyBeaconId(`local-beacon-${park.id}`);
+
+      let beacon: LiveBeaconDto | null = null;
+      try {
+        beacon = await palsApi.startBeacon({
+          placeName: park.name,
+          latitude: park.latitude,
+          longitude: park.longitude,
+          city: isRTL ? "תל אביב" : "Tel Aviv",
+          durationMinutes: 60,
+          petIds: selectedPet ? [selectedPet.id] : pets.map((p) => p.id),
+          species: "DOG",
+        });
+      } catch {
+        /* e.g. network — community check-in may still have succeeded */
+      }
+
       setParkCheckins((prev) => ({ ...prev, [park.id]: true }));
-      showGlobalAlertCompat(copy("checkedInLocal"), copy("checkedInLocalDesc"));
+
+      if (beacon) {
+        setMyBeaconId(beacon.id);
+        setBeacons((prev) => [beacon, ...prev]);
+        showGlobalAlertCompat(copy("checkedIn"), copy("checkedInDesc"));
+      } else if (communityOk) {
+        setMyBeaconId(`park:${park.id}`);
+        showGlobalAlertCompat(copy("checkedIn"), copy("checkedInDesc"));
+      } else {
+        setMyBeaconId(`local-beacon-${park.id}`);
+        showGlobalAlertCompat(copy("checkedInLocal"), copy("checkedInLocalDesc"));
+      }
     } finally {
       setCheckingInPark(null);
     }
@@ -1951,7 +2084,11 @@ export function CommunityScreen() {
     setMyBeaconId(null);
     setParkCheckins({});
     try {
-      if (!id.startsWith("local-")) await palsApi.endBeacon(id);
+      const isPalsBeaconGuid =
+        !id.startsWith("local-") &&
+        !id.startsWith("park:") &&
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+      if (isPalsBeaconGuid) await palsApi.endBeacon(id);
       try {
         await communityApi.endParkCheckIn();
       } catch {
@@ -2080,138 +2217,148 @@ export function CommunityScreen() {
     );
   }
 
-  const renderTopTabs = () => (
-    <View style={{ flexGrow: 0, flexShrink: 0 }}>
-      <View
-        style={{
-          flexDirection: appRowDirection,
-          alignItems: "center",
-          gap: 8,
-          paddingHorizontal: 12,
-          paddingBottom: 6,
-        }}
-      >
-        <View style={{ flexShrink: 0, maxWidth: windowWidth * 0.52, minWidth: 0 }}>
-          <CommunityDashboard
-            t={t}
-            rtlText={rtlText}
-            rowDirection={rowDirectionForAppLayout(isRTL)}
-            activeDogsNearby={dashboardActiveDogs}
-            upcomingMeetups={upcomingMeetupsPreview}
-            apiUpcomingMeetupCount={communityDashboard?.upcomingMeetups ?? null}
-            openQuestionsCount={dashboardOpenQuestions}
-            activeParksCount={dashboardActiveParks}
-            sosCount={dashboardSos}
-            onPressMeetups={() => setMainTab("playdates")}
-            onPressParks={() => setMainTab("parks")}
-            onPressQuestions={() => setMainTab("qa")}
-            onPressSos={() => setMainTab("lostSos")}
-          />
-        </View>
-        <Pressable
-          onPress={() => setCommunitySearchOpen(true)}
-          hitSlop={10}
-          style={{
-            flex: 1,
-            minWidth: 0,
-            flexDirection: appRowDirection,
-            alignItems: "center",
-            gap: 8,
-            backgroundColor: colors.surfaceSecondary,
-            paddingHorizontal: 14,
-            paddingVertical: 10,
-            borderRadius: 12,
-            borderWidth: 1,
-            borderColor: colors.borderLight,
-          }}
-        >
-          <Ionicons name="search" size={18} color={colors.text} />
-          <Text
-            style={{ flexShrink: 1, fontSize: 13, fontWeight: "700", color: colors.textMuted }}
-            numberOfLines={1}
-          >
-            {t("cm_search_title")}
-          </Text>
-        </Pressable>
-      </View>
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        style={[styles.categoryTabsScroll, { flexGrow: 0, flexShrink: 0 }]}
-        contentContainerStyle={[
-          styles.topTabsContent,
-          { flexDirection: appRowDirection },
-        ]}
-      >
-        {(["feed", "playdates", "parks", "groups", "qa", "events", "lostSos"] as MainTab[]).map((tab) => {
-          const active = mainTab === tab;
-          const label =
-            tab === "feed"
-              ? t("cm_tab_feed")
-              : tab === "playdates"
-                ? t("cm_tab_meetups")
-                : tab === "parks"
-                  ? t("cm_tab_parks")
-                  : tab === "groups"
-                    ? t("cm_tab_groups")
-                    : tab === "qa"
-                      ? t("cm_tab_qa")
-                      : tab === "events"
-                        ? t("cm_tab_events")
-                        : t("cm_tab_lost_sos");
-          const icon =
-            tab === "feed"
-              ? "newspaper-outline"
-              : tab === "playdates"
-                ? "calendar-outline"
-                : tab === "parks"
-                  ? "location-outline"
-                  : tab === "groups"
-                    ? "people-outline"
-                    : tab === "qa"
-                      ? "help-circle-outline"
-                      : tab === "events"
-                        ? "sparkles-outline"
-                        : "warning-outline";
-          return (
-            <Pressable
-              key={tab}
-              onPress={() => setMainTab(tab)}
-              style={styles.topTab}
-            >
-              <View style={[styles.topTabCircle, active ? styles.topTabCircleActive : styles.topTabCircleInactive]}>
-                <Ionicons
-                  name={icon as any}
-                  size={28}
-                  color={active ? colors.textInverse : colors.text}
-                />
-              </View>
-              <Text style={[styles.topTabText, active ? styles.topTabTextActive : undefined]} numberOfLines={2}>
-                {label}
-              </Text>
-            </Pressable>
-          );
-        })}
-      </ScrollView>
-    </View>
-  );
+  const renderTopTabs = () => {
+    const meetupCount =
+      upcomingMeetupsPreview.length > 0
+        ? upcomingMeetupsPreview.length
+        : communityDashboard?.upcomingMeetups ?? 0;
+    const upcomingEventsCount = playdates.filter((e) => new Date(e.scheduledFor).getTime() > Date.now()).length;
 
-  const renderHero = () => (
-    <View style={styles.hero}>
-      <View style={[styles.heroRow, rtlRow]}>
-        <View style={styles.heroIcon}>
-          <Ionicons name="paw" size={24} color={colors.textInverse} />
+    const tabBadge = (tab: MainTab): { value: number; alert?: boolean } | null => {
+      switch (tab) {
+        case "feed":
+          return dashboardActiveDogs > 0 ? { value: dashboardActiveDogs } : null;
+        case "playdates":
+          return meetupCount > 0 ? { value: meetupCount } : null;
+        case "parks":
+          return dashboardActiveParks > 0 ? { value: dashboardActiveParks } : null;
+        case "groups":
+          return groups.length > 0 ? { value: groups.length } : null;
+        case "qa":
+          return dashboardOpenQuestions > 0 ? { value: dashboardOpenQuestions } : null;
+        case "events":
+          return upcomingEventsCount > 0 ? { value: upcomingEventsCount } : null;
+        case "lostSos":
+          return dashboardSos > 0 ? { value: dashboardSos, alert: true } : null;
+        default:
+          return null;
+      }
+    };
+
+    const formatBadge = (n: number) => (n > 99 ? "99+" : String(n));
+
+    return (
+      <View style={{ flexGrow: 0, flexShrink: 0 }}>
+        <View style={{ paddingHorizontal: 16, paddingTop: 2, paddingBottom: 6 }}>
+          <Pressable
+            onPress={() => setCommunitySearchOpen(true)}
+            hitSlop={6}
+            accessibilityRole="button"
+            accessibilityLabel={t("cm_search_title")}
+            style={{
+              width: "100%",
+              flexDirection: appRowDirection,
+              alignItems: "center",
+              gap: 10,
+              backgroundColor: colors.surfaceSecondary,
+              paddingHorizontal: 16,
+              paddingVertical: 12,
+              borderRadius: 14,
+              borderWidth: 1,
+              borderColor: colors.borderLight,
+            }}
+          >
+            <Ionicons name="search" size={20} color={colors.textMuted} />
+            <Text
+              style={[{ flex: 1, minWidth: 0, fontSize: 15, fontWeight: "600", color: colors.textMuted }, rtlText]}
+              numberOfLines={1}
+            >
+              {t("cm_search_placeholder")}
+            </Text>
+          </Pressable>
         </View>
-        <View style={{ flex: 1 }}>
-          <Text style={[styles.heroTitle, rtlText]}>{copy("title")}</Text>
-          <Text style={[styles.heroSubtitle, rtlText]}>{copy("subtitle")}</Text>
-        </View>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={[styles.categoryTabsScroll, { flexGrow: 0, flexShrink: 0 }]}
+          contentContainerStyle={[
+            styles.topTabsContent,
+            { flexDirection: appRowDirection },
+          ]}
+        >
+          {(["feed", "playdates", "parks", "groups", "qa", "events", "lostSos"] as MainTab[]).map((tab) => {
+            const active = mainTab === tab;
+            const label =
+              tab === "feed"
+                ? t("cm_tab_feed")
+                : tab === "playdates"
+                  ? t("cm_tab_meetups")
+                  : tab === "parks"
+                    ? t("cm_tab_parks")
+                    : tab === "groups"
+                      ? t("cm_tab_groups")
+                      : tab === "qa"
+                        ? t("cm_tab_qa")
+                        : tab === "events"
+                          ? t("cm_tab_events")
+                          : t("cm_tab_lost_sos");
+            const icon =
+              tab === "feed"
+                ? "newspaper-outline"
+                : tab === "playdates"
+                  ? "calendar-outline"
+                  : tab === "parks"
+                    ? "location-outline"
+                    : tab === "groups"
+                      ? "people-outline"
+                      : tab === "qa"
+                        ? "help-circle-outline"
+                        : tab === "events"
+                          ? "sparkles-outline"
+                          : "warning-outline";
+            const badge = tabBadge(tab);
+            return (
+              <Pressable
+                key={tab}
+                onPress={() => setMainTab(tab)}
+                style={styles.topTab}
+              >
+                <View style={styles.topTabCircleWrap}>
+                  <View style={[styles.topTabCircle, active ? styles.topTabCircleActive : styles.topTabCircleInactive]}>
+                    <Ionicons
+                      name={icon as any}
+                      size={28}
+                      color={active ? colors.textInverse : colors.text}
+                    />
+                  </View>
+                  {badge ? (
+                    <View
+                      style={[
+                        styles.topTabBadge,
+                        isRTL ? { left: -2 } : { right: -2 },
+                        {
+                          borderColor: active ? "rgba(255,255,255,0.92)" : colors.surface,
+                          minWidth: badge.value > 99 ? 26 : 18,
+                        },
+                        badge.alert ? styles.topTabBadgeAlert : { backgroundColor: colors.primary },
+                      ]}
+                    >
+                      <Text style={[styles.topTabBadgeText, { color: colors.textInverse }]} numberOfLines={1}>
+                        {formatBadge(badge.value)}
+                      </Text>
+                    </View>
+                  ) : null}
+                </View>
+                <Text style={[styles.topTabText, active ? styles.topTabTextActive : undefined]} numberOfLines={2}>
+                  {label}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </ScrollView>
       </View>
-      <Text style={[styles.privacyNote, rtlText]}>
-        {copy("privacy")}
-      </Text>
-    </View>
-  );
+    );
+  };
 
   const renderFeedHeaderWithoutHero = () => (
     <>
@@ -2600,45 +2747,72 @@ export function CommunityScreen() {
     </ScrollView>
   );
 
-  const renderGroups = () => (
-    <View style={{ flex: 1 }}>
-      <SectionHeader
-        title={copy("groupsTitle")}
-        subtitle={copy("groupsSub")}
-        actionLabel={isAdmin ? "Create Group" : undefined}
-        onAction={isAdmin ? () => setCreateModalOpen(true) : undefined}
-      />
-      <View style={[styles.searchCard, { flexDirection: appRowDirection }]}>
-        <Ionicons name="search" size={18} color={colors.textMuted} />
-        <TextInput
-          style={[styles.searchInput, rtlInput]}
-          value={groupSearch}
-          onChangeText={setGroupSearch}
-          placeholder={copy("searchGroups")}
-          placeholderTextColor={colors.textMuted}
-        />
+  const renderGroups = () => {
+    const groupsListBottomPad = bottomContentPadding + (isAdmin ? 88 : 0);
+    return (
+      <View style={{ flex: 1, position: "relative" }}>
+        <SectionHeader title={copy("groupsTitle")} subtitle={copy("groupsSub")} />
+        <View style={[styles.searchCard, { flexDirection: appRowDirection }]}>
+          <Ionicons name="search" size={18} color={colors.textMuted} />
+          <TextInput
+            style={[styles.searchInput, rtlInput]}
+            value={groupSearch}
+            onChangeText={setGroupSearch}
+            placeholder={copy("searchGroups")}
+            placeholderTextColor={colors.textMuted}
+          />
+        </View>
+        {groupsLoading && groups.length === 0 ? (
+          <ListSkeleton rows={5} variant="card" />
+        ) : (
+          <FlatList
+            style={{ flex: 1 }}
+            data={filteredGroups}
+            keyExtractor={(item) => item.id}
+            ListEmptyComponent={renderGroupsEmpty}
+            contentContainerStyle={{ paddingBottom: groupsListBottomPad, flexGrow: 1 }}
+            refreshControl={
+              <RefreshControl
+                refreshing={groupsRefreshing}
+                onRefresh={onRefreshGroups}
+                tintColor={colors.text}
+                colors={[colors.text]}
+              />
+            }
+            renderItem={renderGroupCard}
+          />
+        )}
+        {isAdmin ? (
+          <Pressable
+            onPress={() => setCreateModalOpen(true)}
+            accessibilityRole="button"
+            accessibilityLabel={t("createGroup")}
+            style={{
+              position: "absolute",
+              left: 24,
+              bottom: 24 + insets.bottom,
+              zIndex: 100,
+              flexDirection: rowDirectionForAppLayout(isRTL),
+              alignItems: "center",
+              gap: 8,
+              backgroundColor: colors.text,
+              paddingHorizontal: 18,
+              paddingVertical: 14,
+              borderRadius: 18,
+              shadowColor: "#000",
+              shadowOffset: { width: 0, height: 4 },
+              shadowOpacity: 0.25,
+              shadowRadius: 10,
+              elevation: 5,
+            }}
+          >
+            <Ionicons name="add" size={22} color={colors.textInverse} />
+            <Text style={{ color: colors.textInverse, fontSize: 14, fontWeight: "700" }}>{t("createGroup")}</Text>
+          </Pressable>
+        ) : null}
       </View>
-      {groupsLoading && groups.length === 0 ? (
-        <ListSkeleton rows={5} variant="card" />
-      ) : (
-        <FlatList
-          data={filteredGroups}
-          keyExtractor={(item) => item.id}
-          ListEmptyComponent={renderGroupsEmpty}
-          contentContainerStyle={{ paddingBottom: bottomContentPadding }}
-          refreshControl={
-            <RefreshControl
-              refreshing={groupsRefreshing}
-              onRefresh={onRefreshGroups}
-              tintColor={colors.text}
-              colors={[colors.text]}
-            />
-          }
-          renderItem={renderGroupCard}
-        />
-      )}
-    </View>
-  );
+    );
+  };
 
   const renderQuestions = () => (
     <ScrollView
@@ -2760,12 +2934,6 @@ export function CommunityScreen() {
     </View>
   );
 
-  const upcomingMeetupsPreview = useMemo(() => {
-    return [...playdates]
-      .sort((a, b) => new Date(a.scheduledFor).getTime() - new Date(b.scheduledFor).getTime())
-      .slice(0, 5);
-  }, [playdates]);
-
   const renderLostSos = () => (
     <ScrollView
       style={{ flex: 1 }}
@@ -2805,6 +2973,14 @@ export function CommunityScreen() {
               );
               showGlobalAlertCompat(copy("youAreComing"), copy("youAreComingDesc"));
             }}
+            onSosResolved={(postId, resolvedAtIso) => {
+              setPosts((prev) =>
+                prev.map((p) =>
+                  p.id === postId ? { ...p, sosResolvedAt: resolvedAtIso } : p,
+                ),
+              );
+            }}
+            celebrateMarkFoundBurst={burstMarkFoundCelebrate}
             rtlText={rtlText}
             rtlRow={rtlRow}
             isRTL={isRTL}
@@ -2824,7 +3000,6 @@ export function CommunityScreen() {
       <BrandedAppHeader style={{ paddingVertical: 6 }} />
       <View style={{ flex: 1, backgroundColor: colors.surface, overflow: "hidden" }}>
         {renderTopTabs()}
-        {renderHero()}
 
         {mainTab === "feed" ? (        loading && posts.length === 0 ? (
           <ScrollView
@@ -2880,6 +3055,14 @@ export function CommunityScreen() {
                     );
                     showGlobalAlertCompat(copy("youAreComing"), copy("youAreComingDesc"));
                   }}
+                  onSosResolved={(postId, resolvedAtIso) => {
+                    setPosts((prev) =>
+                      prev.map((p) =>
+                        p.id === postId ? { ...p, sosResolvedAt: resolvedAtIso } : p,
+                      ),
+                    );
+                  }}
+                  celebrateMarkFoundBurst={burstMarkFoundCelebrate}
                   rtlText={rtlText}
                   rtlRow={rtlRow}
                   isRTL={isRTL}
@@ -2903,35 +3086,6 @@ export function CommunityScreen() {
         renderQuestions()
       ) : (
         renderEvents()
-      )}
-
-      {/* Admin-only: Create Group FAB */}
-      {mainTab === "groups" && isAdmin && (        <Pressable
-          onPress={() => setCreateModalOpen(true)}
-          style={{
-            position: "absolute",
-            bottom: 100,
-            right: isRTL ? undefined : 20,
-            left: isRTL ? 20 : undefined,
-            flexDirection: rowDirectionForAppLayout(isRTL),
-            alignItems: "center",
-            gap: 8,
-            backgroundColor: colors.text,
-            paddingHorizontal: 18,
-            paddingVertical: 14,
-            borderRadius: 16,
-            shadowColor: colors.shadow,
-            shadowOffset: { width: 0, height: 4 },
-            shadowOpacity: 0.2,
-            shadowRadius: 8,
-            elevation: 6,
-          }}
-        >
-          <Ionicons name="add" size={22} color={colors.textInverse} />
-          <Text style={{ color: colors.textInverse, fontSize: 14, fontWeight: "700" }}>
-            {t("createGroup")}
-          </Text>
-        </Pressable>
       )}
       </View>
 
@@ -3404,6 +3558,10 @@ export function CommunityScreen() {
           </Pressable>
         </Pressable>
       </Modal>
+
+      <View pointerEvents="box-none" style={StyleSheet.absoluteFillObject}>
+        <CelebrationConfettiBurst ref={sosMarkFoundConfettiRef} />
+      </View>
     </SafeAreaView>
   );
 }
@@ -3737,10 +3895,10 @@ const getStyles = (colors: any) =>
       flexShrink: 1,
     },
     topTabsContent: {
-      paddingHorizontal: 20,
-      paddingTop: 12,
-      paddingBottom: 8,
-      gap: 12,
+      paddingHorizontal: 16,
+      paddingTop: 4,
+      paddingBottom: 6,
+      gap: 10,
       alignItems: "flex-start",
     },
     topTab: {
@@ -3748,7 +3906,39 @@ const getStyles = (colors: any) =>
       justifyContent: "flex-start",
       minWidth: 76,
       flexShrink: 0,
-      paddingVertical: 2,
+      paddingVertical: 0,
+    },
+    topTabCircleWrap: {
+      width: 76,
+      height: 76,
+      position: "relative",
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    topTabBadge: {
+      position: "absolute",
+      top: -2,
+      minWidth: 18,
+      height: 18,
+      paddingHorizontal: 4,
+      borderRadius: 10,
+      alignItems: "center",
+      justifyContent: "center",
+      borderWidth: 2,
+      zIndex: 2,
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.12,
+      shadowRadius: 2,
+      elevation: 3,
+    },
+    topTabBadgeAlert: {
+      backgroundColor: colors.warning,
+    },
+    topTabBadgeText: {
+      fontSize: 10,
+      fontWeight: "800",
+      letterSpacing: -0.2,
     },
     topTabCircle: {
       width: 76,
@@ -3773,7 +3963,7 @@ const getStyles = (colors: any) =>
     },
     /** Inactive label — gray; active uses `topTabTextActive` only (never white). */
     topTabText: {
-      marginTop: 10,
+      marginTop: 8,
       fontSize: 13,
       fontWeight: "700",
       color: colors.textSecondary,
@@ -3784,35 +3974,6 @@ const getStyles = (colors: any) =>
     topTabTextActive: {
       color: "#06256F",
       fontWeight: "800",
-    },
-    hero: {
-      marginHorizontal: 16,
-      marginTop: 4,
-      borderRadius: 22,
-      padding: 14,
-      backgroundColor: colors.text,
-      shadowColor: colors.shadow,
-      shadowOffset: { width: 0, height: 10 },
-      shadowOpacity: 0.16,
-      shadowRadius: 22,
-      elevation: 7,
-    },
-    heroRow: { flexDirection: "row", alignItems: "center", gap: 12 },
-    heroTitle: { color: colors.textInverse, fontSize: 25, fontWeight: "900" },
-    heroSubtitle: { color: "rgba(255,255,255,0.84)", fontSize: 13, marginTop: 3, lineHeight: 19 },
-    heroIcon: {
-      width: 48,
-      height: 48,
-      borderRadius: 16,
-      backgroundColor: "rgba(255,255,255,0.16)",
-      alignItems: "center",
-      justifyContent: "center",
-    },
-    privacyNote: {
-      color: "rgba(255,255,255,0.72)",
-      fontSize: 12,
-      marginTop: 10,
-      lineHeight: 18,
     },
     searchCard: {
       flexDirection: "row",
@@ -4380,5 +4541,29 @@ const getStyles = (colors: any) =>
       flex: 1,
       alignItems: "center",
       justifyContent: "center",
+    },
+    sosMarkFoundWrap: {
+      marginTop: 14,
+      alignSelf: "stretch",
+    },
+    sosMarkFoundFullBtn: {
+      width: "100%",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 10,
+      backgroundColor: "#22c55e",
+      paddingVertical: 14,
+      paddingHorizontal: 16,
+      borderRadius: 12,
+      minHeight: 52,
+    },
+    sosMarkFoundFullBtnDisabled: {
+      opacity: 0.65,
+    },
+    sosMarkFoundFullBtnText: {
+      color: "#fff",
+      fontSize: 17,
+      fontWeight: "800",
+      flexShrink: 1,
     },
   });

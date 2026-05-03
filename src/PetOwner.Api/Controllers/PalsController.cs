@@ -242,10 +242,7 @@ public class PalsController : ControllerBase
         if (myPets.Count == 0)
             return Conflict(new { code = "NoPetOnProfile", message = "Add a pet before starting a beacon." });
 
-        var prefs = await _db.PlaydatePrefs.FirstOrDefaultAsync(p => p.UserId == meId);
-        if (prefs is null || !prefs.OptedIn)
-            return Forbid();
-
+        // Beacons are used from Community (dog-park check-in) as well as Pals — do not require PlaydatePrefs.OptedIn here.
         var requestedIds = dto.PetIds.Distinct().ToHashSet();
         if (requestedIds.Count == 0 || !requestedIds.All(id => myPets.Any(p => p.Id == id)))
             return BadRequest(new { message = "Invalid pet selection." });
@@ -303,15 +300,14 @@ public class PalsController : ControllerBase
         if (me.PetCount == 0)
             return Conflict(new { code = "NoPetOnProfile", message = "Add a pet to use Pals." });
 
-        if (me.Prefs is null || !me.Prefs.OptedIn)
-            return Forbid();
-
         if (me.Location?.GeoLocation is null)
             return Conflict(new { code = "LocationRequired", message = "Set your location first." });
 
         var meLat = me.Location.GeoLocation.Y;
         var meLng = me.Location.GeoLocation.X;
-        var maxKm = Math.Clamp(radiusKm ?? me.Prefs.MaxDistanceKm, 1, 50);
+        var prefsRadiusKm = me.Prefs?.MaxDistanceKm;
+        var defaultRadiusKm = prefsRadiusKm is >= 1 and <= 50 ? prefsRadiusKm.Value : 15;
+        var maxKm = Math.Clamp(radiusKm ?? defaultRadiusKm, 1, 50);
         var (latDiff, lngDiff) = BoundingBox(meLat, maxKm);
         var now = DateTime.UtcNow;
 

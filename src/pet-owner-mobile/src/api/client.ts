@@ -87,6 +87,7 @@ import type {
   EarningsSparklineDto,
   StatRange,
   PlaydateMapPinDto,
+  DogParkDto,
 } from "../types/api";
 
 const apiClient = axios.create({
@@ -200,6 +201,10 @@ export const mapApi = {
   getServiceTypes: () =>
     apiClient
       .get<string[]>("/map/service-types", { backgroundRequest: true })
+      .then((r) => r.data),
+  fetchDogParks: (signal?: AbortSignal) =>
+    apiClient
+      .get<DogParkDto[]>("/parks", { signal, backgroundRequest: true })
       .then((r) => r.data),
   getProviderProfile: (providerId: string) =>
     apiClient
@@ -405,6 +410,8 @@ export const postsApi = {
         },
       })
       .then((r) => r.data),
+  getPost: (id: string) =>
+    apiClient.get<PostDto>(`/posts/${id}`).then((r) => r.data),
   create: (data: CreatePostDto) =>
     apiClient.post<PostDto>("/posts", data).then((r) => r.data),
   deletePost: (id: string) => apiClient.delete(`/posts/${id}`),

@@ -116,9 +116,11 @@ export function editCommentInTree(
 
 /** Count how many comments a deletion removes (1 + replies count). */
 export function countSubtree(tree: CommentDto[], id: string): number {
-  for (const c of tree) {
-    if (c.id === id) return 1 + c.replies.length;
-    for (const r of c.replies) {
+  const roots = Array.isArray(tree) ? tree : [];
+  for (const c of roots) {
+    const replies = Array.isArray(c.replies) ? c.replies : [];
+    if (c.id === id) return 1 + replies.length;
+    for (const r of replies) {
       if (r.id === id) return 1;
     }
   }

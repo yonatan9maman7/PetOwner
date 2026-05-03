@@ -31,6 +31,20 @@ import {
   parseMentions,
 } from "./commentTree";
 
+/** API may return null/undefined or items missing `replies`; keep the tree safe for array ops. */
+function normalizeCommentsFromApi(data: unknown): CommentDto[] {
+  if (!Array.isArray(data)) return [];
+  return (data as CommentDto[]).map((c) => ({
+    ...c,
+    replies: Array.isArray(c.replies)
+      ? c.replies.map((r) => ({
+          ...r,
+          replies: Array.isArray(r.replies) ? r.replies : [],
+        }))
+      : [],
+  }));
+}
+
 function relativeTime(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime();
   const mins = Math.floor(diff / 60_000);
@@ -90,8 +104,10 @@ export function CommentsBottomSheet({
     setLoading(true);
     try {
       const data = await postsApi.getComments(postId);
-      setComments(data);
-    } catch {}
+      setComments(normalizeCommentsFromApi(data));
+    } catch {
+      setComments([]);
+    }
     setLoading(false);
   }, [postId]);
 
@@ -113,7 +129,11 @@ export function CommentsBottomSheet({
     }
   }, [replyTarget]);
 
-  const totalCount = comments.reduce((n, c) => n + 1 + c.replies.length, 0);
+  const rootComments = Array.isArray(comments) ? comments : [];
+  const totalCount = rootComments.reduce(
+    (n, c) => n + 1 + (Array.isArray(c.replies) ? c.replies.length : 0),
+    0,
+  );
 
   // ── Submit ──────────────────────────────────────────────────────────────────
 
@@ -198,7 +218,7 @@ export function CommentsBottomSheet({
         text: t("deletePet"),
         style: "destructive",
         onPress: async () => {
-          const delta = countSubtree(comments, comment.id);
+          const delta = countSubtree(rootComments, comment.id);
           setComments((prev) => removeCommentFromTree(prev, comment.id));
           onCommentCountChange(-delta);
           try {
@@ -368,9 +388,10 @@ export function CommentsBottomSheet({
     | { kind: "reply"; comment: CommentDto; isReply: true };
 
   const listData: ListItem[] = [];
-  for (const c of comments) {
+  for (const c of rootComments) {
     listData.push({ kind: "comment", comment: c, isReply: false });
-    for (const r of c.replies) {
+    const replies = Array.isArray(c.replies) ? c.replies : [];
+    for (const r of replies) {
       listData.push({ kind: "reply", comment: r, isReply: true });
     }
   }

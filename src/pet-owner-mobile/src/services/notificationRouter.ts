@@ -68,6 +68,28 @@ export function routeForNotification(nav: Nav, payload: TapPayload): void {
       break;
 
     case "SOS_ALERT":
+      if (payload.relatedEntityId) {
+        navigate("Community", {
+          screen: "CommunityMain",
+          params: { focusPostId: payload.relatedEntityId },
+        });
+      } else {
+        navigate("Community");
+      }
+      break;
+
+    case "sos":
+    case "sos_resolved":
+      if (payload.relatedEntityId) {
+        navigate("Community", {
+          screen: "CommunityMain",
+          params: { focusPostId: payload.relatedEntityId },
+        });
+      } else {
+        navigate("Community");
+      }
+      break;
+
     case "VACCINE_DUE":
       navigate("MyPets");
       break;

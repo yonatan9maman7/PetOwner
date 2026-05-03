@@ -80,6 +80,19 @@ export function NotificationsScreen() {
         case "RequestAccepted":
           navigation.navigate("MyBookings", { tab: "outgoing" });
           break;
+        case "sos":
+        case "sos_resolved": {
+          const postId = n.relatedEntityId;
+          if (!postId) break;
+          const tabNav = navigation.getParent?.();
+          if (tabNav) {
+            tabNav.navigate("Community", {
+              screen: "CommunityMain",
+              params: { focusPostId: postId },
+            });
+          }
+          break;
+        }
       }
     },
     [markRead, navigation],

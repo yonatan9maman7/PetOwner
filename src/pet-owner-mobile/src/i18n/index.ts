@@ -424,6 +424,9 @@ const he = {
   tapMapToMark: "הקש/י על המפה לסמן את המיקום האחרון",
   reportLostMapBtn: "דיווח על חיית מחמד אבודה",
   markFoundBtn: "סמן כנמצא",
+  sosMarkFoundCloseReport: "החיה נמצאה! סגור דיווח",
+  petLostActiveBanner:
+    "חיית המחמד מסומנת כאבודה. סמנו כנמצא כדי לסגור את הדיווח ולעדכן את הקהילה.",
 
   noMessages: "אין הודעות עדיין",
   noMessagesSubtitle: "שלח הודעה למטפל כדי להתחיל",
@@ -1719,6 +1722,9 @@ const en: Record<keyof typeof he, string> = {
   tapMapToMark: "Tap the map to mark last seen location",
   reportLostMapBtn: "Report a lost pet",
   markFoundBtn: "Mark as found",
+  sosMarkFoundCloseReport: "Pet found — close report",
+  petLostActiveBanner:
+    "This pet is marked as lost. Mark as found to close the report and update the community.",
 
   noMessages: "No messages yet",
   noMessagesSubtitle: "Send a message to a caretaker to get started",

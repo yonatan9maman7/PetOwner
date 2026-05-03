@@ -129,6 +129,41 @@ public class PostsController : ControllerBase
         return Ok(postsNormal);
     }
 
+    [HttpGet("{id:guid}")]
+    public async Task<IActionResult> GetById(Guid id)
+    {
+        var userId = GetUserId();
+
+        var dto = await _db.Posts
+            .AsNoTracking()
+            .Where(p => p.Id == id)
+            .Select(p => new PostDto(
+                p.Id,
+                p.UserId,
+                p.IsAnonymous ? "Anonymous" : p.User.Name,
+                p.Content,
+                p.ImageUrl,
+                p.LikeCount,
+                p.CommentCount,
+                p.HelpfulCount,
+                p.Likes.Any(l => l.UserId == userId),
+                p.HelpfulMarks.Any(h => h.UserId == userId),
+                p.SavedByUsers.Any(s => s.UserId == userId),
+                p.CreatedAt,
+                p.User.Role,
+                p.User.ProviderProfile != null && p.User.ProviderProfile.Status == ProviderStatus.Approved,
+                p.Category,
+                p.Title,
+                p.RelatedPetId,
+                p.RelatedPet != null ? p.RelatedPet.Name : null,
+                p.RelatedPet != null ? p.RelatedPet.ImageUrl : null,
+                p.SosResolvedAt,
+                p.IsAnonymous))
+            .FirstOrDefaultAsync();
+
+        return dto is null ? NotFound(new { message = "Post not found." }) : Ok(dto);
+    }
+
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] CreatePostDto dto)
     {

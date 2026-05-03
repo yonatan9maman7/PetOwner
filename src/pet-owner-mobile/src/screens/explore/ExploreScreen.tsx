@@ -34,8 +34,16 @@ import { useFavoritesStore } from "../../store/favoritesStore";
 import { useTheme } from "../../theme/ThemeContext";
 import { DatePickerField } from "../../components/DatePickerField";
 import { TimePickerField } from "../../components/TimePickerField";
-import { mapApi } from "../../api/client";
-import { ProviderType, type MapPinDto, type MapSearchFilters, type PlaydateMapPinDto } from "../../types/api";
+import { mapApi, communityApi, palsApi } from "../../api/client";
+import {
+  ProviderType,
+  PetSpecies,
+  type DogParkDto,
+  type MapPinDto,
+  type MapSearchFilters,
+  type PlaydateMapPinDto,
+} from "../../types/api";
+import { showGlobalAlertCompat } from "../../components/global-modal";
 import { MapViewWrapper, MarkerWrapper, CircleWrapper } from "../../components/MapViewWrapper";
 import { groupPinsForMapMarkers, sortMarkerItemsStable } from "./mapCollision";
 import {
@@ -180,6 +188,7 @@ export function ExploreScreen() {
   const insets = useSafeAreaInsets();
   const isLoggedIn = useAuthStore((s) => s.isLoggedIn);
   const hasPets = usePetsStore((s) => s.pets.length > 0);
+  const pets = usePetsStore((s) => s.pets);
   const favoriteIds = useFavoritesStore((s) => s.ids);
   const toggleFavorite = useFavoritesStore((s) => s.toggle);
 
@@ -236,6 +245,15 @@ export function ExploreScreen() {
   const [selectedPlaydate, setSelectedPlaydate] = useState<PlaydateMapPinDto | null>(null);
   const playdateAbortRef = useRef<AbortController | null>(null);
 
+  /* Dog parks catalog (GET /api/parks) — fetched once, not on map pan */
+  const [dogParks, setDogParks] = useState<DogParkDto[]>([]);
+  const dogParksFetchGenRef = useRef(0);
+  const dogParksAbortRef = useRef<AbortController | null>(null);
+  const [showDogParksOnly, setShowDogParksOnly] = useState(false);
+  const showDogParksOnlyRef = useRef(false);
+  const [selectedDogPark, setSelectedDogPark] = useState<DogParkDto | null>(null);
+  const [dogParkCheckInLoading, setDogParkCheckInLoading] = useState(false);
+
   /* User location */
   const [userLat, setUserLat] = useState<number | null>(null);
   const [userLng, setUserLng] = useState<number | null>(null);
@@ -267,7 +285,8 @@ export function ExploreScreen() {
 
   /* ─── Marker object pool (RecyclerView / view-recycling pattern) ─── */
   const markerPool: MarkerPoolSlot[] = useMemo(() => {
-    const items = sortMarkerItemsStable(groupPinsForMapMarkers(pins));
+    const pinSource = showDogParksOnly ? [] : pins;
+    const items = sortMarkerItemsStable(groupPinsForMapMarkers(pinSource));
 
     let singles = 0;
     let clusters = 0;
@@ -277,7 +296,7 @@ export function ExploreScreen() {
       else { clusters++; clusterPinsTotal += it.pins.length; }
     }
     mapDiag("markerItems.rebuild", {
-      pins: pins.length,
+      pins: pinSource.length,
       total: items.length,
       singles,
       clusters,
@@ -327,7 +346,7 @@ export function ExploreScreen() {
       }
     }
     return pool;
-  }, [pins]);
+  }, [pins, showDogParksOnly]);
 
 
 
@@ -352,8 +371,9 @@ export function ExploreScreen() {
     if (filterRadiusKm) count++;
     if (filterDate && filterTime) count++;
     if (playdateMode) count++;
+    if (showDogParksOnly) count++;
     return count;
-  }, [activeServices, filterMinRating, filterMaxRate, filterRadiusKm, filterDate, filterTime, playdateMode]);
+  }, [activeServices, filterMinRating, filterMaxRate, filterRadiusKm, filterDate, filterTime, playdateMode, showDogParksOnly]);
 
   useFocusEffect(
     useCallback(() => {
@@ -365,6 +385,35 @@ export function ExploreScreen() {
       };
     }, []),
   );
+
+  useEffect(() => {
+    showDogParksOnlyRef.current = showDogParksOnly;
+  }, [showDogParksOnly]);
+
+  /* ─── Dog parks catalog (one fetch per screen mount) ─── */
+  useEffect(() => {
+    const gen = ++dogParksFetchGenRef.current;
+    dogParksAbortRef.current?.abort();
+    const ctrl = new AbortController();
+    dogParksAbortRef.current = ctrl;
+
+    mapApi
+      .fetchDogParks(ctrl.signal)
+      .then((data) => {
+        if (gen !== dogParksFetchGenRef.current) return;
+        if (!exploreScreenFocusedRef.current) return;
+        setDogParks(data);
+      })
+      .catch(() => {
+        if (gen !== dogParksFetchGenRef.current) return;
+        if (!exploreScreenFocusedRef.current) return;
+        setDogParks([]);
+      });
+
+    return () => {
+      ctrl.abort();
+    };
+  }, []);
 
   useEffect(() => {
     mapDiag("selection.change", {
@@ -655,6 +704,7 @@ export function ExploreScreen() {
       if (debounceRef.current) clearTimeout(debounceRef.current);
       if (moveDebounceRef.current) clearTimeout(moveDebounceRef.current);
       pinsAbortRef.current?.abort();
+      dogParksAbortRef.current?.abort();
     };
   }, []);
 
@@ -731,6 +781,7 @@ export function ExploreScreen() {
   /* ─── Search (debounced) ─── */
   const handleSearchSubmit = useCallback(() => {
     setSelectedPin(null);
+    setSelectedDogPark(null);
     setCollocatedChooserPins(null);
     loadPinsRef.current();
   }, []);
@@ -741,6 +792,7 @@ export function ExploreScreen() {
       if (debounceRef.current) clearTimeout(debounceRef.current);
       debounceRef.current = setTimeout(() => {
         setSelectedPin(null);
+        setSelectedDogPark(null);
         setCollocatedChooserPins(null);
         loadPinsRef.current({ silent: true });
       }, 500);
@@ -818,6 +870,10 @@ export function ExploreScreen() {
             mapDiag("region.refetch.suppressed", { seq });
             return;
           }
+          if (showDogParksOnlyRef.current) {
+            mapDiag("region.refetch.skipped-dog-parks-only", { seq });
+            return;
+          }
           setCollocatedChooserPins(null);
           loadPinsRef.current({ silent: true });
         });
@@ -830,6 +886,8 @@ export function ExploreScreen() {
   const applyFilter = useCallback(() => {
     setShowFilterPanel(false);
     setSelectedPin(null);
+    setSelectedPlaydate(null);
+    setSelectedDogPark(null);
     setCollocatedChooserPins(null);
     loadPinsRef.current();
   }, []);
@@ -843,8 +901,10 @@ export function ExploreScreen() {
     setFilterTime("");
     setSearchText("");
     setPlaydateMode(false);
+    setShowDogParksOnly(false);
     setSelectedPin(null);
     setSelectedPlaydate(null);
+    setSelectedDogPark(null);
     setCollocatedChooserPins(null);
     setTimeout(() => loadPinsRef.current(), 0);
   }, []);
@@ -899,13 +959,96 @@ export function ExploreScreen() {
     Keyboard.dismiss();
     if (!markerJustTappedRef.current) {
       setSelectedPin(null);
+      setSelectedDogPark(null);
       setCollocatedChooserPins(null);
     }
   }, []);
 
-  const bottomActionOffset = selectedPin ? 132 : 16;
-  const locationButtonOffset = selectedPin ? 194 : 78;
+  const hasBottomOverlay = Boolean(selectedPin || selectedPlaydate || selectedDogPark);
+  const bottomActionOffset = hasBottomOverlay ? 132 : 16;
+  const locationButtonOffset = hasBottomOverlay ? 194 : 78;
   const selectedPinCardOffset = 16;
+
+  const openDogParkNavigation = useCallback((park: DogParkDto) => {
+    const lat = park.latitude;
+    const lng = park.longitude;
+    const waze = `https://waze.com/ul?ll=${lat},${lng}&navigate=yes`;
+    const gmaps = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`;
+    Linking.openURL(waze).catch(() => {
+      void Linking.openURL(gmaps);
+    });
+  }, []);
+
+  const handleDogParkCheckIn = useCallback(
+    async (park: DogParkDto) => {
+      if (!isLoggedIn) {
+        navigation.navigate("Login");
+        return;
+      }
+      if (!hasPets) {
+        navigation.getParent()?.navigate("MyPets");
+        return;
+      }
+      setDogParkCheckInLoading(true);
+      try {
+        const dogPets = pets.filter((p) => p.species === PetSpecies.Dog);
+        const petIdsForBeacon =
+          dogPets.length > 0 ? dogPets.map((p) => p.id) : pets.map((p) => p.id);
+        const primaryPet = dogPets[0] ?? pets[0];
+
+        let communityOk = false;
+        try {
+          await communityApi.startParkCheckIn({
+            placeId: park.id,
+            placeName: park.name,
+            latitude: park.latitude,
+            longitude: park.longitude,
+            petId: primaryPet?.id,
+            durationMinutes: 75,
+          });
+          communityOk = true;
+        } catch {
+          /* continue to beacon */
+        }
+
+        let beaconOk = false;
+        try {
+          await palsApi.startBeacon({
+            placeName: park.name,
+            latitude: park.latitude,
+            longitude: park.longitude,
+            city: isRTL ? "תל אביב" : "Tel Aviv",
+            durationMinutes: 60,
+            petIds: petIdsForBeacon,
+            species: "DOG",
+          });
+          beaconOk = true;
+        } catch {
+          /* ignore */
+        }
+
+        if (beaconOk || communityOk) {
+          showGlobalAlertCompat(
+            isRTL ? "צ'ק-אין" : "Check-in",
+            isRTL ? "הצ'ק-אין נרשם בהצלחה." : "Your check-in was saved.",
+          );
+        } else {
+          showApiErrorToast(
+            {
+              message: t("genericErrorDesc"),
+              isConnectivityError: false,
+              isAuthError: false,
+              isServerError: false,
+            },
+            { title: t("genericErrorTitle") },
+          );
+        }
+      } finally {
+        setDogParkCheckInLoading(false);
+      }
+    },
+    [hasPets, isLoggedIn, navigation, pets, isRTL, t],
+  );
 
   /* ═════════════════════ RENDER ═════════════════════ */
 
@@ -956,23 +1099,52 @@ export function ExploreScreen() {
             </MarkerWrapper>
           </>
         )}
-        <ExploreMapMarkers
-          pool={markerPool}
-          onPressProviderId={onPressProviderMarkerId}
-          onPressClusterPins={openCollocatedChooser}
-        />
+        {!showDogParksOnly && (
+          <ExploreMapMarkers
+            pool={markerPool}
+            onPressProviderId={onPressProviderMarkerId}
+            onPressClusterPins={openCollocatedChooser}
+          />
+        )}
         {/*
          * Overlay marker for the selected pin — rendered AFTER the base marker set so
          * the dark-paw annotation sits on top. Using a separate <Marker> (instead of
          * flipping a prop on the base paw) means MapKit only sees a clean
          * add / remove when selection changes, not a property update mid-gesture.
          */}
-        <ExploreSelectedMarkerOverlay
-          providerId={selectedPin?.providerId ?? null}
-          latitude={selectedPin?.latitude ?? null}
-          longitude={selectedPin?.longitude ?? null}
-        />
-        {playdateMode && playdatePins.map((pd) => (
+        {!showDogParksOnly && (
+          <ExploreSelectedMarkerOverlay
+            providerId={selectedPin?.providerId ?? null}
+            latitude={selectedPin?.latitude ?? null}
+            longitude={selectedPin?.longitude ?? null}
+          />
+        )}
+        {showDogParksOnly &&
+          dogParks.map((park) => (
+            <MarkerWrapper
+              key={park.id}
+              coordinate={{ latitude: park.latitude, longitude: park.longitude }}
+              tracksViewChanges={false}
+              zIndex={400}
+              onPress={() => {
+                suppressViewportFetchAfterMarkerMsRef.current =
+                  Date.now() + MARKER_TAP_VIEWPORT_SUPPRESS_MS;
+                markerJustTappedRef.current = true;
+                setTimeout(() => {
+                  markerJustTappedRef.current = false;
+                }, 300);
+                setSelectedDogPark(park);
+                setSelectedPin(null);
+                setSelectedPlaydate(null);
+                setCollocatedChooserPins(null);
+              }}
+            >
+              <View style={styles.dogParkMarkerOuter}>
+                <Ionicons name="leaf" size={16} color="#fff" />
+              </View>
+            </MarkerWrapper>
+          ))}
+        {playdateMode && !showDogParksOnly && playdatePins.map((pd) => (
           <MarkerWrapper
             key={pd.eventId}
             coordinate={{ latitude: pd.latitude, longitude: pd.longitude }}
@@ -1125,6 +1297,29 @@ export function ExploreScreen() {
               </View>
             </View>
           )}
+          {showDogParksOnly && (
+            <View style={{ paddingTop: 10 }}>
+              <View
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  alignSelf: "flex-start",
+                  backgroundColor: "#16a34a",
+                  borderRadius: 16,
+                  paddingLeft: 10,
+                  paddingRight: 6,
+                  paddingVertical: 5,
+                  gap: 4,
+                }}
+              >
+                <Ionicons name="leaf" size={12} color="#fff" />
+                <Text style={{ fontSize: 11, fontWeight: "700", color: "#fff" }}>גינות כלבים</Text>
+                <Pressable onPress={() => setShowDogParksOnly(false)} hitSlop={6}>
+                  <Ionicons name="close-circle" size={14} color="#fff" />
+                </Pressable>
+              </View>
+            </View>
+          )}
           {activeServices.size > 0 && (
             <ScrollView
               horizontal
@@ -1176,7 +1371,7 @@ export function ExploreScreen() {
       )}
 
       {/* Empty state */}
-      {!loading && pins.length === 0 && (
+      {!loading && !showDogParksOnly && pins.length === 0 && (
         <View style={styles.emptyOverlay}>
           <View
             className="rounded-2xl px-8 py-6 items-center"
@@ -1185,6 +1380,20 @@ export function ExploreScreen() {
             <Ionicons name="search-outline" size={40} color={colors.textMuted} />
             <Text className="text-base font-semibold mt-3" style={{ color: colors.textSecondary }}>
               {t("noProviders")}
+            </Text>
+          </View>
+        </View>
+      )}
+
+      {showDogParksOnly && dogParks.length === 0 && (
+        <View style={styles.emptyOverlay} pointerEvents="none">
+          <View
+            className="rounded-2xl px-8 py-6 items-center"
+            style={[styles.emptyCard, { backgroundColor: colors.surface, shadowColor: colors.shadow }]}
+          >
+            <Ionicons name="leaf-outline" size={40} color="#16a34a" />
+            <Text className="text-base font-semibold mt-3" style={{ color: colors.textSecondary, textAlign: "center" }}>
+              {isRTL ? "אין גינות כלבים זמינות מהשרת." : "No dog parks returned from the server."}
             </Text>
           </View>
         </View>
@@ -1339,7 +1548,7 @@ export function ExploreScreen() {
       </Pressable>
 
       {/* Selected pin card */}
-      {selectedPin && (
+      {selectedPin && !showDogParksOnly && (
         <View
           className="absolute left-0 right-0"
           style={{ bottom: selectedPinCardOffset, zIndex: 20, paddingHorizontal: BRAND_HEADER_HORIZONTAL_PAD }}
@@ -1462,7 +1671,7 @@ export function ExploreScreen() {
       )}
 
       {/* Selected playdate card */}
-      {selectedPlaydate && (
+      {selectedPlaydate && !showDogParksOnly && (
         <View
           className="absolute left-0 right-0"
           style={{ bottom: 110, zIndex: 20, paddingHorizontal: BRAND_HEADER_HORIZONTAL_PAD }}
@@ -1524,6 +1733,110 @@ export function ExploreScreen() {
                 {t("viewProfile")}
               </Text>
             </Pressable>
+          </View>
+        </View>
+      )}
+
+      {/* Selected dog park — bottom card (no navigation to profile) */}
+      {selectedDogPark && showDogParksOnly && (
+        <View
+          className="absolute left-0 right-0"
+          style={{ bottom: selectedPinCardOffset, zIndex: 20, paddingHorizontal: BRAND_HEADER_HORIZONTAL_PAD }}
+        >
+          <View
+            className="p-4 rounded-xl"
+            style={[styles.sitterCard, { backgroundColor: colors.surface, shadowColor: colors.shadow }]}
+          >
+            <View
+              style={{
+                flexDirection: rowDirectionForAppLayout(isRTL),
+                alignItems: "center",
+                justifyContent: "space-between",
+                marginBottom: 8,
+              }}
+            >
+              <View style={{ flexDirection: rowDirectionForAppLayout(isRTL), alignItems: "center", gap: 8 }}>
+                <View
+                  style={{
+                    width: 40,
+                    height: 40,
+                    borderRadius: 20,
+                    backgroundColor: "#16a34a",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
+                  <Ionicons name="leaf" size={22} color="#fff" />
+                </View>
+                <Text style={{ fontSize: 12, fontWeight: "700", color: "#16a34a" }}>גינות כלבים</Text>
+              </View>
+              <Pressable onPress={() => setSelectedDogPark(null)} hitSlop={8}>
+                <Ionicons name="close" size={22} color={colors.textMuted} />
+              </Pressable>
+            </View>
+            <Text
+              style={{
+                fontSize: 18,
+                fontWeight: "800",
+                color: colors.text,
+                textAlign: isRTL ? "right" : "left",
+              }}
+              numberOfLines={2}
+            >
+              {selectedDogPark.name}
+            </Text>
+            <Text
+              style={{
+                fontSize: 14,
+                color: colors.textSecondary,
+                marginTop: 4,
+                textAlign: isRTL ? "right" : "left",
+              }}
+              numberOfLines={3}
+            >
+              {selectedDogPark.address}
+            </Text>
+            <View
+              style={{
+                marginTop: 14,
+                flexDirection: rowDirectionForAppLayout(isRTL),
+                gap: 10,
+              }}
+            >
+              <Pressable
+                onPress={() => openDogParkNavigation(selectedDogPark)}
+                style={{
+                  flex: 1,
+                  paddingVertical: 12,
+                  borderRadius: 12,
+                  borderWidth: 1.5,
+                  borderColor: colors.border,
+                  alignItems: "center",
+                }}
+              >
+                <Text style={{ fontSize: 14, fontWeight: "700", color: colors.text }}>נווט</Text>
+              </Pressable>
+              <Pressable
+                onPress={() => void handleDogParkCheckIn(selectedDogPark)}
+                disabled={dogParkCheckInLoading}
+                style={{
+                  flex: 1,
+                  paddingVertical: 12,
+                  borderRadius: 12,
+                  backgroundColor: "#16a34a",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  minHeight: 46,
+                  opacity: dogParkCheckInLoading ? 0.65 : 1,
+                }}
+              >
+                {dogParkCheckInLoading ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <Text style={{ fontSize: 14, fontWeight: "700", color: "#fff" }}>צ'ק-אין</Text>
+                )}
+              </Pressable>
+            </View>
           </View>
         </View>
       )}
@@ -1873,7 +2186,10 @@ export function ExploreScreen() {
               {/* ── Play with a Pal toggle ── */}
               <View>
                 <Pressable
-                  onPress={() => setPlaydateMode((prev) => !prev)}
+                  onPress={() => {
+                    setShowDogParksOnly(false);
+                    setPlaydateMode((prev) => !prev);
+                  }}
                   style={{
                     flexDirection: rowDirectionForAppLayout(isRTL),
                     alignItems: "center",
@@ -1894,6 +2210,41 @@ export function ExploreScreen() {
                   {playdateMode && (
                     <Ionicons name="checkmark-circle" size={16} color={colors.textInverse} />
                   )}
+                </Pressable>
+              </View>
+
+              {/* ── Dog parks map layer ── */}
+              <View>
+                <Pressable
+                  onPress={() => {
+                    setPlaydateMode(false);
+                    setShowDogParksOnly((prev) => !prev);
+                  }}
+                  style={{
+                    flexDirection: rowDirectionForAppLayout(isRTL),
+                    alignItems: "center",
+                    gap: 10,
+                    backgroundColor: showDogParksOnly ? "#16a34a" : colors.surfaceSecondary,
+                    paddingHorizontal: 14,
+                    paddingVertical: 12,
+                    borderRadius: 12,
+                    borderWidth: 1.5,
+                    borderColor: showDogParksOnly ? "#16a34a" : colors.border,
+                  }}
+                >
+                  <Ionicons name="leaf" size={18} color={showDogParksOnly ? "#fff" : "#16a34a"} />
+                  <Text
+                    style={{
+                      fontSize: 13,
+                      fontWeight: "600",
+                      color: showDogParksOnly ? "#fff" : colors.textSecondary,
+                      flex: 1,
+                      textAlign: isRTL ? "right" : "left",
+                    }}
+                  >
+                    גינות כלבים
+                  </Text>
+                  {showDogParksOnly && <Ionicons name="checkmark-circle" size={16} color="#fff" />}
                 </Pressable>
               </View>
 
@@ -2198,6 +2549,17 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     paddingHorizontal: 8,
     paddingVertical: 5,
+    borderWidth: 2,
+    borderColor: "#fff",
+  },
+  /** Dog park pin — no shadow* (same MapKit snapshot caveat as `playdateMarker` / user dot). */
+  dogParkMarkerOuter: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "#16a34a",
+    alignItems: "center",
+    justifyContent: "center",
     borderWidth: 2,
     borderColor: "#fff",
   },
