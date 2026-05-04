@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState, memo, useMemo } from "react";
-import { View, StyleSheet, Text, Platform } from "react-native";
+import { View, StyleSheet, Text } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { MarkerWrapper } from "../../components/MapViewWrapper";
 import type { MapPinDto } from "../../types/api";
@@ -7,86 +7,76 @@ import { mapDiag } from "./exploreMapDiag";
 
 /* ── Constants ──────────────────────────────────────────────────────────── */
 
-/**
- * Coordinate used for recycled (inactive) pool slots. The marker is always
- * mounted in the native map but parked at the South Pole where no user will
- * ever scroll. This avoids `removeAnnotation` entirely.
- */
 export const OFFSCREEN_COORDINATE = { latitude: -90, longitude: 0 } as const;
 
-const ANCHOR_CENTER_BOTTOM = { x: 0.5, y: 1 } as const;
+const ANCHOR_CENTER = { x: 0.5, y: 0.5 } as const;
 const MARKER_Z_INDEX = 1;
 const SELECTED_MARKER_Z_INDEX = 1000;
+
+/** Outer snapshot box larger than inner circle — avoids Android squircle clipping. */
+const MARKER_OUTER_SIZE = 50;
+const PAW_INNER_SIZE = 38;
+const PAW_INNER_RADIUS = PAW_INNER_SIZE / 2;
+const ICON_SIZE = 18;
+
+const CLUSTER_OUTER_SIZE = 60;
+const CLUSTER_INNER_SIZE = 44;
+const CLUSTER_INNER_RADIUS = CLUSTER_INNER_SIZE / 2;
+const CLUSTER_ICON_SIZE = 20;
+const TRACKS_TIMEOUT_MS = 1000;
 
 /* ── Styles ─────────────────────────────────────────────────────────────── */
 
 const S = StyleSheet.create({
-  /** Extra horizontal padding + width: Android Google Maps clips custom marker bitmaps to a tight bounds; without slack, the paw circle reads as cut off on the leading edge. */
-  markerRoot: {
-    width: 88,
-    minHeight: 70,
-    paddingHorizontal: 12,
-    alignItems: "center",
+  /** Transparent bounds only — no borderRadius/bg on outer (Android map snapshot). */
+  markerOuter: {
+    width: MARKER_OUTER_SIZE,
+    height: MARKER_OUTER_SIZE,
     backgroundColor: "transparent",
-    overflow: "visible",
-    paddingTop: 6,
-    paddingBottom: 4,
-  },
-  bubble: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: "center",
     justifyContent: "center",
-    borderWidth: 2,
+    alignItems: "center",
+  },
+  bubbleInner: {
+    width: PAW_INNER_SIZE,
+    height: PAW_INNER_SIZE,
+    borderRadius: PAW_INNER_RADIUS,
     backgroundColor: "#ffffff",
-    borderColor: "#e2e2e2",
-    ...Platform.select({
-      android: { elevation: 4 },
-    }),
-  },
-  bubbleSelected: {
-    backgroundColor: "#1a1a2e",
-    borderColor: "#1a1a2e",
-    ...Platform.select({
-      android: { elevation: 8 },
-    }),
-  },
-  arrow: {
-    width: 0,
-    height: 0,
-    marginTop: -1,
-    borderLeftWidth: 6,
-    borderRightWidth: 6,
-    borderTopWidth: 8,
-    borderLeftColor: "transparent",
-    borderRightColor: "transparent",
-    borderTopColor: "#ffffff",
-  },
-  arrowSelected: {
-    borderTopColor: "#1a1a2e",
-  },
-  markerRootCluster: {
-    width: 92,
-    minHeight: 74,
-    paddingHorizontal: 12,
-    alignItems: "center",
-    backgroundColor: "transparent",
-    overflow: "visible",
-    paddingTop: 6,
-    paddingBottom: 4,
-  },
-  clusterWrap: {
-    position: "relative",
-    width: 44,
-    height: 44,
-    alignItems: "center",
     justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 2,
+    borderColor: "#e2e2e2",
+  },
+  bubbleInnerSelected: {
+    width: PAW_INNER_SIZE,
+    height: PAW_INNER_SIZE,
+    borderRadius: PAW_INNER_RADIUS,
+    backgroundColor: "#1a1a2e",
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 2,
+    borderColor: "#1a1a2e",
+  },
+  clusterOuter: {
+    width: CLUSTER_OUTER_SIZE,
+    height: CLUSTER_OUTER_SIZE,
+    backgroundColor: "transparent",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  clusterBubbleInner: {
+    width: CLUSTER_INNER_SIZE,
+    height: CLUSTER_INNER_SIZE,
+    borderRadius: CLUSTER_INNER_RADIUS,
+    backgroundColor: "#ffffff",
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 2,
+    borderColor: "#e2e2e2",
   },
   badge: {
     position: "absolute",
-    top: 0,
-    right: 0,
+    top: 5,
+    right: 5,
     minWidth: 18,
     height: 18,
     borderRadius: 9,
@@ -101,6 +91,14 @@ const S = StyleSheet.create({
     fontSize: 10,
     fontWeight: "800",
     color: "#ffffff",
+  },
+  icon: {
+    width: ICON_SIZE,
+    height: ICON_SIZE,
+  },
+  clusterIcon: {
+    width: CLUSTER_ICON_SIZE,
+    height: CLUSTER_ICON_SIZE,
   },
 });
 
@@ -119,47 +117,33 @@ export type MarkerPoolSlot = {
 
 const PawBubble = memo(function PawBubble() {
   return (
-    <View
-      style={S.markerRoot}
-      {...(Platform.OS === "android" ? { collapsable: false } : {})}
-    >
-      <View style={S.bubble}>
-        <Ionicons name="paw" size={18} color="#1a1a2e" />
+    <View style={S.markerOuter} collapsable={false}>
+      <View style={S.bubbleInner} collapsable={false}>
+        <Ionicons name="paw" size={ICON_SIZE} color="#1a1a2e" style={S.icon} />
       </View>
-      <View style={S.arrow} />
     </View>
   );
 });
 
 const ClusterBubble = memo(function ClusterBubble({ count }: { count: number }) {
   return (
-    <View
-      style={S.markerRootCluster}
-      {...(Platform.OS === "android" ? { collapsable: false } : {})}
-    >
-      <View style={S.clusterWrap}>
-        <View style={S.bubble}>
-          <Ionicons name="paw" size={16} color="#1a1a2e" />
-        </View>
-        <View style={S.badge}>
-          <Text style={S.badgeText}>{count > 99 ? "99+" : count}</Text>
-        </View>
+    <View style={S.clusterOuter} collapsable={false}>
+      <View style={S.clusterBubbleInner} collapsable={false}>
+        <Ionicons name="paw" size={CLUSTER_ICON_SIZE} color="#1a1a2e" style={S.clusterIcon} />
       </View>
-      <View style={S.arrow} />
+      <View style={S.badge}>
+        <Text style={S.badgeText}>{count > 99 ? "99+" : count}</Text>
+      </View>
     </View>
   );
 });
 
 const SelectedPawBubble = memo(function SelectedPawBubble() {
   return (
-    <View
-      style={S.markerRoot}
-      {...(Platform.OS === "android" ? { collapsable: false } : {})}
-    >
-      <View style={[S.bubble, S.bubbleSelected]}>
-        <Ionicons name="paw" size={18} color="#ffffff" />
+    <View style={S.markerOuter} collapsable={false}>
+      <View style={S.bubbleInnerSelected} collapsable={false}>
+        <Ionicons name="paw" size={ICON_SIZE} color="#ffffff" style={S.icon} />
       </View>
-      <View style={[S.arrow, S.arrowSelected]} />
     </View>
   );
 });
@@ -170,18 +154,9 @@ type PooledMarkerProps = {
   slot: MarkerPoolSlot;
   index: number;
   onPressProviderId: (id: string) => void;
-  onPressClusterPins: (pins: MapPinDto[]) => void;
+  onPressClusterPins: (pins: MapPinDto[], coordinate: { latitude: number; longitude: number }) => void;
 };
 
-/**
- * A single recycled marker slot. Keyed by array index so React never
- * unmounts it — only prop updates flow to the native Marker. When the slot
- * is inactive the coordinate is OFFSCREEN_COORDINATE (-90, 0).
- *
- * Both "single" and "offscreen" slots render <PawBubble /> so that the
- * bitmap snapshot is valid for the common offscreen→single transition
- * without needing a re-snapshot. Only cluster visuals differ.
- */
 const PooledMarker = memo(
   function PooledMarker({
     slot,
@@ -189,33 +164,23 @@ const PooledMarker = memo(
     onPressProviderId,
     onPressClusterPins,
   }: PooledMarkerProps) {
-    /*
-     * tracksViewChanges gates when MapKit re-snapshots the CALayer bitmap.
-     * Mount:  true  → captures the Ionicons paw glyph after async font load.
-     * +300ms: false → freezes the bitmap, zero per-frame overhead.
-     *
-     * Visual key tracks the current visual state. When it changes (e.g.
-     * single↔cluster or cluster count change), we re-enable briefly.
-     * offscreen↔single does NOT need a re-snapshot: both render PawBubble.
-     */
     const visualKey = slot.kind === "cluster" ? `c${slot.clusterCount}` : "paw";
     const prevVisualKeyRef = useRef(visualKey);
-    const [tracksViewChanges, setTracksViewChanges] = useState(true);
+    const [isTracking, setIsTracking] = useState(true);
 
     useEffect(() => {
       if (visualKey !== prevVisualKeyRef.current) {
         prevVisualKeyRef.current = visualKey;
-        setTracksViewChanges(true);
+        setIsTracking(true);
       }
     }, [visualKey]);
 
     useEffect(() => {
-      if (!tracksViewChanges) return;
-      const t = setTimeout(() => setTracksViewChanges(false), 300);
+      if (!isTracking) return;
+      const t = setTimeout(() => setIsTracking(false), TRACKS_TIMEOUT_MS);
       return () => clearTimeout(t);
-    }, [tracksViewChanges]);
+    }, [isTracking]);
 
-    /* Stable onPress — reads current slot data from ref at tap time. */
     const slotRef = useRef(slot);
     slotRef.current = slot;
 
@@ -224,7 +189,7 @@ const PooledMarker = memo(
       if (s.kind === "single" && s.providerId) {
         onPressProviderId(s.providerId);
       } else if (s.kind === "cluster" && s.clusterPins) {
-        onPressClusterPins(s.clusterPins);
+        onPressClusterPins(s.clusterPins, s.coordinate);
       }
     }, [onPressProviderId, onPressClusterPins]);
 
@@ -232,8 +197,8 @@ const PooledMarker = memo(
       <MarkerWrapper
         identifier={`pool-${index}`}
         coordinate={slot.coordinate}
-        anchor={ANCHOR_CENTER_BOTTOM}
-        tracksViewChanges={tracksViewChanges}
+        anchor={ANCHOR_CENTER}
+        tracksViewChanges={isTracking}
         onPress={handlePress}
         zIndex={MARKER_Z_INDEX}
       >
@@ -269,7 +234,7 @@ const PooledMarker = memo(
 export type ExploreMapMarkersProps = {
   pool: MarkerPoolSlot[];
   onPressProviderId: (providerId: string) => void;
-  onPressClusterPins: (pins: MapPinDto[]) => void;
+  onPressClusterPins: (pins: MapPinDto[], coordinate: { latitude: number; longitude: number }) => void;
 };
 
 export const ExploreMapMarkers = memo(
@@ -310,12 +275,6 @@ export type ExploreSelectedMarkerOverlayProps = {
   longitude: number | null;
 };
 
-/**
- * Persistent overlay marker for the selected pin's dark-paw visual.
- * Always mounted — never calls addAnnotation/removeAnnotation. When no
- * pin is selected the marker parks at OFFSCREEN_COORDINATE. When a pin
- * is selected it moves to the pin's coordinate via a native prop update.
- */
 export const ExploreSelectedMarkerOverlay = memo(
   function ExploreSelectedMarkerOverlay({
     providerId,
@@ -332,17 +291,17 @@ export const ExploreSelectedMarkerOverlay = memo(
       [isActive, latitude, longitude],
     );
 
-    const [tracksViewChanges, setTracksViewChanges] = useState(true);
+    const [isTracking, setIsTracking] = useState(true);
 
     useEffect(() => {
-      if (isActive) setTracksViewChanges(true);
+      if (isActive) setIsTracking(true);
     }, [isActive]);
 
     useEffect(() => {
-      if (!tracksViewChanges) return;
-      const t = setTimeout(() => setTracksViewChanges(false), 200);
+      if (!isTracking) return;
+      const t = setTimeout(() => setIsTracking(false), TRACKS_TIMEOUT_MS);
       return () => clearTimeout(t);
-    }, [tracksViewChanges]);
+    }, [isTracking]);
 
     useEffect(() => {
       if (isActive) {
@@ -356,8 +315,8 @@ export const ExploreSelectedMarkerOverlay = memo(
       <MarkerWrapper
         identifier="selected-overlay"
         coordinate={coordinate}
-        anchor={ANCHOR_CENTER_BOTTOM}
-        tracksViewChanges={tracksViewChanges}
+        anchor={ANCHOR_CENTER}
+        tracksViewChanges={isTracking}
         zIndex={SELECTED_MARKER_Z_INDEX}
       >
         <SelectedPawBubble />

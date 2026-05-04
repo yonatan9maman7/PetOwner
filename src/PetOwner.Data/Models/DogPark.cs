@@ -4,6 +4,8 @@ namespace PetOwner.Data.Models;
 public class DogPark
 {
     public Guid Id { get; set; }
+    /// <summary>Optional Google Places <c>place_id</c> for sync upserts.</summary>
+    public string? ExternalPlaceId { get; set; }
     public string Name { get; set; } = "";
     public string Address { get; set; } = "";
     public double Latitude { get; set; }

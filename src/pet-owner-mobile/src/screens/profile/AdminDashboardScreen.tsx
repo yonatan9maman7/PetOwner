@@ -9,13 +9,15 @@ import {
   ScrollView,
   Image,
   RefreshControl,
+  Alert,
 } from "react-native";
 import { showGlobalAlertCompat } from "../../components/global-modal";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import axios from "axios";
-import { adminApi } from "../../api/client";
+import { adminApi, mapApi } from "../../api/client";
+import { getNormalizedApiError } from "../../utils/apiUtils";
 import { useTranslation, rowDirectionForAppLayout } from "../../i18n";
 import { formatBreedForDisplay } from "../pets/addPetHelpers";
 import { useTheme } from "../../theme/ThemeContext";
@@ -146,6 +148,7 @@ export function AdminDashboardScreen() {
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [suspendTarget, setSuspendTarget] = useState<AdminUserDto | null>(null);
   const [suspendReason, setSuspendReason] = useState("");
+  const [isSyncingDogParks, setIsSyncingDogParks] = useState(false);
 
   /* ─── Load helpers ─── */
 
@@ -373,6 +376,19 @@ export function AdminDashboardScreen() {
       showGlobalAlertCompat("Error", "Clear failed");
     }
     setActionLoading(null);
+  };
+
+  const syncDogParksFromGoogle = async () => {
+    setIsSyncingDogParks(true);
+    try {
+      await mapApi.syncGoogleDogParks();
+      Alert.alert("הצלחה", "הסנכרון מול גוגל הושלם בהצלחה!");
+    } catch (e: unknown) {
+      const norm = getNormalizedApiError(e);
+      Alert.alert("שגיאה", norm.message || t("genericErrorTitle"));
+    } finally {
+      setIsSyncingDogParks(false);
+    }
   };
 
   /* ─── Tab bar data ─── */
@@ -723,6 +739,101 @@ export function AdminDashboardScreen() {
             color="#8b5cf6"
             colors={colors}
           />
+        </View>
+
+        {/* Dog parks — Google sync (admin) */}
+        <View
+          style={{
+            marginTop: 8,
+            backgroundColor: colors.surface,
+            borderRadius: 16,
+            padding: 18,
+            shadowColor: colors.shadow,
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: 0.06,
+            shadowRadius: 10,
+            elevation: 3,
+            borderWidth: 1,
+            borderColor: colors.border,
+          }}
+        >
+          <View
+            style={{
+              flexDirection: rowDirectionForAppLayout(isRTL),
+              alignItems: "center",
+              gap: 12,
+              marginBottom: 10,
+            }}
+          >
+            <View
+              style={{
+                width: 44,
+                height: 44,
+                borderRadius: 12,
+                backgroundColor: "rgba(22,163,74,0.12)",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <Ionicons name="leaf" size={24} color="#16a34a" />
+            </View>
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Text
+                style={{
+                  fontSize: 16,
+                  fontWeight: "800",
+                  color: colors.text,
+                  textAlign: isRTL ? "right" : "left",
+                }}
+              >
+                ניהול גינות כלבים
+              </Text>
+              <Text
+                style={{
+                  fontSize: 12,
+                  fontWeight: "600",
+                  color: colors.textMuted,
+                  marginTop: 2,
+                  textAlign: isRTL ? "right" : "left",
+                }}
+              >
+                Google Places
+              </Text>
+            </View>
+          </View>
+          <Text
+            style={{
+              fontSize: 13,
+              color: colors.textSecondary,
+              lineHeight: 19,
+              marginBottom: 14,
+              textAlign: isRTL ? "right" : "left",
+            }}
+          >
+            משיכת גינות כלבים מ-Google Places ועדכון הקטלוג בשרת. הפעולה עשויה לקחת מספר שניות.
+          </Text>
+          <Pressable
+            onPress={() => void syncDogParksFromGoogle()}
+            disabled={isSyncingDogParks}
+            style={{
+              flexDirection: rowDirectionForAppLayout(isRTL),
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 10,
+              backgroundColor: "#16a34a",
+              paddingVertical: 14,
+              paddingHorizontal: 16,
+              borderRadius: 14,
+              opacity: isSyncingDogParks ? 0.72 : 1,
+            }}
+          >
+            {isSyncingDogParks ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <Ionicons name="cloud-download-outline" size={20} color="#fff" />
+            )}
+            <Text style={{ fontSize: 15, fontWeight: "800", color: "#fff" }}>סנכרן גינות מגוגל</Text>
+          </Pressable>
         </View>
 
         {/* Developer tools */}

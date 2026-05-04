@@ -16,18 +16,36 @@ function isFiniteCoord(lat: unknown, lng: unknown): boolean {
   return Number.isFinite(la) && Number.isFinite(lo);
 }
 
+function bucketPrecisionForDelta(latitudeDelta: number): number {
+  if (latitudeDelta > 2) return 1;
+  if (latitudeDelta > 0.5) return 2;
+  if (latitudeDelta > 0.1) return 3;
+  return 4;
+}
+
 /**
- * ~11 m bucket so neighbors at the same address (apartment building, plaza, office
- * block) cluster into a single paw with a count badge; tapping the cluster opens the
- * collocated-chooser modal. Precision of 4 decimal places ≈ 11 m at the equator,
- * which matches the real-world "same address" intuition without over-clustering
- * nearby but distinct businesses.
+ * Groups pins into "same-location" clusters using a coordinate bucket whose
+ * precision adapts to the current map zoom (via `latitudeDelta`).
+ *
+ * | latitudeDelta | precision | bucket size |
+ * |---------------|-----------|-------------|
+ * | > 2           | 1         | ~11 km      |
+ * | > 0.5         | 2         | ~1.1 km     |
+ * | > 0.1         | 3         | ~110 m      |
+ * | <= 0.1        | 4 (default)| ~11 m      |
+ *
+ * When `latitudeDelta` is omitted the function defaults to precision 4
+ * (same-address only), preserving the previous behaviour.
  */
-export function groupPinsForMapMarkers(pins: MapPinDto[]): ExploreMapMarkerItem[] {
+export function groupPinsForMapMarkers(
+  pins: MapPinDto[],
+  latitudeDelta?: number,
+): ExploreMapMarkerItem[] {
+  const precision = latitudeDelta != null ? bucketPrecisionForDelta(latitudeDelta) : 4;
   const buckets = new Map<string, MapPinDto[]>();
   for (const p of pins) {
     if (!isFiniteCoord(p.latitude, p.longitude)) continue;
-    const key = `${Number(p.latitude).toFixed(4)},${Number(p.longitude).toFixed(4)}`;
+    const key = `${Number(p.latitude).toFixed(precision)},${Number(p.longitude).toFixed(precision)}`;
     const list = buckets.get(key);
     if (list) list.push(p);
     else buckets.set(key, [p]);

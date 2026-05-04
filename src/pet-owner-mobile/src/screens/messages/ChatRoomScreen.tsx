@@ -12,6 +12,7 @@ import {
 } from "react-native";
 import { showGlobalAlertCompat } from "../../components/global-modal";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useHeaderHeight } from "@react-navigation/elements";
 import { Ionicons } from "@expo/vector-icons";
 import { useChatStore } from "../../store/chatStore";
 import { useAuthStore } from "../../store/authStore";
@@ -23,6 +24,9 @@ import { useKeyboardAvoidingState } from "../../hooks/useKeyboardAvoidingState";
 import type { ChatMessageDto } from "../../types/api";
 
 const READ_RECEIPT_BLUE = "#34B7F1";
+
+/** Matches the in-screen toolbar row below the status bar (`paddingTop: insets.top` + `height: 56`). */
+const CHAT_HEADER_ROW_HEIGHT = 56;
 
 function formatTime(dateStr: string): string {
   const d = new Date(dateStr);
@@ -73,14 +77,26 @@ export function ChatRoomScreen() {
   const [text, setText] = useState("");
   const { keyboardVisible } = useKeyboardAvoidingState();
   const insets = useSafeAreaInsets();
-  const keyboardAvoidBehavior =
-    Platform.OS === "ios" ? ("padding" as const) : undefined;
-  /** When the IME is open, KAV (iOS) / window resize (Android) already lift content — avoid stacking home-indicator padding. */
+  const { bottom: bottomInset } = insets;
+  const navHeaderHeight = useHeaderHeight();
+  /**
+   * Stack uses `headerShown: false` here — `useHeaderHeight()` is often 0.
+   * Fall back to the real chrome above `KeyboardAvoidingView` (status + toolbar).
+   */
+  const keyboardVerticalOffset =
+    Platform.OS === "ios"
+      ? (navHeaderHeight > 0 ? navHeaderHeight : insets.top + CHAT_HEADER_ROW_HEIGHT)
+      : 0;
+  /**
+   * Keyboard closed: pad above system nav / home indicator.
+   * Keyboard open: no extra bottom inset on Android (`adjustResize` + disabled KAV);
+   * iOS keeps a small padding so KAV `padding` does not stack with the home indicator.
+   */
   const inputContainerPaddingBottom = keyboardVisible
-    ? 8
-    : Platform.OS === "ios"
-      ? insets.bottom
-      : 10;
+    ? Platform.OS === "android"
+      ? 0
+      : 8
+    : Math.max(bottomInset, 12);
   const listRef = useRef<FlatList>(null);
 
   const handleBack = useCallback(() => {
@@ -282,8 +298,9 @@ export function ChatRoomScreen() {
 
       <KeyboardAvoidingView
         style={{ flex: 1 }}
-        behavior={keyboardAvoidBehavior}
-        keyboardVerticalOffset={0}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        enabled={Platform.OS === "ios"}
+        keyboardVerticalOffset={keyboardVerticalOffset}
       >
         <FlatList
           ref={listRef}

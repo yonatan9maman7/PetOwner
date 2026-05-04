@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
-import { I18nManager, Modal, Pressable, Text, View } from "react-native";
+import { Modal, Pressable, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuthStore } from "../../store/authStore";
 import { useTheme } from "../../theme/ThemeContext";
@@ -95,7 +95,9 @@ export function GlobalModalProvider({ children }: { children: React.ReactNode })
         role: options?.destructive ? "destructive" : "primary",
         onPress: onConfirm,
       };
-      const buttons = I18nManager.isRTL ? [confirmBtn, cancelBtn] : [cancelBtn, confirmBtn];
+      // Always cancel first, then confirm — the modal card uses `direction: rtl` when language is Hebrew
+      // so the row mirrors (destructive/confirm on the leading reading edge, cancel on the trailing edge).
+      const buttons = [cancelBtn, confirmBtn];
       showModal({
         title,
         message,
@@ -146,7 +148,8 @@ export function GlobalModalProvider({ children }: { children: React.ReactNode })
     return () => registerGlobalModalApi(null);
   }, [api]);
 
-  const isRTL = I18nManager.isRTL;
+  /** Match chosen app language — `Modal` subtree may not follow `I18nManager` the same as the rest of the tree. */
+  const isModalRTL = language === "he";
   const isVerticalButtons = (activeModal?.buttons?.length ?? 0) > 2;
 
   return (
@@ -174,12 +177,17 @@ export function GlobalModalProvider({ children }: { children: React.ReactNode })
               shadowOpacity: isDark ? 0.45 : 0.18,
               shadowRadius: 20,
               elevation: 12,
+              direction: isModalRTL ? "rtl" : "ltr",
             }}
           >
             {activeModal?.title ? (
               <Text
-                className="mb-3 text-right text-xl font-bold"
-                style={{ color: colors.text, writingDirection: isRTL ? "rtl" : "ltr" }}
+                className="mb-3 text-xl font-bold"
+                style={{
+                  color: colors.text,
+                  textAlign: isModalRTL ? "right" : "left",
+                  writingDirection: isModalRTL ? "rtl" : "ltr",
+                }}
               >
                 {activeModal.title}
               </Text>
@@ -187,8 +195,12 @@ export function GlobalModalProvider({ children }: { children: React.ReactNode })
 
             {activeModal?.message ? (
               <Text
-                className="mb-6 text-right text-base"
-                style={{ color: colors.textSecondary, writingDirection: isRTL ? "rtl" : "ltr" }}
+                className="mb-6 text-base"
+                style={{
+                  color: colors.textSecondary,
+                  textAlign: isModalRTL ? "right" : "left",
+                  writingDirection: isModalRTL ? "rtl" : "ltr",
+                }}
               >
                 {activeModal.message}
               </Text>
@@ -237,10 +249,11 @@ export function GlobalModalProvider({ children }: { children: React.ReactNode })
                     }}
                   >
                     <Text
-                      className="text-base font-semibold text-right"
+                      className="text-base font-semibold"
                       style={{
                         color: fg,
-                        writingDirection: isRTL ? "rtl" : "ltr",
+                        textAlign: "center",
+                        writingDirection: isModalRTL ? "rtl" : "ltr",
                       }}
                     >
                       {button.text}

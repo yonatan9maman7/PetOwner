@@ -206,6 +206,17 @@ export const mapApi = {
     apiClient
       .get<DogParkDto[]>("/parks", { signal, backgroundRequest: true })
       .then((r) => r.data),
+  /** Admin: POST /api/parks/sync-google — may take several seconds (Places + DB). */
+  syncGoogleDogParks: () =>
+    apiClient
+      .post<{
+        message: string;
+        imported: number;
+        updated?: number;
+        seedAdds?: number;
+        usedSeedFallback?: boolean;
+      }>("/parks/sync-google", {}, { timeout: 120_000 })
+      .then((r) => r.data),
   getProviderProfile: (providerId: string) =>
     apiClient
       .get<ProviderPublicProfileDto>(`/providers/${providerId}/profile`, {

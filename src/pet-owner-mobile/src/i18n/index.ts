@@ -1,3 +1,4 @@
+import { useCallback } from "react";
 import { I18nManager, Platform } from "react-native";
 import { useAuthStore } from "../store/authStore";
 import communityHe from "../screens/community/i18n/he.json";
@@ -23,7 +24,8 @@ const he = {
   createAccount: "יצירת חשבון",
   myProfile: "הפרופיל שלי",
   logoutButton: "התנתקות",
-  logoutConfirmation: "האם אתה בטוח שברצונך להתנתק?",
+  // RLM (U+200F) before ? keeps trailing Latin punctuation on the logical end in RTL.
+  logoutConfirmation: "האם אתה בטוח שברצונך להתנתק\u200F?",
   tabExplore: "גלה",
   tabMyPets: "החיות שלי",
   tabCommunity: "קהילה",
@@ -2688,8 +2690,13 @@ export function useTranslation() {
   const language = useAuthStore((s) => s.language);
   const isHebrew = language === "he";
 
+  const t = useCallback(
+    (key: TranslationKey): string => translations[language][key],
+    [language],
+  );
+
   return {
-    t: (key: TranslationKey): string => translations[language][key],
+    t,
     language,
     isHebrew,
     isRTL: isHebrew,

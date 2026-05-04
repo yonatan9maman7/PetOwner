@@ -194,6 +194,9 @@ export function DiscoverScreen() {
   const { t, isRTL, rtlText, rtlInput } = useTranslation();
   const insets = useSafeAreaInsets();
   const inputRef = useRef<TextInput>(null);
+  /** Keeps `loadProviders` stable so `useEffect([loadProviders])` does not re-fire every render. */
+  const tRef = useRef(t);
+  tRef.current = t;
 
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("all");
@@ -232,44 +235,46 @@ export function DiscoverScreen() {
   );
 
   const loadProviders = useCallback(
-    (search?: string) => {
+    async (search?: string) => {
       providersAbortRef.current?.abort();
       const controller = new AbortController();
       providersAbortRef.current = controller;
       const gen = ++providersFetchGenRef.current;
       setLoading(true);
-      mapApi
-        .fetchPins(buildFilters(search), controller.signal)
-        .then((pins) => {
-          if (gen !== providersFetchGenRef.current) return;
-          let next = pins;
-          if (providerTypeFilter === ProviderType.Business) {
-            next = pins.filter((p) => mapPinProviderType(p) === ProviderType.Business);
-          } else if (providerTypeFilter === ProviderType.Individual) {
-            next = pins.filter((p) => mapPinProviderType(p) === ProviderType.Individual);
-          }
-          setProviders(next);
-          setProvidersLoadFailed(false);
-        })
-        .catch((error) => {
-          if (gen !== providersFetchGenRef.current) return;
-          if (axios.isCancel(error) || (error as Error)?.name === "CanceledError") {
-            return;
-          }
-          setProvidersLoadFailed(true);
-          if (!(axios.isAxiosError(error) && error.response?.status === 401)) {
-            showApiErrorToast(getNormalizedApiError(error), {
-              title: t("genericErrorTitle"),
-            });
-          }
-        })
-        .finally(() => {
-          if (gen === providersFetchGenRef.current) {
-            setLoading(false);
-          }
+      try {
+        const pins = await mapApi.fetchPins(buildFilters(search), controller.signal);
+        if (gen !== providersFetchGenRef.current) return;
+        let next = pins;
+        if (providerTypeFilter === ProviderType.Business) {
+          next = pins.filter((p) => mapPinProviderType(p) === ProviderType.Business);
+        } else if (providerTypeFilter === ProviderType.Individual) {
+          next = pins.filter((p) => mapPinProviderType(p) === ProviderType.Individual);
+        }
+        setProviders(next);
+        setProvidersLoadFailed(false);
+      } catch (error) {
+        if (gen !== providersFetchGenRef.current) return;
+        if (axios.isCancel(error) || (error as Error)?.name === "CanceledError") {
+          return;
+        }
+        console.error("[DiscoverScreen] fetchPins failed", {
+          search,
+          filters: buildFilters(search),
+          error,
         });
+        setProvidersLoadFailed(true);
+        if (!(axios.isAxiosError(error) && error.response?.status === 401)) {
+          showApiErrorToast(getNormalizedApiError(error), {
+            title: tRef.current("genericErrorTitle"),
+          });
+        }
+      } finally {
+        if (gen === providersFetchGenRef.current) {
+          setLoading(false);
+        }
+      }
     },
-    [buildFilters, providerTypeFilter, t],
+    [buildFilters, providerTypeFilter],
   );
 
   useEffect(() => {
@@ -292,7 +297,7 @@ export function DiscoverScreen() {
   }, []);
 
   useEffect(() => {
-    loadProviders("");
+    void loadProviders("");
   }, [loadProviders]);
 
   /* ─── Category chips (All + dynamic from API) ─── */
@@ -331,14 +336,16 @@ export function DiscoverScreen() {
     setSearchQuery("");
     setIsSearchFocused(false);
     Keyboard.dismiss();
-    loadProviders("");
+    void loadProviders("");
   }, [loadProviders]);
 
   const handleSearchChange = useCallback(
     (text: string) => {
       setSearchQuery(text);
       if (debounceRef.current) clearTimeout(debounceRef.current);
-      debounceRef.current = setTimeout(() => loadProviders(text), 500);
+      debounceRef.current = setTimeout(() => {
+        void loadProviders(text);
+      }, 500);
     },
     [loadProviders],
   );
@@ -462,71 +469,6 @@ export function DiscoverScreen() {
     [colors, isRTL, onViewProvider, rtlText, styles, t],
   );
 
-  const ListEmpty = useMemo(
-    () => {
-      if (loading) {
-        return (
-          <View style={c.emptyWrap}>
-            <ActivityIndicator size="large" color={colors.primary} />
-            <Text style={[styles.emptySubtitle, { marginTop: 12 }]}>
-              {t("loadingProviders")}
-            </Text>
-          </View>
-        );
-      }
-      if (providersLoadFailed && providers.length === 0) {
-        return (
-          <View style={c.emptyWrap}>
-            <View style={[c.emptyIcon, { backgroundColor: colors.surfaceSecondary }]}>
-              <Ionicons name="cloud-offline-outline" size={40} color={colors.textMuted} />
-            </View>
-            <Text style={[styles.emptyTitle]}>{t("providersLoadFailed")}</Text>
-            <Text style={[styles.emptySubtitle]}>{t("providersLoadFailedHint")}</Text>
-            <Pressable
-              onPress={() => loadProviders(searchQuery)}
-              style={{
-                marginTop: 16,
-                paddingHorizontal: 20,
-                paddingVertical: 12,
-                borderRadius: 12,
-                backgroundColor: colors.text,
-              }}
-            >
-              <Text style={{ fontSize: 15, fontWeight: "700", color: colors.textInverse }}>
-                {t("retry")}
-              </Text>
-            </Pressable>
-          </View>
-        );
-      }
-      return (
-        <View style={c.emptyWrap}>
-          <View style={[c.emptyIcon, { backgroundColor: colors.surfaceSecondary }]}>
-            <Ionicons name="search-outline" size={40} color={colors.textMuted} />
-          </View>
-          <Text style={[styles.emptyTitle]}>{t("noBusinessesFound")}</Text>
-          <Text style={[styles.emptySubtitle]}>
-            {t("noBusinessesFoundSubtitle")}
-          </Text>
-        </View>
-      );
-    },
-    [
-      colors.primary,
-      colors.surfaceSecondary,
-      colors.text,
-      colors.textInverse,
-      colors.textMuted,
-      loading,
-      loadProviders,
-      providers.length,
-      providersLoadFailed,
-      searchQuery,
-      styles,
-      t,
-    ],
-  );
-
   return (
     <SafeAreaView
       edges={["top"]}
@@ -577,7 +519,9 @@ export function DiscoverScreen() {
             onFocus={() => setIsSearchFocused(true)}
             onBlur={() => setIsSearchFocused(false)}
             returnKeyType="search"
-            onSubmitEditing={() => loadProviders(searchQuery)}
+            onSubmitEditing={() => {
+              void loadProviders(searchQuery);
+            }}
           />
           {searchQuery.length > 0 && (
             <Pressable onPress={() => handleSearchChange("")} style={c.clearBtn}>
@@ -642,22 +586,69 @@ export function DiscoverScreen() {
         </ScrollView>
       </View>
 
-      {/* ── Provider cards list ── */}
-      <FlatList
-        data={filteredProviders}
-        keyExtractor={(item) => item.providerId}
-        renderItem={renderCard}
-        contentContainerStyle={[
-          c.listContent,
-          { paddingBottom: insets.bottom + 100 },
-        ]}
-        showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
-        ListEmptyComponent={ListEmpty}
-        ItemSeparatorComponent={() => <View style={{ height: 6 }} />}
-        onRefresh={() => loadProviders(searchQuery)}
-        refreshing={loading}
-      />
+      {/* ── Provider cards list (loading / empty / list are mutually exclusive) ── */}
+      <View style={c.listArea}>
+      {loading ? (
+        <View style={[c.emptyWrap, c.listFlexGrow, { justifyContent: "center", flex: 1 }]}>
+          <ActivityIndicator size="large" color={colors.primary} />
+          <Text style={[styles.emptySubtitle, { marginTop: 12 }]}>{t("loadingProviders")}</Text>
+        </View>
+      ) : filteredProviders.length === 0 ? (
+        <View style={[c.emptyWrap, c.listFlexGrow, { flex: 1, justifyContent: "center" }]}>
+          {providersLoadFailed && providers.length === 0 ? (
+            <>
+              <View style={[c.emptyIcon, { backgroundColor: colors.surfaceSecondary }]}>
+                <Ionicons name="cloud-offline-outline" size={40} color={colors.textMuted} />
+              </View>
+              <Text style={[styles.emptyTitle]}>{t("providersLoadFailed")}</Text>
+              <Text style={[styles.emptySubtitle]}>{t("providersLoadFailedHint")}</Text>
+              <Pressable
+                onPress={() => {
+                  void loadProviders(searchQuery);
+                }}
+                style={{
+                  marginTop: 16,
+                  paddingHorizontal: 20,
+                  paddingVertical: 12,
+                  borderRadius: 12,
+                  backgroundColor: colors.text,
+                }}
+              >
+                <Text style={{ fontSize: 15, fontWeight: "700", color: colors.textInverse }}>
+                  {t("retry")}
+                </Text>
+              </Pressable>
+            </>
+          ) : (
+            <>
+              <View style={[c.emptyIcon, { backgroundColor: colors.surfaceSecondary }]}>
+                <Ionicons name="search-outline" size={40} color={colors.textMuted} />
+              </View>
+              <Text style={[styles.emptyTitle]}>{t("noBusinessesFound")}</Text>
+              <Text style={[styles.emptySubtitle]}>{t("noBusinessesFoundSubtitle")}</Text>
+            </>
+          )}
+        </View>
+      ) : (
+        <FlatList
+          data={filteredProviders}
+          keyExtractor={(item) => item.providerId}
+          renderItem={renderCard}
+          contentContainerStyle={[
+            c.listContent,
+            { paddingBottom: insets.bottom + 100 },
+          ]}
+          style={c.listFlexGrow}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          ItemSeparatorComponent={() => <View style={{ height: 6 }} />}
+          onRefresh={() => {
+            void loadProviders(searchQuery);
+          }}
+          refreshing={false}
+        />
+      )}
+      </View>
 
       {/* ── Global Map FAB ── */}
       <Pressable
@@ -860,6 +851,9 @@ const c = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 4,
   },
+  /** Fills space below chips so loader / empty / list layout correctly. */
+  listArea: { flex: 1 },
+  listFlexGrow: { flexGrow: 1 },
   rowReverse: { flexDirection: "row-reverse" },
 
   /* ─── Hero ─── */

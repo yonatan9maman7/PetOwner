@@ -102,7 +102,6 @@ public class MapController : ControllerBase
         return Ok(pins);
     }
 
-    [Authorize]
     [HttpGet("playdate-pins")]
     public async Task<IActionResult> GetPlaydatePins(
         [FromQuery] double? latitude,

@@ -1108,6 +1108,7 @@ public class ApplicationDbContext : DbContext
         {
             entity.HasKey(p => p.Id);
             entity.Property(p => p.Id).HasDefaultValueSql("NEWSEQUENTIALID()");
+            entity.Property(p => p.ExternalPlaceId).HasMaxLength(256);
             entity.Property(p => p.Name).IsRequired().HasMaxLength(200);
             entity.Property(p => p.Address).IsRequired().HasMaxLength(500);
             entity.Property(p => p.Latitude).HasColumnType("float");
@@ -1115,6 +1116,9 @@ public class ApplicationDbContext : DbContext
             entity.Property(p => p.IsActive).HasDefaultValue(true);
             entity.HasIndex(p => p.IsActive);
             entity.HasIndex(p => new { p.Latitude, p.Longitude });
+            entity.HasIndex(p => p.ExternalPlaceId)
+                .IsUnique()
+                .HasFilter("[ExternalPlaceId] IS NOT NULL");
         });
     }
 

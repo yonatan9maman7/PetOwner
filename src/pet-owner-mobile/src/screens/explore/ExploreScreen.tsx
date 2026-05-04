@@ -1,4 +1,12 @@
-import { useState, useRef, useEffect, useCallback, useMemo, type PropsWithChildren } from "react";
+import {
+  useState,
+  useRef,
+  useEffect,
+  useLayoutEffect,
+  useCallback,
+  useMemo,
+  type PropsWithChildren,
+} from "react";
 import {
   View,
   Text,
@@ -14,12 +22,22 @@ import {
   Keyboard,
   FlatList,
   InteractionManager,
+  useWindowDimensions,
 } from "react-native";
 import axios from "axios";
+import { Gesture, GestureDetector, GestureHandlerRootView } from "react-native-gesture-handler";
+import Reanimated, {
+  runOnJS,
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
+  withTiming,
+} from "react-native-reanimated";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect, useNavigation, useRoute } from "@react-navigation/native";
 import * as Location from "expo-location";
+import { LinearGradient } from "expo-linear-gradient";
 import { BRAND_HEADER_HORIZONTAL_PAD } from "../../components/BrandedAppHeader";
 
 /** Tight crop of `petcare-logo-transparent.png` (Explore header only). */
@@ -66,6 +84,8 @@ const MAP_VIEWPORT_DEBOUNCE_MS = 500;
 const PROGRAMMATIC_MAP_MOVE_SUPPRESS_MS = Platform.OS === "ios" ? 1100 : 850;
 /** Longer than MAP_VIEWPORT_DEBOUNCE_MS — skip silent refetch right after a marker tap (can fire onRegionChangeComplete). */
 const MARKER_TAP_VIEWPORT_SUPPRESS_MS = MAP_VIEWPORT_DEBOUNCE_MS + 450;
+/** Filter sheet drag-dismiss: translate past this (px) guarantees off-screen on all devices. */
+const FILTER_SHEET_DISMISS_SLIDE_PX = 960;
 
 const DISTANCE_OPTIONS = [
   { value: null, labelKey: "anyDistance" as const },
@@ -194,7 +214,18 @@ export function ExploreScreen() {
   const route = useRoute<any>();
   const { colors } = useTheme();
   const { t, isRTL, rtlInput } = useTranslation();
+  /** `t` is a new function every render from useTranslation — never use it as a useEffect dep for one-shot fetches. */
+  const tRef = useRef(t);
+  tRef.current = t;
   const insets = useSafeAreaInsets();
+  const { height: windowHeight } = useWindowDimensions();
+  /** Scroll region inside filter sheet: `flex:1` on ScrollView collapsed when the sheet had no fixed height (only maxHeight). */
+  const filterSheetScrollMaxHeight = useMemo(() => {
+    const sheetCap = Math.round(windowHeight * 0.75);
+    const chrome = 128 + Math.max(insets.bottom, 16);
+    return Math.max(220, sheetCap - chrome);
+  }, [windowHeight, insets.bottom]);
+
   const isLoggedIn = useAuthStore((s) => s.isLoggedIn);
   const hasPets = usePetsStore((s) => s.pets.length > 0);
   const pets = usePetsStore((s) => s.pets);
@@ -298,11 +329,13 @@ export function ExploreScreen() {
 
   /* Current map region for viewport-based queries */
   const mapRegionRef = useRef(EXPLORE_MAP_INITIAL_REGION);
+  const mapLatDeltaRef = useRef(EXPLORE_MAP_INITIAL_REGION.latitudeDelta);
+  const [mapLatDelta, setMapLatDelta] = useState(EXPLORE_MAP_INITIAL_REGION.latitudeDelta);
 
   /* ─── Marker object pool (RecyclerView / view-recycling pattern) ─── */
   const markerPool: MarkerPoolSlot[] = useMemo(() => {
     const pinSource = showDogParksOnly ? [] : pins;
-    const items = sortMarkerItemsStable(groupPinsForMapMarkers(pinSource));
+    const items = sortMarkerItemsStable(groupPinsForMapMarkers(pinSource, mapLatDelta));
 
     let singles = 0;
     let clusters = 0;
@@ -362,7 +395,7 @@ export function ExploreScreen() {
       }
     }
     return pool;
-  }, [pins, showDogParksOnly]);
+  }, [pins, showDogParksOnly, mapLatDelta]);
 
 
 
@@ -438,14 +471,14 @@ export function ExploreScreen() {
         setDogParks([]);
         if (axios.isCancel(error) || (error as Error)?.name === "CanceledError") return;
         showApiErrorToast(getNormalizedApiError(error), {
-          title: t("genericErrorTitle"),
+          title: tRef.current("genericErrorTitle"),
         });
       });
 
     return () => {
       ctrl.abort();
     };
-  }, [t]);
+  }, []);
 
   useEffect(() => {
     mapDiag("selection.change", {
@@ -503,10 +536,10 @@ export function ExploreScreen() {
         if (axios.isCancel(error) || (error as Error)?.name === "CanceledError") return;
         if (!exploreScreenFocusedRef.current) return;
         showApiErrorToast(getNormalizedApiError(error), {
-          title: t("genericErrorTitle"),
+          title: tRef.current("genericErrorTitle"),
         });
       });
-  }, [playdateMode, userLat, userLng, filterRadiusKm, t]);
+  }, [playdateMode, userLat, userLng, filterRadiusKm]);
 
   /* ─── Request location ─── */
   useEffect(() => {
@@ -882,6 +915,12 @@ export function ExploreScreen() {
       if (isValidMapRegion(region)) {
         mapRegionRef.current = region;
       }
+      const prev = mapLatDeltaRef.current;
+      const next = region.latitudeDelta;
+      if (Math.abs(next - prev) / Math.max(prev, 1e-9) > 0.15) {
+        mapLatDeltaRef.current = next;
+        setMapLatDelta(next);
+      }
       const seq = ++regionChangeSeqRef.current;
       mapDiag("region.change", {
         seq,
@@ -958,8 +997,16 @@ export function ExploreScreen() {
     [],
   );
 
-  /* ─── Filter panel actions ─── */
-  const applyFilter = useCallback(() => {
+  /* ─── Filter panel: closing applies filters to the map (same as former "Apply") ─── */
+  const filterSheetTranslateY = useSharedValue(0);
+  const closeFilterPanelRef = useRef<() => void>(() => {});
+
+  const invokeFilterCloseFromGesture = useCallback(() => {
+    closeFilterPanelRef.current();
+  }, []);
+
+  const closeFilterPanel = useCallback(() => {
+    Keyboard.dismiss();
     setShowFilterPanel(false);
     setSelectedPin(null);
     setSelectedPlaydate(null);
@@ -967,6 +1014,49 @@ export function ExploreScreen() {
     setCollocatedChooserPins(null);
     loadPinsRef.current();
   }, []);
+
+  useEffect(() => {
+    closeFilterPanelRef.current = closeFilterPanel;
+  }, [closeFilterPanel]);
+
+  useLayoutEffect(() => {
+    if (showFilterPanel) {
+      filterSheetTranslateY.value = 0;
+    }
+  }, [showFilterPanel, filterSheetTranslateY]);
+
+  const filterSheetDragStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: filterSheetTranslateY.value }],
+  }));
+
+  const filterPanGesture = useMemo(
+    () =>
+      Gesture.Pan()
+        .activeOffsetY(8)
+        .failOffsetX([-32, 32])
+        .onUpdate((e) => {
+          const t = e.translationY;
+          filterSheetTranslateY.value = t > 0 ? t : t * 0.2;
+        })
+        .onEnd((e) => {
+          const y = filterSheetTranslateY.value;
+          const dismiss = y > 72 || e.velocityY > 700;
+          if (dismiss) {
+            filterSheetTranslateY.value = withTiming(
+              FILTER_SHEET_DISMISS_SLIDE_PX,
+              { duration: 240 },
+              (finished) => {
+                if (finished) {
+                  runOnJS(invokeFilterCloseFromGesture)();
+                }
+              },
+            );
+          } else {
+            filterSheetTranslateY.value = withSpring(0, { damping: 22, stiffness: 280 });
+          }
+        }),
+    [invokeFilterCloseFromGesture],
+  );
 
   const clearFilter = useCallback(() => {
     setActiveServices(new Set());
@@ -1003,15 +1093,30 @@ export function ExploreScreen() {
     setSelectedPin(pin);
   }, []);
 
-  const openCollocatedChooser = useCallback((clusterPins: MapPinDto[]) => {
-    mapDiag("cluster.press", { count: clusterPins.length });
-    suppressViewportFetchAfterMarkerMsRef.current = Date.now() + MARKER_TAP_VIEWPORT_SUPPRESS_MS;
-    markerJustTappedRef.current = true;
-    setTimeout(() => {
-      markerJustTappedRef.current = false;
-    }, 300);
-    setCollocatedChooserPins(clusterPins);
-  }, []);
+  const openCollocatedChooser = useCallback(
+    (clusterPins: MapPinDto[], clusterCoordinate: { latitude: number; longitude: number }) => {
+      mapDiag("cluster.press", { count: clusterPins.length });
+      suppressViewportFetchAfterMarkerMsRef.current = Date.now() + MARKER_TAP_VIEWPORT_SUPPRESS_MS;
+      markerJustTappedRef.current = true;
+      setTimeout(() => {
+        markerJustTappedRef.current = false;
+      }, 300);
+      if (mapRegionRef.current.latitudeDelta > 0.1) {
+        beginProgrammaticMapMove();
+        mapRef.current?.animateToRegion?.(
+          {
+            ...clusterCoordinate,
+            latitudeDelta: mapRegionRef.current.latitudeDelta / 3,
+            longitudeDelta: mapRegionRef.current.longitudeDelta / 3,
+          },
+          500,
+        );
+        return;
+      }
+      setCollocatedChooserPins(clusterPins);
+    },
+    [beginProgrammaticMapMove],
+  );
 
   const pickFromCollocatedList = useCallback((pin: MapPinDto) => {
     suppressViewportFetchAfterMarkerMsRef.current = Date.now() + MARKER_TAP_VIEWPORT_SUPPRESS_MS;
@@ -1560,46 +1665,72 @@ export function ExploreScreen() {
         }
       </Pressable>
 
-      {/* Report Lost Pet button */}
-      <Pressable
-        onPress={() => {
-          if (!isLoggedIn) {
-            navigation.navigate("Login");
-            return;
-          }
-          if (!hasPets) {
-            navigation.getParent()?.navigate("MyPets");
-            return;
-          }
-          navigation
-            .getParent()
-            ?.navigate("MyPets", { screen: "ReportLost" });
-        }}
+      {/* Report Lost Pet — SOS (nested tab target matches GlobalSosFab / BookingScreen) */}
+      <View
         style={{
           position: "absolute",
           bottom: bottomActionOffset,
           alignSelf: isRTL ? "flex-start" : "flex-end",
           ...(isRTL ? { left: 20 } : { right: 20 }),
-          flexDirection: rowDirectionForAppLayout(isRTL),
-          alignItems: "center",
-          gap: 8,
-          backgroundColor: "#dc2626",
-          paddingHorizontal: 16,
-          paddingVertical: 12,
-          borderRadius: 24,
           zIndex: 18,
-          shadowColor: "#dc2626",
-          shadowOffset: { width: 0, height: 4 },
-          shadowOpacity: 0.35,
-          shadowRadius: 10,
-          elevation: 10,
+          borderRadius: 24,
+          ...Platform.select({
+            ios: {
+              shadowColor: "#b91c1c",
+              shadowOffset: { width: 0, height: 6 },
+              shadowOpacity: 0.4,
+              shadowRadius: 8,
+            },
+            android: { elevation: 8 },
+            default: {},
+          }),
         }}
       >
-        <Ionicons name="alert-circle" size={20} color="#fff" />
-        <Text style={{ fontSize: 13, fontWeight: "800", color: "#fff" }}>
-          {t("reportLostMapBtn")}
-        </Text>
-      </Pressable>
+        <Pressable
+          onPress={() => {
+            if (!isLoggedIn) {
+              navigation.navigate("Login");
+              return;
+            }
+            navigation.navigate("MyPets", { screen: "ReportLost" });
+          }}
+          accessibilityRole="button"
+          accessibilityLabel={t("reportLostMapBtn")}
+          style={({ pressed }) => ({
+            borderRadius: 24,
+            overflow: "hidden",
+            opacity: pressed ? 0.92 : 1,
+          })}
+        >
+          <LinearGradient
+            colors={["#ef4444", "#b91c1c"]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={{
+              flexDirection: rowDirectionForAppLayout(isRTL),
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 8,
+              paddingHorizontal: 18,
+              paddingVertical: 14,
+              borderRadius: 24,
+              borderWidth: 1,
+              borderColor: "rgba(255,255,255,0.28)",
+            }}
+          >
+            <Ionicons name="alert-circle" size={22} color="#ffffff" />
+            <Text
+              style={{
+                fontSize: 13,
+                fontWeight: "700",
+                color: "#ffffff",
+              }}
+            >
+              {t("reportLostMapBtn")}
+            </Text>
+          </LinearGradient>
+        </Pressable>
+      </View>
 
       {/* Discover Businesses FAB */}
       <Pressable
@@ -2238,61 +2369,81 @@ export function ExploreScreen() {
       {/* ═══════════ FILTER PANEL MODAL ═══════════ */}
       <Modal
         visible={showFilterPanel}
-        animationType="slide"
+        animationType="none"
         transparent
-        onRequestClose={() => setShowFilterPanel(false)}
+        onRequestClose={closeFilterPanel}
       >
-        <Pressable
-          style={[styles.modalBackdrop, { backgroundColor: colors.overlay }]}
-          onPress={() => setShowFilterPanel(false)}
-        />
-        <View style={[styles.filterSheet, { backgroundColor: colors.surface, paddingBottom: Math.max(insets.bottom, 16) }]}>
-            {/* Handle */}
-            <View
-              style={{
-                width: 40,
-                height: 4,
-                backgroundColor: colors.border,
-                borderRadius: 2,
-                alignSelf: "center",
-                marginBottom: 16,
-              }}
+        <GestureHandlerRootView style={{ flex: 1 }}>
+          <View style={{ flex: 1, justifyContent: "flex-end", overflow: "hidden" }}>
+            <Pressable
+              style={[StyleSheet.absoluteFillObject, { backgroundColor: colors.overlay }]}
+              onPress={closeFilterPanel}
             />
-
-            {/* Title row */}
-            <View
-              style={{
-                flexDirection: rowDirectionForAppLayout(isRTL),
-                justifyContent: "space-between",
-                alignItems: "center",
-                marginBottom: 20,
-              }}
+            <Reanimated.View
+              style={[
+                styles.filterSheet,
+                filterSheetDragStyle,
+                {
+                  width: "100%",
+                  paddingTop: 0,
+                  backgroundColor: colors.surface,
+                  paddingBottom: Math.max(insets.bottom, 16),
+                },
+              ]}
             >
-              <Text
-                style={{
-                  fontSize: 18,
-                  fontWeight: "700",
-                  color: colors.text,
-                }}
-              >
-                {t("filters")}
-              </Text>
-              <Pressable onPress={clearFilter}>
-                <Text
-                  style={{
-                    fontSize: 13,
-                    fontWeight: "600",
-                    color: "#ef4444",
-                  }}
-                >
-                  {t("clearFilters")}
-                </Text>
-              </Pressable>
-            </View>
+              {/*
+                RNGH Pan + Reanimated: follows finger reliably inside Modal (RN PanResponder often does not).
+                Top chrome is the drag target; padding lives here so the sheet edge is draggable.
+              */}
+              <GestureDetector gesture={filterPanGesture}>
+                <View collapsable={false} style={{ paddingTop: 12, paddingBottom: 4 }}>
+                  <View
+                    style={{
+                      width: 56,
+                      height: 5,
+                      backgroundColor: colors.border,
+                      borderRadius: 3,
+                      alignSelf: "center",
+                      marginBottom: 14,
+                    }}
+                  />
+                  <View
+                    style={{
+                      flexDirection: rowDirectionForAppLayout(isRTL),
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      marginBottom: 16,
+                      minHeight: 44,
+                    }}
+                  >
+                    <Text
+                      style={{
+                        fontSize: 18,
+                        fontWeight: "700",
+                        color: colors.text,
+                      }}
+                    >
+                      {t("filters")}
+                    </Text>
+                    <Pressable onPress={clearFilter} hitSlop={10}>
+                      <Text
+                        style={{
+                          fontSize: 13,
+                          fontWeight: "600",
+                          color: "#ef4444",
+                        }}
+                      >
+                        {t("clearFilters")}
+                      </Text>
+                    </Pressable>
+                  </View>
+                </View>
+              </GestureDetector>
 
             <ScrollView
+              style={{ maxHeight: filterSheetScrollMaxHeight }}
               showsVerticalScrollIndicator={false}
-              contentContainerStyle={{ gap: 20, paddingBottom: 20 }}
+              contentContainerStyle={{ gap: 20, paddingBottom: 28 }}
             >
               {/* ── Play with a Pal toggle ── */}
               <View>
@@ -2554,25 +2705,9 @@ export function ExploreScreen() {
                 </View>
               </View>
             </ScrollView>
-
-            {/* Apply button */}
-            <Pressable
-              onPress={applyFilter}
-              style={{
-                backgroundColor: colors.text,
-                paddingVertical: 16,
-                borderRadius: 14,
-                alignItems: "center",
-                marginTop: 8,
-              }}
-            >
-              <Text
-                style={{ fontSize: 15, fontWeight: "700", color: colors.textInverse }}
-              >
-                {t("applyFilters")}
-              </Text>
-            </Pressable>
-        </View>
+            </Reanimated.View>
+          </View>
+        </GestureHandlerRootView>
       </Modal>
     </View>
   );

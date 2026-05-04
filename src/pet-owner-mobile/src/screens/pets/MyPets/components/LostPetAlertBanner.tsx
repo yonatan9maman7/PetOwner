@@ -4,6 +4,7 @@ import {
   Pressable,
   StyleSheet,
   ActivityIndicator,
+  Platform,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useTranslation, rowDirectionForAppLayout } from "../../../../i18n";
@@ -37,21 +38,26 @@ export function LostPetAlertBanner({
           accessibilityLabel={t("markFoundBtn")}
           onPress={onMarkFoundPress}
           disabled={loading}
+          android_ripple={{
+            color: "rgba(255,255,255,0.28)",
+            foreground: true,
+          }}
           style={({ pressed }) => [
-            styles.cta,
-            { flexDirection: row },
+            styles.ctaPressable,
             pressed && !loading ? styles.ctaPressed : null,
             loading ? styles.ctaDisabled : null,
           ]}
         >
-          {loading ? (
-            <ActivityIndicator color="#fff" size="small" />
-          ) : (
-            <>
-              <Ionicons name="checkmark-circle" size={20} color="#fff" />
-              <Text style={styles.ctaText}>{t("markFoundBtn")}</Text>
-            </>
-          )}
+          <View style={[styles.cta, { flexDirection: row }]}>
+            {loading ? (
+              <ActivityIndicator color="#FFFFFF" size="small" />
+            ) : (
+              <>
+                <Ionicons name="checkmark-circle" size={20} color="#FFFFFF" />
+                <Text style={styles.ctaText}>{t("markFoundBtn")}</Text>
+              </>
+            )}
+          </View>
         </Pressable>
       </View>
     </View>
@@ -97,16 +103,30 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: "#c2410c",
   },
+  ctaPressable: {
+    borderRadius: 12,
+    flexShrink: 0,
+  },
   cta: {
     alignItems: "center",
     justifyContent: "center",
     gap: 6,
     backgroundColor: "#22c55e",
-    paddingVertical: 12,
-    paddingHorizontal: 14,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
     borderRadius: 12,
     minHeight: 48,
     flexShrink: 0,
+    ...Platform.select({
+      android: { elevation: 3 },
+      ios: {
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.18,
+        shadowRadius: 3,
+      },
+      default: {},
+    }),
   },
   ctaPressed: {
     opacity: 0.92,
@@ -115,8 +135,8 @@ const styles = StyleSheet.create({
     opacity: 0.7,
   },
   ctaText: {
-    color: "#fff",
+    color: "#FFFFFF",
     fontSize: 14,
-    fontWeight: "800",
+    fontWeight: "bold",
   },
 });
