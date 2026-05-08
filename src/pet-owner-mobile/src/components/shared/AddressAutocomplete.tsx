@@ -173,6 +173,13 @@ export function AddressAutocomplete({
     [type, language, countryCode],
   );
 
+  const clearDebounce = useCallback(() => {
+    if (debounceRef.current) {
+      clearTimeout(debounceRef.current);
+      debounceRef.current = null;
+    }
+  }, []);
+
   const handleChangeText = useCallback(
     (text: string) => {
       onChangeText(text);
@@ -180,30 +187,34 @@ export function AddressAutocomplete({
         suppressNextSearchRef.current = false;
         return;
       }
-      if (debounceRef.current) clearTimeout(debounceRef.current);
+      clearDebounce();
       const trimmed = text.trim();
       if (trimmed.length < 2) {
         setPredictions([]);
         setSearching(false);
         abortRef.current?.abort();
+        suppressNextSearchRef.current = false;
         return;
       }
       debounceRef.current = setTimeout(() => runSearch(trimmed), DEBOUNCE_MS);
     },
-    [onChangeText, runSearch],
+    [onChangeText, runSearch, clearDebounce],
   );
 
   const handleClear = useCallback(() => {
+    clearDebounce();
+    suppressNextSearchRef.current = false;
     onChangeText("");
     sessionRef.current = createPlacesSession();
     setPredictions([]);
     setSearching(false);
     abortRef.current?.abort();
     onClear?.();
-  }, [onChangeText, onClear]);
+  }, [onChangeText, onClear, clearDebounce]);
 
   const handleSelect = useCallback(
     async (prediction: PlacePrediction) => {
+      clearDebounce();
       // Show selection text immediately for a snappy feel.
       const displayText = prediction.secondaryText
         ? `${prediction.mainText}, ${prediction.secondaryText}`
@@ -247,7 +258,7 @@ export function AddressAutocomplete({
         setResolving(false);
       }
     },
-    [language, onChangeText, onSelect],
+    [language, onChangeText, onSelect, clearDebounce],
   );
 
   const handleFocus = useCallback(() => {

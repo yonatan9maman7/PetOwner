@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
-import { View, Text, Image, Pressable, ScrollView } from "react-native";
+import { View, Text, Pressable, ScrollView } from "react-native";
+import { Image } from "expo-image";
 import { Ionicons } from "@expo/vector-icons";
 import Animated, {
   useSharedValue,
@@ -42,6 +43,7 @@ function ActiveRing({ color }: { color: string }) {
 
   return (
     <Animated.View
+      pointerEvents="none"
       style={[
         {
           position: "absolute",
@@ -91,9 +93,11 @@ function PetAvatar({
         >
           {pet.imageUrl ? (
             <Image
-              source={{ uri: pet.imageUrl }}
+              source={pet.imageUrl}
               style={{ width: AVATAR_SIZE, height: AVATAR_SIZE }}
-              resizeMode="cover"
+              contentFit="cover"
+              cachePolicy="memory-disk"
+              recyclingKey={pet.id}
             />
           ) : (
             <Text style={{ fontSize: 26 }}>{getSpeciesEmoji(pet.species)}</Text>

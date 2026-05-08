@@ -549,9 +549,19 @@ function AddressMapModal({
     [street, building, city].filter(Boolean).join(" ").trim(),
   );
   const mapRef = useRef<any>(null);
+  /** Snapshot when modal opens — used on address clear (X) to reset map + fields like Report Lost SOS flow. */
+  const addressSnapshotRef = useRef({
+    lat,
+    lng,
+    city,
+    street,
+    building,
+    apartment,
+  });
 
   useEffect(() => {
     if (visible) {
+      addressSnapshotRef.current = { lat, lng, city, street, building, apartment };
       setLocalLat(lat);
       setLocalLng(lng);
       setLocalCity(city);
@@ -561,6 +571,20 @@ function AddressMapModal({
       setSearchText([street, building, city].filter(Boolean).join(" ").trim());
     }
   }, [visible, lat, lng, city, street, building, apartment]);
+
+  const handleAddressSearchClear = useCallback(() => {
+    const s = addressSnapshotRef.current;
+    setLocalLat(s.lat);
+    setLocalLng(s.lng);
+    setLocalCity(s.city);
+    setLocalStreet(s.street);
+    setLocalBuilding(s.building);
+    setLocalApartment(s.apartment);
+    mapRef.current?.animateToRegion?.(
+      { latitude: s.lat, longitude: s.lng, latitudeDelta: 0.012, longitudeDelta: 0.012 },
+      400,
+    );
+  }, []);
 
   const applyPlace = useCallback(
     (selection: AddressAutocompleteSelection) => {
@@ -690,6 +714,7 @@ function AddressMapModal({
               value={searchText}
               onChangeText={setSearchText}
               onSelect={applyPlace}
+              onClear={handleAddressSearchClear}
               placeholder={t("searchAddressPlaceholder")}
               isRTL={isRTL}
               type="address"

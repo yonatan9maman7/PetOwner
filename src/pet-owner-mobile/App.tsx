@@ -77,7 +77,9 @@ function AppInner() {
         <AppNavigator />
         <StatusBar style={isDark ? "light" : "dark"} />
       </NavigationContainer>
-      <Toast />
+      <View style={{ zIndex: 9999 }} pointerEvents="box-none">
+        <Toast />
+      </View>
       <ImageSourcePickerHost />
     </>
   );

@@ -13,10 +13,15 @@ import { showGlobalAlertCompat } from "../../components/global-modal";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { CommonActions, useNavigation, useRoute } from "@react-navigation/native";
-import { useTranslation, rowDirectionForAppLayout } from "../../i18n";
+import { useTranslation, rowDirectionForAppLayout, type TranslationKey } from "../../i18n";
 import { useTheme } from "../../theme/ThemeContext";
 import { bookingsApi, mapApi } from "../../api/client";
-import { PetSpecies, ServiceType, type PetDto, type ProviderPublicProfileDto } from "../../types/api";
+import {
+  PetSpecies,
+  ServiceType,
+  type PetDto,
+  type ProviderPublicProfileDto,
+} from "../../types/api";
 import { SmartCalendarPicker } from "../../components/shared/SmartCalendarPicker";
 import { TimeSlotSelector } from "../../components/shared/TimeSlotSelector";
 import { usePetsStore } from "../../store/petsStore";
@@ -33,6 +38,7 @@ const SERVICE_TYPE_BY_ORDINAL: Record<number, ServiceType> = {
   8: ServiceType.DoggyDayCare,
 };
 
+/** English display names for matching API strings in `resolveServiceType` only */
 const SERVICE_TYPE_NAMES: Record<ServiceType, string> = {
   [ServiceType.DogWalking]: "Dog Walking",
   [ServiceType.PetSitting]: "Pet Sitting",
@@ -45,12 +51,33 @@ const SERVICE_TYPE_NAMES: Record<ServiceType, string> = {
   [ServiceType.DoggyDayCare]: "Doggy Day Care",
 };
 
-const PRICING_UNIT_LABELS: Record<number, string> = {
-  0: "hour",
-  1: "night",
-  2: "visit",
-  3: "session",
-  4: "package",
+const SERVICE_TYPE_TO_TRANSLATION_KEY: Record<ServiceType, TranslationKey> = {
+  [ServiceType.DogWalking]: "serviceDogWalking",
+  [ServiceType.PetSitting]: "servicePetSitting",
+  [ServiceType.Boarding]: "serviceBoarding",
+  [ServiceType.DropInVisit]: "serviceDropInVisit",
+  [ServiceType.Training]: "serviceTraining",
+  [ServiceType.Insurance]: "serviceInsurance",
+  [ServiceType.PetStore]: "servicePetStore",
+  [ServiceType.HouseSitting]: "serviceHouseSitting",
+  [ServiceType.DoggyDayCare]: "serviceDoggyDayCare",
+};
+
+const PRICING_UNIT_NUM_TO_KEY: Record<number, TranslationKey> = {
+  0: "rateUnitHour",
+  1: "rateUnitNight",
+  2: "rateUnitVisit",
+  3: "rateUnitSession",
+  4: "rateUnitPackage",
+};
+
+const PET_SPECIES_TO_KEY: Partial<Record<PetSpecies, TranslationKey>> = {
+  [PetSpecies.Dog]: "speciesDog",
+  [PetSpecies.Cat]: "speciesCat",
+  [PetSpecies.Bird]: "speciesBird",
+  [PetSpecies.Rabbit]: "speciesRabbit",
+  [PetSpecies.Reptile]: "speciesReptile",
+  [PetSpecies.Other]: "speciesOther",
 };
 
 function combineDateAndTime(dateStr: string, timeStr: string): string {
@@ -109,6 +136,11 @@ function getBillingMode(rate: any): BillingMode {
   return "flat";
 }
 
+/** Boarding / pet sitting: hotel-style check-in and check-out (date range), regardless of per-hour vs per-night API pricing. */
+function isMultiDayStayService(serviceType: ServiceType | null): boolean {
+  return serviceType === ServiceType.Boarding || serviceType === ServiceType.PetSitting;
+}
+
 /** Calendar nights between local dates; matches server `(end.Date - start.Date).Days` with a minimum of 1 */
 function calendarNightsBetween(start: Date, end: Date): number {
   const s = new Date(start.getFullYear(), start.getMonth(), start.getDate());
@@ -156,10 +188,60 @@ function isDogPet(pet: PetDto): boolean {
   return raw === PetSpecies.Dog || String(raw).toLowerCase() === "dog" || String(raw) === "1";
 }
 
-function petSpeciesLabel(pet: PetDto): string {
+function petSpeciesDisplay(pet: PetDto, t: (key: TranslationKey) => string): string {
   const raw = pet.species as PetSpecies | string | number;
-  if (typeof raw === "string" && raw.length > 0) return raw;
-  return PetSpecies[raw as PetSpecies] ?? "Pet";
+  if (typeof raw === "number") {
+    const key = PET_SPECIES_TO_KEY[raw as PetSpecies];
+    if (key) return t(key);
+  }
+  if (typeof raw === "string") {
+    const s = raw.trim();
+    if (!s) return t("speciesOther");
+    const lower = s.toLowerCase();
+    if (lower === "dog" || lower === "1") return t("speciesDog");
+    if (lower === "cat" || lower === "2") return t("speciesCat");
+    if (lower === "bird" || lower === "3") return t("speciesBird");
+    if (lower === "rabbit" || lower === "4") return t("speciesRabbit");
+    if (lower === "reptile" || lower === "5") return t("speciesReptile");
+    if (lower === "other" || lower === "6") return t("speciesOther");
+    const fromEnum = (PetSpecies as Record<string, unknown>)[s];
+    if (typeof fromEnum === "number") {
+      const key = PET_SPECIES_TO_KEY[fromEnum as PetSpecies];
+      if (key) return t(key);
+    }
+    return s;
+  }
+  return t("speciesOther");
+}
+
+function serviceRateDisplayName(rate: any, t: (key: TranslationKey) => string): string {
+  const serviceType = resolveServiceType(rate);
+  if (serviceType) return t(SERVICE_TYPE_TO_TRANSLATION_KEY[serviceType]);
+  const raw = rate?.service;
+  if (typeof raw === "string" && raw.trim()) return raw.trim();
+  return t("bookingServiceFallback").replace("{{n}}", String(rate?.serviceType ?? "?"));
+}
+
+function pricingUnitShortLabel(rate: any, t: (key: TranslationKey) => string): string {
+  const rawPu = rate?.pricingUnit;
+  if (typeof rawPu === "number" && PRICING_UNIT_NUM_TO_KEY[rawPu]) {
+    return t(PRICING_UNIT_NUM_TO_KEY[rawPu]);
+  }
+  if (typeof rawPu === "string") {
+    const s = rawPu.replace(/\s+/g, "").toLowerCase();
+    if (s === "perhour" || s === "0") return t("rateUnitHour");
+    if (s === "pernight" || s === "1") return t("rateUnitNight");
+    if (s === "pervisit" || s === "2") return t("rateUnitVisit");
+    if (s === "persession" || s === "3") return t("rateUnitSession");
+    if (s === "perpackage" || s === "4") return t("rateUnitPackage");
+  }
+  const unit = String(rate?.unit ?? "").toLowerCase();
+  if (unit === "hour" || unit === "hours") return t("rateUnitHour");
+  if (unit === "night" || unit === "nights") return t("rateUnitNight");
+  if (unit === "visit") return t("rateUnitVisit");
+  if (unit === "session") return t("rateUnitSession");
+  if (unit === "package") return t("rateUnitPackage");
+  return "";
 }
 
 /**
@@ -313,6 +395,7 @@ export function BookingScreen() {
   const isFixedDuration = fixedDurationMinutes !== null;
   const isDogOnlyService = selectedServiceType === ServiceType.DogWalking
     || selectedServiceType === ServiceType.DoggyDayCare;
+  const isMultiDayService = isMultiDayStayService(selectedServiceType);
 
   useEffect(() => {
     if (!isDogOnlyService) return;
@@ -352,7 +435,12 @@ export function BookingScreen() {
     let cancelled = false;
 
     setEndAvailableTimes([]);
-    if (isFixedDuration || selectedBillingMode !== "perNight" || !endDate || !selectedServiceType) {
+    const needsCheckoutDaySlots =
+      !isFixedDuration
+      && !!endDate
+      && !!selectedServiceType
+      && (isMultiDayService || selectedBillingMode === "perNight");
+    if (!needsCheckoutDaySlots) {
       setEndAvailabilityLoading(false);
       return;
     }
@@ -373,7 +461,7 @@ export function BookingScreen() {
     return () => {
       cancelled = true;
     };
-  }, [profile.providerId, isFixedDuration, selectedBillingMode, selectedServiceType, endDate]);
+  }, [profile.providerId, isFixedDuration, isMultiDayService, selectedBillingMode, selectedServiceType, endDate]);
 
   useEffect(() => {
     if (
@@ -392,13 +480,13 @@ export function BookingScreen() {
     if (!sr) return undefined;
     if (fixedDurationMinutes) return undefined;
     const mode = getBillingMode(sr);
-    if (mode === "perNight") {
+    if (mode === "perNight" || isMultiDayService) {
       const resolvedEnd = endDate || startDate;
       if (resolvedEnd === startDate && startTime) return startTime;
       return undefined;
     }
     return startTime || undefined;
-  }, [sr, fixedDurationMinutes, startTime, startDate, endDate]);
+  }, [sr, fixedDurationMinutes, isMultiDayService, startTime, startDate, endDate]);
 
   /** True when a prefill time was requested but falls outside this provider's working hours */
   const prefillTimeInvalid = useMemo(() => {
@@ -424,8 +512,9 @@ export function BookingScreen() {
     if (!selectedRate || !startDate || !startTime) return null;
     const billingMode = getBillingMode(sr);
     if (!fixedDurationMinutes) {
-      if (billingMode === "perNight" && (!endDate || !endTime)) return null;
-      if (billingMode !== "perNight" && !endTime) return null;
+      const needsExplicitCheckoutRange = billingMode === "perNight" || isMultiDayService;
+      if (needsExplicitCheckoutRange && (!endDate || !endTime)) return null;
+      if (!needsExplicitCheckoutRange && !endTime) return null;
     }
     const range = resolveBookingRange(startDate, startTime, endDate, endTime, fixedDurationMinutes);
     if (!range) return null;
@@ -438,7 +527,7 @@ export function BookingScreen() {
       sr?.pricingUnit ?? sr?.PricingUnit,
     );
     return total > 0 ? total : null;
-  }, [selectedRate, sr, startDate, startTime, endDate, endTime, fixedDurationMinutes]);
+  }, [selectedRate, sr, startDate, startTime, endDate, endTime, fixedDurationMinutes, isMultiDayService]);
 
   const handleSubmit = async () => {
     if (submitting) return;
@@ -458,13 +547,37 @@ export function BookingScreen() {
       showGlobalAlertCompat(t("errorTitle"), t("timeSlotUnavailable"));
       return;
     }
+    if (
+      isMultiDayService
+      && !fixedDurationMinutes
+      && startDate
+      && endDate
+      && endDate < startDate
+    ) {
+      showGlobalAlertCompat(t("errorTitle"), t("invalidDates"));
+      return;
+    }
+    if (
+      isMultiDayService
+      && !fixedDurationMinutes
+      && startDate
+      && endDate
+      && startDate === endDate
+      && startTime
+      && endTime
+      && endTime <= startTime
+    ) {
+      showGlobalAlertCompat(t("errorTitle"), t("invalidDates"));
+      return;
+    }
     const billingMode = getBillingMode(sr);
     if (!fixedDurationMinutes) {
-      if (billingMode === "perNight" && (!endDate || !endTime)) {
+      const needsExplicitCheckoutRange = billingMode === "perNight" || isMultiDayService;
+      if (needsExplicitCheckoutRange && (!endDate || !endTime)) {
         showGlobalAlertCompat(t("errorTitle"), t("invalidDates"));
         return;
       }
-      if (billingMode !== "perNight" && !endTime) {
+      if (!needsExplicitCheckoutRange && !endTime) {
         showGlobalAlertCompat(t("errorTitle"), t("invalidDates"));
         return;
       }
@@ -510,7 +623,7 @@ export function BookingScreen() {
       });
       showGlobalAlertCompat(t("bookingSuccess"), t("bookingCreated"), [
         {
-          text: "OK",
+          text: t("alertDismissOk"),
           onPress: () => navigateToMyBookingsOutgoing(navigation),
         },
       ]);
@@ -612,9 +725,8 @@ export function BookingScreen() {
             {t("selectService")}
           </Text>
           {profile.serviceRates.map((rate: any, idx: number) => {
-            const serviceType = resolveServiceType(rate);
-            const name = rate.service ?? (serviceType ? SERVICE_TYPE_NAMES[serviceType] : `Service ${rate.serviceType}`);
-            const unit = rate.unit ?? PRICING_UNIT_LABELS[rate.pricingUnit] ?? "";
+            const name = serviceRateDisplayName(rate, t);
+            const unit = pricingUnitShortLabel(rate, t);
             const selected = selectedRateIdx === idx;
 
             return (
@@ -739,7 +851,7 @@ export function BookingScreen() {
                     {pet.name}
                   </Text>
                   <Text style={{ color: colors.textMuted, fontSize: 11, marginTop: 2 }}>
-                    {petSpeciesLabel(pet)}
+                    {petSpeciesDisplay(pet, t)}
                   </Text>
                   {isSelected ? (
                     <Ionicons
@@ -789,7 +901,7 @@ export function BookingScreen() {
           )}
 
           <Text style={[rtlText, { color: colors.text, fontSize: 16, fontWeight: "700", marginBottom: 14 }]}>
-            {t("startDate")}
+            {isMultiDayService ? t("bookingCheckInDate") : t("startDate")}
           </Text>
           <SmartCalendarPicker
             availabilitySlots={profile.availabilitySlots ?? []}
@@ -797,7 +909,7 @@ export function BookingScreen() {
             onDateSelect={(d) => {
               setStartDate(d);
               // Auto-set end date to start date for single-day services;
-              // for multi-night services the user can change it below.
+              // for stay services the user sets check-out on the second calendar.
               if (!endDate || endDate < d) setEndDate(d);
               // Clear time selections so user picks fresh slots for the new day
               setStartTime("");
@@ -808,7 +920,7 @@ export function BookingScreen() {
           {startDate ? (
             <>
               <Text style={[rtlText, { color: colors.text, fontSize: 14, fontWeight: "700", marginTop: 18, marginBottom: 10 }]}>
-                {t("startTime")}
+                {isMultiDayService ? t("bookingCheckInTime") : t("startTime")}
               </Text>
               {!selectedServiceType ? (
                 <Text style={[rtlText, { color: colors.textMuted, fontSize: 13, paddingVertical: 10 }]}>
@@ -841,18 +953,22 @@ export function BookingScreen() {
             >
               <Ionicons name="time-outline" size={18} color={colors.primary} />
               <Text style={[rtlText, { color: colors.primary, fontSize: 14, fontWeight: "700", flex: 1 }]}>
-                משך הטיול: {fixedDurationMinutes} דקות
+                {t("bookingWalkDuration").replace("{{minutes}}", String(fixedDurationMinutes))}
               </Text>
             </View>
-          ) : sr && (sr.pricingUnit === 1 || sr.unit === "night") ? (
+          ) : sr && isMultiDayService ? (
             <>
               <Text style={[rtlText, { color: colors.text, fontSize: 16, fontWeight: "700", marginTop: 22, marginBottom: 14 }]}>
-                {t("endDate")}
+                {t("bookingCheckOutDate")}
               </Text>
               <SmartCalendarPicker
                 availabilitySlots={profile.availabilitySlots ?? []}
                 selectedDate={endDate}
                 onDateSelect={(d) => {
+                  if (startDate && d < startDate) {
+                    showGlobalAlertCompat(t("errorTitle"), t("invalidDates"));
+                    return;
+                  }
                   setEndDate(d);
                   setEndTime("");
                 }}
@@ -860,7 +976,7 @@ export function BookingScreen() {
               {endDate ? (
                 <>
                   <Text style={[rtlText, { color: colors.text, fontSize: 14, fontWeight: "700", marginTop: 18, marginBottom: 10 }]}>
-                    {t("endTime")}
+                    {t("bookingCheckOutTime")}
                   </Text>
                   <TimeSlotSelector
                     availableTimes={endAvailableTimes}

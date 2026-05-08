@@ -11,6 +11,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   useNavigation,
   useNavigationState,
+  getFocusedRouteNameFromRoute,
 } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuthStore } from "../store/authStore";
@@ -22,15 +23,14 @@ import { useTheme } from "../theme/ThemeContext";
 /** Sits just above the tab bar. */
 const TAB_BAR_OFFSET = 72;
 
-function getFocusedRouteName(state: any): string | undefined {
-  if (!state?.routes?.length) return undefined;
-  const route = state.routes[state.index];
-  if (route.state?.routes?.length) {
-    const inner = route.state.routes[route.state.index];
-    return inner?.name;
-  }
-  return route.name;
-}
+/** Pets stack screens where the global SOS FAB would duplicate the flow or cover inputs. */
+const MY_PETS_STACK_HIDE_SOS = new Set<string>([
+  "ReportLost",
+  "EmergencyVets",
+  "AddPet",
+  "Triage",
+  "ActivityLog",
+]);
 
 function useSosFabVisible(): boolean {
   return useNavigationState((state) => {
@@ -38,10 +38,15 @@ function useSosFabVisible(): boolean {
     const tabRoute = state.routes[state.index];
     if (tabRoute.name !== "MyPets") return false;
 
+    const focused = getFocusedRouteNameFromRoute(tabRoute);
+    if (focused != null) return focused === "MyPetsMain";
+
     const innerState = tabRoute.state;
     if (!innerState?.routes?.length) return true;
-    const innerRoute = innerState.routes[innerState.index!];
-    return innerRoute?.name === "MyPetsMain";
+    const innerRoute = innerState.routes[innerState.index ?? 0];
+    if (!innerRoute?.name) return true;
+    if (MY_PETS_STACK_HIDE_SOS.has(innerRoute.name)) return false;
+    return innerRoute.name === "MyPetsMain";
   });
 }
 

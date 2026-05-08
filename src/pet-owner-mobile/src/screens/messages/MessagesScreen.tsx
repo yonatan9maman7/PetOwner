@@ -4,6 +4,7 @@ import {
   Text,
   TouchableOpacity,
   RefreshControl,
+  InteractionManager,
 } from "react-native";
 import { FlashList } from "@shopify/flash-list";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -41,12 +42,22 @@ export function MessagesScreen() {
   const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
-    startConnection();
+    const task = InteractionManager.runAfterInteractions(() => {
+      startConnection();
+    });
+    return () => {
+      task.cancel?.();
+    };
   }, []);
 
   useFocusEffect(
     useCallback(() => {
-      useChatStore.getState().fetchConversations();
+      const task = InteractionManager.runAfterInteractions(() => {
+        useChatStore.getState().fetchConversations();
+      });
+      return () => {
+        task.cancel?.();
+      };
     }, []),
   );
 

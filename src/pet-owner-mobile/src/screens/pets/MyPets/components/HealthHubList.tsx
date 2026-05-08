@@ -1,3 +1,4 @@
+import { useRef, useEffect } from "react";
 import Animated, { FadeInDown } from "react-native-reanimated";
 import { View } from "react-native";
 import { useNavigation } from "@react-navigation/native";
@@ -22,7 +23,9 @@ export function HealthHubList({ activePet, summary, onSelectSection, onOpenTriag
   const navigation = useNavigation<any>();
   const disabled = !activePet;
   const petId = activePet?.id;
-  const key = petId ?? "none";
+
+  const hasMountedRef = useRef(false);
+  useEffect(() => { hasMountedRef.current = true; }, []);
 
   const widgets = [
     <TriageWidget
@@ -70,10 +73,12 @@ export function HealthHubList({ activePet, summary, onSelectSection, onOpenTriag
     <View style={{ paddingHorizontal: 20, gap: 10, marginTop: 16 }}>
       {widgets.map((widget, i) => (
         <Animated.View
-          key={`${key}-${i}`}
-          entering={FadeInDown.delay(i * 50)
-            .springify()
-            .damping(18)}
+          key={i}
+          entering={
+            !hasMountedRef.current
+              ? FadeInDown.delay(i * 50).springify().damping(18)
+              : undefined
+          }
         >
           {widget}
         </Animated.View>

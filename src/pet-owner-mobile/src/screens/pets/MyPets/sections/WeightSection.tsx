@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
-import { View, Text, Pressable, TextInput, ActivityIndicator } from "react-native";
+import { View, Text, Pressable, TextInput, ActivityIndicator, Alert } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useTranslation, type TranslationKey, rowDirectionForAppLayout } from "../../../../i18n";
 import type { ThemeColors } from "../../../../theme/ThemeContext";
@@ -10,6 +10,10 @@ import { ListSkeleton } from "../../../../components/shared/ListSkeleton";
 import type { WeightLogDto } from "../../../../types/api";
 import { formInputStyle } from "../helpers";
 import { showGlobalAlertCompat } from "../../../../components/global-modal";
+
+const WEIGHT_SAVE_ERROR_TITLE = "שגיאה";
+const WEIGHT_SAVE_ERROR_MESSAGE =
+  "לא הצלחנו לשמור את הנתונים. אנא בדוק את החיבור לרשת ונסה שוב.";
 
 function formatAxisWeightKg(v: number): string {
   const r = Math.round(v * 10) / 10;
@@ -366,11 +370,17 @@ export function WeightSection({ petId, reloadNonce = 0 }: { petId: string; reloa
       setShowForm(false);
       setFormWeight("");
       setFormDate("");
-      await load();
-    } catch {
-      /* error toast from global API interceptor */
+      try {
+        await load();
+      } catch (reloadErr: unknown) {
+        console.error("WeightSection: load after addWeight failed", reloadErr);
+      }
+    } catch (e: unknown) {
+      console.error("WeightSection: addWeightLog failed", e);
+      Alert.alert(WEIGHT_SAVE_ERROR_TITLE, WEIGHT_SAVE_ERROR_MESSAGE);
+    } finally {
+      setSaving(false);
     }
-    setSaving(false);
   };
 
   const startEditLog = (log: WeightLogDto) => {
@@ -404,11 +414,17 @@ export function WeightSection({ petId, reloadNonce = 0 }: { petId: string; reloa
         dateRecorded: editDate,
       });
       cancelEditLog();
-      await load();
-    } catch {
-      /* error toast from global API interceptor */
+      try {
+        await load();
+      } catch (reloadErr: unknown) {
+        console.error("WeightSection: load after updateWeight failed", reloadErr);
+      }
+    } catch (e: unknown) {
+      console.error("WeightSection: updateWeightLog failed", e);
+      Alert.alert(WEIGHT_SAVE_ERROR_TITLE, WEIGHT_SAVE_ERROR_MESSAGE);
+    } finally {
+      setSaving(false);
     }
-    setSaving(false);
   };
 
   const deleteLog = async (logId: string) => {

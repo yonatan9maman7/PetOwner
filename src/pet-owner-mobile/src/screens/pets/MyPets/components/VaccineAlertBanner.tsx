@@ -1,30 +1,20 @@
-import { useEffect, useState } from "react";
 import { View, Text, Pressable } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useTranslation, rowDirectionForAppLayout } from "../../../../i18n";
-import { medicalApi } from "../../../../api/client";
 import { useTheme } from "../../../../theme/ThemeContext";
+import type { VaccineStatusDto } from "../../../../types/api";
 
 interface VaccineAlertBannerProps {
-  petId: string;
+  vaccineStatuses: VaccineStatusDto[];
   onPress: () => void;
 }
 
-export function VaccineAlertBanner({ petId, onPress }: VaccineAlertBannerProps) {
+export function VaccineAlertBanner({ vaccineStatuses, onPress }: VaccineAlertBannerProps) {
   const { t, isRTL } = useTranslation();
   const { colors } = useTheme();
-  const [overdueCount, setOverdueCount] = useState(0);
-  const [dueSoonCount, setDueSoonCount] = useState(0);
 
-  useEffect(() => {
-    medicalApi
-      .getVaccineStatus(petId, { backgroundRequest: true })
-      .then((statuses) => {
-        setOverdueCount(statuses.filter((s) => s.status === "Overdue").length);
-        setDueSoonCount(statuses.filter((s) => s.status === "Due Soon").length);
-      })
-      .catch(() => {});
-  }, [petId]);
+  const overdueCount = vaccineStatuses.filter((s) => s.status === "Overdue").length;
+  const dueSoonCount = vaccineStatuses.filter((s) => s.status === "Due Soon").length;
 
   if (overdueCount === 0 && dueSoonCount === 0) return null;
 

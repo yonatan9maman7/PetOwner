@@ -8,6 +8,7 @@ import {
   KeyboardAvoidingView,
   ScrollView,
   ActivityIndicator,
+  Alert,
 } from "react-native";
 import { useForm, Controller, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -141,25 +142,33 @@ export function AddActivityModal({
 
   const activityType = useWatch({ control, name: "type" });
 
+  const SAVE_ERROR_TITLE = "שגיאה";
+  const SAVE_ERROR_MESSAGE =
+    "לא הצלחנו לשמור את הנתונים. אנא בדוק את החיבור לרשת ונסה שוב.";
+
   const onSubmit = handleSubmit(async (data) => {
     setSubmitting(true);
-    const payload: CreateActivityDto = {
-      type: data.type,
-      date:
-        data.type === "Meal"
-          ? localYmdHhmmToIsoLike(data.date, (data.feedingTime ?? "").trim() || nowHHMM())
-          : data.date,
-      notes: data.notes?.trim() || undefined,
-    };
-    if (data.type === "Walk" || data.type === "Exercise") {
-      payload.durationMinutes = parseInt(data.durationMinutes!.trim(), 10);
-    }
+    try {
+      const payload: CreateActivityDto = {
+        type: data.type,
+        date:
+          data.type === "Meal"
+            ? localYmdHhmmToIsoLike(data.date, (data.feedingTime ?? "").trim() || nowHHMM())
+            : data.date,
+        notes: data.notes?.trim() || undefined,
+      };
+      if (data.type === "Walk" || data.type === "Exercise") {
+        payload.durationMinutes = parseInt(data.durationMinutes!.trim(), 10);
+      }
 
-    const created = await createActivity(petId, payload);
-    setSubmitting(false);
-    if (created) {
+      await createActivity(petId, payload);
       onCreated?.();
       onClose();
+    } catch (e: unknown) {
+      console.error("AddActivityModal: createActivity failed", e);
+      Alert.alert(SAVE_ERROR_TITLE, SAVE_ERROR_MESSAGE);
+    } finally {
+      setSubmitting(false);
     }
   });
 

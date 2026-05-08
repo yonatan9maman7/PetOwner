@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useEffect, useMemo, type RefObject } from "react";
+import { useState, useCallback, useRef, useEffect, useMemo, memo, startTransition, type RefObject } from "react";
 import {
   View,
   Text,
@@ -11,10 +11,12 @@ import {
   Image,
   ScrollView,
   FlatList,
+  type ListRenderItemInfo,
   KeyboardAvoidingView,
   type KeyboardAvoidingViewProps,
   Share,
   StatusBar,
+  InteractionManager,
 } from "react-native";
 import { showGlobalAlertCompat } from "../../components/global-modal";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
@@ -25,11 +27,13 @@ import { useAuthStore } from "../../store/authStore";
 import { usePetsStore } from "../../store/petsStore";
 import { useTranslation, rowDirectionForAppLayout } from "../../i18n";
 import { CommunitySearchModal } from "./components/CommunitySearchModal";
+import { CommunityGroupListCard } from "./components/CommunityGroupListCard";
 import { useTheme } from "../../theme/ThemeContext";
 import { AuthPlaceholder } from "../../components/AuthPlaceholder";
 import { BrandedAppHeader } from "../../components/BrandedAppHeader";
 import { DatePickerField } from "../../components/DatePickerField";
 import { ListSkeleton, ListEmptyState } from "../../components/shared";
+import { useFocusDefer } from "../../hooks/useFocusDefer";
 import { TimePickerField } from "../../components/TimePickerField";
 import { ImageLightbox } from "../../components/ImageLightbox";
 import { MapViewWrapper, MarkerWrapper } from "../../components/MapViewWrapper";
@@ -143,177 +147,8 @@ const VISIBILITY_OPTIONS: Visibility[] = [
   "Group only",
 ];
 
-const demoPostMeta: Record<string, PostMeta> = {
-  "demo-post-1": {
-    kind: "Playdate",
-    location: "פארק הירקון",
-    dogName: "מיקה",
-    visibility: "Nearby only",
-    tags: ["evening", "friendly"],
-    isDemo: true,
-  },
-  "demo-post-2": {
-    kind: "Question",
-    location: "תל אביב",
-    dogName: "במבה",
-    visibility: "Public",
-    tags: ["training"],
-    isDemo: true,
-  },
-  "demo-post-3": {
-    kind: "Recommendation",
-    location: "גינת דובנוב",
-    visibility: "Public",
-    tags: ["dog-park"],
-    isDemo: true,
-  },
-  "demo-post-4": {
-    kind: "Playdate",
-    location: "גן מאיר",
-    dogName: "לונה",
-    visibility: "Nearby only",
-    tags: ["small-dogs"],
-    isDemo: true,
-  },
-  "demo-post-5": {
-    kind: "Lost & Found",
-    location: "דיזנגוף סנטר",
-    visibility: "Public",
-    tags: ["lost-dog"],
-    isDemo: true,
-  },
-};
 
-const DEMO_POSTS: PostDto[] = [
-  {
-    id: "demo-post-1",
-    userId: "demo-user-mika",
-    userName: "מיקה ונועה",
-    content: "מיקה מחפשת חברים למשחק היום בגינת פארק הירקון בשעה 18:30. מי מצטרף?",
-    likeCount: 18,
-    commentCount: 4,
-    helpfulCount: 3,
-    markedHelpfulByMe: false,
-    savedByMe: false,
-    likedByMe: false,
-    createdAt: new Date(Date.now() - 22 * 60_000).toISOString(),
-    authorRole: "Owner",
-    authorIsApprovedProvider: false,
-    category: "playdate",
-  },
-  {
-    id: "demo-post-2",
-    userId: "demo-user-bamba",
-    userName: "עמית כהן",
-    content: "מישהו מכיר מאלף טוב ללברדור אנרגטי באזור תל אביב?",
-    likeCount: 9,
-    commentCount: 7,
-    helpfulCount: 1,
-    markedHelpfulByMe: false,
-    savedByMe: false,
-    likedByMe: false,
-    createdAt: new Date(Date.now() - 75 * 60_000).toISOString(),
-    authorRole: "Owner",
-    authorIsApprovedProvider: false,
-    category: "question",
-  },
-  {
-    id: "demo-post-3",
-    userId: "demo-user-park",
-    userName: "חברי גינת דובנוב",
-    content: "עדכון מגינת דובנוב: הברזייה חזרה לעבוד.",
-    likeCount: 31,
-    commentCount: 3,
-    helpfulCount: 8,
-    markedHelpfulByMe: true,
-    savedByMe: false,
-    likedByMe: true,
-    createdAt: new Date(Date.now() - 3 * 60 * 60_000).toISOString(),
-    authorRole: "Owner",
-    authorIsApprovedProvider: false,
-    category: "recommendation",
-  },
-  {
-    id: "demo-post-4",
-    userId: "demo-user-luna",
-    userName: "מפגש לונה",
-    content: "מחפשים מפגש כלבים קטנים ביום שישי.",
-    likeCount: 14,
-    commentCount: 5,
-    helpfulCount: 2,
-    markedHelpfulByMe: false,
-    savedByMe: false,
-    likedByMe: false,
-    createdAt: new Date(Date.now() - 8 * 60 * 60_000).toISOString(),
-    authorRole: "Owner",
-    authorIsApprovedProvider: false,
-    category: "playdate",
-  },
-  {
-    id: "demo-post-5",
-    userId: "demo-user-lost",
-    userName: "התראת קהילה",
-    content: "כלב אבד באזור דיזנגוף סנטר, אשמח לעזרה.",
-    likeCount: 42,
-    commentCount: 11,
-    helpfulCount: 6,
-    markedHelpfulByMe: false,
-    savedByMe: false,
-    likedByMe: false,
-    createdAt: new Date(Date.now() - 26 * 60 * 60_000).toISOString(),
-    authorRole: "Owner",
-    authorIsApprovedProvider: false,
-    category: "lost_and_found",
-  },
-];
 
-const DEMO_PARKS: DogPark[] = [
-  {
-    id: "park-hayarkon",
-    name: "גינת הכלבים פארק הירקון",
-    address: "פארק הירקון, תל אביב",
-    latitude: 32.1047,
-    longitude: 34.8158,
-    distance: "1.2 km",
-    rating: 4.8,
-    activity: "High",
-    amenities: ["ברזייה", "צל", "גדר", "אזור לכלבים קטנים"],
-    activeDogs: 8,
-    upcomingPlaydates: 2,
-    recentPosts: 6,
-    peakHours: "17:30-20:00",
-  },
-  {
-    id: "dubnov",
-    name: "גינת דובנוב",
-    address: "גינת דובנוב, תל אביב",
-    latitude: 32.0744,
-    longitude: 34.7831,
-    distance: "2.4 km",
-    rating: 4.5,
-    activity: "Medium",
-    amenities: ["ברזייה", "תאורה", "גדר"],
-    activeDogs: 4,
-    upcomingPlaydates: 1,
-    recentPosts: 3,
-    peakHours: "18:00-19:30",
-  },
-  {
-    id: "gan-meir",
-    name: "גן מאיר לכלבים קטנים",
-    address: "גן מאיר, תל אביב",
-    latitude: 32.0735,
-    longitude: 34.7736,
-    distance: "3.1 km",
-    rating: 4.6,
-    activity: "Low",
-    amenities: ["צל", "אזור לכלבים קטנים", "גדר"],
-    activeDogs: 2,
-    upcomingPlaydates: 1,
-    recentPosts: 2,
-    peakHours: "16:00-18:00",
-  },
-];
 
 const HE = {
   title: "הקהילה",
@@ -907,7 +742,7 @@ function useCommunityStyles() {
   return useMemo(() => getStyles(colors), [colors]);
 }
 
-function PostCard({
+const PostCard = memo(function PostCard({
   post,
   meta,
   currentUserId,
@@ -946,7 +781,6 @@ function PostCard({
   isLikePending?: boolean;
   isDeletePending?: boolean;
   onSosResolved?: (postId: string, resolvedAtIso: string) => void;
-  /** Same confetti burst as Add Pet success; fires before SOS API after confirm. */
   celebrateMarkFoundBurst?: () => void;
 }) {
   const { colors } = useTheme();
@@ -1221,7 +1055,7 @@ function PostCard({
       />
     </View>
   );
-}
+});
 
 function Chip({
   label,
@@ -1253,7 +1087,36 @@ function Chip({
   );
 }
 
+function SectionHeader({
+  title,
+  subtitle,
+  actionLabel,
+  onAction,
+}: {
+  title: string;
+  subtitle: string;
+  actionLabel?: string;
+  onAction?: () => void;
+}) {
+  const styles = useCommunityStyles();
+  const { rtlText } = useTranslation();
+  return (
+    <View style={styles.sectionHeader}>
+      <View style={{ flex: 1 }}>
+        <Text style={[styles.sectionTitle, rtlText]}>{title}</Text>
+        <Text style={[styles.sectionSubtitle, rtlText]}>{subtitle}</Text>
+      </View>
+      {actionLabel && onAction ? (
+        <Pressable onPress={onAction} style={styles.primarySmallBtn}>
+          <Text style={styles.primarySmallText}>{actionLabel}</Text>
+        </Pressable>
+      ) : null}
+    </View>
+  );
+}
+
 export function CommunityScreen() {
+  const isDeferredReady = useFocusDefer();
   const sosMarkFoundConfettiRef = useRef<CelebrationConfettiBurstRef>(null);
   const burstMarkFoundCelebrate = useCallback(() => {
     sosMarkFoundConfettiRef.current?.burst();
@@ -1275,11 +1138,10 @@ export function CommunityScreen() {
   const [mainTab, setMainTab] = useState<MainTab>("feed");
 
   const [posts, setPosts] = useState<PostDto[]>([]);
-  const [postMetaById, setPostMetaById] = useState<Record<string, PostMeta>>(demoPostMeta);
+  const [postMetaById, setPostMetaById] = useState<Record<string, PostMeta>>({});
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(false);
   const [feedError, setFeedError] = useState(false);
-  const [feedIsDemo, setFeedIsDemo] = useState(false);
   const [hasMore, setHasMore] = useState(false);
   const [composerOpen, setComposerOpen] = useState(false);
   const [newPostContent, setNewPostContent] = useState("");
@@ -1333,7 +1195,7 @@ export function CommunityScreen() {
   const [beacons, setBeacons] = useState<LiveBeaconDto[]>([]);
   const [beaconsLoading, setBeaconsLoading] = useState(false);
   const [myBeaconId, setMyBeaconId] = useState<string | null>(null);
-  const [parks, setParks] = useState<DogPark[]>(DEMO_PARKS);
+  const [parks, setParks] = useState<DogPark[]>([]);
   const [parksLoading, setParksLoading] = useState(false);
   const [parksUserLocation, setParksUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [checkingInPark, setCheckingInPark] = useState<DogPark | null>(null);
@@ -1373,9 +1235,13 @@ export function CommunityScreen() {
   }, []);
 
   useEffect(() => {
-    if (hydrated && isLoggedIn) {
+    if (!hydrated || !isLoggedIn) return;
+    const task = InteractionManager.runAfterInteractions(() => {
       void loadDashboard();
-    }
+    });
+    return () => {
+      task.cancel?.();
+    };
   }, [hydrated, isLoggedIn, loadDashboard]);
 
   const loadFeed = useCallback(
@@ -1384,17 +1250,11 @@ export function CommunityScreen() {
       setFeedError(false);
       try {
         const data = await postsApi.getFeed(p, PAGE_SIZE, { ranked: true });
-        const nextPosts = data.length > 0 ? data : DEMO_POSTS;
-        setPosts((prev) => (replace ? nextPosts : [...prev, ...nextPosts]));
-        setFeedIsDemo(data.length === 0);
+        setPosts((prev) => (replace ? data : [...prev, ...data]));
         setHasMore(data.length >= PAGE_SIZE);
         setPage(p);
       } catch {
         setFeedError(true);
-        if (replace) {
-          setPosts(DEMO_POSTS);
-          setFeedIsDemo(true);
-        }
       } finally {
         setLoading(false);
       }
@@ -1512,7 +1372,7 @@ export function CommunityScreen() {
         radiusMeters: 8000,
       });
       if (nearby.length === 0) {
-        setParks(DEMO_PARKS);
+        setParks([]);
         return;
       }
       const mapped = nearby.slice(0, 12).map<DogPark>((park, index) => {
@@ -1536,7 +1396,7 @@ export function CommunityScreen() {
       });
       setParks(mapped);
     } catch {
-      setParks(DEMO_PARKS);
+      setParks([]);
     } finally {
       setParksLoading(false);
     }
@@ -1555,16 +1415,24 @@ export function CommunityScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      if (!hydrated || !isLoggedIn) return;
-      loadPets();
-      void loadDashboard();
-      if (mainTab === "feed" || mainTab === "qa" || mainTab === "lostSos") loadFeed(1, true);
-      if (mainTab === "groups") loadGroups();
-      if (mainTab === "playdates" || mainTab === "events") loadPlaydates();
-      if (mainTab === "parks") {
-        loadBeacons();
-        loadDogParks();
-      }
+      if (!hydrated || !isLoggedIn) return undefined;
+      let cancelled = false;
+      const task = InteractionManager.runAfterInteractions(() => {
+        if (cancelled) return;
+        loadPets();
+        void loadDashboard();
+        if (mainTab === "feed" || mainTab === "qa" || mainTab === "lostSos") void loadFeed(1, true);
+        if (mainTab === "groups") void loadGroups();
+        if (mainTab === "playdates" || mainTab === "events") void loadPlaydates();
+        if (mainTab === "parks") {
+          void loadBeacons();
+          void loadDogParks();
+        }
+      });
+      return () => {
+        cancelled = true;
+        task.cancel?.();
+      };
     }, [
       hydrated,
       isLoggedIn,
@@ -1701,6 +1569,11 @@ export function CommunityScreen() {
   const dashboardOpenQuestions = communityDashboard?.openQuestions ?? questionPosts.length;
   const dashboardActiveParks = communityDashboard?.activeDogParks ?? activeParksNearbyCount;
   const dashboardSos = communityDashboard?.sosAlerts ?? sosFeedPosts.length;
+
+  const upcomingEventsCount = useMemo(
+    () => playdates.filter((e) => new Date(e.scheduledFor).getTime() > Date.now()).length,
+    [playdates],
+  );
 
   const handlePublish = async () => {
     const content = newPostContent.trim();
@@ -1963,6 +1836,42 @@ export function CommunityScreen() {
     }
   }, []);
 
+  const handleHidePost = useCallback(
+    (id: string) => {
+      setHiddenPostIds((prev) => new Set(prev).add(id));
+      showGlobalAlertCompat(copy("postHidden"), copy("postHiddenDesc"));
+    },
+    [copy],
+  );
+
+  const handleBlockUser = useCallback(
+    (userId: string) => {
+      setBlockedUserIds((prev) => new Set(prev).add(userId));
+      showGlobalAlertCompat(copy("userBlocked"), copy("userBlockedDesc"));
+    },
+    [copy],
+  );
+
+  const handlePlaydateComing = useCallback(
+    (post: PostDto) => {
+      setPosts((prev) =>
+        prev.map((p) =>
+          p.id === post.id ? { ...p, likeCount: p.likeCount + 1, likedByMe: true } : p,
+        ),
+      );
+      showGlobalAlertCompat(copy("youAreComing"), copy("youAreComingDesc"));
+    },
+    [copy],
+  );
+
+  const handleSosResolved = useCallback((postId: string, resolvedAtIso: string) => {
+    setPosts((prev) =>
+      prev.map((p) =>
+        p.id === postId ? { ...p, sosResolvedAt: resolvedAtIso } : p,
+      ),
+    );
+  }, []);
+
   const loadMore = () => {
     if (!loading && hasMore) loadFeed(page + 1, false);
   };
@@ -2175,42 +2084,68 @@ export function CommunityScreen() {
     }
   };
 
-  const handleJoinGroup = async (item: CommunityGroupDto) => {
-    const previousJoined = item.joinedByMe ?? false;
-    const previousCount = item.memberCount ?? 0;
-    const nextJoined = !previousJoined;
-    setGroups((prev) =>
-      prev.map((g) =>
-        g.id === item.id
-          ? {
-              ...g,
-              joinedByMe: nextJoined,
-              memberCount: nextJoined ? previousCount + 1 : Math.max(0, previousCount - 1),
-            }
-          : g,
-      ),
-    );
-    try {
-      const res = nextJoined
-        ? await communityApi.joinGroup(item.id)
-        : await communityApi.leaveGroup(item.id);
-      setGroups((prev) =>
-        prev.map((g) =>
-          g.id === item.id ? { ...g, joinedByMe: res.joined, memberCount: res.memberCount } : g,
-        ),
-      );
-      showGlobalAlertCompat(copy("groupUpdated"), copy("groupUpdatedDesc"));
-    } catch {
+  const handleJoinGroup = useCallback(
+    async (item: CommunityGroupDto) => {
+      const previousJoined = item.joinedByMe ?? false;
+      const previousCount = item.memberCount ?? 0;
+      const nextJoined = !previousJoined;
       setGroups((prev) =>
         prev.map((g) =>
           g.id === item.id
-            ? { ...g, joinedByMe: previousJoined, memberCount: previousCount }
+            ? {
+                ...g,
+                joinedByMe: nextJoined,
+                memberCount: nextJoined ? previousCount + 1 : Math.max(0, previousCount - 1),
+              }
             : g,
         ),
       );
-      showGlobalAlertCompat(copy("savedLocal"), copy("groupUpdatedDesc"));
-    }
-  };
+      try {
+        const res = nextJoined
+          ? await communityApi.joinGroup(item.id)
+          : await communityApi.leaveGroup(item.id);
+        setGroups((prev) =>
+          prev.map((g) =>
+            g.id === item.id ? { ...g, joinedByMe: res.joined, memberCount: res.memberCount } : g,
+          ),
+        );
+        showGlobalAlertCompat(copy("groupUpdated"), copy("groupUpdatedDesc"));
+      } catch {
+        setGroups((prev) =>
+          prev.map((g) =>
+            g.id === item.id
+              ? { ...g, joinedByMe: previousJoined, memberCount: previousCount }
+              : g,
+          ),
+        );
+        showGlobalAlertCompat(copy("savedLocal"), copy("groupUpdatedDesc"));
+      }
+    },
+    [copy],
+  );
+
+  /** Navigate first — no awaits or heavy work before `navigate` (keeps taps responsive). */
+  const openGroupDetail = useCallback(
+    (group: CommunityGroupDto) => {
+      navigation.navigate("GroupDetail", { group });
+    },
+    [navigation],
+  );
+
+  const renderGroupCard = useCallback(
+    ({ item }: ListRenderItemInfo<CommunityGroupDto>) => (
+      <CommunityGroupListCard
+        item={item}
+        isRTL={isRTL}
+        postsCountSuffix={t("postsCount")}
+        joinedLabel={copy("joined")}
+        joinLabel={copy("joinGroup")}
+        onOpenDetail={openGroupDetail}
+        onToggleJoin={handleJoinGroup}
+      />
+    ),
+    [isRTL, t, copy, openGroupDetail, handleJoinGroup],
+  );
 
   const handleJoinEvent = async (event: PlaydateEventDto) => {
     const previous = event.myRsvpStatus;
@@ -2270,34 +2205,57 @@ export function CommunityScreen() {
     showGlobalAlertCompat(copy("following"), copy("followingDesc"));
   };
 
-  if (!hydrated) {
-    return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={["top"]}>
-        <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
-          <ActivityIndicator size="large" color={colors.text} />
-        </View>
-      </SafeAreaView>
-    );
-  }
-
-  if (!isLoggedIn) {
-    return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: colors.surface, marginTop: -8 }} edges={["top"]}>
-        <AuthPlaceholder
-          title={t("communityTitle")}
-          subtitle={t("communitySubtitle")}
-          icon="people-outline"
-        />
-      </SafeAreaView>
-    );
-  }
+  const renderFeedItem = useCallback(
+    ({ item }: ListRenderItemInfo<PostDto>) => (
+      <PostCard
+        post={item}
+        meta={postMetaById[item.id]}
+        currentUserId={user?.id ?? null}
+        onToggleLike={handleToggleLike}
+        onToggleHelpful={handleToggleHelpful}
+        onToggleSave={handleToggleSave}
+        onDelete={handleDelete}
+        onHide={handleHidePost}
+        onReport={handleReportPost}
+        onBlock={handleBlockUser}
+        onPlaydateComing={handlePlaydateComing}
+        onSosResolved={handleSosResolved}
+        celebrateMarkFoundBurst={burstMarkFoundCelebrate}
+        rtlText={rtlText}
+        rtlRow={rtlRow}
+        isRTL={isRTL}
+        copy={copy}
+        isLikePending={!!likeBusy[item.id]}
+        isDeletePending={!!deleteBusy[item.id]}
+      />
+    ),
+    [
+      postMetaById,
+      user,
+      handleToggleLike,
+      handleToggleHelpful,
+      handleToggleSave,
+      handleDelete,
+      handleHidePost,
+      handleReportPost,
+      handleBlockUser,
+      handlePlaydateComing,
+      handleSosResolved,
+      burstMarkFoundCelebrate,
+      rtlText,
+      rtlRow,
+      isRTL,
+      copy,
+      likeBusy,
+      deleteBusy,
+    ],
+  );
 
   const renderTopTabs = () => {
     const meetupCount =
       upcomingMeetupsPreview.length > 0
         ? upcomingMeetupsPreview.length
         : communityDashboard?.upcomingMeetups ?? 0;
-    const upcomingEventsCount = playdates.filter((e) => new Date(e.scheduledFor).getTime() > Date.now()).length;
 
     const tabBadge = (tab: MainTab): { value: number; alert?: boolean } | null => {
       switch (tab) {
@@ -2396,7 +2354,7 @@ export function CommunityScreen() {
               <Pressable
                 key={tab}
                 onPress={() => {
-                  setMainTab(tab);
+                  startTransition(() => setMainTab(tab));
                   if (tab === "groups" && groups.length === 0) void loadGroups();
                   if (tab === "playdates" || tab === "events") void loadPlaydates();
                   if (tab === "parks") {
@@ -2446,6 +2404,49 @@ export function CommunityScreen() {
     );
   };
 
+  const topTabsElement = useMemo(
+    () => renderTopTabs(),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [
+      mainTab,
+      dashboardActiveDogs,
+      dashboardActiveParks,
+      dashboardOpenQuestions,
+      dashboardSos,
+      upcomingMeetupsPreview,
+      upcomingEventsCount,
+      groups,
+      t,
+      isRTL,
+      appRowDirection,
+      rtlText,
+      colors,
+      styles,
+      posts.length,
+    ],
+  );
+
+  if (!hydrated || !isDeferredReady) {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: colors.surface }} edges={["top"]}>
+        <BrandedAppHeader style={{ paddingVertical: 6 }} />
+        <ListSkeleton rows={5} variant="card" />
+      </SafeAreaView>
+    );
+  }
+
+  if (!isLoggedIn) {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: colors.surface, marginTop: -8 }} edges={["top"]}>
+        <AuthPlaceholder
+          title={t("communityTitle")}
+          subtitle={t("communitySubtitle")}
+          icon="people-outline"
+        />
+      </SafeAreaView>
+    );
+  }
+
   const renderFeedHeaderWithoutHero = () => (
     <>
       <View style={[styles.searchCard, { flexDirection: appRowDirection }]}>
@@ -2458,14 +2459,6 @@ export function CommunityScreen() {
           placeholderTextColor={colors.textMuted}
         />
       </View>
-      {feedIsDemo && (
-        <View style={styles.demoBanner}>
-          <Ionicons name="information-circle-outline" size={16} color={colors.primary} />
-          <Text style={[styles.demoBannerText, rtlText]}>
-            {copy("demoBanner")}
-          </Text>
-        </View>
-      )}
       {feedError && (
         <View style={styles.demoBanner}>
           <Ionicons name="cloud-offline-outline" size={16} color={colors.primary} />
@@ -2548,105 +2541,6 @@ export function CommunityScreen() {
       );
     }
     return <View style={{ height: bottomContentPadding }} />;
-  };
-
-  const renderGroupCard = ({ item }: { item: CommunityGroupDto }) => {
-    const joined = item.joinedByMe ?? false;
-    return (
-    <Pressable
-      onPress={() => navigation.navigate("GroupDetail", { group: item })}
-      style={{
-        backgroundColor: colors.surface,
-        borderRadius: 16,
-        marginHorizontal: 16,
-        marginTop: 12,
-        padding: 16,
-        shadowColor: colors.shadow,
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.06,
-        shadowRadius: 12,
-        elevation: 3,
-      }}
-    >
-      <View
-        style={{
-          flexDirection: rowDirectionForAppLayout(isRTL),
-          alignItems: "center",
-          gap: 14,
-        }}
-      >
-        <View
-          style={{
-            width: 50,
-            height: 50,
-            borderRadius: 16,
-            backgroundColor: colors.surfaceSecondary,
-            alignItems: "center",
-            justifyContent: "center",
-          }}
-        >
-          <Text style={{ fontSize: 24 }}>{item.icon || "👥"}</Text>
-        </View>
-        <View style={{ flex: 1 }}>
-          <Text
-            style={{
-              fontSize: 16,
-              fontWeight: "700",
-              color: colors.text,
-              textAlign: isRTL ? "right" : "left",
-            }}
-            numberOfLines={1}
-          >
-            {item.name}
-          </Text>
-          {item.description ? (
-            <Text
-              style={{
-                fontSize: 13,
-                color: colors.textSecondary,
-                marginTop: 2,
-                textAlign: isRTL ? "right" : "left",
-              }}
-              numberOfLines={2}
-            >
-              {item.description}
-            </Text>
-          ) : null}
-          <View
-            style={{
-              flexDirection: rowDirectionForAppLayout(isRTL),
-              alignItems: "center",
-              gap: 6,
-              marginTop: 6,
-            }}
-          >
-            <Ionicons name="chatbubbles-outline" size={14} color={colors.textMuted} />
-            <Text style={{ fontSize: 12, color: colors.textMuted, fontWeight: "600" }}>
-              {item.postCount} {t("postsCount")}
-            </Text>
-          </View>
-        </View>
-        <Pressable
-          onPress={(e) => {
-            e.stopPropagation();
-            void handleJoinGroup(item);
-          }}
-          style={{
-            backgroundColor: joined ? colors.successLight : colors.text,
-            paddingHorizontal: 16,
-            paddingVertical: 8,
-            borderRadius: 10,
-            borderWidth: joined ? 1 : 0,
-            borderColor: colors.success,
-          }}
-        >
-          <Text style={{ color: joined ? colors.success : colors.textInverse, fontSize: 13, fontWeight: "700" }}>
-            {joined ? copy("joined") : copy("joinGroup")}
-          </Text>
-        </Pressable>
-      </View>
-    </Pressable>
-    );
   };
 
   const renderGroupsEmpty = () =>
@@ -2748,7 +2642,7 @@ export function CommunityScreen() {
         title={copy("parksTitle")}
         subtitle={copy("parksSub")}
         actionLabel={myBeaconId ? copy("removeCheckIn") : copy("checkIn")}
-        onAction={myBeaconId ? handleRemoveBeacon : () => handleParkCheckIn(parks[0] ?? DEMO_PARKS[0])}
+        onAction={myBeaconId ? handleRemoveBeacon : parks[0] ? () => handleParkCheckIn(parks[0]) : undefined}
       />
       <View style={styles.card}>
         <Text style={[styles.sectionCardTitle, rtlText]}>{copy("activeNow")}</Text>
@@ -2857,6 +2751,11 @@ export function CommunityScreen() {
             keyExtractor={(item) => item.id}
             ListEmptyComponent={renderGroupsEmpty}
             contentContainerStyle={{ paddingBottom: groupsListBottomPad, flexGrow: 1 }}
+            keyboardShouldPersistTaps="handled"
+            initialNumToRender={8}
+            maxToRenderPerBatch={8}
+            windowSize={5}
+            removeClippedSubviews
             refreshControl={
               <RefreshControl
                 refreshing={groupsRefreshing}
@@ -2915,7 +2814,7 @@ export function CommunityScreen() {
           setComposerOpen(true);
         }}
       />
-      {(questionPosts.length > 0 ? questionPosts : DEMO_POSTS.filter((p) => p.category === "question")).map((post) => (
+      {questionPosts.length > 0 ? questionPosts.map((post) => (
         <View key={post.id} style={styles.card}>
           <Text style={[styles.sectionCardTitle, rtlText]}>{post.content}</Text>
           <Text style={[styles.sectionCardSub, rtlText]}>
@@ -2936,7 +2835,9 @@ export function CommunityScreen() {
             </Pressable>
           </View>
         </View>
-      ))}
+      )) : (
+        <ListEmptyState icon="help-circle-outline" title={copy("qaTitle")} message={copy("qaSub")} />
+      )}
     </ScrollView>
   );
 
@@ -2998,30 +2899,6 @@ export function CommunityScreen() {
     </ScrollView>
   );
 
-  const SectionHeader = ({
-    title,
-    subtitle,
-    actionLabel,
-    onAction,
-  }: {
-    title: string;
-    subtitle: string;
-    actionLabel?: string;
-    onAction?: () => void;
-  }) => (
-    <View style={styles.sectionHeader}>
-      <View style={{ flex: 1 }}>
-        <Text style={[styles.sectionTitle, rtlText]}>{title}</Text>
-        <Text style={[styles.sectionSubtitle, rtlText]}>{subtitle}</Text>
-      </View>
-      {actionLabel && onAction ? (
-        <Pressable onPress={onAction} style={styles.primarySmallBtn}>
-          <Text style={styles.primarySmallText}>{actionLabel}</Text>
-        </Pressable>
-      ) : null}
-    </View>
-  );
-
   const renderLostSos = () => (
     <ScrollView
       style={{ flex: 1 }}
@@ -3044,30 +2921,11 @@ export function CommunityScreen() {
             onToggleHelpful={handleToggleHelpful}
             onToggleSave={handleToggleSave}
             onDelete={handleDelete}
-            onHide={(id) => {
-              setHiddenPostIds((prev) => new Set(prev).add(id));
-              showGlobalAlertCompat(copy("postHidden"), copy("postHiddenDesc"));
-            }}
+            onHide={handleHidePost}
             onReport={handleReportPost}
-            onBlock={(userId) => {
-              setBlockedUserIds((prev) => new Set(prev).add(userId));
-              showGlobalAlertCompat(copy("userBlocked"), copy("userBlockedDesc"));
-            }}
-            onPlaydateComing={(post) => {
-              setPosts((prev) =>
-                prev.map((p) =>
-                  p.id === post.id ? { ...p, likeCount: p.likeCount + 1, likedByMe: true } : p,
-                ),
-              );
-              showGlobalAlertCompat(copy("youAreComing"), copy("youAreComingDesc"));
-            }}
-            onSosResolved={(postId, resolvedAtIso) => {
-              setPosts((prev) =>
-                prev.map((p) =>
-                  p.id === postId ? { ...p, sosResolvedAt: resolvedAtIso } : p,
-                ),
-              );
-            }}
+            onBlock={handleBlockUser}
+            onPlaydateComing={handlePlaydateComing}
+            onSosResolved={handleSosResolved}
             celebrateMarkFoundBurst={burstMarkFoundCelebrate}
             rtlText={rtlText}
             rtlRow={rtlRow}
@@ -3087,7 +2945,7 @@ export function CommunityScreen() {
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.surface, marginTop: 0 }} edges={["top"]}>
       <BrandedAppHeader style={{ paddingVertical: 6 }} />
       <View style={{ flex: 1, backgroundColor: colors.surface, overflow: "hidden" }}>
-        {renderTopTabs()}
+        {topTabsElement}
 
         {mainTab === "feed" ? (        loading && posts.length === 0 ? (
           <ScrollView
@@ -3104,11 +2962,15 @@ export function CommunityScreen() {
               style={{ flex: 1 }}
               data={filteredPosts}
               keyExtractor={(item) => item.id}
-              ListHeaderComponent={renderFeedHeaderWithoutHero}
+              ListHeaderComponent={renderFeedHeaderWithoutHero()}
               ListEmptyComponent={renderFeedEmpty}
               ListFooterComponent={renderFeedFooter}
               contentContainerStyle={{ paddingBottom: bottomContentPadding, flexGrow: 1 }}
               keyboardShouldPersistTaps="handled"
+              initialNumToRender={5}
+              maxToRenderPerBatch={5}
+              windowSize={7}
+              removeClippedSubviews
               refreshControl={
                 <RefreshControl
                   refreshing={refreshing}
@@ -3117,48 +2979,7 @@ export function CommunityScreen() {
                   colors={[colors.text]}
                 />
               }
-              renderItem={({ item }) => (
-                <PostCard
-                  post={item}
-                  meta={postMetaById[item.id]}
-                  currentUserId={user?.id ?? null}
-                  onToggleLike={handleToggleLike}
-                  onToggleHelpful={handleToggleHelpful}
-                  onToggleSave={handleToggleSave}
-                  onDelete={handleDelete}
-                  onHide={(id) => {
-                    setHiddenPostIds((prev) => new Set(prev).add(id));
-                    showGlobalAlertCompat(copy("postHidden"), copy("postHiddenDesc"));
-                  }}
-                  onReport={handleReportPost}
-                  onBlock={(userId) => {
-                    setBlockedUserIds((prev) => new Set(prev).add(userId));
-                    showGlobalAlertCompat(copy("userBlocked"), copy("userBlockedDesc"));
-                  }}
-                  onPlaydateComing={(post) => {
-                    setPosts((prev) =>
-                      prev.map((p) =>
-                        p.id === post.id ? { ...p, likeCount: p.likeCount + 1, likedByMe: true } : p,
-                      ),
-                    );
-                    showGlobalAlertCompat(copy("youAreComing"), copy("youAreComingDesc"));
-                  }}
-                  onSosResolved={(postId, resolvedAtIso) => {
-                    setPosts((prev) =>
-                      prev.map((p) =>
-                        p.id === postId ? { ...p, sosResolvedAt: resolvedAtIso } : p,
-                      ),
-                    );
-                  }}
-                  celebrateMarkFoundBurst={burstMarkFoundCelebrate}
-                  rtlText={rtlText}
-                  rtlRow={rtlRow}
-                  isRTL={isRTL}
-                  copy={copy}
-                  isLikePending={!!likeBusy[item.id]}
-                  isDeletePending={!!deleteBusy[item.id]}
-                />
-              )}
+              renderItem={renderFeedItem}
             />
           </View>
         )

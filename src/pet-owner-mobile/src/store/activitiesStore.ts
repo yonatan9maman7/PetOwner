@@ -26,7 +26,7 @@ interface ActivitiesState {
 
   fetchActivities: (petId: string, params?: ActivitiesListParams) => Promise<void>;
   fetchSummary: (petId: string, days?: number) => Promise<void>;
-  createActivity: (petId: string, data: CreateActivityDto) => Promise<ActivityDto | null>;
+  createActivity: (petId: string, data: CreateActivityDto) => Promise<ActivityDto>;
   updateActivity: (
     petId: string,
     activityId: string,
@@ -146,7 +146,7 @@ export const useActivitiesStore = create<ActivitiesState>((set, get) => ({
           [petId]: { ...(s.byPetId[petId] ?? emptyBucket()), error: msg },
         },
       }));
-      return null;
+      throw e;
     }
   },
 

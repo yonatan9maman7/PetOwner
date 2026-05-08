@@ -1,5 +1,13 @@
 import { useState, useCallback } from "react";
-import { View, Text, ScrollView, ActivityIndicator, TouchableOpacity, Platform } from "react-native";
+import {
+  View,
+  Text,
+  ScrollView,
+  ActivityIndicator,
+  TouchableOpacity,
+  Platform,
+  InteractionManager,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation, useFocusEffect } from "@react-navigation/native";
@@ -204,38 +212,42 @@ export function ProfileScreen() {
   useFocusEffect(
     useCallback(() => {
       let cancelled = false;
-      setProviderCTA("loading");
-      providerApi
-        .getMe()
-        .then((profile) => {
-          if (cancelled) return;
-          const st = readProviderStatusRaw(profile);
-          const suspended = isProfileSuspended(profile);
-          if (st === "banned" || st === "revoked") {
-            setProviderCTA("inactive");
-            return;
-          }
-          if (suspended) {
-            setProviderCTA("suspended");
-            return;
-          }
-          if (st === "pending") setProviderCTA("pending");
-          else if (st === "approved") setProviderCTA("approved");
-          else setProviderCTA("none");
-        })
-        .catch((err: unknown) => {
-          if (cancelled) return;
-          if (axios.isAxiosError(err) && err.response?.status === 404) {
+      const task = InteractionManager.runAfterInteractions(() => {
+        if (cancelled) return;
+        setProviderCTA("loading");
+        providerApi
+          .getMe()
+          .then((profile) => {
+            if (cancelled) return;
+            const st = readProviderStatusRaw(profile);
+            const suspended = isProfileSuspended(profile);
+            if (st === "banned" || st === "revoked") {
+              setProviderCTA("inactive");
+              return;
+            }
+            if (suspended) {
+              setProviderCTA("suspended");
+              return;
+            }
+            if (st === "pending") setProviderCTA("pending");
+            else if (st === "approved") setProviderCTA("approved");
+            else setProviderCTA("none");
+          })
+          .catch((err: unknown) => {
+            if (cancelled) return;
+            if (axios.isAxiosError(err) && err.response?.status === 404) {
+              setProviderCTA("none");
+              return;
+            }
+            if (axios.isAxiosError(err) && err.response?.status === 401) {
+              return;
+            }
             setProviderCTA("none");
-            return;
-          }
-          if (axios.isAxiosError(err) && err.response?.status === 401) {
-            return;
-          }
-          setProviderCTA("none");
-        });
+          });
+      });
       return () => {
         cancelled = true;
+        task.cancel?.();
       };
     }, []),
   );
@@ -244,23 +256,27 @@ export function ProfileScreen() {
     useCallback(() => {
       if (!userId || (!isProvider && !isAdmin)) {
         setPendingIncomingBookings(0);
-        return;
+        return undefined;
       }
       let cancelled = false;
-      bookingsApi
-        .getMine()
-        .then((list) => {
-          if (cancelled) return;
-          const n = list.filter(
-            (b) => b.providerProfileId === userId && b.status === "Pending",
-          ).length;
-          setPendingIncomingBookings(n);
-        })
-        .catch(() => {
-          if (!cancelled) setPendingIncomingBookings(0);
-        });
+      const task = InteractionManager.runAfterInteractions(() => {
+        if (cancelled) return;
+        bookingsApi
+          .getMine()
+          .then((list) => {
+            if (cancelled) return;
+            const n = list.filter(
+              (b) => b.providerProfileId === userId && b.status === "Pending",
+            ).length;
+            setPendingIncomingBookings(n);
+          })
+          .catch(() => {
+            if (!cancelled) setPendingIncomingBookings(0);
+          });
+      });
       return () => {
         cancelled = true;
+        task.cancel?.();
       };
     }, [userId, isProvider, isAdmin]),
   );

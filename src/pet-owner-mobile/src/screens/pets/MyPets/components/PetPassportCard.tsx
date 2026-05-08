@@ -1,4 +1,5 @@
-import { View, Text, Image, Pressable, ScrollView, useWindowDimensions } from "react-native";
+import { View, Text, Pressable, ScrollView, useWindowDimensions } from "react-native";
+import { Image } from "expo-image";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { BlurView } from "expo-blur";
@@ -182,7 +183,13 @@ export function PetPassportCard({
             }}
           >
             {pet.imageUrl ? (
-              <Image source={{ uri: pet.imageUrl }} style={{ width: 80, height: 80 }} resizeMode="cover" />
+              <Image
+                source={pet.imageUrl}
+                style={{ width: 80, height: 80 }}
+                contentFit="cover"
+                cachePolicy="memory-disk"
+                recyclingKey={pet.id}
+              />
             ) : (
               <Text style={{ fontSize: 40 }}>{getSpeciesEmoji(pet.species)}</Text>
             )}

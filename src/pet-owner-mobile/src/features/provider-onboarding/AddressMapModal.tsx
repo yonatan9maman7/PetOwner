@@ -33,6 +33,15 @@ export function AddressMapModal({ visible, onClose, onConfirm, initial }: Props)
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const mapRef = useRef<any>(null);
+  /** Snapshot when modal opens — used on address clear (X) to reset map + fields like Report Lost SOS flow. */
+  const addressSnapshotRef = useRef({
+    lat: initial.lat || DEFAULT_LAT,
+    lng: initial.lng || DEFAULT_LNG,
+    city: initial.city,
+    street: initial.street,
+    building: initial.building,
+    apartment: initial.apartment,
+  });
 
   const [lat, setLat] = useState(initial.lat || DEFAULT_LAT);
   const [lng, setLng] = useState(initial.lng || DEFAULT_LNG);
@@ -47,8 +56,18 @@ export function AddressMapModal({ visible, onClose, onConfirm, initial }: Props)
 
   useEffect(() => {
     if (visible) {
-      setLat(initial.lat || DEFAULT_LAT);
-      setLng(initial.lng || DEFAULT_LNG);
+      const lat0 = initial.lat || DEFAULT_LAT;
+      const lng0 = initial.lng || DEFAULT_LNG;
+      addressSnapshotRef.current = {
+        lat: lat0,
+        lng: lng0,
+        city: initial.city,
+        street: initial.street,
+        building: initial.building,
+        apartment: initial.apartment,
+      };
+      setLat(lat0);
+      setLng(lng0);
       setCity(initial.city);
       setStreet(initial.street);
       setBuilding(initial.building);
@@ -61,6 +80,20 @@ export function AddressMapModal({ visible, onClose, onConfirm, initial }: Props)
       );
     }
   }, [visible, initial.lat, initial.lng, initial.city, initial.street, initial.building, initial.apartment]);
+
+  const handleAddressSearchClear = useCallback(() => {
+    const s = addressSnapshotRef.current;
+    setLat(s.lat);
+    setLng(s.lng);
+    setCity(s.city);
+    setStreet(s.street);
+    setBuilding(s.building);
+    setApartment(s.apartment);
+    mapRef.current?.animateToRegion?.(
+      { latitude: s.lat, longitude: s.lng, latitudeDelta: 0.012, longitudeDelta: 0.012 },
+      400,
+    );
+  }, []);
 
   const applyPlace = useCallback(
     (selection: AddressAutocompleteSelection) => {
@@ -155,6 +188,7 @@ export function AddressMapModal({ visible, onClose, onConfirm, initial }: Props)
               value={searchText}
               onChangeText={setSearchText}
               onSelect={applyPlace}
+              onClear={handleAddressSearchClear}
               placeholder={t("searchAddressPlaceholder")}
               isRTL={isRTL}
               type="address"

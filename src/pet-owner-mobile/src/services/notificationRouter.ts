@@ -1,8 +1,29 @@
 import type { NavigationContainerRef } from "@react-navigation/native";
+import { StackActions } from "@react-navigation/native";
 import { useNotificationStore } from "../store/notificationStore";
 import type { TapPayload } from "./pushService";
 
 type Nav = NavigationContainerRef<ReactNavigation.RootParamList>;
+
+/**
+ * When a notification sends the user to another tab (e.g. Community), the Profile
+ * stack can still have Notifications (or other screens) on top. Popping that
+ * stack avoids returning to the wrong screen when the Profile tab is selected later.
+ */
+function popProfileStackToRoot(nav: Nav): void {
+  if (!nav.isReady()) return;
+  const root = nav.getRootState();
+  const profileTab = root.routes.find((r) => r.name === "Profile") as
+    | { state?: { key?: string; routes?: unknown[] } }
+    | undefined;
+  const routes = profileTab?.state?.routes;
+  const stackKey = profileTab?.state?.key;
+  if (!routes || routes.length <= 1 || !stackKey) return;
+  nav.dispatch({
+    ...StackActions.popToTop(),
+    source: stackKey,
+  });
+}
 
 /**
  * Routes the app to the correct screen when a push notification is tapped.
@@ -44,6 +65,7 @@ export function routeForNotification(nav: Nav, payload: TapPayload): void {
       } else {
         navigate("Messages");
       }
+      popProfileStackToRoot(nav);
       break;
 
     case "TRIAGE_RESULT":
@@ -53,6 +75,7 @@ export function routeForNotification(nav: Nav, payload: TapPayload): void {
           ? { historyId: payload.relatedEntityId }
           : undefined,
       });
+      popProfileStackToRoot(nav);
       break;
 
     case "GROUP_POST":
@@ -65,6 +88,7 @@ export function routeForNotification(nav: Nav, payload: TapPayload): void {
       } else {
         navigate("Community");
       }
+      popProfileStackToRoot(nav);
       break;
 
     case "SOS_ALERT":
@@ -76,6 +100,7 @@ export function routeForNotification(nav: Nav, payload: TapPayload): void {
       } else {
         navigate("Community");
       }
+      popProfileStackToRoot(nav);
       break;
 
     case "sos":
@@ -88,10 +113,12 @@ export function routeForNotification(nav: Nav, payload: TapPayload): void {
       } else {
         navigate("Community");
       }
+      popProfileStackToRoot(nav);
       break;
 
     case "VACCINE_DUE":
       navigate("MyPets");
+      popProfileStackToRoot(nav);
       break;
 
     default:

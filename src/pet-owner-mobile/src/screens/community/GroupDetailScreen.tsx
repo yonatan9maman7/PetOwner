@@ -6,6 +6,7 @@ import {
   Pressable,
   FlatList,
   ActivityIndicator,
+  InteractionManager,
 } from "react-native";
 import { showGlobalAlertCompat } from "../../components/global-modal";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -15,6 +16,7 @@ import { useAuthStore } from "../../store/authStore";
 import { useTranslation, rowDirectionForAppLayout } from "../../i18n";
 import { useTheme } from "../../theme/ThemeContext";
 import { communityApi } from "../../api/client";
+import { ListSkeleton } from "../../components/shared/ListSkeleton";
 import type {
   GroupPostDto,
   GroupPostCommentDto,
@@ -341,7 +343,12 @@ export function GroupDetailScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      loadPosts();
+      const task = InteractionManager.runAfterInteractions(() => {
+        void loadPosts();
+      });
+      return () => {
+        task.cancel?.();
+      };
     }, [loadPosts]),
   );
 
@@ -608,10 +615,8 @@ export function GroupDetailScreen() {
       </View>
 
       {loading ? (
-        <View
-          style={{ flex: 1, alignItems: "center", justifyContent: "center" }}
-        >
-          <ActivityIndicator size="large" color={colors.text} />
+        <View style={{ flex: 1, paddingTop: 16 }}>
+          <ListSkeleton rows={4} variant="card" />
         </View>
       ) : (
         <FlatList

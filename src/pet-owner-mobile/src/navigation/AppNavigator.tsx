@@ -1,4 +1,4 @@
-import { View } from "react-native";
+import { View, Text } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   createBottomTabNavigator,
@@ -148,7 +148,7 @@ const ProfileStack = createNativeStackNavigator();
 
 function ExploreStackScreen() {
   return (
-    <ExploreStack.Navigator screenOptions={{ headerShown: false }}>
+    <ExploreStack.Navigator screenOptions={{ headerShown: false, freezeOnBlur: true }}>
       <ExploreStack.Screen name="ExploreMain" component={ExploreScreen} />
       <ExploreStack.Screen name="Discover" component={DiscoverScreen} />
       <ExploreStack.Screen name="ProviderProfile" component={ProviderProfileScreen} />
@@ -163,7 +163,7 @@ function ExploreStackScreen() {
 
 function CommunityStackScreen() {
   return (
-    <CommunityStack.Navigator screenOptions={{ headerShown: false }}>
+    <CommunityStack.Navigator screenOptions={{ headerShown: false, freezeOnBlur: true }}>
       <CommunityStack.Screen name="CommunityMain" component={CommunityScreen} />
       <CommunityStack.Screen name="GroupDetail" component={GroupDetailScreen} />
       <CommunityStack.Screen name="PalProfile" component={PalProfileScreen} />
@@ -177,7 +177,7 @@ function CommunityStackScreen() {
 
 function AuthStackScreen() {
   return (
-    <AuthStack.Navigator screenOptions={{ headerShown: false }}>
+    <AuthStack.Navigator screenOptions={{ headerShown: false, freezeOnBlur: true }}>
       <AuthStack.Screen name="LoginScreen" component={LoginScreen} />
       <AuthStack.Screen name="RegisterScreen" component={RegisterScreen} />
       <AuthStack.Screen
@@ -190,7 +190,7 @@ function AuthStackScreen() {
 
 function PetsStackScreen() {
   return (
-    <PetsStack.Navigator screenOptions={{ headerShown: false }}>
+    <PetsStack.Navigator screenOptions={{ headerShown: false, freezeOnBlur: true }}>
       <PetsStack.Screen name="MyPetsMain" component={MyPetsScreen} />
       <PetsStack.Screen name="AddPet" component={AddPetScreen} />
       <PetsStack.Screen name="ReportLost" component={ReportLostScreen} />
@@ -208,7 +208,7 @@ function PetsStackScreen() {
 
 function MessagesStackScreen() {
   return (
-    <MessagesStack.Navigator screenOptions={{ headerShown: false }}>
+    <MessagesStack.Navigator screenOptions={{ headerShown: false, freezeOnBlur: true }}>
       <MessagesStack.Screen name="MessagesMain" component={MessagesScreen} />
       <MessagesStack.Screen name="ChatRoom" component={ChatRoomScreen} />
     </MessagesStack.Navigator>
@@ -217,7 +217,7 @@ function MessagesStackScreen() {
 
 function ProfileStackScreen() {
   return (
-    <ProfileStack.Navigator screenOptions={{ headerShown: false }}>
+    <ProfileStack.Navigator screenOptions={{ headerShown: false, freezeOnBlur: true }}>
       <ProfileStack.Screen name="ProfileMain" component={ProfileScreen} />
       <ProfileStack.Screen name="ProviderEdit" component={ProviderEditScreen} />
       <ProfileStack.Screen name="ProviderDashboard" component={ProviderDashboardScreen} />
@@ -248,13 +248,51 @@ function ProfileStackScreen() {
   );
 }
 
+/**
+ * Isolated component so chat-unread state changes only re-render the icon,
+ * not the entire Tab.Navigator tree.
+ */
+function MessagesTabIcon({ focused, color }: { focused: boolean; color: string }) {
+  const { colors } = useTheme();
+  const chatUnreadTotal = useChatStore((s) =>
+    s.conversations.reduce((acc, c) => acc + Math.max(0, c.unreadCount), 0),
+  );
+
+  return (
+    <View style={{ width: 28, height: 28, alignItems: "center", justifyContent: "center" }}>
+      <Ionicons
+        name={focused ? "chatbubble" : "chatbubble-outline"}
+        size={24}
+        color={color}
+      />
+      {chatUnreadTotal > 0 && (
+        <View
+          style={{
+            position: "absolute",
+            top: -4,
+            right: -10,
+            backgroundColor: colors.primary,
+            minWidth: 18,
+            height: 18,
+            borderRadius: 9,
+            alignItems: "center",
+            justifyContent: "center",
+            paddingHorizontal: 4,
+          }}
+        >
+          <Text style={{ color: "#fff", fontSize: 10, fontWeight: "700", lineHeight: 18 }}>
+            {chatUnreadTotal > 99 ? "99+" : chatUnreadTotal}
+          </Text>
+        </View>
+      )}
+    </View>
+  );
+}
+
 export function AppNavigator() {
   const isLoggedIn = useAuthStore((s) => s.isLoggedIn);
   const requiresPhone = useAuthStore((s) => s.requiresPhone);
   const unreadCount = useNotificationStore((s) => s.unreadCount);
-  const chatUnreadTotal = useChatStore((s) =>
-    s.conversations.reduce((acc, c) => acc + Math.max(0, c.unreadCount), 0),
-  );
   const { t } = useTranslation();
   const { colors } = useTheme();
   const tabBarStyle = useTabBarStyle();
@@ -283,6 +321,10 @@ export function AppNavigator() {
       tabBar={(tabProps) => <TabBarWithSos {...tabProps} />}
       screenOptions={{
         headerShown: false,
+        /** Inactive tabs skip re-renders while off-screen (saves CPU when switching tabs). */
+        freezeOnBlur: true,
+        /** Mount tab stacks on first visit (default in v7; explicit for clarity). */
+        lazy: true,
         tabBarShowLabel: true,
         tabBarActiveTintColor: colors.tabBarActive,
         tabBarInactiveTintColor: colors.tabBarInactive,
@@ -358,27 +400,8 @@ export function AppNavigator() {
               tabBarButtonTestID: "tab-messages",
               tabBarLabel: t("tabMessages"),
               tabBarIcon: ({ focused, color }) => (
-                <Ionicons
-                  name={focused ? "chatbubble" : "chatbubble-outline"}
-                  size={24}
-                  color={color}
-                />
+                <MessagesTabIcon focused={focused} color={color} />
               ),
-              tabBarBadge:
-                chatUnreadTotal > 0
-                  ? chatUnreadTotal > 99
-                    ? "99+"
-                    : chatUnreadTotal
-                  : undefined,
-              tabBarBadgeStyle: {
-                backgroundColor: colors.primary,
-                fontSize: 10,
-                fontWeight: "700" as const,
-                minWidth: 18,
-                height: 18,
-                borderRadius: 9,
-                lineHeight: 18,
-              },
               tabBarStyle: shouldHideTabBar(route) ? TAB_BAR_HIDDEN : tabBarStyle,
             })}
           />

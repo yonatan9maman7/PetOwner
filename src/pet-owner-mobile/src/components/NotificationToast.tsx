@@ -125,6 +125,7 @@ export function NotificationToast() {
   const title = resolveNotificationApiText(current.title, language);
   const message = resolveNotificationApiText(current.message, language);
 
+  // Outermost: box-none passes touches through padding/blank area; card + close are the only targets.
   return (
     <Animated.View
       pointerEvents="box-none"
@@ -142,6 +143,7 @@ export function NotificationToast() {
     >
       <Pressable
         onPress={handlePress}
+        pointerEvents="auto"
         style={{
           flexDirection: "row",
           alignItems: "center",
@@ -191,7 +193,7 @@ export function NotificationToast() {
           </Text>
         </View>
 
-        <Pressable onPress={dismiss} hitSlop={10}>
+        <Pressable onPress={dismiss} hitSlop={10} pointerEvents="auto">
           <Ionicons name="close" size={18} color={colors.textMuted} />
         </Pressable>
       </Pressable>

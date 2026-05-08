@@ -90,6 +90,8 @@ export function NotificationsScreen() {
               screen: "CommunityMain",
               params: { focusPostId: postId },
             });
+            // Switching tabs leaves this screen in the stack; pop so Profile tab opens on main.
+            navigation.popToTop();
           }
           break;
         }

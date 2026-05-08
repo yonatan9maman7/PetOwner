@@ -1,5 +1,14 @@
-import { useEffect, useState, useCallback, useRef } from "react";
-import { View, Pressable, ScrollView, RefreshControl, Text, StyleSheet } from "react-native";
+import { useEffect, useState, useCallback, useRef, startTransition } from "react";
+import {
+  View,
+  Pressable,
+  ScrollView,
+  RefreshControl,
+  Text,
+  StyleSheet,
+  InteractionManager,
+} from "react-native";
+import { Image } from "expo-image";
 import { Ionicons } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
@@ -30,8 +39,9 @@ import { PetPassportCard } from "./components/PetPassportCard";
 import { LostPetAlertBanner } from "./components/LostPetAlertBanner";
 import { VaccineAlertBanner } from "./components/VaccineAlertBanner";
 import { HealthHubList } from "./components/HealthHubList";
-import { useActivePetSummary } from "./hooks/useActivePetSummary";
+import { prefetchActivePetSummary, useActivePetSummary } from "./hooks/useActivePetSummary";
 import type { Section } from "./types";
+import { useDeferredMount } from "../../../hooks/useDeferredMount";
 import { getNormalizedApiError } from "../../../utils/apiUtils";
 import { showApiErrorToast } from "../../../services/apiErrorToast";
 import { showGlobalAlertCompat } from "../../../components/global-modal";
@@ -43,6 +53,7 @@ import {
 const MARK_FOUND_SOS_CELEBRATION_DELAY_MS = 1750;
 
 export function MyPetsScreen() {
+  const isDeferredReady = useDeferredMount();
   const isLoggedIn = useAuthStore((s) => s.isLoggedIn);
   const { pets, loading, error } = usePetsStore();
   const { t, isRTL, rtlStyle } = useTranslation();
@@ -60,6 +71,22 @@ export function MyPetsScreen() {
   useEffect(() => {
     if (isLoggedIn) usePetsStore.getState().fetchPets();
   }, [isLoggedIn]);
+
+  useEffect(() => {
+    if (!isLoggedIn || pets.length === 0) return;
+    const task = InteractionManager.runAfterInteractions(() => {
+      for (const pet of pets) {
+        void prefetchActivePetSummary(pet.id, sectionReloadNonce);
+      }
+      const imageUrls = pets
+        .map((pet) => pet.imageUrl)
+        .filter((url): url is string => typeof url === "string" && url.length > 0);
+      if (imageUrls.length > 0) {
+        void Image.prefetch(imageUrls);
+      }
+    });
+    return () => task.cancel();
+  }, [isLoggedIn, pets, sectionReloadNonce]);
 
   const setSectionDetailOpen = useMyPetsUiStore((s) => s.setSectionDetailOpen);
   useEffect(() => {
@@ -173,6 +200,17 @@ export function MyPetsScreen() {
     );
   }
 
+  if (!isDeferredReady) {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: colors.background, marginTop: -8 }} edges={["top"]}>
+        <BrandedAppHeader />
+        <View style={{ flex: 1, paddingTop: 16 }}>
+          <ListSkeleton rows={2} variant="card" />
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   if (activeSection && activePet) {
     return (
       <View style={{ flex: 1 }}>
@@ -249,7 +287,7 @@ export function MyPetsScreen() {
           <PetAvatarSwitcher
             pets={pets}
             activeIndex={activePetIndex}
-            onSelect={setActivePetIndex}
+            onSelect={(idx) => startTransition(() => setActivePetIndex(idx))}
             onAddPress={() => navigation.navigate("AddPet")}
           />
 
@@ -276,7 +314,7 @@ export function MyPetsScreen() {
 
           {/* Vaccine alert banners */}
           {activePet && (
-            <VaccineAlertBanner petId={activePet.id} onPress={() => setActiveSection("vaccines")} />
+            <VaccineAlertBanner vaccineStatuses={summary.vaccineStatuses} onPress={() => setActiveSection("vaccines")} />
           )}
 
           {/* Health hub dashboard */}
