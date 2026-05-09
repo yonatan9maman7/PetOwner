@@ -16,7 +16,7 @@ import { useAuthStore } from "../../store/authStore";
 import { useTranslation, rowDirectionForAppLayout } from "../../i18n";
 import { useTheme } from "../../theme/ThemeContext";
 import { communityApi } from "../../api/client";
-import { ListSkeleton } from "../../components/shared/ListSkeleton";
+import { PawLoadingSpinner } from "../../components/shared/PawLoadingSpinner";
 import type {
   GroupPostDto,
   GroupPostCommentDto,
@@ -615,8 +615,11 @@ export function GroupDetailScreen() {
       </View>
 
       {loading ? (
-        <View style={{ flex: 1, paddingTop: 16 }}>
-          <ListSkeleton rows={4} variant="card" />
+        <View style={{ flex: 1, alignItems: "center", justifyContent: "center", gap: 16, paddingBottom: 80 }}>
+          <PawLoadingSpinner size={80} />
+          <Text style={{ fontSize: 15, color: colors.textMuted, fontWeight: "500", paddingHorizontal: 24 }} numberOfLines={2}>
+            {group.name}…
+          </Text>
         </View>
       ) : (
         <FlatList

@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState, memo, useMemo } from "react";
-import { View, StyleSheet, Text } from "react-native";
+import { View, StyleSheet, Text, Platform } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { MarkerWrapper } from "../../components/MapViewWrapper";
 import type { MapPinDto } from "../../types/api";
@@ -39,24 +39,26 @@ const S = StyleSheet.create({
   bubbleInner: {
     width: PAW_INNER_SIZE,
     height: PAW_INNER_SIZE,
-    borderRadius: PAW_INNER_RADIUS,
+    borderRadius: 999,
     overflow: "hidden",
     backgroundColor: "#ffffff",
     justifyContent: "center",
     alignItems: "center",
     borderWidth: 2,
     borderColor: "#e2e2e2",
+    ...Platform.select({ android: { elevation: 0 } }),
   },
   bubbleInnerSelected: {
     width: PAW_INNER_SIZE,
     height: PAW_INNER_SIZE,
-    borderRadius: PAW_INNER_RADIUS,
+    borderRadius: 999,
     overflow: "hidden",
     backgroundColor: "#1a1a2e",
     justifyContent: "center",
     alignItems: "center",
     borderWidth: 2,
     borderColor: "#1a1a2e",
+    ...Platform.select({ android: { elevation: 0 } }),
   },
   clusterOuter: {
     width: CLUSTER_OUTER_SIZE,
@@ -68,13 +70,14 @@ const S = StyleSheet.create({
   clusterBubbleInner: {
     width: CLUSTER_INNER_SIZE,
     height: CLUSTER_INNER_SIZE,
-    borderRadius: CLUSTER_INNER_RADIUS,
+    borderRadius: 999,
     overflow: "hidden",
     backgroundColor: "#ffffff",
     justifyContent: "center",
     alignItems: "center",
     borderWidth: 2,
     borderColor: "#e2e2e2",
+    ...Platform.select({ android: { elevation: 0 } }),
   },
   badge: {
     position: "absolute",
@@ -95,14 +98,6 @@ const S = StyleSheet.create({
     fontWeight: "800",
     color: "#ffffff",
   },
-  icon: {
-    width: ICON_SIZE,
-    height: ICON_SIZE,
-  },
-  clusterIcon: {
-    width: CLUSTER_ICON_SIZE,
-    height: CLUSTER_ICON_SIZE,
-  },
 });
 
 /* ── Pool slot type ─────────────────────────────────────────────────────── */
@@ -120,9 +115,14 @@ export type MarkerPoolSlot = {
 
 const PawBubble = memo(function PawBubble() {
   return (
-    <View style={S.markerOuter} collapsable={false}>
+    <View
+      style={S.markerOuter}
+      collapsable={false}
+      renderToHardwareTextureAndroid
+      needsOffscreenAlphaCompositing
+    >
       <View style={S.bubbleInner} collapsable={false}>
-        <Ionicons name="paw" size={ICON_SIZE} color="#1a1a2e" style={S.icon} />
+        <Ionicons name="paw" size={ICON_SIZE} color="#1a1a2e" />
       </View>
     </View>
   );
@@ -130,9 +130,14 @@ const PawBubble = memo(function PawBubble() {
 
 const ClusterBubble = memo(function ClusterBubble({ count }: { count: number }) {
   return (
-    <View style={S.clusterOuter} collapsable={false}>
+    <View
+      style={S.clusterOuter}
+      collapsable={false}
+      renderToHardwareTextureAndroid
+      needsOffscreenAlphaCompositing
+    >
       <View style={S.clusterBubbleInner} collapsable={false}>
-        <Ionicons name="paw" size={CLUSTER_ICON_SIZE} color="#1a1a2e" style={S.clusterIcon} />
+        <Ionicons name="paw" size={CLUSTER_ICON_SIZE} color="#1a1a2e" />
       </View>
       <View style={S.badge}>
         <Text style={S.badgeText}>{count > 99 ? "99+" : count}</Text>
@@ -143,9 +148,14 @@ const ClusterBubble = memo(function ClusterBubble({ count }: { count: number }) 
 
 const SelectedPawBubble = memo(function SelectedPawBubble() {
   return (
-    <View style={S.markerOuter} collapsable={false}>
+    <View
+      style={S.markerOuter}
+      collapsable={false}
+      renderToHardwareTextureAndroid
+      needsOffscreenAlphaCompositing
+    >
       <View style={S.bubbleInnerSelected} collapsable={false}>
-        <Ionicons name="paw" size={ICON_SIZE} color="#ffffff" style={S.icon} />
+        <Ionicons name="paw" size={ICON_SIZE} color="#ffffff" />
       </View>
     </View>
   );

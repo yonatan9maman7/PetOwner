@@ -625,7 +625,11 @@ function AddressMapModal({
 
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
-      <View style={{ flex: 1, backgroundColor: colors.background }}>
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+      >
+        <View style={{ flex: 1, backgroundColor: colors.background }}>
         {/* Header */}
         <View
           style={{
@@ -673,8 +677,8 @@ function AddressMapModal({
         <ScrollView
           style={{ flex: 1 }}
           contentContainerStyle={{ paddingBottom: 24 }}
-          keyboardShouldPersistTaps="handled"
-          keyboardDismissMode="on-drag"
+          keyboardShouldPersistTaps="always"
+          keyboardDismissMode="none"
           showsVerticalScrollIndicator={false}
         >
           <View style={{ height: 200 }}>
@@ -718,6 +722,7 @@ function AddressMapModal({
               placeholder={t("searchAddressPlaceholder")}
               isRTL={isRTL}
               type="address"
+              closeOnBlur={false}
             />
             <AddressField
               label={t("addressCity")}
@@ -777,7 +782,8 @@ function AddressMapModal({
             </Pressable>
           </View>
         </ScrollView>
-      </View>
+        </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }

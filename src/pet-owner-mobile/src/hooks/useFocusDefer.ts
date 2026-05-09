@@ -1,25 +1,25 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
 import { InteractionManager } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
 
 /**
- * Defers heavy UI rendering on every screen focus (initial mount AND subsequent
- * re-focuses after tab switches or stack navigation).
- *
- * On each focus event it immediately yields `false` (show skeleton), then waits
- * for all pending InteractionManager work (i.e. the navigation animation) to
- * complete before returning `true` (reveal full content).
- *
- * Use this instead of `useDeferredMount` for screens that are heavy enough to
- * noticeably block the navigation animation on EVERY visit, not just the first.
+ * Defers heavy UI rendering only on FIRST mount. Subsequent re-focuses skip
+ * the spinner since the component tree is already built and cached by
+ * freezeOnBlur. This prevents the "flash of loading" on every tab switch.
  */
 export function useFocusDefer(): boolean {
   const [ready, setReady] = useState(false);
+  const mountedOnce = useRef(false);
 
   useFocusEffect(
     useCallback(() => {
+      if (mountedOnce.current) {
+        setReady(true);
+        return;
+      }
       setReady(false);
       const task = InteractionManager.runAfterInteractions(() => {
+        mountedOnce.current = true;
         setReady(true);
       });
       return () => {
@@ -29,4 +29,24 @@ export function useFocusDefer(): boolean {
   );
 
   return ready;
+}
+
+/**
+ * Tracks whether this screen is currently focused. Use as a guard in async
+ * callbacks to abort state updates (and avoid ghost work) once the user
+ * leaves the tab.
+ */
+export function useFocusedRef(): React.MutableRefObject<boolean> {
+  const ref = useRef(false);
+
+  useFocusEffect(
+    useCallback(() => {
+      ref.current = true;
+      return () => {
+        ref.current = false;
+      };
+    }, []),
+  );
+
+  return ref;
 }

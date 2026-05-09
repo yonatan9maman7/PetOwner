@@ -18,7 +18,8 @@ import {
   BrandedAppHeader,
   BRAND_HEADER_HORIZONTAL_PAD,
 } from "../../components/BrandedAppHeader";
-import { ListSkeleton, ListEmptyState } from "../../components/shared";
+import { ListEmptyState } from "../../components/shared";
+import { PawLoadingSpinner } from "../../components/shared/PawLoadingSpinner";
 import type { ChatConversationDto } from "../../types/api";
 
 function formatTimeAgo(dateStr: string, t: (k: string) => string): string {
@@ -194,7 +195,10 @@ export function MessagesScreen() {
       </Text>
 
       {loading && conversations.length === 0 ? (
-        <ListSkeleton rows={6} variant="row" />
+        <View style={{ flex: 1, alignItems: "center", justifyContent: "center", gap: 20, paddingBottom: 60 }}>
+          <PawLoadingSpinner size={80} />
+          <Text style={{ fontSize: 15, color: colors.textMuted, fontWeight: "500" }}>{t("messagesTitle")}…</Text>
+        </View>
       ) : (
         <FlashList
           data={sorted}

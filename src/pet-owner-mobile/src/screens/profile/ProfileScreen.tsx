@@ -3,7 +3,6 @@ import {
   View,
   Text,
   ScrollView,
-  ActivityIndicator,
   TouchableOpacity,
   Platform,
   InteractionManager,
@@ -18,6 +17,8 @@ import { providerApi, bookingsApi } from "../../api/client";
 import { useTranslation, rowDirectionForAppLayout } from "../../i18n";
 import { useTheme } from "../../theme/ThemeContext";
 import { BrandedAppHeader } from "../../components/BrandedAppHeader";
+import { PawLoadingSpinner } from "../../components/shared/PawLoadingSpinner";
+import { useDeferredMount } from "../../hooks/useDeferredMount";
 import type { ProviderMeResponse } from "../../types/api";
 import { showGlobalAlertCompat } from "../../components/global-modal";
 
@@ -120,7 +121,7 @@ function ProviderCTALoadingSlot() {
         minHeight: 72,
       }}
     >
-      <ActivityIndicator color={colors.text} />
+      <PawLoadingSpinner size={40} />
     </View>
   );
 }
@@ -182,6 +183,7 @@ type ProviderCTAState =
   | "inactive";
 
 export function ProfileScreen() {
+  const isDeferredReady = useDeferredMount();
   const navigation = useNavigation<any>();
   const user = useAuthStore((s) => s.user);
   const logout = useAuthStore((s) => s.logout);
@@ -280,6 +282,18 @@ export function ProfileScreen() {
       };
     }, [userId, isProvider, isAdmin]),
   );
+
+  if (!isDeferredReady) {
+    return (
+      <SafeAreaView className="flex-1" edges={["top"]} style={{ backgroundColor: colors.background, marginTop: -8 }}>
+        <BrandedAppHeader />
+        <View style={{ flex: 1, alignItems: "center", justifyContent: "center", gap: 20, paddingBottom: 60 }}>
+          <PawLoadingSpinner size={80} />
+          <Text style={{ fontSize: 15, color: colors.textMuted, fontWeight: "500" }}>{t("profileTitle")}…</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView className="flex-1" edges={["top"]} style={{ backgroundColor: colors.background, marginTop: -8 }}>

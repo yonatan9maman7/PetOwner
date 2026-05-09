@@ -102,6 +102,8 @@ export interface AddressAutocompleteProps {
   hideLeadingIcon?: boolean;
   /** Disable the auto-issued required-asterisk render even when label set. */
   hideRequiredMark?: boolean;
+  /** Keep suggestions open even if input loses focus (useful inside draggable ScrollViews). */
+  closeOnBlur?: boolean;
 }
 
 const DEBOUNCE_MS = 250;
@@ -124,6 +126,7 @@ export function AddressAutocomplete({
   onClear,
   hideLeadingIcon,
   hideRequiredMark,
+  closeOnBlur = true,
 }: AddressAutocompleteProps) {
   const { colors } = useTheme();
   const [predictions, setPredictions] = useState<PlacePrediction[]>([]);
@@ -267,9 +270,10 @@ export function AddressAutocomplete({
   }, []);
 
   const handleBlur = useCallback(() => {
+    if (!closeOnBlur) return;
     // Delay so a tap on a suggestion fires onPress before the dropdown unmounts.
     blurTimerRef.current = setTimeout(() => setFocused(false), 180);
-  }, []);
+  }, [closeOnBlur]);
 
   const isOpen = focused && predictions.length > 0;
   const trailing = useMemo(() => {

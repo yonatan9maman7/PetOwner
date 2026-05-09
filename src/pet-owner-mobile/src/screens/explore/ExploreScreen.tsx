@@ -39,6 +39,7 @@ import { useFocusEffect, useNavigation, useRoute } from "@react-navigation/nativ
 import * as Location from "expo-location";
 import { LinearGradient } from "expo-linear-gradient";
 import { BRAND_HEADER_HORIZONTAL_PAD } from "../../components/BrandedAppHeader";
+import { PawLoadingSpinner } from "../../components/shared/PawLoadingSpinner";
 
 /** Tight crop of `petcare-logo-transparent.png` (Explore header only). */
 const EXPLORE_HEADER_LOGO = require("../../../assets/petcare-logo-header-trimmed.png");
@@ -1563,7 +1564,10 @@ export function ExploreScreen() {
       {/* Loading — do not block touches; map/header stay usable while pins load */}
       {loading && (
         <View style={styles.loadingOverlay} pointerEvents="none">
-          <ActivityIndicator size="large" color={colors.text} />
+          <View style={{ alignItems: "center", gap: 16 }}>
+            <PawLoadingSpinner size={80} />
+            <Text style={{ fontSize: 15, color: colors.textMuted, fontWeight: "500" }}>{t("exploreTitle")}…</Text>
+          </View>
         </View>
       )}
 

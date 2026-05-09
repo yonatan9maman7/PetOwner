@@ -8,6 +8,23 @@ namespace PetOwner.Api.Services;
 
 public class NotificationService : INotificationService
 {
+    private static readonly Dictionary<string, (string He, string En)> NotificationI18nMap = new(StringComparer.Ordinal)
+    {
+        ["NOTIFICATIONS.SOS_ALERT_TITLE"] = ("🆘 SOS - חיית מחמד נעדרת", "🆘 SOS - Missing Pet"),
+        ["NOTIFICATIONS.SOS_ALERT"] = ("חיית מחמד באזור שלך נעדרת. לחצו לצפייה ולעזרה.", "A pet near you is missing. Tap to view and help."),
+        ["NOTIFICATIONS.SOS_RESOLVED_TITLE"] = ("✅ SOS טופל", "✅ SOS Resolved"),
+        ["NOTIFICATIONS.SOS_RESOLVED"] = ("חדשות טובות! חיית המחמד נמצאה בשלום!", "Great news! The pet has been found safe!"),
+        ["NOTIFICATIONS.PROVIDER_APPROVED_TITLE"] = ("🎉 בקשת ספק אושרה", "🎉 Provider Approved"),
+        ["NOTIFICATIONS.PROVIDER_APPROVED"] = ("הפרופיל שלך אושר כספק. אפשר להתחיל לקבל הזמנות.", "Your provider profile has been approved. You can now start receiving bookings."),
+        ["NOTIFICATIONS.ACCOUNT_SUSPENDED_TITLE"] = ("⚠️ החשבון הושעה", "⚠️ Account Suspended"),
+        ["NOTIFICATIONS.ACCOUNT_SUSPENDED"] = ("החשבון הושעה. ניתן לפנות לתמיכה לפרטים נוספים.", "Your account has been suspended. Contact support for more details."),
+        ["NOTIFICATIONS.PROVIDER_BANNED_TITLE"] = ("🚫 גישת ספק הוסרה", "🚫 Provider Access Removed"),
+        ["NOTIFICATIONS.PROVIDER_BANNED"] = ("גישת הספק הוסרה מהחשבון שלך.", "Your provider access has been removed."),
+        ["NOTIFICATIONS.ACCOUNT_REACTIVATED_TITLE"] = ("✅ החשבון הופעל מחדש", "✅ Account Reactivated"),
+        ["NOTIFICATIONS.ACCOUNT_REACTIVATED"] = ("החשבון שלך הופעל מחדש ופעיל שוב.", "Your account has been reactivated and is active again."),
+        ["NOTIFICATIONS.NEW"] = ("🔔 התראה חדשה", "🔔 New Notification"),
+    };
+
     private readonly ApplicationDbContext _db;
     private readonly IHubContext<NotificationHub> _hub;
     private readonly IExpoPushService _expoPush;
@@ -107,6 +124,10 @@ public class NotificationService : INotificationService
             .AsNoTracking()
             .ToDictionaryAsync(p => p.UserId);
 
+        var userLanguages = await _db.Users
+            .AsNoTracking()
+            .ToDictionaryAsync(u => u.Id, u => u.PreferredLanguage);
+
         var allTokens = await _db.UserPushTokens
             .AsNoTracking()
             .ToListAsync();
@@ -123,8 +144,12 @@ public class NotificationService : INotificationService
             if (!tokensByUser.TryGetValue(n.UserId, out var tokens) || tokens.Count == 0)
                 continue;
 
+            userLanguages.TryGetValue(n.UserId, out var preferredLanguage);
+            var pushTitle = ResolveNotificationTextForLanguage(title, preferredLanguage);
+            var pushMessage = ResolveNotificationTextForLanguage(message, preferredLanguage);
+
             // Fire-and-forget per user (errors logged inside ExpoPushService).
-            _ = _expoPush.SendAsync(tokens, title, message, new
+            _ = _expoPush.SendAsync(tokens, pushTitle, pushMessage, new
             {
                 type,
                 relatedEntityId,
@@ -197,6 +222,12 @@ public class NotificationService : INotificationService
         if (prefs is not null && (!prefs.PushEnabled || !MatchesCategory(prefs, type)))
             return;
 
+        var preferredLanguage = await _db.Users
+            .AsNoTracking()
+            .Where(u => u.Id == userId)
+            .Select(u => u.PreferredLanguage)
+            .FirstOrDefaultAsync();
+
         var tokens = await _db.UserPushTokens
             .AsNoTracking()
             .Where(t => t.UserId == userId)
@@ -205,7 +236,10 @@ public class NotificationService : INotificationService
 
         if (tokens.Count == 0) return;
 
-        await _expoPush.SendAsync(tokens, title, message, new
+        var pushTitle = ResolveNotificationTextForLanguage(title, preferredLanguage);
+        var pushMessage = ResolveNotificationTextForLanguage(message, preferredLanguage);
+
+        await _expoPush.SendAsync(tokens, pushTitle, pushMessage, new
         {
             type,
             relatedEntityId,
@@ -239,4 +273,16 @@ public class NotificationService : INotificationService
 
             _ => true,
         };
+
+    private static string ResolveNotificationTextForLanguage(string rawText, string? preferredLanguage)
+    {
+        if (!NotificationI18nMap.TryGetValue(rawText, out var localized))
+            return rawText;
+
+        var lang = preferredLanguage?.Trim();
+        var isEnglish = !string.IsNullOrEmpty(lang)
+            && lang.StartsWith("en", StringComparison.OrdinalIgnoreCase);
+
+        return isEnglish ? localized.En : localized.He;
+    }
 }

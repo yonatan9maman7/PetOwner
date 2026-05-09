@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useEffect, useMemo, memo, startTransition, type RefObject } from "react";
+import { useState, useCallback, useRef, useEffect, useMemo, memo, type RefObject } from "react";
 import {
   View,
   Text,
@@ -15,7 +15,6 @@ import {
   KeyboardAvoidingView,
   type KeyboardAvoidingViewProps,
   Share,
-  StatusBar,
   InteractionManager,
 } from "react-native";
 import { showGlobalAlertCompat } from "../../components/global-modal";
@@ -33,7 +32,8 @@ import { AuthPlaceholder } from "../../components/AuthPlaceholder";
 import { BrandedAppHeader } from "../../components/BrandedAppHeader";
 import { DatePickerField } from "../../components/DatePickerField";
 import { ListSkeleton, ListEmptyState } from "../../components/shared";
-import { useFocusDefer } from "../../hooks/useFocusDefer";
+import { PawLoadingSpinner } from "../../components/shared/PawLoadingSpinner";
+import { useFocusDefer, useFocusedRef } from "../../hooks/useFocusDefer";
 import { TimePickerField } from "../../components/TimePickerField";
 import { ImageLightbox } from "../../components/ImageLightbox";
 import { MapViewWrapper, MarkerWrapper } from "../../components/MapViewWrapper";
@@ -1117,6 +1117,7 @@ function SectionHeader({
 
 export function CommunityScreen() {
   const isDeferredReady = useFocusDefer();
+  const focusedRef = useFocusedRef();
   const sosMarkFoundConfettiRef = useRef<CelebrationConfettiBurstRef>(null);
   const burstMarkFoundCelebrate = useCallback(() => {
     sosMarkFoundConfettiRef.current?.burst();
@@ -1227,39 +1228,45 @@ export function CommunityScreen() {
   const bottomContentPadding = 16 + insets.bottom;
 
   const loadDashboard = useCallback(async () => {
+    if (!focusedRef.current) return;
     try {
-      setCommunityDashboard(await communityApi.getDashboard());
+      const data = await communityApi.getDashboard();
+      if (!focusedRef.current) return;
+      setCommunityDashboard(data);
     } catch {
-      setCommunityDashboard(null);
+      if (focusedRef.current) setCommunityDashboard(null);
     }
-  }, []);
+  }, [focusedRef]);
 
   useEffect(() => {
     if (!hydrated || !isLoggedIn) return;
     const task = InteractionManager.runAfterInteractions(() => {
-      void loadDashboard();
+      if (focusedRef.current) void loadDashboard();
     });
     return () => {
       task.cancel?.();
     };
-  }, [hydrated, isLoggedIn, loadDashboard]);
+  }, [hydrated, isLoggedIn, loadDashboard, focusedRef]);
 
   const loadFeed = useCallback(
     async (p: number, replace: boolean) => {
+      if (!focusedRef.current) return;
       if (replace) setLoading(true);
       setFeedError(false);
       try {
         const data = await postsApi.getFeed(p, PAGE_SIZE, { ranked: true });
+        if (!focusedRef.current) return;
         setPosts((prev) => (replace ? data : [...prev, ...data]));
         setHasMore(data.length >= PAGE_SIZE);
         setPage(p);
       } catch {
+        if (!focusedRef.current) return;
         setFeedError(true);
       } finally {
-        setLoading(false);
+        if (focusedRef.current) setLoading(false);
       }
     },
-    [],
+    [focusedRef],
   );
 
   useFocusEffect(
@@ -1294,17 +1301,21 @@ export function CommunityScreen() {
   }, [loadFeed, loadDashboard]);
 
   const loadGroups = useCallback(async () => {
+    if (!focusedRef.current) return;
     setGroupsLoading(true);
     try {
-      setGroups(await communityApi.getGroups());
+      const data = await communityApi.getGroups();
+      if (!focusedRef.current) return;
+      setGroups(data);
     } catch {
       /* error toast from global API interceptor */
     } finally {
-      setGroupsLoading(false);
+      if (focusedRef.current) setGroupsLoading(false);
     }
-  }, []);
+  }, [focusedRef]);
 
   const loadPets = useCallback(async () => {
+    if (!focusedRef.current) return;
     try {
       const cachedPets = usePetsStore.getState().pets;
       if (cachedPets.length > 0) {
@@ -1312,36 +1323,47 @@ export function CommunityScreen() {
         setSelectedPetId((current) => current ?? cachedPets[0]?.id ?? null);
       }
       await fetchStorePets();
+      if (!focusedRef.current) return;
       const currentStorePets = usePetsStore.getState().pets;
       const data = currentStorePets.length > 0 ? currentStorePets : await petsApi.getMyPets();
+      if (!focusedRef.current) return;
       setPets(data);
       setSelectedPetId((current) => current ?? data[0]?.id ?? null);
     } catch {}
-  }, [fetchStorePets]);
+  }, [fetchStorePets, focusedRef]);
 
   const loadPlaydates = useCallback(async () => {
+    if (!focusedRef.current) return;
     setPlaydatesLoading(true);
     try {
-      setPlaydates(await playdatesApi.list());
+      const data = await playdatesApi.list();
+      if (!focusedRef.current) return;
+      setPlaydates(data);
     } catch {
+      if (!focusedRef.current) return;
       setPlaydates([]);
     } finally {
-      setPlaydatesLoading(false);
+      if (focusedRef.current) setPlaydatesLoading(false);
     }
-  }, []);
+  }, [focusedRef]);
 
   const loadBeacons = useCallback(async () => {
+    if (!focusedRef.current) return;
     setBeaconsLoading(true);
     try {
-      setBeacons(await palsApi.getActiveBeacons());
+      const data = await palsApi.getActiveBeacons();
+      if (!focusedRef.current) return;
+      setBeacons(data);
     } catch {
+      if (!focusedRef.current) return;
       setBeacons([]);
     } finally {
-      setBeaconsLoading(false);
+      if (focusedRef.current) setBeaconsLoading(false);
     }
-  }, []);
+  }, [focusedRef]);
 
   const loadDogParks = useCallback(async () => {
+    if (!focusedRef.current) return;
     setParksLoading(true);
     try {
       let latitude = 32.0853;
@@ -1356,14 +1378,17 @@ export function CommunityScreen() {
           const result = await Location.getForegroundPermissionsAsync();
           status = result.status;
         }
+        if (!focusedRef.current) return;
         if (status === "granted") {
           const loc = await Location.getCurrentPositionAsync({});
+          if (!focusedRef.current) return;
           latitude = loc.coords.latitude;
           longitude = loc.coords.longitude;
         }
       } catch {
         // Keep Tel Aviv fallback when location is unavailable.
       }
+      if (!focusedRef.current) return;
       setParksUserLocation({ latitude, longitude });
       const nearby = await fetchNearbyDogParks({
         latitude,
@@ -1371,6 +1396,7 @@ export function CommunityScreen() {
         language: isRTL ? "he" : "en",
         radiusMeters: 8000,
       });
+      if (!focusedRef.current) return;
       if (nearby.length === 0) {
         setParks([]);
         return;
@@ -1396,47 +1422,52 @@ export function CommunityScreen() {
       });
       setParks(mapped);
     } catch {
+      if (!focusedRef.current) return;
       setParks([]);
     } finally {
-      setParksLoading(false);
+      if (focusedRef.current) setParksLoading(false);
     }
-  }, [copy, isRTL]);
+  }, [copy, isRTL, focusedRef]);
 
   const onRefreshGroups = useCallback(async () => {
     setGroupsRefreshing(true);
     try {
-      setGroups(await communityApi.getGroups());
+      const data = await communityApi.getGroups();
+      if (!focusedRef.current) return;
+      setGroups(data);
     } catch {
       /* error toast from global API interceptor */
     } finally {
-      setGroupsRefreshing(false);
+      if (focusedRef.current) setGroupsRefreshing(false);
     }
-  }, []);
+  }, [focusedRef]);
+
+  const mainTabRef = useRef(mainTab);
+  mainTabRef.current = mainTab;
 
   useFocusEffect(
     useCallback(() => {
       if (!hydrated || !isLoggedIn) return undefined;
-      let cancelled = false;
       const task = InteractionManager.runAfterInteractions(() => {
-        if (cancelled) return;
+        if (!focusedRef.current) return;
         loadPets();
         void loadDashboard();
-        if (mainTab === "feed" || mainTab === "qa" || mainTab === "lostSos") void loadFeed(1, true);
-        if (mainTab === "groups") void loadGroups();
-        if (mainTab === "playdates" || mainTab === "events") void loadPlaydates();
-        if (mainTab === "parks") {
+        const tab = mainTabRef.current;
+        if (tab === "feed" || tab === "qa" || tab === "lostSos") void loadFeed(1, true);
+        if (tab === "groups") void loadGroups();
+        if (tab === "playdates" || tab === "events") void loadPlaydates();
+        if (tab === "parks") {
           void loadBeacons();
           void loadDogParks();
         }
       });
       return () => {
-        cancelled = true;
         task.cancel?.();
       };
     }, [
       hydrated,
       isLoggedIn,
-      mainTab,
+      focusedRef,
       loadFeed,
       loadDashboard,
       loadGroups,
@@ -1454,19 +1485,24 @@ export function CommunityScreen() {
       setSearchRemoteLoading(false);
       return;
     }
+    let active = true;
     const handle = setTimeout(() => {
       void (async () => {
         setSearchRemoteLoading(true);
         try {
-          setSearchRemote(await communityApi.search(q));
+          const data = await communityApi.search(q);
+          if (active) setSearchRemote(data);
         } catch {
-          setSearchRemote(null);
+          if (active) setSearchRemote(null);
         } finally {
-          setSearchRemoteLoading(false);
+          if (active) setSearchRemoteLoading(false);
         }
       })();
     }, 380);
-    return () => clearTimeout(handle);
+    return () => {
+      active = false;
+      clearTimeout(handle);
+    };
   }, [communitySearchQuery, communitySearchOpen]);
 
   const filteredPosts = useMemo(() => {
@@ -2354,16 +2390,19 @@ export function CommunityScreen() {
               <Pressable
                 key={tab}
                 onPress={() => {
-                  startTransition(() => setMainTab(tab));
-                  if (tab === "groups" && groups.length === 0) void loadGroups();
-                  if (tab === "playdates" || tab === "events") void loadPlaydates();
-                  if (tab === "parks") {
-                    void loadBeacons();
-                    void loadDogParks();
-                  }
-                  if (tab === "feed" || tab === "qa" || tab === "lostSos") {
-                    if (posts.length === 0) void loadFeed(1, true);
-                  }
+                  setMainTab(tab);
+                  InteractionManager.runAfterInteractions(() => {
+                    if (!focusedRef.current) return;
+                    if (tab === "groups" && groups.length === 0) void loadGroups();
+                    if (tab === "playdates" || tab === "events") void loadPlaydates();
+                    if (tab === "parks") {
+                      void loadBeacons();
+                      void loadDogParks();
+                    }
+                    if (tab === "feed" || tab === "qa" || tab === "lostSos") {
+                      if (posts.length === 0) void loadFeed(1, true);
+                    }
+                  });
                 }}
                 style={styles.topTab}
               >
@@ -2413,13 +2452,12 @@ export function CommunityScreen() {
       dashboardActiveParks,
       dashboardOpenQuestions,
       dashboardSos,
-      upcomingMeetupsPreview,
+      upcomingMeetupsPreview.length,
       upcomingEventsCount,
-      groups,
+      groups.length,
       t,
       isRTL,
       appRowDirection,
-      rtlText,
       colors,
       styles,
       posts.length,
@@ -2430,7 +2468,12 @@ export function CommunityScreen() {
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: colors.surface }} edges={["top"]}>
         <BrandedAppHeader style={{ paddingVertical: 6 }} />
-        <ListSkeleton rows={5} variant="card" />
+        <View style={{ flex: 1, alignItems: "center", justifyContent: "center", gap: 20, paddingBottom: 60 }}>
+          <PawLoadingSpinner size={80} />
+          <Text style={{ fontSize: 15, color: colors.textMuted, fontWeight: "500" }}>
+            {t("communityTitle")}…
+          </Text>
+        </View>
       </SafeAreaView>
     );
   }
@@ -2998,62 +3041,67 @@ export function CommunityScreen() {
       )}
       </View>
 
-      <CommunitySearchModal
-        visible={communitySearchOpen}
-        onClose={() => {
-          setCommunitySearchOpen(false);
-          setCommunitySearchQuery("");
-        }}
-        t={t}
-        rtlText={rtlText}
-        rtlInput={rtlInput}
-        rowDirection={rowDirectionForAppLayout(isRTL)}
-        query={communitySearchQuery}
-        onQueryChange={setCommunitySearchQuery}
-        posts={searchPostsForModal}
-        groups={searchGroupsForModal}
-        meetups={playdates}
-        parks={parks.map((p) => ({ id: p.id, name: p.name }))}
-        loading={searchRemoteLoading}
-      />
+      {communitySearchOpen && (
+        <CommunitySearchModal
+          visible
+          onClose={() => {
+            setCommunitySearchOpen(false);
+            setCommunitySearchQuery("");
+          }}
+          t={t}
+          rtlText={rtlText}
+          rtlInput={rtlInput}
+          rowDirection={rowDirectionForAppLayout(isRTL)}
+          query={communitySearchQuery}
+          onQueryChange={setCommunitySearchQuery}
+          posts={searchPostsForModal}
+          groups={searchGroupsForModal}
+          meetups={playdates}
+          parks={parks.map((p) => ({ id: p.id, name: p.name }))}
+          loading={searchRemoteLoading}
+        />
+      )}
 
-      <CreatePostModal
-        visible={composerOpen}
-        onClose={() => {
-          setComposerOpen(false);
-          setNewPostContent("");
-          setPickedImageUri(null);
-        }}
-        colors={colors}
-        styles={styles}
-        rtlInput={rtlInput}
-        isRTL={isRTL}
-        copy={copy}
-        content={newPostContent}
-        setContent={setNewPostContent}
-        postType={newPostType}
-        setPostType={setNewPostType}
-        location={newPostLocation}
-        setLocation={setNewPostLocation}
-        visibility={newPostVisibility}
-        setVisibility={setNewPostVisibility}
-        tags={newPostTags}
-        setTags={setNewPostTags}
-        pets={pets}
-        selectedPetId={selectedPetId}
-        setSelectedPetId={setSelectedPetId}
-        pickedImageUri={pickedImageUri}
-        setPickedImageUri={setPickedImageUri}
-        handlePickPostImage={handlePickPostImage}
-        handlePublish={handlePublish}
-        posting={posting}
-        uploadingImage={uploadingImage}
-        inputRef={composerInputRef}
-        keyboardAvoidBehavior={keyboardAvoidBehavior}
-      />
+      {composerOpen && (
+        <CreatePostModal
+          visible
+          onClose={() => {
+            setComposerOpen(false);
+            setNewPostContent("");
+            setPickedImageUri(null);
+          }}
+          colors={colors}
+          styles={styles}
+          rtlInput={rtlInput}
+          isRTL={isRTL}
+          copy={copy}
+          content={newPostContent}
+          setContent={setNewPostContent}
+          postType={newPostType}
+          setPostType={setNewPostType}
+          location={newPostLocation}
+          setLocation={setNewPostLocation}
+          visibility={newPostVisibility}
+          setVisibility={setNewPostVisibility}
+          tags={newPostTags}
+          setTags={setNewPostTags}
+          pets={pets}
+          selectedPetId={selectedPetId}
+          setSelectedPetId={setSelectedPetId}
+          pickedImageUri={pickedImageUri}
+          setPickedImageUri={setPickedImageUri}
+          handlePickPostImage={handlePickPostImage}
+          handlePublish={handlePublish}
+          posting={posting}
+          uploadingImage={uploadingImage}
+          inputRef={composerInputRef}
+          keyboardAvoidBehavior={keyboardAvoidBehavior}
+        />
+      )}
 
+      {playdateModalOpen && (
       <CreatePlaydateModal
-        visible={playdateModalOpen}
+        visible
         onClose={() => setPlaydateModalOpen(false)}
         colors={colors}
         styles={styles}
@@ -3087,176 +3135,167 @@ export function CommunityScreen() {
         onCreate={handleCreatePlaydate}
         keyboardAvoidBehavior={keyboardAvoidBehavior}
       />
+      )}
 
-      <Modal
-        visible={!!selectedPark}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setSelectedPark(null)}
-      >
-        <View style={styles.modalRoot}>
-        <Pressable style={styles.modalBackdropFill} onPress={() => setSelectedPark(null)} />
-          <Pressable style={styles.detailSheet} onPress={(e) => e.stopPropagation()}>
-            {selectedPark && (
-              <>
-                <View style={styles.handle} />
-                <Text style={[styles.modalTitle, rtlText]}>{selectedPark.name}</Text>
-                <Text style={[styles.sectionCardSub, rtlText]}>
-                  {selectedPark.distance} · {selectedPark.rating.toFixed(1)} {copy("rating")} · {copy("peak")} {selectedPark.peakHours}
-                </Text>
-                <View style={styles.mapPlaceholder}>
-                  <MapViewWrapper
-                    style={{ flex: 1 }}
-                    initialRegion={{
-                      latitude: selectedPark.latitude,
-                      longitude: selectedPark.longitude,
-                      latitudeDelta: 0.01,
-                      longitudeDelta: 0.01,
-                    }}
-                    pointerEvents="none"
-                  >
-                    <MarkerWrapper
-                      coordinate={{
-                        latitude: selectedPark.latitude,
-                        longitude: selectedPark.longitude,
-                      }}
-                      title={selectedPark.name}
-                      description={selectedPark.address ?? copy("parkLocation")}
-                    />
-                  </MapViewWrapper>
-                </View>
-                <View style={[styles.metaWrap, { flexDirection: appRowDirection }]}>
-                  {selectedPark.amenities.map((amenity) => (
-                    <Text key={amenity} style={styles.metaPill}>{amenity}</Text>
-                  ))}
-                </View>
-                <Text style={[styles.contentText, rtlText]}>
-                  {selectedPark.activeDogs} {copy("activeDogsNow")}, {selectedPark.upcomingPlaydates} {copy("upcomingPlaydates")}, {selectedPark.recentPosts} {copy("recentPosts")}.
-                </Text>
-                <View style={[styles.actionBar, rtlRow]}>
-                  <Pressable
-                    onPress={() => {
-                      setNewPlaydateLocation(selectedPark.name);
-                      setSelectedPark(null);
-                      setPlaydateModalOpen(true);
-                    }}
-                    style={styles.primarySmallBtn}
-                  >
-                    <Text style={styles.primarySmallText}>{copy("createPlaydate")}</Text>
-                  </Pressable>
-                  <Pressable onPress={() => handleParkCheckIn(selectedPark)} style={styles.smallOutlineBtn}>
-                    <Text style={styles.smallOutlineText}>{copy("checkIn")}</Text>
-                  </Pressable>
-                </View>
-              </>
-            )}
-          </Pressable>
-        </View>
-      </Modal>
-
-      <Modal
-        visible={!!dogProfilePet}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setDogProfilePet(null)}
-      >
-        <View style={styles.modalRoot}>
-        <Pressable style={styles.modalBackdropFill} onPress={() => setDogProfilePet(null)} />
-          <Pressable style={styles.detailSheet} onPress={(e) => e.stopPropagation()}>
-            {dogProfilePet && (
-              <>
-                {(() => {
-                  const invited = invitedPetIds.has(dogProfilePet.id);
-                  const followed = followedPetIds.has(dogProfilePet.id);
-                  return (
-                    <>
-                <View style={styles.handle} />
-                <View style={styles.largeDogAvatar}>
-                  {dogProfilePet.imageUrl ? (
-                    <Image source={{ uri: dogProfilePet.imageUrl }} style={StyleSheet.absoluteFill} />
-                  ) : (
-                    <Ionicons name="paw" size={34} color={colors.textInverse} />
-                  )}
-                </View>
-                <Text style={[styles.modalTitle, { textAlign: "center" }]}>{dogProfilePet.name}</Text>
-                <Text style={[styles.sectionCardSub, { textAlign: "center" }]}>
-                  {dogProfilePet.breed ? formatBreedForDisplay(dogProfilePet.breed, t) : copy("dog")} · {dogProfilePet.age}
-                </Text>
-                <View style={[styles.metaWrap, { justifyContent: "center" }]}>
-                  <Text style={styles.metaPill}>{copy("localDogProfile")}</Text>
-                  <Text style={styles.metaPill}>{copy("energyLevel")}: {energyLabel("Medium", isRTL)}</Text>
-                  <Text style={styles.metaPill}>{copy("parks")}</Text>
-                </View>
-                <View style={[styles.actionBar, { justifyContent: "center" }]}>
-                  <Pressable
-                    onPress={() => handleInvitePet(dogProfilePet)}
-                    style={invited ? styles.smallOutlineBtn : styles.primarySmallBtn}
-                  >
-                    <Text style={invited ? styles.smallOutlineText : styles.primarySmallText}>
-                      {invited ? copy("invited") : copy("invite")}
-                    </Text>
-                  </Pressable>
-                  <Pressable
-                    onPress={() => handleFollowPet(dogProfilePet)}
-                    style={followed ? styles.primarySmallBtn : styles.smallOutlineBtn}
-                  >
-                    <Text style={followed ? styles.primarySmallText : styles.smallOutlineText}>
-                      {followed ? copy("followed") : copy("follow")}
-                    </Text>
-                  </Pressable>
-                </View>
-                    </>
-                  );
-                })()}
-              </>
-            )}
-          </Pressable>
-        </View>
-      </Modal>
-
-      <Modal
-        visible={!!playdateCommentsOpenFor}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setPlaydateCommentsOpenFor(null)}
-      >
-        <View style={styles.modalRoot}>
-        <Pressable style={styles.modalBackdropFill} onPress={() => setPlaydateCommentsOpenFor(null)} />
-          <KeyboardAvoidingView behavior={keyboardAvoidBehavior} style={styles.keyboardSheet}>
+      {selectedPark && (
+        <Modal
+          visible
+          transparent
+          animationType="slide"
+          onRequestClose={() => setSelectedPark(null)}
+        >
+          <View style={styles.modalRoot}>
+          <Pressable style={styles.modalBackdropFill} onPress={() => setSelectedPark(null)} />
             <Pressable style={styles.detailSheet} onPress={(e) => e.stopPropagation()}>
               <View style={styles.handle} />
-              <Text style={[styles.modalTitle, rtlText]}>{copy("playdateComments")}</Text>
-              <Text style={[styles.emptyInline, rtlText]}>
-                {copy("commentsHint")}
+              <Text style={[styles.modalTitle, rtlText]}>{selectedPark.name}</Text>
+              <Text style={[styles.sectionCardSub, rtlText]}>
+                {selectedPark.distance} · {selectedPark.rating.toFixed(1)} {copy("rating")} · {copy("peak")} {selectedPark.peakHours}
               </Text>
-              <TextInput
-                value={playdateCommentText}
-                onChangeText={setPlaydateCommentText}
-                placeholder={copy("writeComment")}
-                placeholderTextColor={colors.textMuted}
-                style={[styles.input, rtlInput]}
-              />
-              <Pressable
-                onPress={async () => {
-                  const content = playdateCommentText.trim();
-                  if (!content || !playdateCommentsOpenFor) return;
-                  try {
-                    await playdatesApi.addComment(playdateCommentsOpenFor.id, content);
-                    showGlobalAlertCompat(copy("commentAdded"), copy("commentAddedDesc"));
-                  } catch {
-                    showGlobalAlertCompat(copy("commentLocal"), copy("commentLocalDesc"));
-                  }
-                  setPlaydateCommentText("");
-                  setPlaydateCommentsOpenFor(null);
-                }}
-                style={styles.primaryBtn}
-              >
-                <Text style={styles.primaryBtnText}>{copy("postComment")}</Text>
-              </Pressable>
+              <View style={styles.mapPlaceholder}>
+                <MapViewWrapper
+                  style={{ flex: 1 }}
+                  initialRegion={{
+                    latitude: selectedPark.latitude,
+                    longitude: selectedPark.longitude,
+                    latitudeDelta: 0.01,
+                    longitudeDelta: 0.01,
+                  }}
+                  pointerEvents="none"
+                >
+                  <MarkerWrapper
+                    coordinate={{
+                      latitude: selectedPark.latitude,
+                      longitude: selectedPark.longitude,
+                    }}
+                    title={selectedPark.name}
+                    description={selectedPark.address ?? copy("parkLocation")}
+                  />
+                </MapViewWrapper>
+              </View>
+              <View style={[styles.metaWrap, { flexDirection: appRowDirection }]}>
+                {selectedPark.amenities.map((amenity) => (
+                  <Text key={amenity} style={styles.metaPill}>{amenity}</Text>
+                ))}
+              </View>
+              <Text style={[styles.contentText, rtlText]}>
+                {selectedPark.activeDogs} {copy("activeDogsNow")}, {selectedPark.upcomingPlaydates} {copy("upcomingPlaydates")}, {selectedPark.recentPosts} {copy("recentPosts")}.
+              </Text>
+              <View style={[styles.actionBar, rtlRow]}>
+                <Pressable
+                  onPress={() => {
+                    setNewPlaydateLocation(selectedPark.name);
+                    setSelectedPark(null);
+                    setPlaydateModalOpen(true);
+                  }}
+                  style={styles.primarySmallBtn}
+                >
+                  <Text style={styles.primarySmallText}>{copy("createPlaydate")}</Text>
+                </Pressable>
+                <Pressable onPress={() => handleParkCheckIn(selectedPark)} style={styles.smallOutlineBtn}>
+                  <Text style={styles.smallOutlineText}>{copy("checkIn")}</Text>
+                </Pressable>
+              </View>
             </Pressable>
-          </KeyboardAvoidingView>
-        </View>
-      </Modal>
+          </View>
+        </Modal>
+      )}
+
+      {dogProfilePet && (
+        <Modal
+          visible
+          transparent
+          animationType="slide"
+          onRequestClose={() => setDogProfilePet(null)}
+        >
+          <View style={styles.modalRoot}>
+          <Pressable style={styles.modalBackdropFill} onPress={() => setDogProfilePet(null)} />
+            <Pressable style={styles.detailSheet} onPress={(e) => e.stopPropagation()}>
+              <View style={styles.handle} />
+              <View style={styles.largeDogAvatar}>
+                {dogProfilePet.imageUrl ? (
+                  <Image source={{ uri: dogProfilePet.imageUrl }} style={StyleSheet.absoluteFill} />
+                ) : (
+                  <Ionicons name="paw" size={34} color={colors.textInverse} />
+                )}
+              </View>
+              <Text style={[styles.modalTitle, { textAlign: "center" }]}>{dogProfilePet.name}</Text>
+              <Text style={[styles.sectionCardSub, { textAlign: "center" }]}>
+                {dogProfilePet.breed ? formatBreedForDisplay(dogProfilePet.breed, t) : copy("dog")} · {dogProfilePet.age}
+              </Text>
+              <View style={[styles.metaWrap, { justifyContent: "center" }]}>
+                <Text style={styles.metaPill}>{copy("localDogProfile")}</Text>
+                <Text style={styles.metaPill}>{copy("energyLevel")}: {energyLabel("Medium", isRTL)}</Text>
+                <Text style={styles.metaPill}>{copy("parks")}</Text>
+              </View>
+              <View style={[styles.actionBar, { justifyContent: "center" }]}>
+                <Pressable
+                  onPress={() => handleInvitePet(dogProfilePet)}
+                  style={invitedPetIds.has(dogProfilePet.id) ? styles.smallOutlineBtn : styles.primarySmallBtn}
+                >
+                  <Text style={invitedPetIds.has(dogProfilePet.id) ? styles.smallOutlineText : styles.primarySmallText}>
+                    {invitedPetIds.has(dogProfilePet.id) ? copy("invited") : copy("invite")}
+                  </Text>
+                </Pressable>
+                <Pressable
+                  onPress={() => handleFollowPet(dogProfilePet)}
+                  style={followedPetIds.has(dogProfilePet.id) ? styles.primarySmallBtn : styles.smallOutlineBtn}
+                >
+                  <Text style={followedPetIds.has(dogProfilePet.id) ? styles.primarySmallText : styles.smallOutlineText}>
+                    {followedPetIds.has(dogProfilePet.id) ? copy("followed") : copy("follow")}
+                  </Text>
+                </Pressable>
+              </View>
+            </Pressable>
+          </View>
+        </Modal>
+      )}
+
+      {playdateCommentsOpenFor && (
+        <Modal
+          visible
+          transparent
+          animationType="slide"
+          onRequestClose={() => setPlaydateCommentsOpenFor(null)}
+        >
+          <View style={styles.modalRoot}>
+          <Pressable style={styles.modalBackdropFill} onPress={() => setPlaydateCommentsOpenFor(null)} />
+            <KeyboardAvoidingView behavior={keyboardAvoidBehavior} style={styles.keyboardSheet}>
+              <Pressable style={styles.detailSheet} onPress={(e) => e.stopPropagation()}>
+                <View style={styles.handle} />
+                <Text style={[styles.modalTitle, rtlText]}>{copy("playdateComments")}</Text>
+                <Text style={[styles.emptyInline, rtlText]}>
+                  {copy("commentsHint")}
+                </Text>
+                <TextInput
+                  value={playdateCommentText}
+                  onChangeText={setPlaydateCommentText}
+                  placeholder={copy("writeComment")}
+                  placeholderTextColor={colors.textMuted}
+                  style={[styles.input, rtlInput]}
+                />
+                <Pressable
+                  onPress={async () => {
+                    const content = playdateCommentText.trim();
+                    if (!content || !playdateCommentsOpenFor) return;
+                    try {
+                      await playdatesApi.addComment(playdateCommentsOpenFor.id, content);
+                      showGlobalAlertCompat(copy("commentAdded"), copy("commentAddedDesc"));
+                    } catch {
+                      showGlobalAlertCompat(copy("commentLocal"), copy("commentLocalDesc"));
+                    }
+                    setPlaydateCommentText("");
+                    setPlaydateCommentsOpenFor(null);
+                  }}
+                  style={styles.primaryBtn}
+                >
+                  <Text style={styles.primaryBtnText}>{copy("postComment")}</Text>
+                </Pressable>
+              </Pressable>
+            </KeyboardAvoidingView>
+          </View>
+        </Modal>
+      )}
 
       <CommentsBottomSheet
         visible={!!answerPost}
@@ -3281,8 +3320,9 @@ export function CommunityScreen() {
       />
 
       {/* Create Group Modal (Admin only) */}
+      {createModalOpen && (
       <Modal
-        visible={createModalOpen}
+        visible
         transparent
         animationType="fade"
         onRequestClose={() => setCreateModalOpen(false)}
@@ -3467,6 +3507,7 @@ export function CommunityScreen() {
           </Pressable>
         </Pressable>
       </Modal>
+      )}
 
       <View pointerEvents="box-none" style={StyleSheet.absoluteFillObject}>
         <CelebrationConfettiBurst ref={sosMarkFoundConfettiRef} />

@@ -10,7 +10,6 @@ import {
   StyleSheet,
   Keyboard,
   Image,
-  ActivityIndicator,
   Platform,
   type ViewStyle,
 } from "react-native";
@@ -28,6 +27,7 @@ import { mapApi } from "../../api/client";
 import { getNormalizedApiError } from "../../utils/apiUtils";
 import { showApiErrorToast } from "../../services/apiErrorToast";
 import { ProviderType, type MapPinDto, type MapSearchFilters } from "../../types/api";
+import { PawLoadingSpinner } from "../../components/shared/PawLoadingSpinner";
 
 /* ─── Category chip definitions ─── */
 
@@ -589,9 +589,9 @@ export function DiscoverScreen() {
       {/* ── Provider cards list (loading / empty / list are mutually exclusive) ── */}
       <View style={c.listArea}>
       {loading ? (
-        <View style={[c.emptyWrap, c.listFlexGrow, { justifyContent: "center", flex: 1 }]}>
-          <ActivityIndicator size="large" color={colors.primary} />
-          <Text style={[styles.emptySubtitle, { marginTop: 12 }]}>{t("loadingProviders")}</Text>
+        <View style={[c.emptyWrap, c.listFlexGrow, { justifyContent: "center", flex: 1, gap: 16 }]}>
+          <PawLoadingSpinner size={80} />
+          <Text style={[styles.emptySubtitle]}>{t("loadingProviders")}</Text>
         </View>
       ) : filteredProviders.length === 0 ? (
         <View style={[c.emptyWrap, c.listFlexGrow, { flex: 1, justifyContent: "center" }]}>
