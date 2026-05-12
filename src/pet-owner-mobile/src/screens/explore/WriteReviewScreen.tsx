@@ -21,7 +21,7 @@ import { useAuthStore } from "../../store/authStore";
 import { useReviewsStore } from "../../store/reviewsStore";
 import { bookingsApi } from "../../api/client";
 import { StarRatingInput } from "./components/StarRatingInput";
-import { InlineError } from "../../components/shared";
+import { InlineError, ScreenLoadingCenter } from "../../components/shared";
 import { formInputStyle } from "../pets/MyPets/helpers";
 import { useKeyboardAvoidingState } from "../../hooks/useKeyboardAvoidingState";
 
@@ -187,9 +187,7 @@ export function WriteReviewScreen() {
 
       <KeyboardAvoidingView className="flex-1" behavior={keyboardAvoidBehavior}>
         {resolvingBooking ? (
-          <View className="flex-1 items-center justify-center">
-            <ActivityIndicator size="large" color={colors.primary} />
-          </View>
+          <ScreenLoadingCenter title={`${t("writeReviewTitle")}…`} />
         ) : !resolvedBookingId ? (
           <ScrollView contentContainerStyle={{ padding: 24 }} keyboardShouldPersistTaps="handled">
             <Ionicons name="document-text-outline" size={48} color={colors.textMuted} style={{ alignSelf: "center" }} />

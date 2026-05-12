@@ -20,6 +20,7 @@ import Animated, { FadeInDown, FadeIn } from "react-native-reanimated";
 import { useTranslation, rowDirectionForAppLayout } from "../../i18n";
 import { useTheme, type ThemeColors } from "../../theme/ThemeContext";
 import { triageApi } from "../../api/client";
+import { ScreenLoadingCenter } from "../../components/shared/ScreenLoadingCenter";
 import type { NearbyVetDto } from "../../types/api";
 
 const MAX_RESULTS = 15;
@@ -275,8 +276,7 @@ export function EmergencyVetsScreen() {
       {/* Body */}
       {state === "loading" ? (
         <View style={styles.center}>
-          <ActivityIndicator size="large" color={colors.primary} />
-          <Text style={[styles.loadingText, rtlText]}>{t("findingProviders")}</Text>
+          <ScreenLoadingCenter fill={false} title={t("findingProviders")} style={{ paddingBottom: 0 }} />
         </View>
       ) : state === "location-denied" ? (
         <View style={styles.center}>

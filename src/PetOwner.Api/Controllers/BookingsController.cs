@@ -102,7 +102,8 @@ public class BookingsController : ControllerBase
         if (currentPetCount + requestedPetIds.Count > serviceRate.MaxPetCapacity)
             return BadRequest(new { message = "The provider does not have enough pet capacity for this time slot." });
 
-        var totalPrice = CalculateTotalPrice(serviceRate, bookingStart, bookingEnd);
+        var lineTotal = CalculateTotalPrice(serviceRate, bookingStart, bookingEnd);
+        var totalPrice = lineTotal * pets.Count;
 
         if (totalPrice <= 0)
             return BadRequest(new { message = "Calculated price must be greater than zero." });

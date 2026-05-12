@@ -4,7 +4,6 @@ import {
   Text,
   Pressable,
   FlatList,
-  ActivityIndicator,
   RefreshControl,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -15,6 +14,7 @@ import { resolveNotificationApiText, useTranslation, type TranslationKey, rowDir
 import { useTheme } from "../../theme/ThemeContext";
 import type { NotificationDto } from "../../types/api";
 import { parseUtcTimestamp } from "../../utils/parseUtcTimestamp";
+import { ScreenLoadingCenter } from "../../components/shared/ScreenLoadingCenter";
 
 function formatNotificationRelativeTime(
   dateStr: string,
@@ -142,11 +142,7 @@ export function NotificationsScreen() {
       </View>
 
       {loading && notifications.length === 0 ? (
-        <View
-          style={{ flex: 1, alignItems: "center", justifyContent: "center" }}
-        >
-          <ActivityIndicator size="large" color={colors.primary} />
-        </View>
+        <ScreenLoadingCenter title={`${t("notificationsTitle")}…`} />
       ) : notifications.length === 0 ? (
         <View
           style={{

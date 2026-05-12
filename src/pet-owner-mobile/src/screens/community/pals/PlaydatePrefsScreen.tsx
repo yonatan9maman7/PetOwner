@@ -3,6 +3,7 @@ import {
   View, Text, TextInput, Pressable, Switch, ScrollView,
   ActivityIndicator, StyleSheet,
 } from "react-native";
+import { ScreenLoadingCenter } from "../../../components/shared/ScreenLoadingCenter";
 import { showGlobalAlertCompat } from "../../../components/global-modal";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -78,9 +79,7 @@ export function PlaydatePrefsScreen() {
   if (loading) {
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={["top"]}>
-        <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
-          <ActivityIndicator color={colors.text} />
-        </View>
+        <ScreenLoadingCenter title={`${t("palsTab")}…`} />
       </SafeAreaView>
     );
   }

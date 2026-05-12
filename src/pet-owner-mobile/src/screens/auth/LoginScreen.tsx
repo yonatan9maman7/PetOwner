@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import {
   View,
   Text,
@@ -20,6 +20,7 @@ import { useFocusEffect, useNavigation } from "@react-navigation/native";
 // import * as AppleAuthentication from "expo-apple-authentication";
 // import * as Crypto from "expo-crypto";
 import * as WebBrowser from "expo-web-browser";
+import { makeRedirectUri } from "expo-auth-session";
 import * as Google from "expo-auth-session/providers/google";
 import { useAuthStore } from "../../store/authStore";
 import { useTranslation } from "../../i18n";
@@ -34,6 +35,92 @@ import * as biometricService from "../../services/biometricService";
 WebBrowser.maybeCompleteAuthSession();
 
 const LOGIN_HERO_LOGO = require("../../../assets/petcare-logo-transparent.png");
+
+/** True when `expo-auth-session` Google provider has the client IDs it requires for this OS. */
+function hasGoogleOAuthEnvForCurrentPlatform(): boolean {
+  const web = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID?.trim();
+  if (!web) return false;
+  if (Platform.OS === "android") {
+    return Boolean(process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID?.trim());
+  }
+  if (Platform.OS === "ios") {
+    return Boolean(process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID?.trim());
+  }
+  return true;
+}
+
+type GoogleSignInControlProps = {
+  socialLoading: boolean;
+  colors: { text: string; inputBg: string; surfaceSecondary: string };
+  rtlRow: Record<string, unknown>;
+  onIdToken: (idToken: string) => void;
+  onFlowError: () => void;
+};
+
+/** Isolated so `Google.useAuthRequest` is only mounted when env is complete (avoids render-time invariant). */
+function GoogleSignInControl({
+  socialLoading,
+  colors,
+  rtlRow,
+  onIdToken,
+  onFlowError,
+}: GoogleSignInControlProps) {
+  /** Must match `expo.scheme` in app.json so the standalone app receives the OAuth return (default uses `applicationId:` which does not match intent filters). */
+  const googleRedirectUri = useMemo(
+    () =>
+      makeRedirectUri({
+        scheme: "petowner",
+        path: "oauthredirect",
+      }),
+    [],
+  );
+
+  const [_googleRequest, googleResponse, promptGoogleAsync] = Google.useAuthRequest({
+    iosClientId: process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID,
+    androidClientId: process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID,
+    webClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID,
+    redirectUri: googleRedirectUri,
+  });
+
+  useEffect(() => {
+    if (googleResponse?.type === "success") {
+      const idToken = googleResponse.authentication?.idToken;
+      if (!idToken) {
+        onFlowError();
+        return;
+      }
+      onIdToken(idToken);
+    } else if (googleResponse?.type === "error") {
+      onFlowError();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- use latest handlers from parent
+  }, [googleResponse]);
+
+  return (
+    <Pressable
+      className="flex-1 items-center justify-center gap-3 h-12 rounded-xl"
+      style={({ pressed }) => ({
+        ...rtlRow,
+        backgroundColor: pressed ? colors.inputBg : colors.surfaceSecondary,
+      })}
+      onPress={() => {
+        void promptGoogleAsync();
+      }}
+      disabled={socialLoading}
+    >
+      {socialLoading ? (
+        <ActivityIndicator size="small" color={colors.text} />
+      ) : (
+        <>
+          <Ionicons name="logo-google" size={20} color={colors.text} />
+          <Text className="text-sm font-bold" style={{ color: colors.text }}>
+            Google
+          </Text>
+        </>
+      )}
+    </Pressable>
+  );
+}
 
 /* ─── LoginScreen (root) ─────────────────────────────────────────── */
 
@@ -99,11 +186,8 @@ function LoginForm() {
   const { colors } = useTheme();
   const { behavior: keyboardAvoidBehavior } = useKeyboardAvoidingState();
 
-  const [_googleRequest, googleResponse, promptGoogleAsync] = Google.useAuthRequest({
-    iosClientId: process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID,
-    androidClientId: process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID,
-    webClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID,
-  });
+  const showGoogleButton = hasGoogleOAuthEnvForCurrentPlatform();
+  const showSocialSection = Platform.OS === "ios" || showGoogleButton;
 
   /* Warm hero logo decode/cache as soon as the screen mounts */
   useEffect(() => {
@@ -116,6 +200,7 @@ function LoginForm() {
   /* ── Check biometric availability on mount ── */
   useEffect(() => {
     let cancelled = false;
+    let bioTimer: ReturnType<typeof setTimeout> | undefined;
     (async () => {
       const [sup, en, label] = await Promise.all([
         biometricService.isSupported(),
@@ -127,12 +212,11 @@ function LoginForm() {
       setBioEnabled(available);
       setBioTypeLabel(label);
       if (available) {
-        // Slight delay so the form is visible before the system prompt appears.
-        setTimeout(() => runBiometricLogin(label), 400);
+        bioTimer = setTimeout(() => runBiometricLogin(label), 400);
         setAutoPromptDone(true);
       }
     })();
-    return () => { cancelled = true; };
+    return () => { cancelled = true; if (bioTimer) clearTimeout(bioTimer); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -143,33 +227,6 @@ function LoginForm() {
     }
   }, []);
   ── */
-
-  /* ── Handle Google auth result ── */
-  useEffect(() => {
-    if (googleResponse?.type === "success") {
-      const idToken = googleResponse.authentication?.idToken;
-      if (!idToken) {
-        showApiErrorToast({
-          message: t("socialLoginFailed"),
-          title: t("errorTitle"),
-          isConnectivityError: false,
-          isAuthError: false,
-          isServerError: false,
-        });
-        return;
-      }
-      handleSocialLoginToken("Google", idToken);
-    } else if (googleResponse?.type === "error") {
-      showApiErrorToast({
-        message: t("socialLoginFailed"),
-        title: t("errorTitle"),
-        isConnectivityError: false,
-        isAuthError: false,
-        isServerError: false,
-      });
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [googleResponse]);
 
   /* ── Biometric login helper ── */
   const runBiometricLogin = async (label?: biometricService.BiometricTypeLabel) => {
@@ -313,10 +370,6 @@ function LoginForm() {
     //   }
     //   showGlobalAlertCompat(t("errorTitle"), t("socialLoginFailed"));
     // }
-  };
-
-  const handleGoogleSignIn = async () => {
-    await promptGoogleAsync();
   };
 
   const labelCls = `text-xs font-bold mb-2 px-1 ${alignCls} ${!isHebrew ? "uppercase tracking-widest" : ""}`;
@@ -667,59 +720,63 @@ function LoginForm() {
             </View>
           )}
 
-          {/* ── Divider ── */}
-          <View className="flex-row items-center my-6">
-            <View className="flex-1 h-px" style={{ backgroundColor: colors.borderLight }} />
-            <Text
-              style={[rtlStyle, { color: colors.textSecondary }]}
-              className={`px-4 text-xs font-bold ${!isHebrew ? "uppercase tracking-wider" : ""}`}
-            >
-              {t("socialDivider")}
-            </Text>
-            <View className="flex-1 h-px" style={{ backgroundColor: colors.borderLight }} />
-          </View>
+          {/* ── Divider + social (only when at least one provider is available) ── */}
+          {showSocialSection && (
+            <>
+              <View className="flex-row items-center my-6">
+                <View className="flex-1 h-px" style={{ backgroundColor: colors.borderLight }} />
+                <Text
+                  style={[rtlStyle, { color: colors.textSecondary }]}
+                  className={`px-4 text-xs font-bold ${!isHebrew ? "uppercase tracking-wider" : ""}`}
+                >
+                  {t("socialDivider")}
+                </Text>
+                <View className="flex-1 h-px" style={{ backgroundColor: colors.borderLight }} />
+              </View>
 
-          {/* ── Social Login ── */}
-          <View className="flex-row gap-4">
-            {Platform.OS === "ios" && (
-              <Pressable
-                className="flex-1 items-center justify-center gap-3 h-12 rounded-xl"
-                style={({ pressed }) => ({
-                  ...rtlRow,
-                  backgroundColor: pressed ? colors.inputBg : colors.surfaceSecondary,
-                })}
-                onPress={handleAppleSignIn}
-                disabled={socialLoading}
-              >
-                {socialLoading ? (
-                  <ActivityIndicator size="small" color={colors.text} />
-                ) : (
-                  <>
-                    <Ionicons name="logo-apple" size={20} color={colors.text} />
-                    <Text className="text-sm font-bold" style={{ color: colors.text }}>Apple</Text>
-                  </>
+              <View className="flex-row gap-4">
+                {Platform.OS === "ios" && (
+                  <Pressable
+                    className="flex-1 items-center justify-center gap-3 h-12 rounded-xl"
+                    style={({ pressed }) => ({
+                      ...rtlRow,
+                      backgroundColor: pressed ? colors.inputBg : colors.surfaceSecondary,
+                    })}
+                    onPress={handleAppleSignIn}
+                    disabled={socialLoading}
+                  >
+                    {socialLoading ? (
+                      <ActivityIndicator size="small" color={colors.text} />
+                    ) : (
+                      <>
+                        <Ionicons name="logo-apple" size={20} color={colors.text} />
+                        <Text className="text-sm font-bold" style={{ color: colors.text }}>
+                          Apple
+                        </Text>
+                      </>
+                    )}
+                  </Pressable>
                 )}
-              </Pressable>
-            )}
-            <Pressable
-              className="flex-1 items-center justify-center gap-3 h-12 rounded-xl"
-              style={({ pressed }) => ({
-                ...rtlRow,
-                backgroundColor: pressed ? colors.inputBg : colors.surfaceSecondary,
-              })}
-              onPress={handleGoogleSignIn}
-              disabled={socialLoading}
-            >
-              {socialLoading ? (
-                <ActivityIndicator size="small" color={colors.text} />
-              ) : (
-                <>
-                  <Ionicons name="logo-google" size={20} color={colors.text} />
-                  <Text className="text-sm font-bold" style={{ color: colors.text }}>Google</Text>
-                </>
-              )}
-            </Pressable>
-          </View>
+                {showGoogleButton && (
+                  <GoogleSignInControl
+                    socialLoading={socialLoading}
+                    colors={colors}
+                    rtlRow={rtlRow}
+                    onIdToken={(idToken) => void handleSocialLoginToken("Google", idToken)}
+                    onFlowError={() =>
+                      showApiErrorToast({
+                        message: t("socialLoginFailed"),
+                        title: t("errorTitle"),
+                        isConnectivityError: false,
+                        isAuthError: false,
+                        isServerError: false,
+                      })
+                    }
+                  />
+                )}
+              </View>
+            </>
+          )}
 
           {/* ── Footer ── */}
           <View

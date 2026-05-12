@@ -26,7 +26,7 @@ import { BrandedAppHeader } from "../../../components/BrandedAppHeader";
 import { useTheme } from "../../../theme/ThemeContext";
 import type { PetDto } from "../../../types/api";
 import { ListSkeleton } from "../../../components/shared/ListSkeleton";
-import { PawLoadingSpinner } from "../../../components/shared/PawLoadingSpinner";
+import { ScreenLoadingCenter } from "../../../components/shared/ScreenLoadingCenter";
 import { ListEmptyState } from "../../../components/shared/ListEmptyState";
 import { InlineError } from "../../../components/shared/InlineError";
 import { SectionShell } from "./sections/SectionShell";
@@ -205,12 +205,7 @@ export function MyPetsScreen() {
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: colors.background, marginTop: -8 }} edges={["top"]}>
         <BrandedAppHeader />
-        <View style={{ flex: 1, alignItems: "center", justifyContent: "center", gap: 20, paddingBottom: 60 }}>
-          <PawLoadingSpinner size={80} />
-          <Text style={{ fontSize: 15, color: colors.textMuted, fontWeight: "500" }}>
-            {t("myPetsTitle")}…
-          </Text>
-        </View>
+        <ScreenLoadingCenter title={`${t("myPetsTitle")}…`} />
       </SafeAreaView>
     );
   }
@@ -243,9 +238,7 @@ export function MyPetsScreen() {
       <BrandedAppHeader />
 
       {loading && pets.length === 0 ? (
-        <View style={{ flex: 1, alignItems: "center", justifyContent: "center", gap: 20, paddingBottom: 60 }}>
-          <PawLoadingSpinner size={80} />
-        </View>
+        <ScreenLoadingCenter />
       ) : pets.length === 0 ? (
         <ScrollView
           contentContainerStyle={{ flexGrow: 1, paddingBottom: 40 }}

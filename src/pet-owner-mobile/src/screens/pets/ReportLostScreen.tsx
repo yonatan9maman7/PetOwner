@@ -23,6 +23,7 @@ import {
   MarkerWrapper,
 } from "../../components/MapViewWrapper";
 import { AddressAutocomplete } from "../../components/shared/AddressAutocomplete";
+import { ScreenLoadingCenter } from "../../components/shared/ScreenLoadingCenter";
 import { fetchReverseGeocode } from "../../api/googlePlaces";
 import { useAuthStore } from "../../store/authStore";
 import { usePetsStore } from "../../store/petsStore";
@@ -370,11 +371,7 @@ export function ReportLostScreen() {
         </View>
 
         {loading && pets.length === 0 ? (
-          <View
-            style={{ flex: 1, alignItems: "center", justifyContent: "center" }}
-          >
-            <ActivityIndicator size="large" color={colors.primary} />
-          </View>
+          <ScreenLoadingCenter />
         ) : (
           <ScrollView
             style={{ flex: 1 }}

@@ -17,6 +17,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import axios from "axios";
 import { adminApi, mapApi } from "../../api/client";
+import { ScreenLoadingCenter } from "../../components/shared/ScreenLoadingCenter";
 import { getNormalizedApiError } from "../../utils/apiUtils";
 import { useTranslation, rowDirectionForAppLayout } from "../../i18n";
 import { formatBreedForDisplay } from "../pets/addPetHelpers";
@@ -416,9 +417,7 @@ export function AdminDashboardScreen() {
   if (loading) {
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: colors.background, marginTop: -8 }} edges={["top"]}>
-        <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
-          <ActivityIndicator size="large" color={colors.primary} />
-        </View>
+        <ScreenLoadingCenter />
       </SafeAreaView>
     );
   }

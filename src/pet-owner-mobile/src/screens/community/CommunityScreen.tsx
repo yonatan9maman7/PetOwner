@@ -31,8 +31,7 @@ import { useTheme } from "../../theme/ThemeContext";
 import { AuthPlaceholder } from "../../components/AuthPlaceholder";
 import { BrandedAppHeader } from "../../components/BrandedAppHeader";
 import { DatePickerField } from "../../components/DatePickerField";
-import { ListSkeleton, ListEmptyState } from "../../components/shared";
-import { PawLoadingSpinner } from "../../components/shared/PawLoadingSpinner";
+import { ListEmptyState, ScreenLoadingCenter } from "../../components/shared";
 import { useFocusDefer, useFocusedRef } from "../../hooks/useFocusDefer";
 import { TimePickerField } from "../../components/TimePickerField";
 import { ImageLightbox } from "../../components/ImageLightbox";
@@ -61,686 +60,29 @@ import { pickImageWithSource } from "../../utils/imagePicker";
 import { formatBreedForDisplay } from "../pets/addPetHelpers";
 import { fetchNearbyDogParks, geocodeAddress } from "../../api/googlePlaces";
 import { useKeyboardAvoidingState } from "../../hooks/useKeyboardAvoidingState";
-import { formatCommunityDistanceKm, formatCommunityRelativeTime } from "./utils/formatCommunity";
+import { formatCommunityRelativeTime } from "./utils/formatCommunity";
 import {
   CelebrationConfettiBurst,
   type CelebrationConfettiBurstRef,
 } from "../../components/CelebrationConfettiBurst";
-
-const PAGE_SIZE = 20;
-/** Post-confetti delay before SOS resolve API (matches UX spec ~1.5–2s). */
-const MARK_FOUND_SOS_CELEBRATION_DELAY_MS = 1750;
-
-type MainTab = "feed" | "playdates" | "parks" | "groups" | "qa" | "events" | "lostSos";
-type FeedFilter =
-  | "Nearby"
-  | "Playdates"
-  | "Questions"
-  | "Recommendations"
-  | "Dog Parks"
-  | "Lost & Found"
-  | "Events"
-  | "Groups";
-type PostKind =
-  | "Cute moment"
-  | "Question"
-  | "Recommendation"
-  | "Playdate"
-  | "Warning"
-  | "Lost & Found"
-  | "Event";
-type Visibility = "Public" | "Nearby only" | "Friends only" | "Group only";
-type DogSizeSuitability = "Small" | "Medium" | "Large" | "All";
-type EnergyLevel = "Calm" | "Medium" | "High";
-
-interface PostMeta {
-  kind: PostKind;
-  location?: string;
-  dogName?: string;
-  visibility?: Visibility;
-  tags?: string[];
-  isDemo?: boolean;
-}
-
-interface DogPark {
-  id: string;
-  placeId?: string;
-  name: string;
-  address?: string;
-  latitude: number;
-  longitude: number;
-  distance: string;
-  rating: number;
-  activity: "Low" | "Medium" | "High";
-  amenities: string[];
-  activeDogs: number;
-  upcomingPlaydates: number;
-  recentPosts: number;
-  peakHours: string;
-}
-
-const FEED_FILTERS: FeedFilter[] = [
-  "Nearby",
-  "Playdates",
-  "Questions",
-  "Recommendations",
-  "Dog Parks",
-  "Lost & Found",
-  "Events",
-  "Groups",
-];
-
-const POST_TYPES: PostKind[] = [
-  "Cute moment",
-  "Question",
-  "Recommendation",
-  "Playdate",
-  "Warning",
-  "Lost & Found",
-  "Event",
-];
-
-const VISIBILITY_OPTIONS: Visibility[] = [
-  "Public",
-  "Nearby only",
-  "Friends only",
-  "Group only",
-];
-
-
-
-
-const HE = {
-  title: "הקהילה",
-  subtitle: "הקהילה המקומית של הכלב שלך",
-  privacy: "המיקום המדויק ישותף רק כאשר תבחר להצטרף או ליצור מפגש.",
-  search: "חיפוש פוסטים, גינות וכלבים",
-  createPost: "יצירת פוסט",
-  createPlaydate: "קביעת מפגש",
-  myDogs: "הכלבים שלי",
-  noPets: "עדיין אין כלבים להצגה.",
-  feed: "פיד",
-  playdates: "מפגשים",
-  parks: "גינות כלבים",
-  groups: "קבוצות",
-  qa: "שאלות ותשובות",
-  events: "אירועים",
-  nearby: "קרוב אליי",
-  questions: "שאלות",
-  recommendations: "המלצות",
-  lostFound: "אבדות ומציאות",
-  coming: "אני מגיע",
-  like: "אהבתי",
-  comment: "תגובה",
-  share: "שיתוף",
-  follow: "עקוב",
-  invite: "הזמן למשחק",
-  checkIn: "אני כאן",
-  removeCheckIn: "הסר צ'ק-אין",
-  viewPark: "צפה בגינה",
-  hidePost: "הסתר פוסט",
-  reportPost: "דווח על פוסט",
-  blockUser: "חסום משתמש",
-  provider: "נותן שירות",
-  demoBanner: "מוצגת פעילות לדוגמה עד שיהיו פוסטים אמיתיים.",
-  apiFallback: "הפיד אינו זמין כרגע, לכן מוצגים פוסטים לדוגמה.",
-  localDogProfile: "פרופיל כלב מקומי",
-  communityPlaydate: "מפגש קהילתי",
-  interested: "מתעניינים",
-  posted: "הפוסט פורסם",
-  postedDesc: "הפוסט שלך עלה לקהילה.",
-  savedLocal: "נשמר מקומית",
-  savedLocalPost: "ה-API לא זמין, לכן הפוסט יוצג רק בסשן הנוכחי.",
-  postNeedsContent: "צריך תוכן לפוסט",
-  postNeedsContentDesc: "כתוב משהו או צרף תמונה לפני הפרסום.",
-  locationRecommended: "מומלץ להוסיף מיקום",
-  locationRecommendedDesc: "פוסט אבדות ומציאות עובד טוב יותר עם אזור משוער.",
-  tip: "טיפ",
-  playdateTip: "לפרטי RSVP מלאים, כדאי להשתמש גם בקביעת מפגש.",
-  deletePost: "למחוק פוסט?",
-  cancel: "ביטול",
-  delete: "מחיקה",
-  postHidden: "הפוסט הוסתר",
-  postHiddenDesc: "הפוסט הוסר מהפיד שלך.",
-  reportReceived: "הדיווח התקבל",
-  reportReceivedDesc: "תודה שעזרת לשמור על הקהילה בטוחה.",
-  userBlocked: "המשתמש נחסם",
-  userBlockedDesc: "פוסטים מהמשתמש הזה מוסתרים מקומית.",
-  youAreComing: "סימנו שאתה מגיע",
-  youAreComingDesc: "העניין שלך במפגש נשמר.",
-  dogPlaydatesTitle: "מפגשי כלבים",
-  dogPlaydatesSub: "תאם מפגשים מקומיים והצטרף עם הכלב שלך.",
-  noPlaydates: "אין מפגשים עדיין",
-  noPlaydatesSub: "אפשר ליצור את המפגש הראשון לכלבים באזור.",
-  openPlaydate: "מפגש פתוח לכלבים חברותיים מהאזור.",
-  allSizes: "כל הגדלים",
-  going: "מגיעים",
-  maybe: "אולי",
-  notGoing: "לא מגיע",
-  comments: "תגובות",
-  parksTitle: "גינות כלבים / פעילים עכשיו",
-  parksSub: "ראה צ'ק-אינים חיים וגלה פעילות ידידותית בגינות.",
-  activeNow: "פעילים עכשיו",
-  noBeacons: "אין צ'ק-אינים כרגע. אפשר לסמן שאתה כאן כדי שבעלי כלבים באזור ידעו.",
-  activeNowShort: "פעיל עכשיו",
-  rating: "דירוג",
-  activity: "פעילות",
-  activeDogsNow: "כלבים פעילים עכשיו",
-  upcomingPlaydates: "מפגשים קרובים",
-  recentPosts: "פוסטים אחרונים",
-  createPlaydateInPark: "קבע מפגש",
-  groupsTitle: "קבוצות קהילה",
-  groupsSub: "מצא תחומי עניין, המלצות, קבוצות גזע ותמיכה.",
-  searchGroups: "חיפוש קבוצות",
-  joined: "הצטרפת",
-  joinGroup: "הצטרף",
-  groupUpdated: "הקבוצה עודכנה",
-  groupUpdatedDesc: "החברות מוצגת מקומית עד שתתווסף תמיכת שרת.",
-  qaTitle: "שאלות ותשובות / המלצות",
-  qaSub: "שאל בעלי כלבים באזור על מאלפים, דוגסיטרים, אוכל והתנהגות.",
-  askQuestion: "שאל שאלה",
-  askedBy: "נשאל על ידי",
-  answers: "תשובות",
-  training: "אילוף",
-  bestAnswerPending: "תשובה מומלצת ממתינה",
-  helpful: "מועיל",
-  savePost: "שמור",
-  answer: "ענה",
-  answerHint: "אפשר לענות דרך כפתור התגובות בפוסט.",
-  eventsTitle: "אירועים ופעילויות",
-  eventsSub: "טיולי סוף שבוע, מפגשי גורים, ימי אימוץ וסדנאות.",
-  spotsLeft: "מקומות נותרו",
-  dogsAttending: "כלבים משתתפים",
-  joinEvent: "הצטרף לאירוע",
-  eventUpdated: "האירוע עודכן",
-  eventUpdatedDesc: "ההצטרפות נשמרה מקומית.",
-  createPostTitle: "יצירת פוסט",
-  postType: "סוג פוסט",
-  dog: "כלב",
-  whatHappening: "מה קורה בקהילת הכלבים שלך?",
-  locationOrPark: "מיקום או גינת כלבים",
-  visibility: "פרטיות",
-  tags: "תגיות, מופרדות בפסיקים",
-  addMedia: "הוסף תמונה / וידאו",
-  publishPost: "פרסם בקהילה",
-  createPlaydateTitle: "קביעת מפגש",
-  titleField: "כותרת",
-  dateField: "YYYY-MM-DD",
-  timeField: "HH:mm",
-  sizeFit: "התאמת גודל",
-  ageFit: "התאמת גיל",
-  energyLevel: "רמת אנרגיה",
-  maxParticipants: "מספר משתתפים מקסימלי",
-  description: "תיאור",
-  requiresApproval: "דורש אישור מארגן",
-  missingDetails: "חסרים פרטים",
-  missingDetailsDesc: "כותרת, תאריך, שעה ומיקום הם שדות חובה.",
-  invalidDate: "תאריך לא תקין",
-  invalidDateDesc: "יש להזין תאריך בפורמט YYYY-MM-DD ושעה בפורמט HH:mm.",
-  futureTime: "בחר זמן עתידי",
-  futureTimeDesc: "אי אפשר ליצור מפגש בעבר.",
-  playdateCreated: "המפגש נוצר",
-  playdateCreatedDesc: "בעלי כלבים יכולים להצטרף עכשיו.",
-  playdateSavedLocal: "ה-API לא זמין, לכן המפגש מוצג רק בסשן הנוכחי.",
-  checkedIn: "סימנת שאתה כאן",
-  checkedInDesc: "סימנת שאתה כאן עם הכלב שלך.",
-  checkedInLocal: "הצ'ק-אין נשמר מקומית",
-  checkedInLocalDesc: "Beacon API לא זמין, לכן הצ'ק-אין מקומי.",
-  checkInRemoved: "הצ'ק-אין הוסר",
-  parkLocation: "מיקום גינה משוער",
-  peak: "שעות עומס",
-  playdateComments: "תגובות למפגש",
-  commentsHint: "תגובות מלאות נטענות במסך פרטי המפגש. אפשר להוסיף כאן תגובה קצרה לסשן.",
-  writeComment: "כתיבת תגובה",
-  postComment: "פרסם תגובה",
-  commentAdded: "התגובה נוספה",
-  commentAddedDesc: "התגובה פורסמה.",
-  commentLocal: "התגובה נשמרה מקומית",
-  commentLocalDesc: "ה-API לא זמין, לכן התגובה מקומית כרגע.",
-  inviteOpened: "הזמנה למשחק נפתחה",
-  following: "עקיבה",
-  followingDesc: "העקיבה נשמרה מקומית.",
-  invited: "הוזמן",
-  followed: "עוקב",
-  postKindCuteMoment: "רגע מתוק",
-  postKindQuestion: "שאלה",
-  postKindRecommendation: "המלצה",
-  postKindPlaydate: "מפגש",
-  postKindWarning: "אזהרה",
-  postKindLostFound: "אבדות ומציאות",
-  postKindEvent: "אירוע",
-  visibilityPublic: "ציבורי",
-  visibilityNearbyOnly: "קרוב אליי",
-  visibilityFriendsOnly: "חברים בלבד",
-  visibilityGroupOnly: "קבוצה בלבד",
-  sizeSmall: "קטנים",
-  sizeMedium: "בינוניים",
-  sizeLarge: "גדולים",
-  sizeAll: "כולם",
-} as const;
-
-const EN: Record<keyof typeof HE, string> = {
-  title: "Community",
-  subtitle: "Your local dog community",
-  privacy: "Exact location is only shared when you choose to join or create a playdate.",
-  search: "Search posts, parks and dogs",
-  createPost: "Create Post",
-  createPlaydate: "Create Playdate",
-  myDogs: "My dogs",
-  noPets: "No dogs to show yet.",
-  feed: "Feed",
-  playdates: "Playdates",
-  parks: "Dog Parks",
-  groups: "Groups",
-  qa: "Q&A",
-  events: "Events",
-  nearby: "Nearby",
-  questions: "Questions",
-  recommendations: "Recommendations",
-  lostFound: "Lost & Found",
-  coming: "I'm coming",
-  like: "Like",
-  comment: "Comment",
-  share: "Share",
-  follow: "Follow",
-  invite: "Invite to play",
-  checkIn: "Check in",
-  removeCheckIn: "Remove check-in",
-  viewPark: "View park",
-  hidePost: "Hide post",
-  reportPost: "Report post",
-  blockUser: "Block user",
-  provider: "Provider",
-  demoBanner: "Showing demo community activity until real posts are available.",
-  apiFallback: "Feed API is unavailable, so fallback posts are shown for this session.",
-  localDogProfile: "Friendly local dog profile",
-  communityPlaydate: "Community playdate",
-  interested: "interested",
-  posted: "Posted",
-  postedDesc: "Your post is live in the community.",
-  savedLocal: "Saved locally",
-  savedLocalPost: "The API was unavailable, so this post is visible in this session.",
-  postNeedsContent: "Post needs content",
-  postNeedsContentDesc: "Write something or attach an image before publishing.",
-  locationRecommended: "Location recommended",
-  locationRecommendedDesc: "Lost & Found posts work best with an approximate area.",
-  tip: "Tip",
-  playdateTip: "For full RSVP details, use Create Playdate too.",
-  deletePost: "Delete post?",
-  cancel: "Cancel",
-  delete: "Delete",
-  postHidden: "Post hidden",
-  postHiddenDesc: "This post was hidden from your feed.",
-  reportReceived: "Report received",
-  reportReceivedDesc: "Thanks for helping keep PawSquare safe.",
-  userBlocked: "User blocked",
-  userBlockedDesc: "Posts from this user are hidden locally.",
-  youAreComing: "You're coming",
-  youAreComingDesc: "Marked your interest for this playdate post.",
-  dogPlaydatesTitle: "Dog Playdates",
-  dogPlaydatesSub: "Coordinate local meetups and RSVP with your dog.",
-  noPlaydates: "No playdates yet",
-  noPlaydatesSub: "Create the first meetup for dogs nearby.",
-  openPlaydate: "Open dog playdate for friendly local dogs.",
-  allSizes: "All sizes",
-  going: "Going",
-  maybe: "Maybe",
-  notGoing: "Not going",
-  comments: "Comments",
-  parksTitle: "Dog Parks / Live Nearby",
-  parksSub: "See live check-ins and discover friendly park activity.",
-  activeNow: "Active now",
-  noBeacons: "No live beacons yet. Check in to let nearby dog owners know you are around.",
-  activeNowShort: "active now",
-  rating: "rating",
-  activity: "activity",
-  activeDogsNow: "active dogs now",
-  upcomingPlaydates: "upcoming playdates",
-  recentPosts: "recent posts",
-  createPlaydateInPark: "Create playdate",
-  groupsTitle: "Community Groups",
-  groupsSub: "Find local interests, advice, breed groups and support circles.",
-  searchGroups: "Search groups",
-  joined: "Joined",
-  joinGroup: "Join",
-  groupUpdated: "Group updated",
-  groupUpdatedDesc: "Membership is reflected locally until backend join support is added.",
-  qaTitle: "Q&A / Recommendations",
-  qaSub: "Ask local dog owners for trainers, sitters, food and behavior advice.",
-  askQuestion: "Ask Question",
-  askedBy: "Asked by",
-  answers: "answers",
-  training: "Training",
-  bestAnswerPending: "Best answer pending",
-  helpful: "Helpful",
-  savePost: "Save",
-  answer: "Answer",
-  answerHint: "Use the comments button on the feed post to answer.",
-  eventsTitle: "Events / Local Activities",
-  eventsSub: "Weekend walks, puppy socials, adoption days and workshops.",
-  spotsLeft: "spots left",
-  dogsAttending: "dogs attending",
-  joinEvent: "Join event",
-  eventUpdated: "Event updated",
-  eventUpdatedDesc: "Your event RSVP is saved locally.",
-  createPostTitle: "Create Post",
-  postType: "Post type",
-  dog: "Dog",
-  whatHappening: "What is happening in your dog community?",
-  locationOrPark: "Location or dog park",
-  visibility: "Visibility",
-  tags: "Tags, comma separated",
-  addMedia: "Add image/video placeholder",
-  publishPost: "Post to Community",
-  createPlaydateTitle: "Create Playdate",
-  titleField: "Title",
-  dateField: "YYYY-MM-DD",
-  timeField: "HH:mm",
-  sizeFit: "Dog size suitability",
-  ageFit: "Dog age suitability",
-  energyLevel: "Energy level",
-  maxParticipants: "Max participants",
-  description: "Description",
-  requiresApproval: "Requires organizer approval",
-  missingDetails: "Missing details",
-  missingDetailsDesc: "Title, date, time and location are required.",
-  invalidDate: "Invalid date",
-  invalidDateDesc: "Use date as YYYY-MM-DD and time as HH:mm.",
-  futureTime: "Choose a future time",
-  futureTimeDesc: "Playdates cannot be created in the past.",
-  playdateCreated: "Playdate created",
-  playdateCreatedDesc: "Dog owners can RSVP now.",
-  playdateSavedLocal: "The API was unavailable, so this playdate is visible in this session.",
-  checkedIn: "Checked in",
-  checkedInDesc: "You checked in with your dog.",
-  checkedInLocal: "Checked in locally",
-  checkedInLocalDesc: "Beacon API was unavailable, so this check-in is local.",
-  checkInRemoved: "Check-in removed",
-  parkLocation: "Approximate park location",
-  peak: "peak",
-  playdateComments: "Playdate comments",
-  commentsHint: "Comments are loaded in the event detail screen. Add a quick comment here for this session.",
-  writeComment: "Write a comment",
-  postComment: "Post comment",
-  commentAdded: "Comment added",
-  commentAddedDesc: "Your comment was posted.",
-  commentLocal: "Comment saved locally",
-  commentLocalDesc: "The API was unavailable, so this is local for now.",
-  inviteOpened: "Invite to play opened",
-  following: "Following",
-  followingDesc: "Follow saved locally.",
-  invited: "Invited",
-  followed: "Following",
-  postKindCuteMoment: "Cute moment",
-  postKindQuestion: "Question",
-  postKindRecommendation: "Recommendation",
-  postKindPlaydate: "Playdate",
-  postKindWarning: "Warning",
-  postKindLostFound: "Lost & Found",
-  postKindEvent: "Event",
-  visibilityPublic: "Public",
-  visibilityNearbyOnly: "Nearby only",
-  visibilityFriendsOnly: "Friends only",
-  visibilityGroupOnly: "Group only",
-  sizeSmall: "Small",
-  sizeMedium: "Medium",
-  sizeLarge: "Large",
-  sizeAll: "All",
-};
-
-type CopyKey = keyof typeof HE;
-
-function initials(name: string): string {
-  return name
-    .split(" ")
-    .slice(0, 2)
-    .map((w) => w[0])
-    .join("")
-    .toUpperCase();
-}
-
-function formatDateTime(iso: string): string {
-  const d = new Date(iso);
-  return `${d.toLocaleDateString()} ${d.toLocaleTimeString([], {
-    hour: "2-digit",
-    minute: "2-digit",
-  })}`;
-}
-
-function formatDistanceKm(valueKm: number, language: "he" | "en"): string {
-  if (!Number.isFinite(valueKm) || valueKm <= 0) {
-    return language === "he" ? "0.1 ק״מ" : "0.1 km";
-  }
-  return formatCommunityDistanceKm(valueKm, language);
-}
-
-function distanceKm(aLat: number, aLng: number, bLat: number, bLng: number): number {
-  const toRad = (v: number) => (v * Math.PI) / 180;
-  const earthRadiusKm = 6371;
-  const dLat = toRad(bLat - aLat);
-  const dLng = toRad(bLng - aLng);
-  const a =
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos(toRad(aLat)) * Math.cos(toRad(bLat)) * Math.sin(dLng / 2) * Math.sin(dLng / 2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  return earthRadiusKm * c;
-}
-
-function categoryToKind(category?: string): PostKind {
-  switch ((category ?? "").toLowerCase()) {
-    case "question":
-    case "questions":
-      return "Question";
-    case "recommendation":
-    case "recommendations":
-      return "Recommendation";
-    case "playdate":
-    case "playdates":
-      return "Playdate";
-    case "lost_and_found":
-    case "lost & found":
-      return "Lost & Found";
-    case "event":
-    case "events":
-      return "Event";
-    case "warning":
-      return "Warning";
-    default:
-      return "Cute moment";
-  }
-}
-
-function filterLabel(filter: FeedFilter, copy: (key: CopyKey) => string): string {
-  switch (filter) {
-    case "Nearby":
-      return copy("nearby");
-    case "Playdates":
-      return copy("playdates");
-    case "Questions":
-      return copy("questions");
-    case "Recommendations":
-      return copy("recommendations");
-    case "Dog Parks":
-      return copy("parks");
-    case "Lost & Found":
-      return copy("lostFound");
-    case "Events":
-      return copy("events");
-    case "Groups":
-      return copy("groups");
-  }
-}
-
-function filterIcon(filter: FeedFilter): keyof typeof Ionicons.glyphMap {
-  switch (filter) {
-    case "Nearby":
-      return "navigate-outline";
-    case "Playdates":
-      return "calendar-outline";
-    case "Questions":
-      return "help-circle-outline";
-    case "Recommendations":
-      return "star-outline";
-    case "Dog Parks":
-      return "leaf-outline";
-    case "Lost & Found":
-      return "alert-circle-outline";
-    case "Events":
-      return "sparkles-outline";
-    case "Groups":
-      return "people-outline";
-  }
-}
-
-function postKindLabel(kind: PostKind, isRTL: boolean): string {
-  if (!isRTL) {
-    switch (kind) {
-      case "Cute moment":
-        return EN.postKindCuteMoment;
-      case "Question":
-        return EN.postKindQuestion;
-      case "Recommendation":
-        return EN.postKindRecommendation;
-      case "Playdate":
-        return EN.postKindPlaydate;
-      case "Warning":
-        return EN.postKindWarning;
-      case "Lost & Found":
-        return EN.postKindLostFound;
-      case "Event":
-        return EN.postKindEvent;
-    }
-  }
-  switch (kind) {
-    case "Cute moment":
-      return "רגע מתוק";
-    case "Question":
-      return "שאלה";
-    case "Recommendation":
-      return "המלצה";
-    case "Playdate":
-      return "מפגש";
-    case "Warning":
-      return "אזהרה";
-    case "Lost & Found":
-      return "אבדות ומציאות";
-    case "Event":
-      return "אירוע";
-  }
-}
-
-function visibilityLabel(visibility: Visibility, isRTL: boolean): string {
-  if (!isRTL) {
-    switch (visibility) {
-      case "Public":
-        return EN.visibilityPublic;
-      case "Nearby only":
-        return EN.visibilityNearbyOnly;
-      case "Friends only":
-        return EN.visibilityFriendsOnly;
-      case "Group only":
-        return EN.visibilityGroupOnly;
-    }
-  }
-  switch (visibility) {
-    case "Public":
-      return "ציבורי";
-    case "Nearby only":
-      return "קרוב אליי";
-    case "Friends only":
-      return "חברים בלבד";
-    case "Group only":
-      return "קבוצה בלבד";
-  }
-}
-
-function sizeLabel(size: DogSizeSuitability, isRTL: boolean): string {
-  if (!isRTL) {
-    switch (size) {
-      case "Small":
-        return EN.sizeSmall;
-      case "Medium":
-        return EN.sizeMedium;
-      case "Large":
-        return EN.sizeLarge;
-      case "All":
-        return EN.sizeAll;
-    }
-  }
-  switch (size) {
-    case "Small":
-      return "קטנים";
-    case "Medium":
-      return "בינוניים";
-    case "Large":
-      return "גדולים";
-    case "All":
-      return "כולם";
-  }
-}
-
-function energyLabel(level: EnergyLevel, isRTL: boolean): string {
-  if (!isRTL) return level;
-  switch (level) {
-    case "Calm":
-      return "רגועה";
-    case "Medium":
-      return "בינונית";
-    case "High":
-      return "גבוהה";
-  }
-}
-
-function ageLabel(age: string, isRTL: boolean): string {
-  if (!isRTL) return age;
-  const labels: Record<string, string> = {
-    Puppies: "גורים",
-    Adults: "בוגרים",
-    Seniors: "מבוגרים",
-    All: "כולם",
-  };
-  return labels[age] ?? age;
-}
-
-function activityLabel(activity: DogPark["activity"], isRTL: boolean): string {
-  if (!isRTL) return activity;
-  switch (activity) {
-    case "Low":
-      return "נמוכה";
-    case "Medium":
-      return "בינונית";
-    case "High":
-      return "גבוהה";
-  }
-}
-
-/** Active SOS-style lost post: Lost & Found category, not yet resolved on the server. */
-function isActiveSosLostPost(post: PostDto, kind: PostKind): boolean {
-  if (kind !== "Lost & Found" || post.sosResolvedAt) return false;
-  const cat = (post.category ?? "").toLowerCase();
-  if (cat.includes("sos") || cat.includes("lost")) return true;
-  return post.content.includes("🆘") || /SOS:/i.test(post.content);
-}
-
-function filterMatchesPost(filter: FeedFilter, post: PostDto, meta?: PostMeta): boolean {
-  const kind = meta?.kind ?? categoryToKind(post.category);
-  if (filter === "Nearby") return true;
-  if (filter === "Groups") return true;
-  if (filter === "Dog Parks") {
-    return /park|fountain|dog run/i.test(`${post.content} ${meta?.location ?? ""}`);
-  }
-  if (filter === "Questions") return kind === "Question";
-  if (filter === "Recommendations") return kind === "Recommendation";
-  if (filter === "Lost & Found") return kind === "Lost & Found";
-  if (filter === "Playdates") return kind === "Playdate";
-  if (filter === "Events") return kind === "Event";
-  return true;
-}
-
-function useCommunityStyles() {
-  const { colors } = useTheme();
-  return useMemo(() => getStyles(colors), [colors]);
-}
+import { getStyles, useCommunityStyles } from "./communityStyles";
+import {
+  PAGE_SIZE,
+  MARK_FOUND_SOS_CELEBRATION_DELAY_MS,
+  HE, EN, type CopyKey,
+  type MainTab, type FeedFilter, type PostKind, type Visibility,
+  type DogSizeSuitability, type EnergyLevel, type PostMeta, type DogPark,
+  POST_TYPES, VISIBILITY_OPTIONS,
+  initials, formatDateTime, formatDistanceKm, distanceKm,
+  categoryToKind, postKindLabel, visibilityLabel, sizeLabel, energyLabel, ageLabel,
+  activityLabel, isActiveSosLostPost, filterMatchesPost,
+} from "./communityShared";
+import { PlaydatesTab } from "./tabs/PlaydatesTab";
+import { ParksTab } from "./tabs/ParksTab";
+import { GroupsTab } from "./tabs/GroupsTab";
+import { QATab } from "./tabs/QATab";
+import { EventsTab } from "./tabs/EventsTab";
+import { LostSosTab } from "./tabs/LostSosTab";
 
 const PostCard = memo(function PostCard({
   post,
@@ -1057,35 +399,6 @@ const PostCard = memo(function PostCard({
   );
 });
 
-function Chip({
-  label,
-  icon,
-  active,
-  onPress,
-}: {
-  label: string;
-  icon: keyof typeof Ionicons.glyphMap;
-  active?: boolean;
-  onPress: () => void;
-}) {
-  const { colors } = useTheme();
-  const styles = useCommunityStyles();
-  return (
-    <Pressable
-      onPress={onPress}
-      style={[styles.chip, active ? styles.chipActive : styles.chipInactive]}
-    >
-      <Ionicons
-        name={icon}
-        size={14}
-        color={active ? colors.textInverse : colors.textSecondary}
-      />
-      <Text style={[styles.chipText, active ? styles.chipTextActive : styles.chipTextInactive]}>
-        {label}
-      </Text>
-    </Pressable>
-  );
-}
 
 function SectionHeader({
   title,
@@ -1137,6 +450,7 @@ export function CommunityScreen() {
   const { behavior: keyboardAvoidBehavior } = useKeyboardAvoidingState();
 
   const [mainTab, setMainTab] = useState<MainTab>("feed");
+  const [isSwappingSector, setIsSwappingSector] = useState(false);
 
   const [posts, setPosts] = useState<PostDto[]>([]);
   const [postMetaById, setPostMetaById] = useState<Record<string, PostMeta>>({});
@@ -1908,9 +1222,9 @@ export function CommunityScreen() {
     );
   }, []);
 
-  const loadMore = () => {
+  const loadMore = useCallback(() => {
     if (!loading && hasMore) loadFeed(page + 1, false);
-  };
+  }, [loading, hasMore, loadFeed, page]);
 
   const handleCreateGroup = async () => {
     const name = newGroupName.trim();
@@ -2390,8 +1704,11 @@ export function CommunityScreen() {
               <Pressable
                 key={tab}
                 onPress={() => {
+                  const switching = tab !== mainTabRef.current;
                   setMainTab(tab);
+                  if (switching) setIsSwappingSector(true);
                   InteractionManager.runAfterInteractions(() => {
+                    if (switching) setIsSwappingSector(false);
                     if (!focusedRef.current) return;
                     if (tab === "groups" && groups.length === 0) void loadGroups();
                     if (tab === "playdates" || tab === "events") void loadPlaydates();
@@ -2443,6 +1760,39 @@ export function CommunityScreen() {
     );
   };
 
+  /** Stable per-post renderer for the LostSos tab (passed as render prop to avoid circular deps). */
+  const renderLostSosSingleCard = useCallback(
+    (post: PostDto) => (
+      <PostCard
+        key={post.id}
+        post={post}
+        meta={postMetaById[post.id]}
+        currentUserId={user?.id ?? null}
+        onToggleLike={handleToggleLike}
+        onToggleHelpful={handleToggleHelpful}
+        onToggleSave={handleToggleSave}
+        onDelete={handleDelete}
+        onHide={handleHidePost}
+        onReport={handleReportPost}
+        onBlock={handleBlockUser}
+        onPlaydateComing={handlePlaydateComing}
+        onSosResolved={handleSosResolved}
+        celebrateMarkFoundBurst={burstMarkFoundCelebrate}
+        rtlText={rtlText}
+        rtlRow={rtlRow}
+        isRTL={isRTL}
+        copy={copy}
+        isLikePending={!!likeBusy[post.id]}
+        isDeletePending={!!deleteBusy[post.id]}
+      />
+    ),
+    [
+      postMetaById, user, handleToggleLike, handleToggleHelpful, handleToggleSave,
+      handleDelete, handleHidePost, handleReportPost, handleBlockUser, handlePlaydateComing,
+      handleSosResolved, burstMarkFoundCelebrate, rtlText, rtlRow, isRTL, copy, likeBusy, deleteBusy,
+    ],
+  );
+
   const topTabsElement = useMemo(
     () => renderTopTabs(),
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -2464,109 +1814,80 @@ export function CommunityScreen() {
     ],
   );
 
-  if (!hydrated || !isDeferredReady) {
-    return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: colors.surface }} edges={["top"]}>
-        <BrandedAppHeader style={{ paddingVertical: 6 }} />
-        <View style={{ flex: 1, alignItems: "center", justifyContent: "center", gap: 20, paddingBottom: 60 }}>
-          <PawLoadingSpinner size={80} />
-          <Text style={{ fontSize: 15, color: colors.textMuted, fontWeight: "500" }}>
-            {t("communityTitle")}…
-          </Text>
+  /** Stable memoized FlatList header element — only recomputed when its data changes. */
+  const feedHeaderElement = useMemo(
+    () => (
+      <>
+        <View style={[styles.searchCard, { flexDirection: appRowDirection }]}>
+          <Ionicons name="search" size={18} color={colors.textMuted} />
+          <TextInput
+            style={[styles.searchInput, rtlInput]}
+            value={search}
+            onChangeText={setSearch}
+            placeholder={copy("search")}
+            placeholderTextColor={colors.textMuted}
+          />
         </View>
-      </SafeAreaView>
-    );
-  }
-
-  if (!isLoggedIn) {
-    return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: colors.surface, marginTop: -8 }} edges={["top"]}>
-        <AuthPlaceholder
-          title={t("communityTitle")}
-          subtitle={t("communitySubtitle")}
-          icon="people-outline"
-        />
-      </SafeAreaView>
-    );
-  }
-
-  const renderFeedHeaderWithoutHero = () => (
-    <>
-      <View style={[styles.searchCard, { flexDirection: appRowDirection }]}>
-        <Ionicons name="search" size={18} color={colors.textMuted} />
-        <TextInput
-          style={[styles.searchInput, rtlInput]}
-          value={search}
-          onChangeText={setSearch}
-          placeholder={copy("search")}
-          placeholderTextColor={colors.textMuted}
-        />
-      </View>
-      {feedError && (
-        <View style={styles.demoBanner}>
-          <Ionicons name="cloud-offline-outline" size={16} color={colors.primary} />
-          <Text style={[styles.demoBannerText, rtlText]}>
-            {copy("apiFallback")}
-          </Text>
-        </View>
-      )}
-      <View style={styles.card}>
-        <View style={[styles.quickActions, rtlRow]}>
-          <Pressable onPress={() => setComposerOpen(true)} style={[styles.quickActionPrimary, rtlRow]}>
-            <Ionicons name="create-outline" size={18} color={colors.textInverse} />
-            <Text style={styles.quickActionPrimaryText}>{copy("createPost")}</Text>
-          </Pressable>
-          <Pressable onPress={() => setPlaydateModalOpen(true)} style={[styles.quickActionSecondary, rtlRow]}>
-            <Ionicons name="calendar-outline" size={18} color={colors.text} />
-            <Text style={styles.quickActionSecondaryText}>{copy("createPlaydate")}</Text>
-          </Pressable>
-        </View>
-      </View>
-      {pets.length > 0 && (
+        {feedError && (
+          <View style={styles.demoBanner}>
+            <Ionicons name="cloud-offline-outline" size={16} color={colors.primary} />
+            <Text style={[styles.demoBannerText, rtlText]}>
+              {copy("apiFallback")}
+            </Text>
+          </View>
+        )}
         <View style={styles.card}>
-          <Text style={[styles.sectionCardTitle, rtlText]}>{copy("myDogs")}</Text>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={[styles.dogProfileRail, { flexDirection: appRowDirection }]}
-          >
-            {pets.map((pet) => (
-              <Pressable key={pet.id} onPress={() => setDogProfilePet(pet)} style={styles.dogProfileCard}>
-                <View style={styles.dogProfileAvatar}>
-                  {pet.imageUrl ? (
-                    <Image source={{ uri: pet.imageUrl }} style={StyleSheet.absoluteFill} />
-                  ) : (
-                    <Ionicons name="paw" size={22} color={colors.textInverse} />
-                  )}
-                </View>
-                <Text style={[styles.dogProfileName, rtlText]} numberOfLines={2}>{pet.name}</Text>
-                <Text style={[styles.dogProfileSub, rtlText]} numberOfLines={2}>
-                  {pet.breed ? formatBreedForDisplay(pet.breed, t) : copy("dog")} · {pet.age}
-                </Text>
-              </Pressable>
-            ))}
-          </ScrollView>
+          <View style={[styles.quickActions, rtlRow]}>
+            <Pressable onPress={() => setComposerOpen(true)} style={[styles.quickActionPrimary, rtlRow]}>
+              <Ionicons name="create-outline" size={18} color={colors.textInverse} />
+              <Text style={styles.quickActionPrimaryText}>{copy("createPost")}</Text>
+            </Pressable>
+            <Pressable onPress={() => setPlaydateModalOpen(true)} style={[styles.quickActionSecondary, rtlRow]}>
+              <Ionicons name="calendar-outline" size={18} color={colors.text} />
+              <Text style={styles.quickActionSecondaryText}>{copy("createPlaydate")}</Text>
+            </Pressable>
+          </View>
         </View>
-      )}
-      {pets.length === 0 && (
-        <View style={styles.card}>
-          <Text style={[styles.sectionCardTitle, rtlText]}>{copy("myDogs")}</Text>
-          <Text style={[styles.emptyInline, rtlText]}>{copy("noPets")}</Text>
-        </View>
-      )}
-    </>
+        {pets.length > 0 && (
+          <View style={styles.card}>
+            <Text style={[styles.sectionCardTitle, rtlText]}>{copy("myDogs")}</Text>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={[styles.dogProfileRail, { flexDirection: appRowDirection }]}
+            >
+              {pets.map((pet) => (
+                <Pressable key={pet.id} onPress={() => setDogProfilePet(pet)} style={styles.dogProfileCard}>
+                  <View style={styles.dogProfileAvatar}>
+                    {pet.imageUrl ? (
+                      <Image source={{ uri: pet.imageUrl }} style={StyleSheet.absoluteFill} />
+                    ) : (
+                      <Ionicons name="paw" size={22} color={colors.textInverse} />
+                    )}
+                  </View>
+                  <Text style={[styles.dogProfileName, rtlText]} numberOfLines={2}>{pet.name}</Text>
+                  <Text style={[styles.dogProfileSub, rtlText]} numberOfLines={2}>
+                    {pet.breed ? formatBreedForDisplay(pet.breed, t) : copy("dog")} · {pet.age}
+                  </Text>
+                </Pressable>
+              ))}
+            </ScrollView>
+          </View>
+        )}
+        {pets.length === 0 && (
+          <View style={styles.card}>
+            <Text style={[styles.sectionCardTitle, rtlText]}>{copy("myDogs")}</Text>
+            <Text style={[styles.emptyInline, rtlText]}>{copy("noPets")}</Text>
+          </View>
+        )}
+      </>
+    ),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [search, feedError, appRowDirection, styles, colors, rtlText, rtlRow, rtlInput, copy, pets, t],
   );
 
-  const renderFeedEmpty = () =>
-    !loading ? (
-      <ListEmptyState
-        icon="newspaper-outline"
-        title={t("noPostsYet")}
-        message={t("noPostsSubtitle")}
-      />
-    ) : null;
-
-  const renderFeedFooter = () => {
+  /** Stable FlatList footer renderer — only recomputed when loading/pagination state changes. */
+  const renderFeedFooter = useCallback(() => {
     if (loading && posts.length > 0) {
       return (
         <ActivityIndicator
@@ -2584,382 +1905,94 @@ export function CommunityScreen() {
       );
     }
     return <View style={{ height: bottomContentPadding }} />;
-  };
+  }, [loading, posts.length, hasMore, loadMore, colors.text, styles, t, bottomContentPadding]);
 
-  const renderGroupsEmpty = () =>
-    !groupsLoading ? (
+  if (!hydrated || !isDeferredReady) {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: colors.surface }} edges={["top"]}>
+        <BrandedAppHeader style={{ paddingVertical: 6 }} />
+        <ScreenLoadingCenter title={`${t("communityTitle")}…`} />
+      </SafeAreaView>
+    );
+  }
+
+  if (!isLoggedIn) {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: colors.surface, marginTop: -8 }} edges={["top"]}>
+        <AuthPlaceholder
+          title={t("communityTitle")}
+          subtitle={t("communitySubtitle")}
+          icon="people-outline"
+        />
+      </SafeAreaView>
+    );
+  }
+
+  const renderFeedEmpty = () =>
+    !loading ? (
       <ListEmptyState
-        icon="people-outline"
-        title={t("noGroups")}
-        message={t("noGroupsSubtitle")}
+        icon="newspaper-outline"
+        title={t("noPostsYet")}
+        message={t("noPostsSubtitle")}
       />
     ) : null;
 
-  const renderPlaydateCard = (event: PlaydateEventDto) => (
-    <View key={event.id} style={styles.card}>
-      <View style={[styles.cardRow, rtlRow]}>
-        <View style={styles.iconBubble}>
-          <Ionicons name="calendar" size={19} color={colors.text} />
-        </View>
-        <View style={{ flex: 1 }}>
-          <Text style={[styles.sectionCardTitle, rtlText]}>{event.title}</Text>
-          <Text style={[styles.sectionCardSub, rtlText]}>
-            {event.hostUserName} · {formatDateTime(event.scheduledFor)}
-          </Text>
-        </View>
-      </View>
-      <Text style={[styles.contentText, rtlText]}>
-        {event.description || copy("openPlaydate")}
-      </Text>
-      <View style={[styles.metaWrap, { flexDirection: appRowDirection }]}>
-        <Text style={styles.metaPill}>{event.locationName}</Text>
-        <Text style={styles.metaPill}>{copy("allSizes")}</Text>
-        <Text style={styles.metaPill}>{event.goingCount} {copy("going")}</Text>
-        {event.maxPets ? <Text style={styles.metaPill}>{copy("maxParticipants")} {event.maxPets}</Text> : null}
-      </View>
-      <View style={[styles.actionBar, rtlRow]}>
-        {(["Going", "Maybe", "NotGoing"] as RsvpStatusValue[]).map((status) => {
-          const active = event.myRsvpStatus === status;
-          return (
-            <Pressable
-              key={status}
-              onPress={() => handleRsvp(event, status)}
-              style={[styles.rsvpButton, active && styles.rsvpButtonActive]}
+  return (
+    <SafeAreaView style={{ flex: 1, backgroundColor: colors.surface, marginTop: 0 }} edges={["top"]}>
+      <BrandedAppHeader style={{ paddingVertical: 6 }} />
+      <View style={{ flex: 1, backgroundColor: colors.surface, overflow: "hidden" }}>
+        {topTabsElement}
+
+        {isSwappingSector ? (
+          <ScreenLoadingCenter spinnerSize={60} />
+        ) : mainTab === "feed" ? (
+          loading && posts.length === 0 ? (
+            <ScrollView
+              style={{ flex: 1 }}
+              contentContainerStyle={{ paddingBottom: bottomContentPadding }}
+              scrollEnabled={false}
             >
-              <Text style={[styles.rsvpText, active && styles.rsvpTextActive]}>
-                {status === "Going" ? copy("going") : status === "Maybe" ? copy("maybe") : copy("notGoing")}
-              </Text>
-            </Pressable>
-          );
-        })}
-        <Pressable onPress={() => setPlaydateCommentsOpenFor(event)} style={[styles.actionBtn, rtlRow]}>
-          <Ionicons name="chatbubble-outline" size={17} color={colors.textSecondary} />
-          <Text style={styles.actionText}>{copy("comments")}</Text>
-        </Pressable>
-      </View>
-    </View>
-  );
-
-  const renderPlaydates = () => (
-    <ScrollView
-      style={{ flex: 1 }}
-      refreshControl={<RefreshControl refreshing={playdatesLoading} onRefresh={loadPlaydates} tintColor={colors.text} colors={[colors.text]} />}
-      contentContainerStyle={{ paddingBottom: bottomContentPadding }}
-    >
-      <SectionHeader
-        title={copy("dogPlaydatesTitle")}
-        subtitle={copy("dogPlaydatesSub")}
-        actionLabel={copy("createPlaydate")}
-        onAction={() => setPlaydateModalOpen(true)}
-      />
-      {playdatesLoading && playdates.length === 0 ? (
-        <ListSkeleton rows={3} variant="card" />
-      ) : playdates.length > 0 ? (
-        playdates.map(renderPlaydateCard)
-      ) : (
-        <ListEmptyState
-          icon="calendar-outline"
-          title={copy("noPlaydates")}
-          message={copy("noPlaydatesSub")}
-        />
-      )}
-    </ScrollView>
-  );
-
-  const renderParks = () => (
-    <ScrollView
-      style={{ flex: 1 }}
-      refreshControl={
-        <RefreshControl
-          refreshing={beaconsLoading || parksLoading}
-          onRefresh={async () => {
-            await Promise.all([loadBeacons(), loadDogParks()]);
-          }}
-          tintColor={colors.text}
-          colors={[colors.text]}
-        />
-      }
-      contentContainerStyle={{ paddingBottom: bottomContentPadding }}
-    >
-      <SectionHeader
-        title={copy("parksTitle")}
-        subtitle={copy("parksSub")}
-        actionLabel={myBeaconId ? copy("removeCheckIn") : copy("checkIn")}
-        onAction={myBeaconId ? handleRemoveBeacon : parks[0] ? () => handleParkCheckIn(parks[0]) : undefined}
-      />
-      <View style={styles.card}>
-        <Text style={[styles.sectionCardTitle, rtlText]}>{copy("activeNow")}</Text>
-        {beacons.length > 0 ? (
-          beacons.slice(0, 3).map((beacon) => (
-            <Pressable
-              key={beacon.id}
-              onPress={() => navigation.navigate("LiveBeaconDetail", { beaconId: beacon.id })}
-              style={[styles.liveBeaconRow, rtlRow]}
-            >
-              <View style={styles.liveDot} />
-              <View style={{ flex: 1 }}>
-                <Text style={[styles.authorName, rtlText]}>{beacon.hostUserName}</Text>
-                <Text style={[styles.sectionCardSub, rtlText]}>
-                  {beacon.placeName} · {copy("activeNowShort")}
-                </Text>
-              </View>
-              <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
-            </Pressable>
-          ))
-        ) : (
-          <Text style={[styles.emptyInline, rtlText]}>
-            {copy("noBeacons")}
-          </Text>
-        )}
-      </View>
-      {parksLoading && parks.length === 0 ? (
-        <ListSkeleton rows={3} variant="card" />
-      ) : parks.length > 0 ? (
-        parks.map((park) => {
-        const checkedIn = !!parkCheckins[park.id];
-        return (
-          <View key={park.id} style={styles.card}>
-            <View style={[styles.cardRow, rtlRow]}>
-              <View style={styles.iconBubble}>
-                <Ionicons name="leaf-outline" size={19} color={colors.text} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={[styles.sectionCardTitle, rtlText]}>{park.name}</Text>
-                <Text style={[styles.sectionCardSub, rtlText]}>
-                  {park.distance} · {park.rating.toFixed(1)} {copy("rating")} · {activityLabel(park.activity, isRTL)} {copy("activity")}
-                </Text>
-              </View>
-            </View>
-            <View style={[styles.metaWrap, { flexDirection: appRowDirection }]}>
-              {park.amenities.map((amenity) => (
-                <Text key={amenity} style={styles.metaPill}>{amenity}</Text>
-              ))}
-            </View>
-            <Text style={[styles.sectionCardSub, rtlText]}>
-              {park.activeDogs + (checkedIn ? 1 : 0)} {copy("activeDogsNow")} · {park.upcomingPlaydates} {copy("upcomingPlaydates")} · {park.recentPosts} {copy("recentPosts")}
-            </Text>
-            <View style={[styles.actionBar, rtlRow]}>
-              <Pressable
-                onPress={() => (checkedIn ? handleRemoveBeacon() : handleParkCheckIn(park))}
-                disabled={checkingInPark?.id === park.id}
-                style={[styles.primarySmallBtn, checkingInPark?.id === park.id && { opacity: 0.6 }]}
-              >
-                <Text style={styles.primarySmallText}>
-                  {checkedIn ? copy("removeCheckIn") : copy("checkIn")}
-                </Text>
-              </Pressable>
-              <Pressable onPress={() => setSelectedPark(park)} style={styles.smallOutlineBtn}>
-                <Text style={styles.smallOutlineText}>{copy("viewPark")}</Text>
-              </Pressable>
-              <Pressable
-                onPress={() => {
-                  setNewPlaydateLocation(park.name);
-                  setPlaydateModalOpen(true);
-                }}
-                style={styles.smallOutlineBtn}
-              >
-                <Text style={styles.smallOutlineText}>{copy("createPlaydateInPark")}</Text>
-              </Pressable>
-            </View>
-          </View>
-        );
-      })
-      ) : (
-        <ListEmptyState icon="leaf-outline" title={copy("parksTitle")} message={copy("noBeacons")} />
-      )}
-    </ScrollView>
-  );
-
-  const renderGroups = () => {
-    const groupsListBottomPad = bottomContentPadding + (isAdmin ? 88 : 0);
-    return (
-      <View style={{ flex: 1, position: "relative" }}>
-        <SectionHeader title={copy("groupsTitle")} subtitle={copy("groupsSub")} />
-        <View style={[styles.searchCard, { flexDirection: appRowDirection }]}>
-          <Ionicons name="search" size={18} color={colors.textMuted} />
-          <TextInput
-            style={[styles.searchInput, rtlInput]}
-            value={groupSearch}
-            onChangeText={setGroupSearch}
-            placeholder={copy("searchGroups")}
-            placeholderTextColor={colors.textMuted}
-          />
-        </View>
-        {groupsLoading && groups.length === 0 ? (
-          <ListSkeleton rows={5} variant="card" />
-        ) : (
-          <FlatList
-            style={{ flex: 1 }}
-            data={filteredGroups}
-            keyExtractor={(item) => item.id}
-            ListEmptyComponent={renderGroupsEmpty}
-            contentContainerStyle={{ paddingBottom: groupsListBottomPad, flexGrow: 1 }}
-            keyboardShouldPersistTaps="handled"
-            initialNumToRender={8}
-            maxToRenderPerBatch={8}
-            windowSize={5}
-            removeClippedSubviews
-            refreshControl={
-              <RefreshControl
-                refreshing={groupsRefreshing}
-                onRefresh={onRefreshGroups}
-                tintColor={colors.text}
-                colors={[colors.text]}
+              {feedHeaderElement}
+              <ScreenLoadingCenter spinnerSize={60} fill={false} style={{ paddingTop: 40 }} />
+            </ScrollView>
+          ) : (
+            <View style={{ flex: 1 }}>
+              <FlatList
+                style={{ flex: 1 }}
+                data={filteredPosts}
+                keyExtractor={(item) => item.id}
+                ListHeaderComponent={feedHeaderElement}
+                ListEmptyComponent={renderFeedEmpty}
+                ListFooterComponent={renderFeedFooter}
+                contentContainerStyle={{ paddingBottom: bottomContentPadding, flexGrow: 1 }}
+                keyboardShouldPersistTaps="handled"
+                initialNumToRender={5}
+                maxToRenderPerBatch={5}
+                windowSize={7}
+                removeClippedSubviews
+                refreshControl={
+                  <RefreshControl
+                    refreshing={refreshing}
+                    onRefresh={onRefreshFeed}
+                    tintColor={colors.text}
+                    colors={[colors.text]}
+                  />
+                }
+                renderItem={renderFeedItem}
               />
-            }
-            renderItem={renderGroupCard}
-          />
-        )}
-        {isAdmin ? (
-          <Pressable
-            onPress={() => setCreateModalOpen(true)}
-            accessibilityRole="button"
-            accessibilityLabel={t("createGroup")}
-            style={{
-              position: "absolute",
-              left: 24,
-              bottom: 24 + insets.bottom,
-              zIndex: 100,
-              flexDirection: rowDirectionForAppLayout(isRTL),
-              alignItems: "center",
-              gap: 8,
-              backgroundColor: colors.text,
-              paddingHorizontal: 18,
-              paddingVertical: 14,
-              borderRadius: 18,
-              shadowColor: "#000",
-              shadowOffset: { width: 0, height: 4 },
-              shadowOpacity: 0.25,
-              shadowRadius: 10,
-              elevation: 5,
-            }}
-          >
-            <Ionicons name="add" size={22} color={colors.textInverse} />
-            <Text style={{ color: colors.textInverse, fontSize: 14, fontWeight: "700" }}>{t("createGroup")}</Text>
-          </Pressable>
-        ) : null}
-      </View>
-    );
-  };
-
-  const renderQuestions = () => (
-    <ScrollView
-      style={{ flex: 1 }}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefreshFeed} tintColor={colors.text} colors={[colors.text]} />}
-      contentContainerStyle={{ paddingBottom: bottomContentPadding }}
-    >
-      <SectionHeader
-        title={copy("qaTitle")}
-        subtitle={copy("qaSub")}
-        actionLabel={copy("askQuestion")}
-        onAction={() => {
-          setNewPostType("Question");
-          setComposerOpen(true);
-        }}
-      />
-      {questionPosts.length > 0 ? questionPosts.map((post) => (
-        <View key={post.id} style={styles.card}>
-          <Text style={[styles.sectionCardTitle, rtlText]}>{post.content}</Text>
-          <Text style={[styles.sectionCardSub, rtlText]}>
-            {copy("askedBy")} {post.userName} · {post.commentCount} {copy("answers")}
-          </Text>
-          <View style={[styles.metaWrap, { flexDirection: appRowDirection }]}>
-            <Text style={styles.metaPill}>{copy("training")}</Text>
-            <Text style={styles.metaPill}>{copy("bestAnswerPending")}</Text>
-            <Text style={styles.metaPill}>{copy("helpful")} {post.likeCount}</Text>
-          </View>
-          <View style={[styles.actionBar, rtlRow]}>
-            <Pressable onPress={() => setAnswerPost(post)}
-              style={styles.primarySmallBtn}>
-              <Text style={styles.primarySmallText}>{copy("answer")}</Text>
-            </Pressable>
-            <Pressable onPress={() => handleToggleLike(post.id)} style={styles.smallOutlineBtn}>
-              <Text style={styles.smallOutlineText}>{copy("helpful")}</Text>
-            </Pressable>
-          </View>
-        </View>
-      )) : (
-        <ListEmptyState icon="help-circle-outline" title={copy("qaTitle")} message={copy("qaSub")} />
-      )}
-    </ScrollView>
-  );
-
-  const renderEvents = () => (
-    <ScrollView
-      style={{ flex: 1 }}
-      refreshControl={<RefreshControl refreshing={playdatesLoading} onRefresh={loadPlaydates} tintColor={colors.text} colors={[colors.text]} />}
-      contentContainerStyle={{ paddingBottom: bottomContentPadding }}
-    >
-      <SectionHeader
-        title={copy("eventsTitle")}
-        subtitle={copy("eventsSub")}
-        actionLabel={copy("createPlaydate")}
-        onAction={() => setPlaydateModalOpen(true)}
-      />
-      {playdatesLoading && playdates.length === 0 ? (
-        <ListSkeleton rows={3} variant="card" />
-      ) : playdates.length > 0 ? (
-        playdates.map((event) => {
-          const joined = event.myRsvpStatus === "Going";
-          const spotsLeft = Math.max(0, (event.maxPets ?? event.goingCount) - event.goingCount);
-          return (
-            <View key={event.id} style={styles.card}>
-              <View style={[styles.cardRow, rtlRow]}>
-                <View style={styles.iconBubble}>
-                  <Ionicons name="sparkles-outline" size={19} color={colors.text} />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={[styles.sectionCardTitle, rtlText]}>{event.title}</Text>
-                  <Text style={[styles.sectionCardSub, rtlText]}>
-                    {event.hostUserName} · {formatDateTime(event.scheduledFor)}
-                  </Text>
-                </View>
-              </View>
-              <Text style={[styles.contentText, rtlText]}>{event.description || copy("openPlaydate")}</Text>
-              <View style={[styles.metaWrap, { flexDirection: appRowDirection }]}>
-                <Text style={styles.metaPill}>{event.locationName}</Text>
-                <Text style={styles.metaPill}>
-                  {event.maxPets ? `${event.maxPets} ${copy("maxParticipants")}` : copy("allSizes")}
-                </Text>
-                <Text style={styles.metaPill}>{spotsLeft} {copy("spotsLeft")}</Text>
-                <Text style={styles.metaPill}>{event.goingCount} {copy("dogsAttending")}</Text>
-              </View>
-              <Pressable onPress={() => handleJoinEvent(event)} style={joined ? styles.smallOutlineBtn : styles.primarySmallBtn}>
-                <Text style={joined ? styles.smallOutlineText : styles.primarySmallText}>
-                  {joined ? copy("joined") : copy("joinEvent")}
-                </Text>
-              </Pressable>
             </View>
-          );
-        })
-      ) : (
-        <ListEmptyState
-          icon="sparkles-outline"
-          title={copy("noPlaydates")}
-          message={copy("eventsSub")}
-        />
-      )}
-    </ScrollView>
-  );
-
-  const renderLostSos = () => (
-    <ScrollView
-      style={{ flex: 1 }}
-      refreshControl={
-        <RefreshControl refreshing={refreshing} onRefresh={onRefreshFeed} tintColor={colors.text} colors={[colors.text]} />
-      }
-      contentContainerStyle={{ paddingBottom: bottomContentPadding }}
-    >
-      <SectionHeader title={t("cm_lost_sos_title")} subtitle={t("cm_lost_sos_subtitle")} />
-      {loading && sosFeedPosts.length === 0 ? (
-        <ListSkeleton rows={3} variant="card" />
-      ) : sosFeedPosts.length > 0 ? (
-        sosFeedPosts.map((item) => (
-          <PostCard
-            key={item.id}
-            post={item}
-            meta={postMetaById[item.id]}
+          )
+        ) : mainTab === "lostSos" ? (
+          <LostSosTab
+            sosFeedPosts={sosFeedPosts}
+            loading={loading}
+            refreshing={refreshing}
+            postMetaById={postMetaById}
             currentUserId={user?.id ?? null}
+            likeBusy={likeBusy}
+            deleteBusy={deleteBusy}
+            bottomContentPadding={bottomContentPadding}
+            onRefresh={onRefreshFeed}
             onToggleLike={handleToggleLike}
             onToggleHelpful={handleToggleHelpful}
             onToggleSave={handleToggleSave}
@@ -2969,76 +2002,87 @@ export function CommunityScreen() {
             onBlock={handleBlockUser}
             onPlaydateComing={handlePlaydateComing}
             onSosResolved={handleSosResolved}
-            celebrateMarkFoundBurst={burstMarkFoundCelebrate}
-            rtlText={rtlText}
-            rtlRow={rtlRow}
-            isRTL={isRTL}
+            burstMarkFoundCelebrate={burstMarkFoundCelebrate}
+            renderPostCard={renderLostSosSingleCard}
             copy={copy}
-            isLikePending={!!likeBusy[item.id]}
-            isDeletePending={!!deleteBusy[item.id]}
+            t={t}
           />
-        ))
-      ) : (
-        <ListEmptyState icon="warning-outline" title={t("cm_lost_sos_title")} message={t("cm_lost_sos_empty")} />
-      )}
-    </ScrollView>
-  );
-
-  return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: colors.surface, marginTop: 0 }} edges={["top"]}>
-      <BrandedAppHeader style={{ paddingVertical: 6 }} />
-      <View style={{ flex: 1, backgroundColor: colors.surface, overflow: "hidden" }}>
-        {topTabsElement}
-
-        {mainTab === "feed" ? (        loading && posts.length === 0 ? (
-          <ScrollView
-            style={{ flex: 1 }}
-            contentContainerStyle={{ paddingBottom: bottomContentPadding }}
-            scrollEnabled={false}
-          >
-            {renderFeedHeaderWithoutHero()}
-            <ListSkeleton rows={4} variant="card" />
-          </ScrollView>
+        ) : mainTab === "playdates" ? (
+          <PlaydatesTab
+            playdates={playdates}
+            playdatesLoading={playdatesLoading}
+            bottomContentPadding={bottomContentPadding}
+            selectedPet={selectedPet}
+            onRefresh={loadPlaydates}
+            onCreatePlaydate={() => setPlaydateModalOpen(true)}
+            onRsvp={handleRsvp}
+            onOpenComments={setPlaydateCommentsOpenFor}
+            copy={copy}
+          />
+        ) : mainTab === "parks" ? (
+          <ParksTab
+            parks={parks}
+            parksLoading={parksLoading}
+            beacons={beacons}
+            beaconsLoading={beaconsLoading}
+            myBeaconId={myBeaconId}
+            parkCheckins={parkCheckins}
+            checkingInPark={checkingInPark}
+            bottomContentPadding={bottomContentPadding}
+            onRefresh={async () => {
+              await Promise.all([loadBeacons(), loadDogParks()]);
+            }}
+            onCheckIn={handleParkCheckIn}
+            onRemoveBeacon={handleRemoveBeacon}
+            onViewPark={setSelectedPark}
+            onCreatePlaydateAtPark={(parkName) => {
+              setNewPlaydateLocation(parkName);
+              setPlaydateModalOpen(true);
+            }}
+            copy={copy}
+          />
+        ) : mainTab === "groups" ? (
+          <GroupsTab
+            filteredGroups={filteredGroups}
+            groupsLoading={groupsLoading}
+            groupsRefreshing={groupsRefreshing}
+            groupSearch={groupSearch}
+            isAdmin={isAdmin}
+            bottomContentPadding={bottomContentPadding}
+            insets={insets}
+            onRefresh={onRefreshGroups}
+            onSetGroupSearch={setGroupSearch}
+            onOpenCreateModal={() => setCreateModalOpen(true)}
+            renderGroupCard={renderGroupCard}
+            copy={copy}
+            t={t}
+          />
+        ) : mainTab === "qa" ? (
+          <QATab
+            questionPosts={questionPosts}
+            refreshing={refreshing}
+            bottomContentPadding={bottomContentPadding}
+            onRefresh={onRefreshFeed}
+            onAskQuestion={() => {
+              setNewPostType("Question");
+              setComposerOpen(true);
+            }}
+            onAnswer={setAnswerPost}
+            onToggleLike={handleToggleLike}
+            copy={copy}
+            t={t}
+          />
         ) : (
-          <View style={{ flex: 1 }}>
-            <FlatList
-              style={{ flex: 1 }}
-              data={filteredPosts}
-              keyExtractor={(item) => item.id}
-              ListHeaderComponent={renderFeedHeaderWithoutHero()}
-              ListEmptyComponent={renderFeedEmpty}
-              ListFooterComponent={renderFeedFooter}
-              contentContainerStyle={{ paddingBottom: bottomContentPadding, flexGrow: 1 }}
-              keyboardShouldPersistTaps="handled"
-              initialNumToRender={5}
-              maxToRenderPerBatch={5}
-              windowSize={7}
-              removeClippedSubviews
-              refreshControl={
-                <RefreshControl
-                  refreshing={refreshing}
-                  onRefresh={onRefreshFeed}
-                  tintColor={colors.text}
-                  colors={[colors.text]}
-                />
-              }
-              renderItem={renderFeedItem}
-            />
-          </View>
-        )
-      ) : mainTab === "lostSos" ? (
-        renderLostSos()
-      ) : mainTab === "playdates" ? (
-        renderPlaydates()
-      ) : mainTab === "parks" ? (
-        renderParks()
-      ) : mainTab === "groups" ? (
-        renderGroups()
-      ) : mainTab === "qa" ? (
-        renderQuestions()
-      ) : (
-        renderEvents()
-      )}
+          <EventsTab
+            playdates={playdates}
+            playdatesLoading={playdatesLoading}
+            bottomContentPadding={bottomContentPadding}
+            onRefresh={loadPlaydates}
+            onCreatePlaydate={() => setPlaydateModalOpen(true)}
+            onJoinEvent={handleJoinEvent}
+            copy={copy}
+          />
+        )}
       </View>
 
       {communitySearchOpen && (
@@ -3835,685 +2879,3 @@ function CreatePlaydateModal({
     </Modal>
   );
 }
-
-const getStyles = (colors: any) =>
-  StyleSheet.create({
-    /** Pull category row closer to the navy header; strip uses page background. */
-    categoryTabsScroll: {
-      backgroundColor: colors.surface,
-      marginTop: 0,
-      flexShrink: 1,
-    },
-    topTabsContent: {
-      paddingHorizontal: 16,
-      paddingTop: 4,
-      paddingBottom: 6,
-      gap: 10,
-      alignItems: "flex-start",
-    },
-    topTab: {
-      alignItems: "center",
-      justifyContent: "flex-start",
-      minWidth: 76,
-      flexShrink: 0,
-      paddingVertical: 0,
-    },
-    topTabCircleWrap: {
-      width: 76,
-      height: 76,
-      position: "relative",
-      alignItems: "center",
-      justifyContent: "center",
-    },
-    topTabBadge: {
-      position: "absolute",
-      top: -2,
-      minWidth: 18,
-      height: 18,
-      paddingHorizontal: 4,
-      borderRadius: 10,
-      alignItems: "center",
-      justifyContent: "center",
-      borderWidth: 2,
-      zIndex: 2,
-      shadowColor: "#000",
-      shadowOffset: { width: 0, height: 1 },
-      shadowOpacity: 0.12,
-      shadowRadius: 2,
-      elevation: 3,
-    },
-    topTabBadgeAlert: {
-      backgroundColor: colors.warning,
-    },
-    topTabBadgeText: {
-      fontSize: 10,
-      fontWeight: "800",
-      letterSpacing: -0.2,
-    },
-    topTabCircle: {
-      width: 76,
-      height: 76,
-      borderRadius: 38,
-      borderWidth: 1,
-      alignItems: "center",
-      justifyContent: "center",
-      shadowColor: "#06256f",
-      shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: 0.08,
-      shadowRadius: 12,
-      elevation: 4,
-    },
-    topTabCircleActive: {
-      backgroundColor: colors.text,
-      borderColor: colors.text,
-    },
-    topTabCircleInactive: {
-      backgroundColor: colors.surface,
-      borderColor: colors.border,
-    },
-    /** Inactive label — gray; active uses `topTabTextActive` only (never white). */
-    topTabText: {
-      marginTop: 8,
-      fontSize: 13,
-      fontWeight: "700",
-      color: colors.textSecondary,
-      textAlign: "center",
-      lineHeight: 16,
-      maxWidth: 92,
-    },
-    topTabTextActive: {
-      color: "#06256F",
-      fontWeight: "800",
-    },
-    searchCard: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: 10,
-      backgroundColor: colors.surface,
-      borderRadius: 16,
-      marginHorizontal: 16,
-      marginTop: 10,
-      paddingHorizontal: 14,
-      minHeight: 54,
-      borderWidth: 1,
-      borderColor: colors.border,
-    },
-    searchInput: {
-      flex: 1,
-      paddingVertical: 12,
-      fontSize: 15,
-      color: colors.text,
-    },
-    filterContent: {
-      paddingHorizontal: 16,
-      paddingTop: 10,
-      gap: 8,
-      paddingBottom: 2,
-    },
-    chip: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: 6,
-      paddingHorizontal: 12,
-      paddingVertical: 8,
-      borderRadius: 999,
-      borderWidth: 1,
-      minHeight: 36,
-    },
-    chipActive: { backgroundColor: colors.text, borderColor: colors.text },
-    chipInactive: { backgroundColor: colors.surface, borderColor: colors.border },
-    chipText: { fontSize: 12, fontWeight: "800" },
-    chipTextActive: { color: colors.textInverse },
-    chipTextInactive: { color: colors.textSecondary },
-    demoBanner: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: 8,
-      marginHorizontal: 16,
-      marginTop: 10,
-      padding: 10,
-      borderRadius: 14,
-      backgroundColor: colors.primaryLight,
-    },
-    demoBannerText: { flex: 1, color: colors.primary, fontSize: 12, fontWeight: "700" },
-    pillsRow: {
-      paddingHorizontal: 16,
-      paddingTop: 8,
-      paddingBottom: 4,
-      gap: 10,
-    },
-    pill: { paddingHorizontal: 20, paddingVertical: 8, borderRadius: 20 },
-    pillActive: { backgroundColor: colors.text },
-    pillInactive: {
-      backgroundColor: colors.surface,
-      borderWidth: 1,
-      borderColor: colors.border,
-    },
-    pillText: { fontSize: 14, fontWeight: "600" },
-    pillTextActive: { color: colors.textInverse },
-    pillTextInactive: { color: colors.textSecondary },
-    card: {
-      backgroundColor: colors.surface,
-      borderRadius: 16,
-      marginHorizontal: 16,
-      marginTop: 10,
-      padding: 14,
-      shadowColor: colors.shadow,
-      shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.06,
-      shadowRadius: 12,
-      elevation: 3,
-    },
-    cardRow: { flexDirection: "row", alignItems: "center", gap: 12 },
-    avatar: {
-      width: 42,
-      height: 42,
-      borderRadius: 21,
-      backgroundColor: colors.text,
-      alignItems: "center",
-      justifyContent: "center",
-    },
-    avatarText: { color: colors.textInverse, fontSize: 14, fontWeight: "700" },
-    authorRow: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: 6,
-      flexWrap: "wrap",
-    },
-    authorName: { fontSize: 15, fontWeight: "700", color: colors.text },
-    providerBadge: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: 3,
-      backgroundColor: colors.text,
-      paddingHorizontal: 6,
-      paddingVertical: 2,
-      borderRadius: 8,
-    },
-    providerBadgeText: { color: colors.textInverse, fontSize: 10, fontWeight: "700" },
-    sosBadge: {
-      backgroundColor: "#dc2626",
-      paddingHorizontal: 6,
-      paddingVertical: 2,
-      borderRadius: 8,
-    },
-    kindBadge: {
-      backgroundColor: colors.primaryLight,
-      paddingHorizontal: 7,
-      paddingVertical: 3,
-      borderRadius: 999,
-    },
-    kindBadgeText: { color: colors.text, fontSize: 10, fontWeight: "800" },
-    timeText: { fontSize: 12, color: colors.textMuted, marginTop: 1 },
-    contentText: { fontSize: 15, color: colors.text, lineHeight: 23, marginTop: 12 },
-    dogMiniCard: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: 10,
-      padding: 10,
-      borderRadius: 14,
-      backgroundColor: colors.surfaceTertiary,
-      marginTop: 12,
-    },
-    dogAvatar: {
-      width: 34,
-      height: 34,
-      borderRadius: 17,
-      backgroundColor: colors.text,
-      alignItems: "center",
-      justifyContent: "center",
-    },
-    dogName: { color: colors.text, fontSize: 14, fontWeight: "800" },
-    dogSubtle: { color: colors.textMuted, fontSize: 12 },
-    dogProfileRail: {
-      gap: 12,
-      paddingTop: 12,
-      paddingBottom: 2,
-    },
-    dogProfileCard: {
-      width: 154,
-      padding: 12,
-      borderRadius: 18,
-      backgroundColor: colors.surfaceTertiary,
-      borderWidth: 1,
-      borderColor: colors.borderLight,
-      alignItems: "center",
-    },
-    dogProfileAvatar: {
-      width: 78,
-      height: 78,
-      borderRadius: 39,
-      overflow: "hidden",
-      backgroundColor: colors.text,
-      alignItems: "center",
-      justifyContent: "center",
-      marginBottom: 8,
-    },
-    dogProfileName: { color: colors.text, fontSize: 15, fontWeight: "900", textAlign: "center", lineHeight: 19 },
-    dogProfileSub: { color: colors.textMuted, fontSize: 12, marginTop: 3, textAlign: "center", lineHeight: 17 },
-    postImage: {
-      width: "100%",
-      aspectRatio: 4 / 3,
-      borderRadius: 12,
-      marginTop: 12,
-      backgroundColor: colors.surfaceSecondary,
-    },
-    composerThumbnail: {
-      width: "100%",
-      aspectRatio: 4 / 3,
-      borderRadius: 12,
-      backgroundColor: colors.surfaceSecondary,
-    },
-    thumbnailRemoveBtn: {
-      position: "absolute",
-      top: 8,
-      right: 8,
-    },
-    pickerIconBtn: {
-      padding: 6,
-    },
-    imagePlaceholder: {
-      height: 180,
-      borderRadius: 12,
-      backgroundColor: colors.surfaceSecondary,
-      alignItems: "center",
-      justifyContent: "center",
-      marginTop: 12,
-    },
-    playdateInline: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: 12,
-      padding: 12,
-      borderRadius: 16,
-      backgroundColor: colors.primaryLight,
-      marginTop: 12,
-    },
-    inlineTitle: { fontSize: 14, fontWeight: "900", color: colors.text },
-    inlineSub: { fontSize: 12, color: colors.textSecondary, marginTop: 2 },
-    menu: {
-      alignSelf: "flex-end",
-      marginTop: 10,
-      borderRadius: 14,
-      backgroundColor: colors.surfaceTertiary,
-      borderWidth: 1,
-      borderColor: colors.border,
-      overflow: "hidden",
-    },
-    menuItem: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: 8,
-      paddingHorizontal: 12,
-      paddingVertical: 10,
-    },
-    menuText: { color: colors.textSecondary, fontSize: 13, fontWeight: "700" },
-    actionBar: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: 20,
-      marginTop: 14,
-      paddingTop: 12,
-      borderTopWidth: 1,
-      borderTopColor: colors.borderLight,
-      flexWrap: "wrap",
-    },
-    actionBtn: { flexDirection: "row", alignItems: "center", gap: 6 },
-    actionText: { fontSize: 13, fontWeight: "600", color: colors.textSecondary },
-    commentSection: {
-      backgroundColor: colors.surfaceTertiary,
-      borderRadius: 12,
-      marginTop: 12,
-      padding: 12,
-    },
-    commentItem: { flexDirection: "row", gap: 8, marginBottom: 10 },
-    commentAvatar: {
-      width: 28,
-      height: 28,
-      borderRadius: 14,
-      backgroundColor: colors.textMuted,
-      alignItems: "center",
-      justifyContent: "center",
-    },
-    commentAvatarText: { color: colors.textInverse, fontSize: 10, fontWeight: "700" },
-    commentHeader: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: 6,
-    },
-    commentAuthor: { fontSize: 13, fontWeight: "700", color: colors.text },
-    commentTime: { fontSize: 11, color: colors.textMuted },
-    commentContent: {
-      fontSize: 13,
-      color: colors.textSecondary,
-      lineHeight: 18,
-      marginTop: 2,
-    },
-    commentInputRow: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: 8,
-      marginTop: 8,
-    },
-    commentInput: {
-      flex: 1,
-      backgroundColor: colors.surface,
-      borderRadius: 20,
-      paddingHorizontal: 14,
-      paddingVertical: 8,
-      fontSize: 13,
-      color: colors.text,
-      borderWidth: 1,
-      borderColor: colors.border,
-    },
-    commentSendBtn: {
-      width: 32,
-      height: 32,
-      borderRadius: 16,
-      backgroundColor: colors.text,
-      alignItems: "center",
-      justifyContent: "center",
-    },
-    composerClosed: { flexDirection: "row", alignItems: "center", gap: 12 },
-    composerAvatar: {
-      width: 36,
-      height: 36,
-      borderRadius: 18,
-      backgroundColor: colors.text,
-      alignItems: "center",
-      justifyContent: "center",
-    },
-    composerPlaceholder: { flex: 1, fontSize: 15, color: colors.textMuted },
-    composerInput: {
-      fontSize: 15,
-      color: colors.text,
-      minHeight: 80,
-      textAlignVertical: "top",
-      lineHeight: 22,
-    },
-    composerActions: {
-      flexDirection: "row",
-      justifyContent: "flex-end",
-      alignItems: "center",
-      gap: 12,
-      marginTop: 12,
-    },
-    composerCancel: { paddingHorizontal: 16, paddingVertical: 10 },
-    composerCancelText: { fontSize: 14, fontWeight: "600", color: colors.textSecondary },
-    publishBtn: {
-      backgroundColor: colors.text,
-      paddingHorizontal: 20,
-      paddingVertical: 10,
-      borderRadius: 12,
-      minWidth: 90,
-      alignItems: "center",
-    },
-    publishText: { color: colors.textInverse, fontSize: 14, fontWeight: "700" },
-    quickActions: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: 10,
-      flexWrap: "wrap",
-    },
-    quickActionPrimary: {
-      flex: 1,
-      minWidth: 140,
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "center",
-      gap: 8,
-      backgroundColor: colors.text,
-      paddingVertical: 12,
-      minHeight: 48,
-      borderRadius: 14,
-    },
-    quickActionPrimaryText: { color: colors.textInverse, fontSize: 14, fontWeight: "900" },
-    quickActionSecondary: {
-      flex: 1,
-      minWidth: 140,
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "center",
-      gap: 8,
-      backgroundColor: colors.primaryLight,
-      paddingVertical: 12,
-      minHeight: 48,
-      borderRadius: 14,
-    },
-    quickActionSecondaryText: { color: colors.text, fontSize: 14, fontWeight: "900" },
-    sectionHeader: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: 12,
-      paddingHorizontal: 16,
-      paddingTop: 14,
-      paddingBottom: 4,
-      flexWrap: "wrap",
-    },
-    sectionTitle: { color: colors.text, fontSize: 22, fontWeight: "900" },
-    sectionSubtitle: { color: colors.textSecondary, fontSize: 13, lineHeight: 18, marginTop: 2 },
-    sectionCardTitle: { color: colors.text, fontSize: 16, fontWeight: "900" },
-    sectionCardSub: { color: colors.textSecondary, fontSize: 12, marginTop: 3 },
-    iconBubble: {
-      width: 42,
-      height: 42,
-      borderRadius: 15,
-      backgroundColor: colors.primaryLight,
-      alignItems: "center",
-      justifyContent: "center",
-    },
-    metaWrap: {
-      flexDirection: "row",
-      gap: 7,
-      flexWrap: "wrap",
-      marginTop: 12,
-    },
-    metaPill: {
-      overflow: "hidden",
-      borderRadius: 999,
-      backgroundColor: colors.surfaceSecondary,
-      color: colors.textSecondary,
-      fontSize: 12,
-      fontWeight: "800",
-      paddingHorizontal: 10,
-      paddingVertical: 6,
-    },
-    primarySmallBtn: {
-      backgroundColor: colors.text,
-      paddingHorizontal: 14,
-      paddingVertical: 9,
-      borderRadius: 12,
-      alignSelf: "flex-start",
-      minHeight: 38,
-      justifyContent: "center",
-    },
-    primarySmallText: { color: colors.textInverse, fontSize: 12, fontWeight: "900" },
-    smallOutlineBtn: {
-      borderWidth: 1,
-      borderColor: colors.border,
-      backgroundColor: colors.surface,
-      paddingHorizontal: 13,
-      paddingVertical: 8,
-      borderRadius: 12,
-      alignSelf: "flex-start",
-      minHeight: 38,
-      justifyContent: "center",
-    },
-    smallOutlineText: { color: colors.text, fontSize: 12, fontWeight: "800" },
-    rsvpButton: {
-      paddingHorizontal: 12,
-      paddingVertical: 8,
-      borderRadius: 999,
-      backgroundColor: colors.surfaceSecondary,
-    },
-    rsvpButtonActive: { backgroundColor: colors.text },
-    rsvpText: { color: colors.textSecondary, fontSize: 12, fontWeight: "800" },
-    rsvpTextActive: { color: colors.textInverse },
-    liveBeaconRow: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: 10,
-      paddingTop: 12,
-    },
-    liveDot: {
-      width: 10,
-      height: 10,
-      borderRadius: 5,
-      backgroundColor: colors.success,
-    },
-    emptyInline: { color: colors.textMuted, fontSize: 13, lineHeight: 19, marginTop: 10 },
-    modalRoot: {
-      flex: 1,
-      justifyContent: "flex-end",
-    },
-    modalBackdrop: {
-      flex: 1,
-      backgroundColor: colors.overlay,
-      justifyContent: "flex-end",
-    },
-    modalBackdropFill: {
-      ...StyleSheet.absoluteFillObject,
-      backgroundColor: colors.overlay,
-    },
-    keyboardSheet: { flex: 1, justifyContent: "flex-end" },
-    detailSheet: {
-      backgroundColor: colors.surface,
-      borderTopLeftRadius: 26,
-      borderTopRightRadius: 26,
-      padding: 20,
-      paddingBottom: 34,
-      maxHeight: "88%",
-    },
-    handle: {
-      width: 42,
-      height: 4,
-      borderRadius: 2,
-      backgroundColor: colors.border,
-      alignSelf: "center",
-      marginBottom: 16,
-    },
-    modalTitle: { color: colors.text, fontSize: 22, fontWeight: "900", marginBottom: 12 },
-    label: { color: colors.textSecondary, fontSize: 13, fontWeight: "800", marginTop: 12, marginBottom: 8 },
-    input: {
-      backgroundColor: colors.surfaceTertiary,
-      borderRadius: 14,
-      borderWidth: 1,
-      borderColor: colors.border,
-      paddingHorizontal: 14,
-      paddingVertical: 12,
-      color: colors.text,
-      fontSize: 15,
-      marginTop: 10,
-    },
-    textArea: { minHeight: 96, textAlignVertical: "top" },
-    modalChipWrap: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-    modalChip: {
-      borderWidth: 1,
-      borderColor: colors.border,
-      borderRadius: 999,
-      paddingHorizontal: 12,
-      paddingVertical: 8,
-      backgroundColor: colors.surface,
-    },
-    modalChipActive: { backgroundColor: colors.text, borderColor: colors.text },
-    modalChipText: { color: colors.textSecondary, fontSize: 12, fontWeight: "800" },
-    modalChipTextActive: { color: colors.textInverse },
-    modalActions: {
-      flexDirection: "row",
-      justifyContent: "flex-end",
-      alignItems: "center",
-      gap: 10,
-      marginTop: 14,
-    },
-    mediaRow: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 10 },
-    twoCol: { flexDirection: "row", gap: 10 },
-    colInput: { flex: 1 },
-    checkRow: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 14 },
-    checkText: { color: colors.text, fontSize: 14, fontWeight: "700" },
-    mapPlaceholder: {
-      height: 140,
-      borderRadius: 18,
-      backgroundColor: colors.surfaceTertiary,
-      overflow: "hidden",
-      marginTop: 12,
-      borderWidth: 1,
-      borderColor: colors.border,
-    },
-    largeDogAvatar: {
-      width: 96,
-      height: 96,
-      borderRadius: 48,
-      overflow: "hidden",
-      backgroundColor: colors.text,
-      alignItems: "center",
-      justifyContent: "center",
-      alignSelf: "center",
-      marginBottom: 12,
-    },
-    primaryBtn: {
-      backgroundColor: colors.text,
-      paddingVertical: 14,
-      borderRadius: 14,
-      alignItems: "center",
-      marginTop: 14,
-    },
-    primaryBtnText: { color: colors.textInverse, fontSize: 15, fontWeight: "900" },
-    emptyContainer: {
-      alignItems: "center",
-      paddingTop: 60,
-      paddingHorizontal: 32,
-    },
-    emptyTitle: {
-      fontSize: 18,
-      fontWeight: "700",
-      color: colors.text,
-      textAlign: "center",
-      marginTop: 16,
-    },
-    emptySubtitle: {
-      fontSize: 14,
-      color: colors.textMuted,
-      textAlign: "center",
-      marginTop: 6,
-    },
-    loadMoreBtn: {
-      alignSelf: "center",
-      backgroundColor: colors.surface,
-      paddingHorizontal: 28,
-      paddingVertical: 12,
-      borderRadius: 24,
-      marginVertical: 20,
-      borderWidth: 1,
-      borderColor: colors.border,
-    },
-    loadMoreText: { fontSize: 14, fontWeight: "600", color: colors.text },
-    loadingCenter: {
-      flex: 1,
-      alignItems: "center",
-      justifyContent: "center",
-    },
-    sosMarkFoundWrap: {
-      marginTop: 14,
-      alignSelf: "stretch",
-    },
-    sosMarkFoundFullBtn: {
-      width: "100%",
-      alignItems: "center",
-      justifyContent: "center",
-      gap: 10,
-      backgroundColor: "#22c55e",
-      paddingVertical: 14,
-      paddingHorizontal: 16,
-      borderRadius: 12,
-      minHeight: 52,
-    },
-    sosMarkFoundFullBtnDisabled: {
-      opacity: 0.65,
-    },
-    sosMarkFoundFullBtnText: {
-      color: "#fff",
-      fontSize: 17,
-      fontWeight: "800",
-      flexShrink: 1,
-    },
-  });

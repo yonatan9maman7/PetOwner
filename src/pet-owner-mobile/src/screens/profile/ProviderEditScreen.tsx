@@ -27,6 +27,7 @@ import {
   AddressAutocomplete,
   type AddressAutocompleteSelection,
 } from "../../components/shared/AddressAutocomplete";
+import { ScreenLoadingCenter } from "../../components/shared/ScreenLoadingCenter";
 import { fetchReverseGeocode } from "../../api/googlePlaces";
 import { DogSizeCapacityEditor, toggleDogSize } from "../../features/provider-onboarding/DogSizeCapacityFields";
 import {
@@ -1251,8 +1252,8 @@ export function ProviderEditScreen() {
 
   if (loading) {
     return (
-      <View style={{ flex: 1, backgroundColor: colors.background, alignItems: "center", justifyContent: "center" }}>
-        <ActivityIndicator size="large" color={colors.text} />
+      <View style={{ flex: 1, backgroundColor: colors.background }}>
+        <ScreenLoadingCenter />
       </View>
     );
   }

@@ -3,6 +3,7 @@ import {
   View, Text, ScrollView, Pressable, ActivityIndicator, StyleSheet,
 } from "react-native";
 import { showGlobalAlertCompat } from "../../../components/global-modal";
+import { ScreenLoadingCenter } from "../../../components/shared/ScreenLoadingCenter";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation, useRoute } from "@react-navigation/native";
@@ -78,9 +79,7 @@ export function LiveBeaconDetailScreen() {
   if (loading) {
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={["top"]}>
-        <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
-          <ActivityIndicator color={colors.text} />
-        </View>
+        <ScreenLoadingCenter title={`${t("palsTabLiveNow")}…`} />
       </SafeAreaView>
     );
   }

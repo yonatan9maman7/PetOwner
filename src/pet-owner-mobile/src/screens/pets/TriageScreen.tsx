@@ -31,6 +31,7 @@ import { useTranslation, rowDirectionForAppLayout } from "../../i18n";
 import { useTheme } from "../../theme/ThemeContext";
 import { useKeyboardAvoidingState } from "../../hooks/useKeyboardAvoidingState";
 import { triageApi, petsApi } from "../../api/client";
+import { ScreenLoadingCenter } from "../../components/shared/ScreenLoadingCenter";
 import { getSpeciesEmoji } from "./MyPets/constants";
 import { PetSpecies } from "../../types/api";
 import { pickImageWithSource } from "../../utils/imagePicker";
@@ -482,9 +483,7 @@ export function TriageScreen() {
   if (petsLoading) {
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: colors.surface, marginTop: -8 }} edges={["top"]}>
-        <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
-          <ActivityIndicator size="large" color={colors.primary} />
-        </View>
+        <ScreenLoadingCenter />
       </SafeAreaView>
     );
   }
@@ -606,9 +605,7 @@ export function TriageScreen() {
           /* ═══════════════ HISTORY VIEW ═══════════════ */
           <View style={{ flex: 1 }}>
             {historyLoading ? (
-              <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
-                <ActivityIndicator size="large" color={colors.primary} />
-              </View>
+              <ScreenLoadingCenter fill={false} style={{ paddingTop: 60 }} />
             ) : allHistory.length === 0 ? (
               <View style={{ flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 40 }}>
                 <Ionicons

@@ -14,7 +14,7 @@ import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import { useTranslation, rowDirectionForAppLayout } from "../../i18n";
 import { useTheme } from "../../theme/ThemeContext";
 import { useProviderDashboardStore } from "../../store/providerDashboardStore";
-import { ListSkeleton, ListEmptyState, InlineError } from "../../components/shared";
+import { ListSkeleton, ListEmptyState, InlineError, ScreenLoadingCenter } from "../../components/shared";
 import type { TranslationKey } from "../../i18n";
 import type {
   EarningsTransactionDto,
@@ -359,9 +359,7 @@ export function ProviderDashboardScreen() {
         </Pressable>
 
         {loading && !stats ? (
-          <View className="pt-2">
-            <ListSkeleton rows={2} variant="card" />
-          </View>
+          <ScreenLoadingCenter spinnerSize={48} fill={false} style={{ paddingVertical: 32 }} />
         ) : null}
 
         {stats ? (
@@ -440,7 +438,7 @@ export function ProviderDashboardScreen() {
             </Text>
 
             {earningsSectionLoading ? (
-              <ListSkeleton rows={3} variant="row" />
+              <ScreenLoadingCenter spinnerSize={48} fill={false} style={{ paddingVertical: 32 }} />
             ) : earnings ? (
               <View
                 className="rounded-2xl p-4 mb-4"

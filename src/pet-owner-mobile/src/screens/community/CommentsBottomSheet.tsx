@@ -122,11 +122,10 @@ export function CommentsBottomSheet({
     }
   }, [visible, load]);
 
-  // Focus input when reply mode activates
   useEffect(() => {
-    if (replyTarget) {
-      setTimeout(() => inputRef.current?.focus(), 120);
-    }
+    if (!replyTarget) return;
+    const id = setTimeout(() => inputRef.current?.focus(), 120);
+    return () => clearTimeout(id);
   }, [replyTarget]);
 
   const rootComments = Array.isArray(comments) ? comments : [];

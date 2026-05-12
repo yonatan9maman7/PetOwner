@@ -1,9 +1,11 @@
 import React, { useCallback, useEffect, useRef, useState, memo, useMemo } from "react";
 import { View, StyleSheet, Text, Platform } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import Svg, { Circle, Path } from "react-native-svg";
 import { MarkerWrapper } from "../../components/MapViewWrapper";
 import type { MapPinDto } from "../../types/api";
 import { mapDiag } from "./exploreMapDiag";
+import { IONICONS_PAW_PATHS } from "./exploreMapIoniconsPawPaths";
 
 /* ── Constants ──────────────────────────────────────────────────────────── */
 
@@ -16,14 +18,17 @@ const SELECTED_MARKER_Z_INDEX = 1000;
 /** Outer snapshot box larger than inner circle — avoids Android squircle clipping. */
 const MARKER_OUTER_SIZE = 50;
 const PAW_INNER_SIZE = 38;
-const PAW_INNER_RADIUS = PAW_INNER_SIZE / 2;
 const ICON_SIZE = 18;
 
 const CLUSTER_OUTER_SIZE = 60;
 const CLUSTER_INNER_SIZE = 44;
-const CLUSTER_INNER_RADIUS = CLUSTER_INNER_SIZE / 2;
 const CLUSTER_ICON_SIZE = 20;
 const TRACKS_TIMEOUT_MS = 1000;
+
+/** Ionicons paw artwork uses a 512 canvas; scale circle to match `PAW_INNER_SIZE` inside `MARKER_OUTER_SIZE`. */
+const PAW_SVG_VIEWBOX = 512;
+const PAW_SVG_CIRCLE_R = (PAW_INNER_SIZE / 2) * (PAW_SVG_VIEWBOX / MARKER_OUTER_SIZE);
+const PAW_SVG_STROKE_W = 2 * (PAW_SVG_VIEWBOX / MARKER_OUTER_SIZE);
 
 /* ── Styles ─────────────────────────────────────────────────────────────── */
 
@@ -112,6 +117,34 @@ export type MarkerPoolSlot = {
 };
 
 /* ── Visual bubbles (static, memo'd) ────────────────────────────────────── */
+
+/** Android: same Ionicons geometry as iOS, drawn with SVG (avoids `Marker` view-snapshot bugs). */
+const PawMarkerSvg = memo(function PawMarkerSvg({ variant }: { variant: "default" | "selected" }) {
+  const sel = variant === "selected";
+  const cx = PAW_SVG_VIEWBOX / 2;
+  const cy = PAW_SVG_VIEWBOX / 2;
+  return (
+    <View style={S.markerOuter} collapsable={false}>
+      <Svg
+        width={MARKER_OUTER_SIZE}
+        height={MARKER_OUTER_SIZE}
+        viewBox={`0 0 ${PAW_SVG_VIEWBOX} ${PAW_SVG_VIEWBOX}`}
+      >
+        <Circle
+          cx={cx}
+          cy={cy}
+          r={PAW_SVG_CIRCLE_R}
+          fill={sel ? "#1a1a2e" : "#ffffff"}
+          stroke={sel ? "#1a1a2e" : "#e2e2e2"}
+          strokeWidth={PAW_SVG_STROKE_W}
+        />
+        {IONICONS_PAW_PATHS.map((d, i) => (
+          <Path key={i} d={d} fill={sel ? "#ffffff" : "#1a1a2e"} />
+        ))}
+      </Svg>
+    </View>
+  );
+});
 
 const PawBubble = memo(function PawBubble() {
   return (
@@ -206,6 +239,8 @@ const PooledMarker = memo(
       }
     }, [onPressProviderId, onPressClusterPins]);
 
+    const androidSvg = Platform.OS === "android";
+
     return (
       <MarkerWrapper
         identifier={`pool-${index}`}
@@ -217,6 +252,8 @@ const PooledMarker = memo(
       >
         {slot.kind === "cluster" ? (
           <ClusterBubble count={slot.clusterCount} />
+        ) : androidSvg ? (
+          <PawMarkerSvg variant="default" />
         ) : (
           <PawBubble />
         )}
@@ -324,6 +361,8 @@ export const ExploreSelectedMarkerOverlay = memo(
       }
     }, [isActive, providerId]);
 
+    const androidSvg = Platform.OS === "android";
+
     return (
       <MarkerWrapper
         identifier="selected-overlay"
@@ -332,7 +371,7 @@ export const ExploreSelectedMarkerOverlay = memo(
         tracksViewChanges={isTracking}
         zIndex={SELECTED_MARKER_Z_INDEX}
       >
-        <SelectedPawBubble />
+        {androidSvg ? <PawMarkerSvg variant="selected" /> : <SelectedPawBubble />}
       </MarkerWrapper>
     );
   },

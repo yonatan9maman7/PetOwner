@@ -17,6 +17,7 @@ import { providerApi, bookingsApi } from "../../api/client";
 import { useTranslation, rowDirectionForAppLayout } from "../../i18n";
 import { useTheme } from "../../theme/ThemeContext";
 import { BrandedAppHeader } from "../../components/BrandedAppHeader";
+import { ScreenLoadingCenter } from "../../components/shared/ScreenLoadingCenter";
 import { PawLoadingSpinner } from "../../components/shared/PawLoadingSpinner";
 import { useDeferredMount } from "../../hooks/useDeferredMount";
 import type { ProviderMeResponse } from "../../types/api";
@@ -287,10 +288,7 @@ export function ProfileScreen() {
     return (
       <SafeAreaView className="flex-1" edges={["top"]} style={{ backgroundColor: colors.background, marginTop: -8 }}>
         <BrandedAppHeader />
-        <View style={{ flex: 1, alignItems: "center", justifyContent: "center", gap: 20, paddingBottom: 60 }}>
-          <PawLoadingSpinner size={80} />
-          <Text style={{ fontSize: 15, color: colors.textMuted, fontWeight: "500" }}>{t("profileTitle")}…</Text>
-        </View>
+        <ScreenLoadingCenter title={`${t("profileTitle")}…`} />
       </SafeAreaView>
     );
   }

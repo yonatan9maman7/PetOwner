@@ -19,6 +19,7 @@ import { useTranslation, rowDirectionForAppLayout } from "../../i18n";
 import { useTheme } from "../../theme/ThemeContext";
 import { useAuthStore } from "../../store/authStore";
 import { providerApi, usersApi } from "../../api/client";
+import { ScreenLoadingCenter } from "../../components/shared/ScreenLoadingCenter";
 import { SparklineChart } from "../../components/SparklineChart";
 import type {
   AchievementDto,
@@ -258,9 +259,7 @@ export function MyStatsScreen() {
       </View>
 
       {loading ? (
-        <View className="flex-1 items-center justify-center">
-          <ActivityIndicator size="large" color={colors.text} />
-        </View>
+        <ScreenLoadingCenter title={`${t("myStats")}…`} />
       ) : !activeStats ? (
         <EmptyState
           icon="bar-chart-outline"

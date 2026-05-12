@@ -6,7 +6,7 @@ import type { PlaydatePrefsDto } from "../../../types/api";
 import { palsApi } from "../../../api/client";
 import { useTheme } from "../../../theme/ThemeContext";
 import { useTranslation, rowDirectionForAppLayout } from "../../../i18n";
-import { PawLoadingSpinner } from "../../../components/shared/PawLoadingSpinner";
+import { ScreenLoadingCenter } from "../../../components/shared/ScreenLoadingCenter";
 import { NearbyPalsList } from "./NearbyPalsList";
 import { LiveBeaconsList } from "./LiveBeaconsList";
 import { PlaydateEventsList } from "./PlaydateEventsList";
@@ -30,18 +30,8 @@ export function PalsScreen() {
 
   if (loading) {
     return (
-      <View
-        style={{
-          flex: 1,
-          alignItems: "center",
-          justifyContent: "center",
-          gap: 20,
-          paddingBottom: 60,
-          backgroundColor: colors.background,
-        }}
-      >
-        <PawLoadingSpinner size={80} />
-        <Text style={{ fontSize: 15, color: colors.textMuted, fontWeight: "500" }}>{t("palsTab")}…</Text>
+      <View style={{ flex: 1, backgroundColor: colors.background }}>
+        <ScreenLoadingCenter title={`${t("palsTab")}…`} />
       </View>
     );
   }

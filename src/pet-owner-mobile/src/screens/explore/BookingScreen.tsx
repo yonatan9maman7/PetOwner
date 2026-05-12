@@ -24,6 +24,7 @@ import {
 } from "../../types/api";
 import { SmartCalendarPicker } from "../../components/shared/SmartCalendarPicker";
 import { TimeSlotSelector } from "../../components/shared/TimeSlotSelector";
+import { ScreenLoadingCenter } from "../../components/shared/ScreenLoadingCenter";
 import { usePetsStore } from "../../store/petsStore";
 
 const SERVICE_TYPE_BY_ORDINAL: Record<number, ServiceType> = {
@@ -175,6 +176,11 @@ function calculateBookingTotal(
       }
       return rate;
   }
+}
+
+/** Matches web `booking-modal`: line total × number of pets on the booking. */
+function applyPetMultiplier(total: number, petCount: number): number {
+  return total * Math.max(1, petCount);
 }
 
 function getFixedDurationMinutes(rate: any): number | null {
@@ -518,7 +524,7 @@ export function BookingScreen() {
     }
     const range = resolveBookingRange(startDate, startTime, endDate, endTime, fixedDurationMinutes);
     if (!range) return null;
-    const total = calculateBookingTotal(
+    const lineTotal = calculateBookingTotal(
       billingMode,
       sr?.rate ?? 0,
       range.start,
@@ -526,8 +532,19 @@ export function BookingScreen() {
       fixedDurationMinutes,
       sr?.pricingUnit ?? sr?.PricingUnit,
     );
+    const total = applyPetMultiplier(lineTotal, selectedPetIds.length);
     return total > 0 ? total : null;
-  }, [selectedRate, sr, startDate, startTime, endDate, endTime, fixedDurationMinutes, isMultiDayService]);
+  }, [
+    selectedRate,
+    sr,
+    startDate,
+    startTime,
+    endDate,
+    endTime,
+    fixedDurationMinutes,
+    isMultiDayService,
+    selectedPetIds.length,
+  ]);
 
   const handleSubmit = async () => {
     if (submitting) return;
@@ -589,7 +606,7 @@ export function BookingScreen() {
     }
     const startISO = range.start.toISOString();
     const endISO = range.end.toISOString();
-    const clientTotal = calculateBookingTotal(
+    const lineTotal = calculateBookingTotal(
       billingMode,
       sr?.rate ?? 0,
       range.start,
@@ -597,6 +614,7 @@ export function BookingScreen() {
       fixedDurationMinutes,
       sr?.pricingUnit ?? sr?.PricingUnit,
     );
+    const clientTotal = applyPetMultiplier(lineTotal, selectedPetIds.length);
     if (clientTotal <= 0) {
       showGlobalAlertCompat(t("errorTitle"), t("invalidDates"));
       return;
@@ -669,9 +687,7 @@ export function BookingScreen() {
       </View>
 
       {showPetsLoading ? (
-        <View className="flex-1 items-center justify-center p-6">
-          <ActivityIndicator size="large" color={colors.primary} />
-        </View>
+        <ScreenLoadingCenter />
       ) : !hasPets ? (
         <View className="flex-1 items-center justify-center p-6">
           <Text className="text-5xl mb-4">🐾</Text>

@@ -37,7 +37,7 @@ import type { DogSize, ProviderPublicProfileDto } from "../../types/api";
 import { ProviderType } from "../../types/api";
 import { useReviewsStore } from "../../store/reviewsStore";
 import { StarRatingInput } from "./components/StarRatingInput";
-import { InlineError } from "../../components/shared";
+import { InlineError, ScreenLoadingCenter } from "../../components/shared";
 import { formInputStyle } from "../pets/MyPets/helpers";
 import {
   DOG_ICON_SIZES,
@@ -460,9 +460,7 @@ export function ProviderProfileScreen() {
   if (loading) {
     return (
       <SafeAreaView edges={["top"]} style={[s.flex, { backgroundColor: colors.background }]}>
-        <View style={s.centerContent}>
-          <ActivityIndicator size="large" color={colors.text} />
-        </View>
+        <ScreenLoadingCenter title={`${t("providerProfileTitle")}…`} />
       </SafeAreaView>
     );
   }

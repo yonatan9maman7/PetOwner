@@ -16,6 +16,7 @@ import { useTheme } from "../../theme/ThemeContext";
 import { useAuthStore } from "../../store/authStore";
 import { useBookingsStore } from "../../store/bookingsStore";
 import { bookingsApi } from "../../api/client";
+import { ScreenLoadingCenter } from "../../components/shared/ScreenLoadingCenter";
 import type { BookingDto } from "../../types/api";
 
 const STATUS_COLORS: Record<string, { bg: string; text: string }> = {
@@ -682,9 +683,7 @@ export function MyBookingsScreen() {
       )}
 
       {loading ? (
-        <View className="flex-1 items-center justify-center">
-          <ActivityIndicator size="large" color={colors.text} />
-        </View>
+        <ScreenLoadingCenter title={`${t("myBookings")}…`} />
       ) : bookings.length === 0 ? (
         <View className="flex-1 items-center justify-center px-10">
           <Ionicons

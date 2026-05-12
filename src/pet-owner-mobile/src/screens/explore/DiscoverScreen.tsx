@@ -27,7 +27,7 @@ import { mapApi } from "../../api/client";
 import { getNormalizedApiError } from "../../utils/apiUtils";
 import { showApiErrorToast } from "../../services/apiErrorToast";
 import { ProviderType, type MapPinDto, type MapSearchFilters } from "../../types/api";
-import { PawLoadingSpinner } from "../../components/shared/PawLoadingSpinner";
+import { ScreenLoadingCenter } from "../../components/shared/ScreenLoadingCenter";
 
 /* ─── Category chip definitions ─── */
 
@@ -181,6 +181,8 @@ function FloatingRatingBadge({
   );
 }
 
+const ItemSeparator = () => <View style={{ height: 6 }} />;
+
 /* ══════════════════ MAIN SCREEN ══════════════════ */
 
 export function DiscoverScreen() {
@@ -292,6 +294,7 @@ export function DiscoverScreen() {
 
   useEffect(() => {
     return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
       providersAbortRef.current?.abort();
     };
   }, []);
@@ -373,6 +376,10 @@ export function DiscoverScreen() {
     () => createStyles(colors, Platform.OS === "android"),
     [colors],
   );
+
+  const onRefresh = useCallback(() => {
+    void loadProviders(searchQuery);
+  }, [loadProviders, searchQuery]);
 
   const renderCard = useCallback(
     ({ item, index }: { item: MapPinDto; index: number }) => (
@@ -589,9 +596,8 @@ export function DiscoverScreen() {
       {/* ── Provider cards list (loading / empty / list are mutually exclusive) ── */}
       <View style={c.listArea}>
       {loading ? (
-        <View style={[c.emptyWrap, c.listFlexGrow, { justifyContent: "center", flex: 1, gap: 16 }]}>
-          <PawLoadingSpinner size={80} />
-          <Text style={[styles.emptySubtitle]}>{t("loadingProviders")}</Text>
+        <View style={[c.emptyWrap, c.listFlexGrow, { justifyContent: "center", flex: 1 }]}>
+          <ScreenLoadingCenter fill={false} title={t("loadingProviders")} />
         </View>
       ) : filteredProviders.length === 0 ? (
         <View style={[c.emptyWrap, c.listFlexGrow, { flex: 1, justifyContent: "center" }]}>
@@ -641,11 +647,13 @@ export function DiscoverScreen() {
           style={c.listFlexGrow}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
-          ItemSeparatorComponent={() => <View style={{ height: 6 }} />}
-          onRefresh={() => {
-            void loadProviders(searchQuery);
-          }}
+          ItemSeparatorComponent={ItemSeparator}
+          onRefresh={onRefresh}
           refreshing={false}
+          initialNumToRender={8}
+          maxToRenderPerBatch={8}
+          windowSize={5}
+          removeClippedSubviews
         />
       )}
       </View>

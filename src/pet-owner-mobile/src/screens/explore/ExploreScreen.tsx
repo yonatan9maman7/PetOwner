@@ -39,7 +39,7 @@ import { useFocusEffect, useNavigation, useRoute } from "@react-navigation/nativ
 import * as Location from "expo-location";
 import { LinearGradient } from "expo-linear-gradient";
 import { BRAND_HEADER_HORIZONTAL_PAD } from "../../components/BrandedAppHeader";
-import { PawLoadingSpinner } from "../../components/shared/PawLoadingSpinner";
+import { ScreenLoadingCenter } from "../../components/shared/ScreenLoadingCenter";
 
 /** Tight crop of `petcare-logo-transparent.png` (Explore header only). */
 const EXPLORE_HEADER_LOGO = require("../../../assets/petcare-logo-header-trimmed.png");
@@ -544,10 +544,15 @@ export function ExploreScreen() {
 
   /* ─── Request location ─── */
   useEffect(() => {
-    let sub: Location.LocationSubscription | null = null;
+    let active = true;
+    // Track the subscription promise so cleanup can call .remove() even if
+    // the component unmounts before watchPositionAsync resolves (race condition fix).
+    let subPromise: Promise<Location.LocationSubscription> | null = null;
+
     (async () => {
       try {
         const { status } = await Location.requestForegroundPermissionsAsync();
+        if (!active) return;
         if (status !== "granted") {
           setLocationHint("denied");
           return;
@@ -555,13 +560,14 @@ export function ExploreScreen() {
         setLocationHint("none");
 
         // Subscribe to position updates so the blue dot + circle stay live.
-        sub = await Location.watchPositionAsync(
+        subPromise = Location.watchPositionAsync(
           {
             accuracy: Location.Accuracy.Balanced,
             timeInterval: 5000,
             distanceInterval: 10,
           },
           (loc) => {
+            if (!active) return;
             const { latitude, longitude } = loc.coords;
             // Only update state (and therefore re-render the dot/circle) when the
             // user physically moves ≥ 10 m. GPS jitter while stationary produces
@@ -595,9 +601,18 @@ export function ExploreScreen() {
             }
           },
         );
+        const sub = await subPromise;
+        // If we unmounted while the promise was in-flight, remove immediately.
+        if (!active) sub.remove();
       } catch {}
     })();
-    return () => { sub?.remove(); };
+
+    return () => {
+      active = false;
+      // If subPromise is still pending (unmounted before watchPositionAsync resolved),
+      // remove the subscription as soon as it resolves.
+      subPromise?.then((sub) => sub.remove()).catch(() => {});
+    };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -793,6 +808,7 @@ export function ExploreScreen() {
       if (moveDebounceRef.current) clearTimeout(moveDebounceRef.current);
       pinsAbortRef.current?.abort();
       dogParksAbortRef.current?.abort();
+      playdateAbortRef.current?.abort();
     };
   }, []);
 
@@ -1564,10 +1580,7 @@ export function ExploreScreen() {
       {/* Loading — do not block touches; map/header stay usable while pins load */}
       {loading && (
         <View style={styles.loadingOverlay} pointerEvents="none">
-          <View style={{ alignItems: "center", gap: 16 }}>
-            <PawLoadingSpinner size={80} />
-            <Text style={{ fontSize: 15, color: colors.textMuted, fontWeight: "500" }}>{t("exploreTitle")}…</Text>
-          </View>
+          <ScreenLoadingCenter fill={false} title={`${t("exploreTitle")}…`} />
         </View>
       )}
 
