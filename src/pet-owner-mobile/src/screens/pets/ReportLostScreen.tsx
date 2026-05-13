@@ -30,6 +30,7 @@ import { usePetsStore } from "../../store/petsStore";
 import { filesApi } from "../../api/client";
 import { useTranslation, rowDirectionForAppLayout } from "../../i18n";
 import { useTheme } from "../../theme/ThemeContext";
+import { navigateToLoginClearingStack } from "../../navigation/navigateToLoginClearingStack";
 import { PetSpecies } from "../../types/api";
 import type { PetDto } from "../../types/api";
 import { getSpeciesEmoji } from "./MyPets/constants";
@@ -299,7 +300,7 @@ export function ReportLostScreen() {
             {t("reportLostNeedLogin")}
           </Text>
           <Pressable
-            onPress={() => navigation.navigate("Login")}
+            onPress={() => navigateToLoginClearingStack(navigation)}
             style={{
               marginTop: 32,
               height: 56,

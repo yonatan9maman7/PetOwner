@@ -7,6 +7,7 @@ import { servicesForProviderType } from "./constants";
 import { FieldLabel } from "./FieldLabel";
 import { DogSizeCapacityFields } from "./DogSizeCapacityFields";
 import type { OnboardingFormValues } from "./schemas";
+import { grossFromProviderNet } from "../../utils/pricingDisplay";
 
 export function ServicesStep() {
   const { t, isRTL } = useTranslation();
@@ -92,7 +93,7 @@ export function ServicesStep() {
 
             {state.enabled && (
               <View style={{ marginTop: 12 }}>
-                <FieldLabel text={t("priceLabel")} isRTL={isRTL} required variant="small" />
+                <FieldLabel text={t("providerNetEarningsLabel")} isRTL={isRTL} required variant="small" />
                 <View
                   style={{
                     flexDirection: rowDirectionForAppLayout(isRTL),
@@ -122,6 +123,28 @@ export function ServicesStep() {
                 />
                 <Text style={{ fontSize: 12, color: colors.textSecondary }}>{t(svc.unitKey)}</Text>
               </View>
+                {(() => {
+                  const raw = String(state.rate ?? "").replace(",", ".").trim();
+                  const net = parseFloat(raw);
+                  if (!Number.isFinite(net) || net <= 0) return null;
+                  const gross = grossFromProviderNet(net);
+                  const hint = t("providerPriceEarningsHint")
+                    .replace("{{net}}", net.toFixed(2))
+                    .replace("{{gross}}", gross.toFixed(2));
+                  return (
+                    <Text
+                      style={{
+                        marginTop: 8,
+                        fontSize: 12,
+                        lineHeight: 17,
+                        color: colors.textSecondary,
+                        textAlign: isRTL ? "right" : "left",
+                      }}
+                    >
+                      {hint}
+                    </Text>
+                  );
+                })()}
               </View>
             )}
           </View>

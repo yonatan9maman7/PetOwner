@@ -26,6 +26,7 @@ import { SmartCalendarPicker } from "../../components/shared/SmartCalendarPicker
 import { TimeSlotSelector } from "../../components/shared/TimeSlotSelector";
 import { ScreenLoadingCenter } from "../../components/shared/ScreenLoadingCenter";
 import { usePetsStore } from "../../store/petsStore";
+import { customerPriceBreakdownFromProviderNet } from "../../utils/pricingDisplay";
 
 const SERVICE_TYPE_BY_ORDINAL: Record<number, ServiceType> = {
   0: ServiceType.DogWalking,
@@ -514,7 +515,7 @@ export function BookingScreen() {
     );
   };
 
-  const estimatedPrice = useMemo(() => {
+  const estimatedPricing = useMemo(() => {
     if (!selectedRate || !startDate || !startTime) return null;
     const billingMode = getBillingMode(sr);
     if (!fixedDurationMinutes) {
@@ -532,8 +533,10 @@ export function BookingScreen() {
       fixedDurationMinutes,
       sr?.pricingUnit ?? sr?.PricingUnit,
     );
-    const total = applyPetMultiplier(lineTotal, selectedPetIds.length);
-    return total > 0 ? total : null;
+    const providerNet = applyPetMultiplier(lineTotal, selectedPetIds.length);
+    if (providerNet <= 0) return null;
+    const { gross, fee, total } = customerPriceBreakdownFromProviderNet(providerNet);
+    return { providerNet, gross, fee, total };
   }, [
     selectedRate,
     sr,
@@ -1028,8 +1031,8 @@ export function BookingScreen() {
           )}
         </View>
 
-        {/* Price Estimate */}
-        {estimatedPrice !== null && (
+        {/* Price estimate (server uses same net → gross + fee model) */}
+        {estimatedPricing !== null && (
           <View
             className="rounded-2xl p-5 mb-5"
             style={{
@@ -1041,12 +1044,57 @@ export function BookingScreen() {
               elevation: 2,
             }}
           >
-            <Text style={[rtlText, { color: colors.text, fontSize: 14, fontWeight: "700", marginBottom: 4 }]}>
+            <Text style={[rtlText, { color: colors.text, fontSize: 14, fontWeight: "700", marginBottom: 12 }]}>
               {t("estimatedPrice")}
             </Text>
-            <Text style={{ fontSize: 28, fontWeight: "800", color: colors.text, textAlign: "center", marginTop: 4 }}>
-              ₪{estimatedPrice.toFixed(2)}
-            </Text>
+            <View style={{ gap: 8 }}>
+              <View
+                style={{
+                  flexDirection: rowDirectionForAppLayout(isRTL),
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                }}
+              >
+                <Text style={[rtlText, { flex: 1, fontSize: 14, color: colors.textSecondary, paddingEnd: 8 }]}>
+                  {t("bookingBreakdownBase")}
+                </Text>
+                <Text style={{ fontSize: 15, fontWeight: "700", color: colors.text }}>
+                  ₪{estimatedPricing.gross.toFixed(2)}
+                </Text>
+              </View>
+              <View
+                style={{
+                  flexDirection: rowDirectionForAppLayout(isRTL),
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                }}
+              >
+                <Text style={[rtlText, { flex: 1, fontSize: 14, color: colors.textSecondary, paddingEnd: 8 }]}>
+                  {t("bookingBreakdownFee")}
+                </Text>
+                <Text style={{ fontSize: 15, fontWeight: "700", color: colors.text }}>
+                  ₪{estimatedPricing.fee.toFixed(2)}
+                </Text>
+              </View>
+              <View
+                style={{
+                  marginTop: 4,
+                  paddingTop: 12,
+                  borderTopWidth: 1,
+                  borderTopColor: colors.borderLight,
+                  flexDirection: rowDirectionForAppLayout(isRTL),
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                }}
+              >
+                <Text style={[rtlText, { flex: 1, fontSize: 15, fontWeight: "800", color: colors.text, paddingEnd: 8 }]}>
+                  {t("bookingBreakdownTotal")}
+                </Text>
+                <Text style={{ fontSize: 18, fontWeight: "800", color: colors.primary }}>
+                  ₪{estimatedPricing.total.toFixed(2)}
+                </Text>
+              </View>
+            </View>
           </View>
         )}
 
@@ -1141,7 +1189,7 @@ export function BookingScreen() {
               <Ionicons name="checkmark-circle" size={20} color={colors.textInverse} />
               <Text style={{ color: colors.textInverse, fontSize: 16, fontWeight: "700" }}>
                 {t("confirmBooking")}
-                {estimatedPrice !== null ? ` — ₪${estimatedPrice.toFixed(2)}` : ""}
+                {estimatedPricing !== null ? ` — ₪${estimatedPricing.total.toFixed(2)}` : ""}
               </Text>
             </>
           )}

@@ -88,14 +88,12 @@ public class WebhooksController : ControllerBase
             return Ok(new { message = "Booking not found; ignored." });
         }
 
-        // Idempotency: if we already processed this txn (or the booking is already paid with the
-        // same txn), return 200 OK without double-processing.
-        if (booking.PaymentStatus == PaymentStatus.Paid &&
-            !string.IsNullOrEmpty(booking.TransactionId) &&
-            string.Equals(booking.TransactionId, transactionCode, StringComparison.Ordinal))
+        // Idempotency: terminal Paid state — return 200 OK without DB updates (duplicate or conflicting txn codes).
+        if (booking.PaymentStatus == PaymentStatus.Paid)
         {
             _logger.LogInformation(
-                "Grow webhook duplicate for booking {BookingId}, txn {Txn}; already Paid.", bookingId, transactionCode);
+                "Grow webhook: booking {BookingId} already Paid (stored txn={Stored}, incoming txn={Incoming}); treating as duplicate.",
+                bookingId, booking.TransactionId, transactionCode);
             return Ok(new { message = "Already processed." });
         }
 

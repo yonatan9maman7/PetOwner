@@ -9,6 +9,16 @@ public class Booking
     public DateTime StartDate { get; set; }
     public DateTime EndDate { get; set; }
     public decimal TotalPrice { get; set; }
+
+    /// <summary>Provider net for this booking (sum over pets × duration at net rate).</summary>
+    public decimal ProviderNetAmount { get; set; }
+
+    /// <summary>Customer-facing subtotal before 4% service fee (gross after 10% platform commission on net).</summary>
+    public decimal GrossAmount { get; set; }
+
+    /// <summary>4% customer service fee on <see cref="GrossAmount"/>.</summary>
+    public decimal ServiceFee { get; set; }
+
     public BookingStatus Status { get; set; } = BookingStatus.Pending;
     public PaymentStatus PaymentStatus { get; set; } = PaymentStatus.Pending;
     public string? PaymentUrl { get; set; }

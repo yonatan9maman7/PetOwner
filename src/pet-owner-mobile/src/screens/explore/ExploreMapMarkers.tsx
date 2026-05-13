@@ -23,7 +23,7 @@ const ICON_SIZE = 18;
 const CLUSTER_OUTER_SIZE = 60;
 const CLUSTER_INNER_SIZE = 44;
 const CLUSTER_ICON_SIZE = 20;
-const TRACKS_TIMEOUT_MS = 1000;
+const TRACKS_TIMEOUT_MS = Platform.OS === "android" ? 2000 : 1000;
 
 /** Ionicons paw artwork uses a 512 canvas; scale circle to match `PAW_INNER_SIZE` inside `MARKER_OUTER_SIZE`. */
 const PAW_SVG_VIEWBOX = 512;

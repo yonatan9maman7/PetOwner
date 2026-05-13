@@ -49,11 +49,19 @@ public class AuthController : ControllerBase
         var emailNorm = NormalizeEmail(dto.Email);
         var emailExists = await _db.Users.AnyAsync(u => u.Email.ToLower() == emailNorm);
         if (emailExists)
-            return BadRequest(new { message = "A user with this email already exists." });
+            return Conflict(new
+            {
+                message = "This email address is already registered.",
+                code = "EMAIL_ALREADY_REGISTERED"
+            });
 
         var phoneExists = await _db.Users.AnyAsync(u => u.Phone == dto.Phone);
         if (phoneExists)
-            return BadRequest(new { message = "This phone number is already registered." });
+            return Conflict(new
+            {
+                message = "This phone number is already registered.",
+                code = "PHONE_ALREADY_REGISTERED"
+            });
 
         var user = new User
         {
@@ -94,10 +102,18 @@ public class AuthController : ControllerBase
 
         if (user is null || string.IsNullOrEmpty(user.PasswordHash) ||
             !BCrypt.Net.BCrypt.Verify(dto.Password, user.PasswordHash))
-            return Unauthorized(new { message = "Invalid email or password." });
+            return Unauthorized(new
+            {
+                message = "Invalid email or password.",
+                code = "INVALID_CREDENTIALS"
+            });
 
         if (!user.IsActive)
-            return Unauthorized(new { message = "Your account has been suspended. Please contact support." });
+            return Unauthorized(new
+            {
+                message = "Your account has been suspended. Please contact support.",
+                code = "ACCOUNT_SUSPENDED"
+            });
 
         var token = _tokenService.GenerateAccessToken(user);
         return Ok(new { token, userId = user.Id });
@@ -115,7 +131,7 @@ public class AuthController : ControllerBase
         {
             var claims = await _googleValidator.ValidateAsync(dto.IdToken);
             if (claims is null)
-                return Unauthorized(new { message = "Invalid social token." });
+                return Unauthorized(new { message = "Invalid social token.", code = "INVALID_SOCIAL_TOKEN" });
 
             providerUserId = claims.Subject;
             providerEmail = claims.Email;
@@ -125,14 +141,14 @@ public class AuthController : ControllerBase
         {
             var claims = await _appleValidator.ValidateAsync(dto.IdToken, dto.RawNonce);
             if (claims is null)
-                return Unauthorized(new { message = "Invalid social token." });
+                return Unauthorized(new { message = "Invalid social token.", code = "INVALID_SOCIAL_TOKEN" });
 
             providerUserId = claims.Subject;
             providerEmail = claims.Email;
         }
         else
         {
-            return BadRequest(new { message = "Unsupported provider." });
+            return BadRequest(new { message = "Unsupported provider.", code = "UNSUPPORTED_AUTH_PROVIDER" });
         }
 
         bool isGoogle = dto.Provider.Equals("Google", StringComparison.OrdinalIgnoreCase);
@@ -153,7 +169,11 @@ public class AuthController : ControllerBase
                 if (!string.IsNullOrEmpty(user.PasswordHash))
                 {
                     // Password user — do not auto-link
-                    return Conflict(new { message = "Please log in with your password." });
+                    return Conflict(new
+                    {
+                        message = "Please log in with your password.",
+                        code = "PASSWORD_ACCOUNT_EXISTS"
+                    });
                 }
 
                 // Social-only user: attach this provider
@@ -196,7 +216,11 @@ public class AuthController : ControllerBase
         }
 
         if (!user.IsActive)
-            return Unauthorized(new { message = "Your account has been suspended. Please contact support." });
+            return Unauthorized(new
+            {
+                message = "Your account has been suspended. Please contact support.",
+                code = "ACCOUNT_SUSPENDED"
+            });
 
         var token = _tokenService.GenerateAccessToken(user);
         return Ok(new { token, userId = user.Id, requiresPhone = user.Phone == null });
@@ -209,35 +233,39 @@ public class AuthController : ControllerBase
         var emailNorm = NormalizeEmail(dto.Email);
         var user = await _db.Users.FirstOrDefaultAsync(u => u.Email.ToLower() == emailNorm);
 
-        if (user is not null)
-        {
-            var tokenBytes = RandomNumberGenerator.GetBytes(32);
-            var resetToken = Convert.ToBase64String(tokenBytes);
+        if (user is null)
+            return NotFound(new
+            {
+                message = "No account found with this email address.",
+                code = "USER_NOT_FOUND"
+            });
 
-            user.ResetPasswordToken = resetToken;
-            user.ResetPasswordTokenExpiry = DateTime.UtcNow.AddHours(1);
-            await _db.SaveChangesAsync();
+        var tokenBytes = RandomNumberGenerator.GetBytes(32);
+        var resetToken = Convert.ToBase64String(tokenBytes);
 
-            var encodedToken = Uri.EscapeDataString(resetToken);
-            var encodedEmail = Uri.EscapeDataString(emailNorm);
-            var baseUrl = (_config["FrontendBaseUrl"] ?? "http://localhost:4200").TrimEnd('/');
-            var resetLink = $"{baseUrl}/reset-password?token={encodedToken}&email={encodedEmail}";
+        user.ResetPasswordToken = resetToken;
+        user.ResetPasswordTokenExpiry = DateTime.UtcNow.AddHours(1);
+        await _db.SaveChangesAsync();
 
-            _logger.LogInformation(
-                "Password reset requested for {Email}. Dev/test reset link: {ResetLink}",
-                emailNorm,
-                resetLink);
+        var encodedToken = Uri.EscapeDataString(resetToken);
+        var encodedEmail = Uri.EscapeDataString(emailNorm);
+        var baseUrl = (_config["FrontendBaseUrl"] ?? "http://localhost:4200").TrimEnd('/');
+        var resetLink = $"{baseUrl}/reset-password?token={encodedToken}&email={encodedEmail}";
 
-            const string subject = "איפוס סיסמה למערכת";
-            var body =
-                $"<div dir='rtl' style='text-align: right; font-family: sans-serif;'><h2>שלום,</h2>" +
-                "<p>קיבלנו בקשה לאיפוס הסיסמה שלך.</p>" +
-                "<p>לחיצה על הקישור הבא תוביל אותך למסך איפוס הסיסמה:</p>" +
-                $"<p><a href='{resetLink}'>לחץ כאן לאיפוס הסיסמה</a></p>" +
-                "<p>אם לא ביקשת לאפס את הסיסמה, התעלם מהודעה זו.</p></div>";
+        _logger.LogInformation(
+            "Password reset requested for {Email}. Dev/test reset link: {ResetLink}",
+            emailNorm,
+            resetLink);
 
-            await _emailService.SendEmailAsync(emailNorm, subject, body);
-        }
+        const string subject = "איפוס סיסמה למערכת";
+        var body =
+            $"<div dir='rtl' style='text-align: right; font-family: sans-serif;'><h2>שלום,</h2>" +
+            "<p>קיבלנו בקשה לאיפוס הסיסמה שלך.</p>" +
+            "<p>לחיצה על הקישור הבא תוביל אותך למסך איפוס הסיסמה:</p>" +
+            $"<p><a href='{resetLink}'>לחץ כאן לאיפוס הסיסמה</a></p>" +
+            "<p>אם לא ביקשת לאפס את הסיסמה, התעלם מהודעה זו.</p></div>";
+
+        await _emailService.SendEmailAsync(emailNorm, subject, body);
 
         return Ok(new { message = "If the email exists in our system, a reset link has been sent." });
     }

@@ -41,6 +41,7 @@ import { pickImageWithSource } from "../../utils/imagePicker";
 import { getNormalizedApiError } from "../../utils/apiUtils";
 import { showApiErrorToast } from "../../services/apiErrorToast";
 import { useKeyboardAvoidingState } from "../../hooks/useKeyboardAvoidingState";
+import { grossFromProviderNet } from "../../utils/pricingDisplay";
 
 const NAVY = "#001a5a";
 const DEFAULT_LAT = 32.0809;
@@ -113,6 +114,7 @@ function ServiceRow({
   onDeletePackage,
   onAddPackagePress,
   t,
+  isRTL,
 }: {
   service: ServiceDef;
   state: ServiceState;
@@ -121,6 +123,7 @@ function ServiceRow({
   onDeletePackage: (pkgId: string) => void;
   onAddPackagePress: () => void;
   t: (key: TranslationKey) => string;
+  isRTL: boolean;
 }) {
   const { colors } = useTheme();
 
@@ -161,7 +164,7 @@ function ServiceRow({
           </Text>
           {state.enabled && (
             <Text style={{ fontSize: 11, color: colors.textMuted, marginTop: 1 }}>
-              {t(service.unitKey)}
+              {t("providerNetEarningsLabel")} · {t(service.unitKey)}
             </Text>
           )}
         </View>
@@ -216,6 +219,31 @@ function ServiceRow({
           style={{ transform: [{ scale: 0.8 }], marginLeft: 8 }}
         />
       </View>
+
+      {state.enabled && (() => {
+        const raw = String(state.rate ?? "").trim();
+        const net = parseFloat(raw);
+        if (!Number.isFinite(net) || net <= 0) return null;
+        const gross = grossFromProviderNet(net);
+        const hint = t("providerPriceEarningsHint")
+          .replace("{{net}}", net.toFixed(2))
+          .replace("{{gross}}", gross.toFixed(2));
+        return (
+          <Text
+            style={{
+              marginTop: 8,
+              marginLeft: isRTL ? 0 : 52,
+              marginRight: isRTL ? 52 : 0,
+              fontSize: 11,
+              lineHeight: 15,
+              color: colors.textSecondary,
+              textAlign: isRTL ? "right" : "left",
+            }}
+          >
+            {hint}
+          </Text>
+        );
+      })()}
 
       {/* Packages section (visible only when service is enabled) */}
       {state.enabled && (
@@ -1635,6 +1663,7 @@ export function ProviderEditScreen() {
                     onDeletePackage={(pkgId) => deletePackage(svc.serviceType, pkgId)}
                     onAddPackagePress={() => setPkgModalServiceType(svc.serviceType)}
                     t={t}
+                    isRTL={isRTL}
                   />
                 ))}
                 {showDogSizeCapacity && (

@@ -971,6 +971,12 @@ export interface BookingDto {
   startDate: string;
   endDate: string;
   totalPrice: number;
+  /** Provider net for this booking (server-computed). */
+  providerNetAmount: number;
+  /** Customer subtotal before 4% service fee. */
+  grossAmount: number;
+  /** 4% customer service fee on gross. */
+  serviceFee: number;
   pricingUnit: string;
   status: string;
   paymentStatus: string;

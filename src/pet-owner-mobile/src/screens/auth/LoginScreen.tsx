@@ -25,7 +25,7 @@ import * as Google from "expo-auth-session/providers/google";
 import { useAuthStore } from "../../store/authStore";
 import { useTranslation } from "../../i18n";
 import { getNormalizedApiError } from "../../utils/apiUtils";
-import { showApiErrorToast } from "../../services/apiErrorToast";
+import { mapAuthApiErrorToTranslationKey } from "../../utils/authErrorI18n";
 import { LanguageToggle } from "../../components/LanguageToggle";
 import { authApi } from "../../api/client";
 import { useTheme } from "../../theme/ThemeContext";
@@ -172,6 +172,7 @@ function LoginForm() {
   const [bioLoading, setBioLoading] = useState(false);
   const [socialLoading, setSocialLoading] = useState(false);
   const [secureEntry, setSecureEntry] = useState(true);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [bioEnabled, setBioEnabled] = useState(false);
   const [bioTypeLabel, setBioTypeLabel] = useState<biometricService.BiometricTypeLabel>("generic");
   const [autoPromptDone, setAutoPromptDone] = useState(false);
@@ -185,6 +186,8 @@ function LoginForm() {
     useTranslation();
   const { colors } = useTheme();
   const { behavior: keyboardAvoidBehavior } = useKeyboardAvoidingState();
+
+  const clearAuthError = useCallback(() => setErrorMessage(null), []);
 
   const showGoogleButton = hasGoogleOAuthEnvForCurrentPlatform();
   const showSocialSection = Platform.OS === "ios" || showGoogleButton;
@@ -256,13 +259,7 @@ function LoginForm() {
         // Stored password is stale (changed elsewhere) — wipe and fall back.
         await biometricService.disable();
         setBioEnabled(false);
-        showApiErrorToast({
-          message: t("biometricFailedFallback"),
-          title: t("errorTitle"),
-          isConnectivityError: false,
-          isAuthError: true,
-          isServerError: false,
-        });
+        setErrorMessage(t("biometricFailedFallback"));
         emailRef.current?.focus();
       } else if (
         typeof err === "object" &&
@@ -270,7 +267,8 @@ function LoginForm() {
         "response" in err &&
         (err as { response?: unknown }).response
       ) {
-        showApiErrorToast(getNormalizedApiError(err));
+        const key = mapAuthApiErrorToTranslationKey(getNormalizedApiError(err));
+        setErrorMessage(t(key));
       }
       // Unexpected biometric / SecureStore errors: authenticateAndGetCredentials already showed "Biometric Error".
     } finally {
@@ -285,13 +283,15 @@ function LoginForm() {
       return;
     }
 
+    setErrorMessage(null);
     setLoading(true);
     try {
       const data = await authApi.login({ email, password });
       await setAuth(data.token, data.userId);
       navigation.navigate("Explore");
     } catch (err: unknown) {
-      showApiErrorToast(getNormalizedApiError(err));
+      const key = mapAuthApiErrorToTranslationKey(getNormalizedApiError(err));
+      setErrorMessage(t(key));
     } finally {
       setLoading(false);
     }
@@ -303,6 +303,7 @@ function LoginForm() {
     options?: { givenName?: string; familyName?: string; rawNonce?: string }
   ) => {
     setSocialLoading(true);
+    setErrorMessage(null);
     try {
       const data = await authApi.socialLogin({
         provider,
@@ -311,22 +312,8 @@ function LoginForm() {
       });
       await setAuth(data.token, data.userId, data.requiresPhone);
     } catch (err: unknown) {
-      const status =
-        typeof err === "object" &&
-        err !== null &&
-        "response" in err &&
-        (err as { response?: { status?: number } }).response?.status;
-      if (status === 409) {
-        showApiErrorToast({
-          message: t("socialLoginEmailExists"),
-          title: t("errorTitle"),
-          isConnectivityError: false,
-          isAuthError: false,
-          isServerError: false,
-        });
-      } else {
-        showApiErrorToast(getNormalizedApiError(err));
-      }
+      const key = mapAuthApiErrorToTranslationKey(getNormalizedApiError(err));
+      setErrorMessage(t(key));
     } finally {
       setSocialLoading(false);
     }
@@ -572,7 +559,10 @@ function LoginForm() {
                 placeholder={t("emailPlaceholder")}
                 placeholderTextColor={colors.textMuted}
                 value={email}
-                onChangeText={setEmail}
+                onChangeText={(v) => {
+                  clearAuthError();
+                  setEmail(v);
+                }}
                 keyboardType="email-address"
                 autoCapitalize="none"
                 autoComplete="email"
@@ -623,7 +613,10 @@ function LoginForm() {
                 placeholder={t("passwordPlaceholder")}
                 placeholderTextColor={colors.textMuted}
                 value={password}
-                onChangeText={setPassword}
+                onChangeText={(v) => {
+                  clearAuthError();
+                  setPassword(v);
+                }}
                 secureTextEntry={secureEntry}
                 returnKeyType="done"
                 onSubmitEditing={handleLogin}
@@ -643,7 +636,7 @@ function LoginForm() {
 
           {/* ── Forgot Password Link ── */}
           <Pressable
-            className="mb-6"
+            className="mb-2"
             style={trailingFormLinkAlign}
             hitSlop={8}
             onPress={() => navigation.navigate("ForgotPasswordScreen")}
@@ -652,6 +645,25 @@ function LoginForm() {
               {t("forgotPassword")}
             </Text>
           </Pressable>
+
+          {errorMessage ? (
+            <Text
+              accessibilityRole="alert"
+              style={[
+                rtlText,
+                {
+                  color: colors.danger,
+                  marginBottom: 14,
+                  textAlign: isHebrew ? "right" : "left",
+                },
+              ]}
+              className="text-sm leading-5 px-1"
+            >
+              {errorMessage}
+            </Text>
+          ) : (
+            <View style={{ height: 10 }} />
+          )}
 
           {/* ── Sign-In Button ── */}
           <Pressable
@@ -706,6 +718,7 @@ function LoginForm() {
               {autoPromptDone && (
                 <Pressable
                   onPress={() => {
+                    clearAuthError();
                     setAutoPromptDone(false);
                     emailRef.current?.focus();
                   }}
@@ -763,15 +776,7 @@ function LoginForm() {
                     colors={colors}
                     rtlRow={rtlRow}
                     onIdToken={(idToken) => void handleSocialLoginToken("Google", idToken)}
-                    onFlowError={() =>
-                      showApiErrorToast({
-                        message: t("socialLoginFailed"),
-                        title: t("errorTitle"),
-                        isConnectivityError: false,
-                        isAuthError: false,
-                        isServerError: false,
-                      })
-                    }
+                    onFlowError={() => setErrorMessage(t("socialLoginFailed"))}
                   />
                 )}
               </View>

@@ -23,7 +23,7 @@ import { authApi } from "../../api/client";
 import { useTheme } from "../../theme/ThemeContext";
 import { useKeyboardAvoidingState } from "../../hooks/useKeyboardAvoidingState";
 import { getNormalizedApiError } from "../../utils/apiUtils";
-import { showApiErrorToast } from "../../services/apiErrorToast";
+import { mapAuthApiErrorToTranslationKey } from "../../utils/authErrorI18n";
 
 const AUTH_PETCARE_HERO_LOGO = require("../../../assets/petcare-logo-transparent.png");
 
@@ -35,7 +35,10 @@ export function RegisterScreen() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [secureEntry, setSecureEntry] = useState(true);
+
+  const clearAuthError = useCallback(() => setErrorMessage(null), []);
 
   const fullNameRef = useRef<TextInput>(null);
   const emailRef = useRef<TextInput>(null);
@@ -123,6 +126,7 @@ export function RegisterScreen() {
       return;
     }
 
+    setErrorMessage(null);
     setLoading(true);
     try {
       await authApi.register({
@@ -149,7 +153,8 @@ export function RegisterScreen() {
         ],
       );
     } catch (err: unknown) {
-      showApiErrorToast(getNormalizedApiError(err));
+      const key = mapAuthApiErrorToTranslationKey(getNormalizedApiError(err));
+      setErrorMessage(t(key));
     } finally {
       setLoading(false);
     }
@@ -320,7 +325,10 @@ export function RegisterScreen() {
                 placeholder={t("fullNamePlaceholder")}
                 placeholderTextColor={colors.textMuted}
                 value={fullName}
-                onChangeText={setFullName}
+                onChangeText={(v) => {
+                  clearAuthError();
+                  setFullName(v);
+                }}
                 autoCapitalize="words"
                 autoComplete="name"
                 returnKeyType="next"
@@ -365,7 +373,10 @@ export function RegisterScreen() {
                 placeholder={t("emailPlaceholder")}
                 placeholderTextColor={colors.textMuted}
                 value={email}
-                onChangeText={setEmail}
+                onChangeText={(v) => {
+                  clearAuthError();
+                  setEmail(v);
+                }}
                 keyboardType="email-address"
                 autoCapitalize="none"
                 autoComplete="email"
@@ -412,7 +423,10 @@ export function RegisterScreen() {
                 placeholder={t("phonePlaceholder")}
                 placeholderTextColor={colors.textMuted}
                 value={phone}
-                onChangeText={setPhone}
+                onChangeText={(v) => {
+                  clearAuthError();
+                  setPhone(v);
+                }}
                 keyboardType="phone-pad"
                 autoComplete="tel"
                 ref={phoneRef}
@@ -463,7 +477,10 @@ export function RegisterScreen() {
                 placeholder={t("passwordPlaceholder")}
                 placeholderTextColor={colors.textMuted}
                 value={password}
-                onChangeText={setPassword}
+                onChangeText={(v) => {
+                  clearAuthError();
+                  setPassword(v);
+                }}
                 secureTextEntry={secureEntry}
                 returnKeyType="next"
                 blurOnSubmit={false}
@@ -522,7 +539,10 @@ export function RegisterScreen() {
                 placeholder={t("confirmPasswordPlaceholder")}
                 placeholderTextColor={colors.textMuted}
                 value={confirmPassword}
-                onChangeText={setConfirmPassword}
+                onChangeText={(v) => {
+                  clearAuthError();
+                  setConfirmPassword(v);
+                }}
                 secureTextEntry={secureEntry}
                 returnKeyType="done"
                 onSubmitEditing={handleRegister}
@@ -544,7 +564,10 @@ export function RegisterScreen() {
           <Pressable
             style={rtlRow}
             className="items-center gap-3 mb-6"
-            onPress={() => setTermsAccepted((v) => !v)}
+            onPress={() => {
+              clearAuthError();
+              setTermsAccepted((v) => !v);
+            }}
           >
             <View
               className="w-5 h-5 rounded border-2 items-center justify-center"
@@ -568,6 +591,23 @@ export function RegisterScreen() {
               </Text>
             </Text>
           </Pressable>
+
+          {errorMessage ? (
+            <Text
+              accessibilityRole="alert"
+              style={[
+                rtlText,
+                {
+                  color: colors.danger,
+                  marginBottom: 12,
+                  textAlign: isHebrew ? "right" : "left",
+                },
+              ]}
+              className="text-sm leading-5 px-1"
+            >
+              {errorMessage}
+            </Text>
+          ) : null}
 
           {/* ── Register Button ── */}
           <Pressable

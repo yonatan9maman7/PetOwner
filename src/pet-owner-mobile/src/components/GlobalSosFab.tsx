@@ -19,6 +19,7 @@ import { useMyPetsUiStore } from "../store/myPetsUiStore";
 import { usePetsStore } from "../store/petsStore";
 import { useTranslation } from "../i18n";
 import { useTheme } from "../theme/ThemeContext";
+import { navigateToLoginClearingStack } from "../navigation/navigateToLoginClearingStack";
 
 /** Sits just above the tab bar. */
 const TAB_BAR_OFFSET = 72;
@@ -73,7 +74,7 @@ export function GlobalSosFab() {
     (then: () => void) => {
       if (!isLoggedIn) {
         setMenuOpen(false);
-        navigation.navigate("Login");
+        navigateToLoginClearingStack(navigation);
         return;
       }
       then();

@@ -17,17 +17,20 @@ public class BookingsController : ControllerBase
 {
     private readonly ApplicationDbContext _db;
     private readonly IGrowPaymentService _growPayment;
+    private readonly IPricingService _pricing;
     private readonly INotificationService _notifications;
     private readonly IAchievementService _achievements;
 
     public BookingsController(
         ApplicationDbContext db,
         IGrowPaymentService growPayment,
+        IPricingService pricing,
         INotificationService notifications,
         IAchievementService achievements)
     {
         _db = db;
         _growPayment = growPayment;
+        _pricing = pricing;
         _notifications = notifications;
         _achievements = achievements;
     }
@@ -102,10 +105,9 @@ public class BookingsController : ControllerBase
         if (currentPetCount + requestedPetIds.Count > serviceRate.MaxPetCapacity)
             return BadRequest(new { message = "The provider does not have enough pet capacity for this time slot." });
 
-        var lineTotal = CalculateTotalPrice(serviceRate, bookingStart, bookingEnd);
-        var totalPrice = lineTotal * pets.Count;
+        var breakdown = _pricing.Calculate(serviceRate, bookingStart, bookingEnd, pets.Count);
 
-        if (totalPrice <= 0)
+        if (breakdown.TotalAmountToPay <= 0)
             return BadRequest(new { message = "Calculated price must be greater than zero." });
 
         var owner = await _db.Users.FindAsync(ownerId);
@@ -119,7 +121,10 @@ public class BookingsController : ControllerBase
             Service = request.ServiceType,
             StartDate = bookingStart,
             EndDate = bookingEnd,
-            TotalPrice = totalPrice,
+            TotalPrice = breakdown.TotalAmountToPay,
+            ProviderNetAmount = breakdown.ProviderNetAmount,
+            GrossAmount = breakdown.GrossAmount,
+            ServiceFee = breakdown.ServiceFee,
             Status = BookingStatus.Pending,
             PaymentStatus = PaymentStatus.Pending,
             CreatedAt = DateTime.UtcNow,
@@ -305,27 +310,12 @@ public class BookingsController : ControllerBase
             b.Id, b.OwnerId, b.ProviderProfileId,
             providerName, ownerName,
             b.Service.ToString(), b.StartDate, b.EndDate,
-            b.TotalPrice, unit, b.Status.ToString(),
+            b.TotalPrice, b.ProviderNetAmount, b.GrossAmount, b.ServiceFee, unit, b.Status.ToString(),
             b.PaymentStatus.ToString(), b.PaymentUrl,
             b.CreatedAt, b.Notes,
             providerPhone, ownerPhone,
             b.Review is not null
         );
-    }
-
-    private static decimal CalculateTotalPrice(ProviderServiceRate rate, DateTime start, DateTime end)
-    {
-        return rate.Unit switch
-        {
-            PricingUnit.PerNight => rate.Rate * Math.Max(1, (end.Date - start.Date).Days),
-            PricingUnit.PerHour => rate.Rate * (decimal)Math.Max(0, (end - start).TotalHours),
-            PricingUnit.PerVisit => rate.Rate,
-            PricingUnit.PerSession when rate.FixedDurationMinutes is > 0 =>
-                rate.Rate * (decimal)Math.Max(0, (end - start).TotalHours),
-            PricingUnit.PerSession => rate.Rate,
-            PricingUnit.PerPackage => rate.Rate,
-            _ => 0m,
-        };
     }
 
     private Guid GetUserId() =>

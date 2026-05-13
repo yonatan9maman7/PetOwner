@@ -121,6 +121,10 @@ public class GrowPaymentService : IGrowPaymentService
             throw new InvalidOperationException("Grow:UserId is not configured.");
         if (string.IsNullOrWhiteSpace(_settings.ApiKey))
             throw new InvalidOperationException("Grow:ApiKey is not configured.");
+
+        if (string.IsNullOrWhiteSpace(_settings.CallbackUrl))
+            _logger.LogWarning(
+                "Grow:CallbackUrl is empty — notifyUrl will not be sent to Grow; payment status will rely on client polling only.");
     }
 
     private string BuildFullName(string? raw)

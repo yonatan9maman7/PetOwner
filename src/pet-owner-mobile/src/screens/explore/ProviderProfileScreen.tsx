@@ -19,11 +19,7 @@ import { showGlobalAlertCompat } from "../../components/global-modal";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
-import {
-  useNavigation,
-  useRoute,
-  CommonActions,
-} from "@react-navigation/native";
+import { useNavigation, useRoute } from "@react-navigation/native";
 import { useTranslation, rowDirectionForAppLayout } from "../../i18n";
 import { useAuthStore } from "../../store/authStore";
 import { useFavoritesStore } from "../../store/favoritesStore";
@@ -46,6 +42,7 @@ import {
 } from "../../features/provider-onboarding/dogSizeConstants";
 import { ReviewCard } from "./components/ReviewCard";
 import { ProviderShareCardCaptureView } from "./components/ProviderShareCardCaptureView";
+import { navigateToLoginClearingStack } from "../../navigation/navigateToLoginClearingStack";
 
 const DAY_KEYS = ["daySun", "dayMon", "dayTue", "dayWed", "dayThu", "dayFri", "daySat"] as const;
 
@@ -418,10 +415,7 @@ export function ProviderProfileScreen() {
   };
 
   const navigateToLogin = useCallback(() => {
-    navigation.goBack();
-    setTimeout(() => {
-      navigation.dispatch(CommonActions.navigate({ name: "Login" }));
-    }, 100);
+    navigateToLoginClearingStack(navigation);
   }, [navigation]);
 
   /* ─── Not logged in ─── */

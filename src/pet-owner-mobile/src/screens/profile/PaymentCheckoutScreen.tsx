@@ -18,17 +18,23 @@ import { useFocusEffect, useNavigation, useRoute } from "@react-navigation/nativ
 import { useTranslation, rowDirectionForAppLayout } from "../../i18n";
 import { useTheme } from "../../theme/ThemeContext";
 import { bookingsApi } from "../../api/client";
+import type { BookingDto } from "../../types/api";
 import { InlineError } from "../../components/shared/InlineError";
 
 /** Must match Grow / backend redirect URLs (intercepted in WebView, not loaded as real pages). */
 const SUCCESS_PREFIX = "https://petowner.app/payment/success";
 const CANCEL_PREFIX = "https://petowner.app/payment/cancel";
 
+const POLL_INTERVAL_MS = 1500;
+const POLL_TIMEOUT_MS = 15_000;
+
 export type PaymentCheckoutParams = {
   bookingId: string;
   paymentUrl: string;
   providerName: string;
 };
+
+type PostPayPhase = "idle" | "processing" | "verifying_manual";
 
 export function PaymentCheckoutScreen() {
   const navigation = useNavigation<any>();
@@ -45,8 +51,11 @@ export function PaymentCheckoutScreen() {
 
   const [webViewLoading, setWebViewLoading] = useState(true);
   const [webViewError, setWebViewError] = useState<string | null>(null);
-  /** idle = showing WebView; processing = success redirect, polling backend */
-  const [paymentPhase, setPaymentPhase] = useState<"idle" | "processing">("idle");
+  /** After success redirect: polling backend, then optional manual verify. */
+  const [postPayPhase, setPostPayPhase] = useState<PostPayPhase>("idle");
+  const [bookingDetail, setBookingDetail] = useState<BookingDto | null>(null);
+  const [detailLoadError, setDetailLoadError] = useState<string | null>(null);
+  const [refreshBusy, setRefreshBusy] = useState(false);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -56,39 +65,73 @@ export function PaymentCheckoutScreen() {
     };
   }, []);
 
-  const finishWithDelayedMessage = useCallback(() => {
-    showGlobalAlertCompat(t("paymentTitle"), t("paymentSuccessDelayed"), [
-      { text: t("confirmAction"), onPress: () => navigation.goBack() },
-    ]);
-  }, [navigation, t]);
+  const loadBookingDetail = useCallback(async () => {
+    try {
+      const b = await bookingsApi.getById(bookingId);
+      if (mountedRef.current) {
+        setBookingDetail(b);
+        setDetailLoadError(null);
+      }
+      return b;
+    } catch {
+      if (mountedRef.current) {
+        setDetailLoadError(t("genericErrorDesc"));
+      }
+      return null;
+    }
+  }, [bookingId, t]);
+
+  useEffect(() => {
+    void loadBookingDetail();
+  }, [loadBookingDetail]);
 
   const pollUntilPaid = useCallback(async () => {
-    for (let i = 0; i < 5; i++) {
-      if (pollCancelledRef.current || !mountedRef.current) return;
+    const deadline = Date.now() + POLL_TIMEOUT_MS;
+    while (!pollCancelledRef.current && mountedRef.current && Date.now() < deadline) {
       try {
         const b = await bookingsApi.getById(bookingId);
-        if (b.paymentStatus === "Paid") {
-          if (mountedRef.current) navigation.goBack();
-          return;
+        if (mountedRef.current) {
+          setBookingDetail(b);
+          if (b.paymentStatus === "Paid") {
+            navigation.goBack();
+            return;
+          }
         }
       } catch {
-        // continue polling; transient errors
+        // transient — continue until timeout
       }
-      if (i < 4 && mountedRef.current && !pollCancelledRef.current) {
-        await new Promise((r) => setTimeout(r, 1500));
-      }
+      if (pollCancelledRef.current || !mountedRef.current) return;
+      if (Date.now() >= deadline) break;
+      await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
     }
     if (mountedRef.current && !pollCancelledRef.current) {
-      finishWithDelayedMessage();
+      setPostPayPhase("verifying_manual");
     }
-  }, [bookingId, finishWithDelayedMessage, navigation]);
+  }, [bookingId, navigation]);
 
   const handlePaymentSuccess = useCallback(() => {
     if (handledRedirectRef.current) return;
     handledRedirectRef.current = true;
-    setPaymentPhase("processing");
+    setPostPayPhase("processing");
     void pollUntilPaid();
   }, [pollUntilPaid]);
+
+  const onRefreshStatusPress = useCallback(async () => {
+    setRefreshBusy(true);
+    try {
+      const b = await bookingsApi.getById(bookingId);
+      if (!mountedRef.current) return;
+      setBookingDetail(b);
+      if (b.paymentStatus === "Paid") {
+        navigation.goBack();
+        return;
+      }
+    } catch {
+      showGlobalAlertCompat(t("genericErrorTitle"), t("genericErrorDesc"));
+    } finally {
+      if (mountedRef.current) setRefreshBusy(false);
+    }
+  }, [bookingId, navigation, t]);
 
   const tryHandleRedirectUrl = useCallback(
     (url: string): boolean => {
@@ -120,10 +163,12 @@ export function PaymentCheckoutScreen() {
     webViewRef.current?.reload();
   }, []);
 
+  const awaitingPostPay = postPayPhase === "processing" || postPayPhase === "verifying_manual";
+
   useFocusEffect(
     useCallback(() => {
       const onHardwareBack = () => {
-        if (paymentPhase === "processing") {
+        if (awaitingPostPay) {
           pollCancelledRef.current = true;
           navigation.goBack();
           return true;
@@ -140,10 +185,87 @@ export function PaymentCheckoutScreen() {
       };
       const sub = BackHandler.addEventListener("hardwareBackPress", onHardwareBack);
       return () => sub.remove();
-    }, [navigation, paymentPhase, t]),
+    }, [navigation, awaitingPostPay, t]),
   );
 
   const headerTitle = `${t("paymentTitle")} · ${providerName ?? ""}`.trim();
+
+  const showItemized =
+    bookingDetail &&
+    (bookingDetail.grossAmount > 0 || bookingDetail.serviceFee > 0 || bookingDetail.totalPrice > 0);
+
+  const breakdownCard = showItemized ? (
+    <View
+      style={{
+        marginHorizontal: 16,
+        marginTop: 12,
+        marginBottom: 8,
+        padding: 16,
+        borderRadius: 14,
+        backgroundColor: colors.surface,
+        borderWidth: 1,
+        borderColor: colors.borderLight,
+        shadowColor: colors.shadow,
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.06,
+        shadowRadius: 6,
+        elevation: 2,
+      }}
+    >
+      <Text style={[rtlText, { fontSize: 13, fontWeight: "700", color: colors.text, marginBottom: 10 }]}>
+        {t("paymentSummaryTitle")}
+      </Text>
+      {bookingDetail!.grossAmount > 0 || bookingDetail!.serviceFee > 0 ? (
+        <>
+          <View
+            style={{
+              flexDirection: rowDirectionForAppLayout(isRTL),
+              justifyContent: "space-between",
+              marginBottom: 8,
+            }}
+          >
+            <Text style={[rtlText, { flex: 1, fontSize: 13, color: colors.textSecondary, paddingEnd: 8 }]}>
+              {t("bookingBreakdownBase")}
+            </Text>
+            <Text style={{ fontSize: 14, fontWeight: "700", color: colors.text }}>
+              ₪{bookingDetail!.grossAmount.toFixed(2)}
+            </Text>
+          </View>
+          <View
+            style={{
+              flexDirection: rowDirectionForAppLayout(isRTL),
+              justifyContent: "space-between",
+              marginBottom: 10,
+            }}
+          >
+            <Text style={[rtlText, { flex: 1, fontSize: 13, color: colors.textSecondary, paddingEnd: 8 }]}>
+              {t("bookingBreakdownFee")}
+            </Text>
+            <Text style={{ fontSize: 14, fontWeight: "700", color: colors.text }}>
+              ₪{bookingDetail!.serviceFee.toFixed(2)}
+            </Text>
+          </View>
+        </>
+      ) : null}
+      <View
+        style={{
+          flexDirection: rowDirectionForAppLayout(isRTL),
+          justifyContent: "space-between",
+          alignItems: "center",
+          paddingTop: bookingDetail!.grossAmount > 0 || bookingDetail!.serviceFee > 0 ? 10 : 0,
+          borderTopWidth: bookingDetail!.grossAmount > 0 || bookingDetail!.serviceFee > 0 ? 1 : 0,
+          borderTopColor: colors.borderLight,
+        }}
+      >
+        <Text style={[rtlText, { flex: 1, fontSize: 14, fontWeight: "800", color: colors.text, paddingEnd: 8 }]}>
+          {t("bookingBreakdownTotal")}
+        </Text>
+        <Text style={{ fontSize: 17, fontWeight: "800", color: colors.primary }}>
+          ₪{bookingDetail!.totalPrice.toFixed(2)}
+        </Text>
+      </View>
+    </View>
+  ) : null;
 
   if (Platform.OS === "web") {
     return (
@@ -178,6 +300,7 @@ export function PaymentCheckoutScreen() {
           </Text>
           <View style={{ width: 24 }} />
         </View>
+        {breakdownCard}
         <View className="flex-1 px-5 pt-6">
           <Text style={[{ fontSize: 15, color: colors.textSecondary, lineHeight: 22 }, rtlText]}>
             {t("paymentWebHint")}
@@ -237,13 +360,26 @@ export function PaymentCheckoutScreen() {
         <View style={{ width: 24 }} />
       </View>
 
+      {detailLoadError ? (
+        <View className="px-4 pt-2">
+          <InlineError
+            message={detailLoadError}
+            onRetry={() => {
+              void loadBookingDetail();
+            }}
+          />
+        </View>
+      ) : null}
+
+      {postPayPhase === "idle" ? breakdownCard : null}
+
       {webViewError ? (
         <View className="px-4 pt-3">
           <InlineError message={webViewError} onRetry={reloadWebView} />
         </View>
       ) : null}
 
-      {paymentPhase === "processing" ? (
+      {postPayPhase === "processing" ? (
         <View
           className="flex-1 items-center justify-center px-8"
           style={{ backgroundColor: colors.background }}
@@ -264,6 +400,51 @@ export function PaymentCheckoutScreen() {
             {t("paymentProcessing")}
           </Text>
           <ActivityIndicator size="large" color={colors.primary} style={{ marginTop: 24 }} />
+        </View>
+      ) : postPayPhase === "verifying_manual" ? (
+        <View
+          className="flex-1 items-center justify-center px-8"
+          style={{ backgroundColor: colors.background }}
+        >
+          <Ionicons name="time-outline" size={56} color={colors.primary} />
+          <Text
+            style={[
+              {
+                marginTop: 20,
+                fontSize: 16,
+                fontWeight: "600",
+                color: colors.text,
+                textAlign: "center",
+                lineHeight: 24,
+              },
+              rtlText,
+            ]}
+          >
+            {t("paymentVerifyingWithProvider")}
+          </Text>
+          <Pressable
+            onPress={() => void onRefreshStatusPress()}
+            disabled={refreshBusy}
+            style={{
+              marginTop: 28,
+              paddingVertical: 14,
+              paddingHorizontal: 28,
+              borderRadius: 14,
+              backgroundColor: colors.primary,
+              minWidth: 200,
+              alignItems: "center",
+              justifyContent: "center",
+              opacity: refreshBusy ? 0.7 : 1,
+            }}
+          >
+            {refreshBusy ? (
+              <ActivityIndicator color={colors.primaryText} />
+            ) : (
+              <Text style={{ fontSize: 15, fontWeight: "700", color: colors.primaryText }}>
+                {t("paymentRefreshStatus")}
+              </Text>
+            )}
+          </Pressable>
         </View>
       ) : (
         <View className="flex-1 relative">

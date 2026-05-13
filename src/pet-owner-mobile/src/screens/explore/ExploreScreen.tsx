@@ -23,6 +23,8 @@ import {
   FlatList,
   InteractionManager,
   useWindowDimensions,
+  DeviceEventEmitter,
+  type LayoutChangeEvent,
 } from "react-native";
 import axios from "axios";
 import { Gesture, GestureDetector, GestureHandlerRootView } from "react-native-gesture-handler";
@@ -35,7 +37,8 @@ import Reanimated, {
 } from "react-native-reanimated";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
-import { useFocusEffect, useNavigation, useRoute } from "@react-navigation/native";
+import { useFocusEffect, useIsFocused, useNavigation, useRoute } from "@react-navigation/native";
+import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 import * as Location from "expo-location";
 import { LinearGradient } from "expo-linear-gradient";
 import { BRAND_HEADER_HORIZONTAL_PAD } from "../../components/BrandedAppHeader";
@@ -79,6 +82,10 @@ import {
   isValidMapRegion,
   viewportPinsSearchParamsFromRegion,
 } from "./exploreMapLayoutConstants";
+import {
+  navigateToLoginClearingStack,
+  EXPLORE_CLEAR_BEFORE_LOGIN_EVENT,
+} from "../../navigation/navigateToLoginClearingStack";
 
 /** Debounce for silent pin refresh after map gestures (reduces GET /map/pins churn while dragging). */
 const MAP_VIEWPORT_DEBOUNCE_MS = 500;
@@ -220,12 +227,11 @@ export function ExploreScreen() {
   tRef.current = t;
   const insets = useSafeAreaInsets();
   const { height: windowHeight } = useWindowDimensions();
-  /** Scroll region inside filter sheet: `flex:1` on ScrollView collapsed when the sheet had no fixed height (only maxHeight). */
-  const filterSheetScrollMaxHeight = useMemo(() => {
-    const sheetCap = Math.round(windowHeight * 0.75);
-    const chrome = 128 + Math.max(insets.bottom, 16);
-    return Math.max(220, sheetCap - chrome);
-  }, [windowHeight, insets.bottom]);
+  const isFocused = useIsFocused();
+  const tabBarHeight = useBottomTabBarHeight();
+  /** When the scene bleeds under the tab bar after transitions, `bottom` must offset by tab height. */
+  const DEFAULT_TAB_BAR_FLOOR = 68;
+  const resolvedTabBarH = tabBarHeight > 0.5 ? tabBarHeight : DEFAULT_TAB_BAR_FLOOR;
 
   const isLoggedIn = useAuthStore((s) => s.isLoggedIn);
   const hasPets = usePetsStore((s) => s.pets.length > 0);
@@ -301,6 +307,8 @@ export function ExploreScreen() {
   const showDogParksOnlyRef = useRef(false);
   const [selectedDogPark, setSelectedDogPark] = useState<DogParkDto | null>(null);
   const [dogParkCheckInLoading, setDogParkCheckInLoading] = useState(false);
+  /** Live height of whichever bottom card is visible — drives FAB stack position (no hardcoded estimate). */
+  const [measuredCardHeight, setMeasuredCardHeight] = useState(0);
 
   /* User location */
   const [userLat, setUserLat] = useState<number | null>(null);
@@ -1042,6 +1050,32 @@ export function ExploreScreen() {
     }
   }, [showFilterPanel, filterSheetTranslateY]);
 
+  useEffect(() => {
+    const sub = DeviceEventEmitter.addListener(EXPLORE_CLEAR_BEFORE_LOGIN_EVENT, () => {
+      setSelectedPin(null);
+      setSelectedPlaydate(null);
+      setSelectedDogPark(null);
+      setCollocatedChooserPins(null);
+      setShowFilterPanel(false);
+      filterSheetTranslateY.value = 0;
+    });
+    return () => sub.remove();
+  }, [filterSheetTranslateY]);
+
+  useFocusEffect(
+    useCallback(() => {
+      filterSheetTranslateY.value = 0;
+      return undefined;
+    }, [filterSheetTranslateY]),
+  );
+
+  /** Scroll region inside filter sheet — uses window minus tab bar so scroll height matches visible stack. */
+  const filterSheetScrollMaxHeight = useMemo(() => {
+    const sheetCap = Math.round(windowHeight * 0.75);
+    const chrome = 128 + Math.max(insets.bottom, 16);
+    return Math.max(220, sheetCap - chrome);
+  }, [windowHeight, insets.bottom, isFocused]);
+
   const filterSheetDragStyle = useAnimatedStyle(() => ({
     transform: [{ translateY: filterSheetTranslateY.value }],
   }));
@@ -1074,6 +1108,12 @@ export function ExploreScreen() {
         }),
     [invokeFilterCloseFromGesture],
   );
+
+  const openFilterPanelAfterInteractions = useCallback(() => {
+    InteractionManager.runAfterInteractions(() => {
+      setShowFilterPanel(true);
+    });
+  }, []);
 
   const clearFilter = useCallback(() => {
     setActiveServices(new Set());
@@ -1130,7 +1170,9 @@ export function ExploreScreen() {
         );
         return;
       }
-      setCollocatedChooserPins(clusterPins);
+      InteractionManager.runAfterInteractions(() => {
+        setCollocatedChooserPins(clusterPins);
+      });
     },
     [beginProgrammaticMapMove],
   );
@@ -1163,9 +1205,25 @@ export function ExploreScreen() {
   }, []);
 
   const hasBottomOverlay = Boolean(selectedPin || selectedPlaydate || selectedDogPark);
-  const bottomActionOffset = hasBottomOverlay ? 132 : 16;
-  const locationButtonOffset = hasBottomOverlay ? 194 : 78;
-  const selectedPinCardOffset = 16;
+
+  useEffect(() => {
+    if (!hasBottomOverlay) setMeasuredCardHeight(0);
+  }, [hasBottomOverlay]);
+
+  const onBottomCardLayout = useCallback((e: LayoutChangeEvent) => {
+    const h = e.nativeEvent.layout.height;
+    if (Number.isFinite(h) && h > 0) setMeasuredCardHeight(h);
+  }, []);
+
+  /** Inside artificial floor: FAB row sits above measured card + gap (user spec: 10 + card + 10). */
+  const OVERLAY_FLOOR_PAD = 10;
+  const fabRowBottom = useMemo(
+    () =>
+      OVERLAY_FLOOR_PAD +
+      (hasBottomOverlay && measuredCardHeight > 0 ? measuredCardHeight + 10 : 0),
+    [hasBottomOverlay, measuredCardHeight],
+  );
+  const locationButtonBottom = fabRowBottom + 56;
 
   const openDogParkNavigation = useCallback((park: DogParkDto) => {
     const lat = park.latitude;
@@ -1180,7 +1238,7 @@ export function ExploreScreen() {
   const handleDogParkCheckIn = useCallback(
     async (park: DogParkDto) => {
       if (!isLoggedIn) {
-        navigation.navigate("Login");
+        navigateToLoginClearingStack(navigation);
         return;
       }
       if (!hasPets) {
@@ -1436,7 +1494,7 @@ export function ExploreScreen() {
                 <Ionicons name="close-circle" size={22} color={colors.textMuted} />
               </Pressable>
             ) : (
-              <Pressable onPress={() => setShowFilterPanel(true)}>
+              <Pressable onPress={openFilterPanelAfterInteractions}>
                 <View>
                   <Ionicons name="options" size={22} color={activeFilterCount > 0 ? colors.text : colors.textMuted} />
                   {activeFilterCount > 0 && (
@@ -1613,6 +1671,17 @@ export function ExploreScreen() {
         </View>
       )}
 
+      <View
+        style={{
+          position: "absolute",
+          top: 0,
+          left: 0,
+          right: 0,
+          height: Math.max(0, windowHeight - resolvedTabBarH),
+          zIndex: 16,
+        }}
+        pointerEvents="box-none"
+      >
       {/* My Location button */}
       <Pressable
         onPress={async () => {
@@ -1660,7 +1729,7 @@ export function ExploreScreen() {
         }}
         style={{
           position: "absolute",
-          bottom: locationButtonOffset,
+          bottom: locationButtonBottom,
           ...(isRTL ? { left: 20 } : { right: 20 }),
           width: 46,
           height: 46,
@@ -1686,7 +1755,7 @@ export function ExploreScreen() {
       <View
         style={{
           position: "absolute",
-          bottom: bottomActionOffset,
+          bottom: fabRowBottom,
           alignSelf: isRTL ? "flex-start" : "flex-end",
           ...(isRTL ? { left: 20 } : { right: 20 }),
           zIndex: 18,
@@ -1706,7 +1775,7 @@ export function ExploreScreen() {
         <Pressable
           onPress={() => {
             if (!isLoggedIn) {
-              navigation.navigate("Login");
+              navigateToLoginClearingStack(navigation);
               return;
             }
             navigation.navigate("MyPets", { screen: "ReportLost" });
@@ -1765,7 +1834,7 @@ export function ExploreScreen() {
         }}
         style={{
           position: "absolute",
-          bottom: bottomActionOffset,
+          bottom: fabRowBottom,
           ...(isRTL ? { right: 20 } : { left: 20 }),
           alignItems: "center",
           zIndex: 18,
@@ -1803,8 +1872,14 @@ export function ExploreScreen() {
       {/* Selected pin card */}
       {selectedPin && !showDogParksOnly && (
         <View
+          key={`pin-sheet-${selectedPin.providerId}`}
           className="absolute left-0 right-0"
-          style={{ bottom: selectedPinCardOffset, zIndex: 20, paddingHorizontal: BRAND_HEADER_HORIZONTAL_PAD }}
+          onLayout={onBottomCardLayout}
+          style={{
+            bottom: OVERLAY_FLOOR_PAD,
+            zIndex: 20,
+            paddingHorizontal: BRAND_HEADER_HORIZONTAL_PAD,
+          }}
         >
           <View
             className="p-4 rounded-xl flex-row items-center gap-4"
@@ -1927,7 +2002,12 @@ export function ExploreScreen() {
       {selectedPlaydate && !showDogParksOnly && (
         <View
           className="absolute left-0 right-0"
-          style={{ bottom: 110, zIndex: 20, paddingHorizontal: BRAND_HEADER_HORIZONTAL_PAD }}
+          onLayout={onBottomCardLayout}
+          style={{
+            bottom: OVERLAY_FLOOR_PAD,
+            zIndex: 20,
+            paddingHorizontal: BRAND_HEADER_HORIZONTAL_PAD,
+          }}
         >
           <View
             className="p-4 rounded-xl"
@@ -1994,7 +2074,12 @@ export function ExploreScreen() {
       {selectedDogPark && showDogParksOnly && (
         <View
           className="absolute left-0 right-0"
-          style={{ bottom: selectedPinCardOffset, zIndex: 20, paddingHorizontal: BRAND_HEADER_HORIZONTAL_PAD }}
+          onLayout={onBottomCardLayout}
+          style={{
+            bottom: OVERLAY_FLOOR_PAD,
+            zIndex: 20,
+            paddingHorizontal: BRAND_HEADER_HORIZONTAL_PAD,
+          }}
         >
           <View
             className="p-4 rounded-xl"
@@ -2099,6 +2184,8 @@ export function ExploreScreen() {
           </View>
         </View>
       )}
+
+      </View>
 
       <Modal
         visible={collocatedChooserPins != null && collocatedChooserPins.length > 0}

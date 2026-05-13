@@ -1,6 +1,7 @@
 import { View, Text, Pressable } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
+import { navigateToLoginClearingStack } from "../navigation/navigateToLoginClearingStack";
 import { useTranslation } from "../i18n";
 import { useTheme } from "../theme/ThemeContext";
 
@@ -45,7 +46,7 @@ export function AuthPlaceholder({
       <Pressable
         className="w-full h-14 rounded-2xl items-center justify-center active:opacity-90"
         style={{ backgroundColor: colors.brand }}
-        onPress={() => navigation.navigate("Login")}
+        onPress={() => navigateToLoginClearingStack(navigation)}
       >
         <Text className="text-base font-bold" style={{ color: colors.primaryText }}>
           {t("loginButton")}

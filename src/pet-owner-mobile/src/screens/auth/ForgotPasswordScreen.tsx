@@ -20,7 +20,7 @@ import { useTranslation } from "../../i18n";
 import { LanguageToggle } from "../../components/LanguageToggle";
 import { authApi } from "../../api/client";
 import { getNormalizedApiError } from "../../utils/apiUtils";
-import { showApiErrorToast } from "../../services/apiErrorToast";
+import { mapAuthApiErrorToTranslationKey } from "../../utils/authErrorI18n";
 import { useTheme } from "../../theme/ThemeContext";
 import { useKeyboardAvoidingState } from "../../hooks/useKeyboardAvoidingState";
 
@@ -29,6 +29,7 @@ const AUTH_PETCARE_HERO_LOGO = require("../../../assets/petcare-logo-transparent
 export function ForgotPasswordScreen() {
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const navigation = useNavigation<any>();
   const isLoggedIn = useAuthStore((s) => s.isLoggedIn);
@@ -37,6 +38,8 @@ export function ForgotPasswordScreen() {
     useTranslation();
   const { colors } = useTheme();
   const { behavior: keyboardAvoidBehavior } = useKeyboardAvoidingState();
+
+  const clearAuthError = useCallback(() => setErrorMessage(null), []);
 
   const heroBackgroundColor = "#081B3E";
   const LOGO_REVEAL_OPACITY_START = 0.35;
@@ -95,6 +98,7 @@ export function ForgotPasswordScreen() {
       return;
     }
 
+    setErrorMessage(null);
     setLoading(true);
     try {
       await authApi.forgotPassword(email);
@@ -102,7 +106,8 @@ export function ForgotPasswordScreen() {
         { text: "OK", onPress: () => navigation.goBack() },
       ]);
     } catch (err: unknown) {
-      showApiErrorToast(getNormalizedApiError(err));
+      const key = mapAuthApiErrorToTranslationKey(getNormalizedApiError(err));
+      setErrorMessage(t(key));
     } finally {
       setLoading(false);
     }
@@ -249,13 +254,33 @@ export function ForgotPasswordScreen() {
                 placeholder={t("forgotEmailPlaceholder")}
                 placeholderTextColor={colors.textMuted}
                 value={email}
-                onChangeText={setEmail}
+                onChangeText={(v) => {
+                  clearAuthError();
+                  setEmail(v);
+                }}
                 keyboardType="email-address"
                 autoCapitalize="none"
                 autoComplete="email"
               />
             </View>
           </View>
+
+          {errorMessage ? (
+            <Text
+              accessibilityRole="alert"
+              style={[
+                rtlText,
+                {
+                  color: colors.danger,
+                  marginBottom: 14,
+                  textAlign: isHebrew ? "right" : "left",
+                },
+              ]}
+              className="text-sm leading-5 px-1"
+            >
+              {errorMessage}
+            </Text>
+          ) : null}
 
           <Pressable
             className="h-14 rounded-xl items-center justify-center active:opacity-90"
