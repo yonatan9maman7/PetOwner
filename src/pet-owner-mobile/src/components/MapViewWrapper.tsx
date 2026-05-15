@@ -3,10 +3,25 @@ import { View, Text } from "react-native";
 import MapView, { Marker, Circle } from "react-native-maps";
 
 export const MapViewWrapper = React.forwardRef<MapView, any>(
-  ({ style, fallbackLabel, children, ...rest }, ref) => {
+  ({ style, fallbackLabel, children, onMapReady, onError, ...rest }, ref) => {
     try {
       return (
-        <MapView ref={ref} style={[{ flex: 1 }, style]} {...rest}>
+        <MapView
+          ref={ref}
+          style={[{ flex: 1 }, style]}
+          {...rest}
+          onMapReady={(e) => {
+            // Temporary: surface native map init vs API key / billing issues in Metro logs.
+            // eslint-disable-next-line no-console
+            console.log("Map ready");
+            onMapReady?.(e);
+          }}
+          onError={(e) => {
+            // eslint-disable-next-line no-console
+            console.log("Map error:", e);
+            onError?.(e);
+          }}
+        >
           {children}
         </MapView>
       );

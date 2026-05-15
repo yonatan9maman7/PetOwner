@@ -187,8 +187,14 @@ function LoginForm() {
   const insets = useSafeAreaInsets();
   const { t, isHebrew, rtlText, rtlStyle, rtlRow, rtlInput, alignCls, trailingFormLinkAlign } =
     useTranslation();
-  const { colors } = useTheme();
+  const { colors, isDark } = useTheme();
   const { behavior: keyboardAvoidBehavior } = useKeyboardAvoidingState();
+
+  /** Text on filled `colors.brand` controls; `textInverse` matches `brand` in dark theme and disappears. */
+  const onBrandLabelColor = colors.primaryText;
+  /** Forgot password: legible on dark hero/surface (see theme dark `brand` vs background). */
+  const forgotPasswordColor = isDark ? "#E0E0E0" : "#333333";
+  const usePasswordInsteadColor = isDark ? "#E0E0E0" : colors.brand;
 
   const clearAuthError = useCallback(() => setErrorMessage(null), []);
 
@@ -575,16 +581,16 @@ function LoginForm() {
                 })}
               >
                 {bioLoading ? (
-                  <ActivityIndicator color={colors.textInverse} size="large" />
+                  <ActivityIndicator color={onBrandLabelColor} size="large" />
                 ) : (
                   <>
-                    <Ionicons name={bioIcon as any} size={56} color={colors.textInverse} />
+                    <Ionicons name={bioIcon as any} size={56} color={onBrandLabelColor} />
                     <Text
                       style={{
                         marginTop: 14,
                         fontSize: 17,
                         fontWeight: "700",
-                        color: colors.textInverse,
+                        color: onBrandLabelColor,
                         textAlign: "center",
                       }}
                     >
@@ -603,7 +609,7 @@ function LoginForm() {
                 hitSlop={12}
                 style={{ marginTop: 20 }}
               >
-                <Text style={{ fontSize: 15, fontWeight: "600", color: colors.brand }}>
+                <Text style={{ fontSize: 15, fontWeight: "600", color: usePasswordInsteadColor }}>
                   {t("usePasswordInstead")}
                 </Text>
               </Pressable>
@@ -654,6 +660,7 @@ function LoginForm() {
                     }}
                     keyboardType="email-address"
                     autoCapitalize="none"
+                    textContentType="username"
                     autoComplete="email"
                     returnKeyType="next"
                     blurOnSubmit={false}
@@ -707,6 +714,8 @@ function LoginForm() {
                       setPassword(v);
                     }}
                     secureTextEntry={secureEntry}
+                    textContentType="password"
+                    autoComplete="password"
                     returnKeyType="done"
                     onSubmitEditing={handleLogin}
                   />
@@ -730,7 +739,7 @@ function LoginForm() {
                 hitSlop={8}
                 onPress={() => navigation.navigate("ForgotPasswordScreen")}
               >
-                <Text className="text-xs font-bold" style={{ color: colors.brand }}>
+                <Text className="text-xs font-bold" style={{ color: forgotPasswordColor }}>
                   {t("forgotPassword")}
                 </Text>
               </Pressable>
@@ -763,9 +772,9 @@ function LoginForm() {
                 disabled={loading}
               >
                 {loading ? (
-                  <ActivityIndicator color={colors.textInverse} />
+                  <ActivityIndicator color={onBrandLabelColor} />
                 ) : (
-                  <Text className="text-base font-bold" style={{ color: colors.textInverse }}>
+                  <Text className="text-base font-bold" style={{ color: onBrandLabelColor }}>
                     {t("loginButton")}
                   </Text>
                 )}

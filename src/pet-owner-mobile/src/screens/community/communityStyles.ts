@@ -86,7 +86,7 @@ export const getStyles = (colors: any) =>
       maxWidth: 92,
     },
     topTabTextActive: {
-      color: "#06256F",
+      color: colors.primary,
       fontWeight: "800",
     },
     searchCard: {
@@ -557,6 +557,12 @@ export const getStyles = (colors: any) =>
       marginBottom: 16,
     },
     modalTitle: { color: colors.text, fontSize: 22, fontWeight: "900", marginBottom: 12 },
+    modalFormSubtitle: {
+      color: colors.textMuted,
+      fontSize: 14,
+      lineHeight: 20,
+      marginBottom: 20,
+    },
     label: { color: colors.textSecondary, fontSize: 13, fontWeight: "800", marginTop: 12, marginBottom: 8 },
     input: {
       backgroundColor: colors.surfaceTertiary,

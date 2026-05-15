@@ -24,8 +24,41 @@ import { useTheme } from "../../theme/ThemeContext";
 import { useKeyboardAvoidingState } from "../../hooks/useKeyboardAvoidingState";
 import { getNormalizedApiError } from "../../utils/apiUtils";
 import { mapAuthApiErrorToTranslationKey } from "../../utils/authErrorI18n";
+import { isValidEmailFormat } from "../../utils/emailValidation";
+import { isValidPhoneFormat } from "../../utils/phoneValidation";
 
 const AUTH_PETCARE_HERO_LOGO = require("../../../assets/petcare-logo-transparent.png");
+
+const MIN_PASSWORD_LENGTH = 6;
+
+function InlineFieldError({
+  message,
+  rtlText,
+  colors,
+}: {
+  message: string | null;
+  rtlText: { textAlign: "right" | "left"; writingDirection: "rtl" | "ltr" };
+  colors: { danger: string };
+}) {
+  if (!message) return null;
+  return (
+    <Text
+      accessibilityRole="alert"
+      style={[
+        rtlText,
+        {
+          color: colors.danger,
+          fontSize: 12,
+          marginTop: 6,
+          lineHeight: 16,
+        },
+      ]}
+      className="px-1"
+    >
+      {message}
+    </Text>
+  );
+}
 
 export function RegisterScreen() {
   const [fullName, setFullName] = useState("");
@@ -36,6 +69,12 @@ export function RegisterScreen() {
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [fullNameError, setFullNameError] = useState<string | null>(null);
+  const [emailError, setEmailError] = useState<string | null>(null);
+  const [phoneError, setPhoneError] = useState<string | null>(null);
+  const [passwordError, setPasswordError] = useState<string | null>(null);
+  const [confirmPasswordError, setConfirmPasswordError] = useState<string | null>(null);
+  const [termsError, setTermsError] = useState<string | null>(null);
   const [secureEntry, setSecureEntry] = useState(true);
 
   const clearAuthError = useCallback(() => setErrorMessage(null), []);
@@ -51,8 +90,14 @@ export function RegisterScreen() {
   const insets = useSafeAreaInsets();
   const { t, language, isHebrew, rtlText, rtlStyle, rtlRow, rtlInput, alignCls } =
     useTranslation();
-  const { colors } = useTheme();
+  const { colors, isDark } = useTheme();
   const { behavior: keyboardAvoidBehavior } = useKeyboardAvoidingState();
+
+  /** Dark theme `brand` matches page chrome; use accent fill for terms checkbox + CTA. */
+  const termsCheckboxAccent = isDark ? colors.primary : colors.brand;
+  const termsCheckboxUncheckedBorder = isDark ? "rgba(232, 237, 244, 0.55)" : colors.textSecondary;
+  const registerCtaBackground = isDark ? colors.primary : colors.brand;
+  const onRegisterCtaLabel = colors.primaryText;
 
   const heroBackgroundColor = "#081B3E";
   const LOGO_REVEAL_OPACITY_START = 0.35;
@@ -107,32 +152,62 @@ export function RegisterScreen() {
 
   const handleRegister = async () => {
     if (loading) return;
-    if (
-      !fullName.trim() ||
-      !email.trim() ||
-      !phone.trim() ||
-      !password.trim() ||
-      !confirmPassword.trim()
-    ) {
-      showGlobalAlertCompat(t("errorTitle"), t("fillAllFields"));
-      return;
-    }
-    if (!termsAccepted) {
-      showGlobalAlertCompat(t("errorTitle"), t("acceptTermsError"));
-      return;
-    }
-    if (password !== confirmPassword) {
-      showGlobalAlertCompat(t("errorTitle"), t("passwordMismatch"));
-      return;
-    }
 
     setErrorMessage(null);
+    setFullNameError(null);
+    setEmailError(null);
+    setPhoneError(null);
+    setPasswordError(null);
+    setConfirmPasswordError(null);
+    setTermsError(null);
+
+    let valid = true;
+
+    if (!fullName.trim()) {
+      setFullNameError(t("fieldRequiredShort"));
+      valid = false;
+    }
+    if (!email.trim()) {
+      setEmailError(t("fieldRequiredShort"));
+      valid = false;
+    } else if (!isValidEmailFormat(email)) {
+      setEmailError(t("invalid_email_format"));
+      valid = false;
+    }
+    if (!phone.trim()) {
+      setPhoneError(t("fieldRequiredShort"));
+      valid = false;
+    } else if (!isValidPhoneFormat(phone)) {
+      setPhoneError(t("invalid_phone") || "Please enter a valid phone number");
+      valid = false;
+    }
+    if (!password.trim()) {
+      setPasswordError(t("fieldRequiredShort"));
+      valid = false;
+    } else if (password.trim().length < MIN_PASSWORD_LENGTH) {
+      setPasswordError(t("passwordMinLengthRegister"));
+      valid = false;
+    }
+    if (!confirmPassword.trim()) {
+      setConfirmPasswordError(t("fieldRequiredShort"));
+      valid = false;
+    } else if (password !== confirmPassword) {
+      setConfirmPasswordError(t("passwordMismatch"));
+      valid = false;
+    }
+    if (!termsAccepted) {
+      setTermsError(t("acceptTermsError"));
+      valid = false;
+    }
+
+    if (!valid) return;
+
     setLoading(true);
     try {
       await authApi.register({
         name: fullName,
         email,
-        phone,
+        phone: phone.trim(),
         password,
         role: "Owner",
         languagePreference: language,
@@ -327,6 +402,7 @@ export function RegisterScreen() {
                 value={fullName}
                 onChangeText={(v) => {
                   clearAuthError();
+                  setFullNameError(null);
                   setFullName(v);
                 }}
                 autoCapitalize="words"
@@ -336,6 +412,7 @@ export function RegisterScreen() {
                 onSubmitEditing={() => emailRef.current?.focus()}
               />
             </View>
+            <InlineFieldError message={fullNameError} rtlText={rtlText} colors={colors} />
           </View>
 
           {/* ── Email ── */}
@@ -375,6 +452,7 @@ export function RegisterScreen() {
                 value={email}
                 onChangeText={(v) => {
                   clearAuthError();
+                  setEmailError(null);
                   setEmail(v);
                 }}
                 keyboardType="email-address"
@@ -386,6 +464,7 @@ export function RegisterScreen() {
                 onSubmitEditing={() => phoneRef.current?.focus()}
               />
             </View>
+            <InlineFieldError message={emailError} rtlText={rtlText} colors={colors} />
           </View>
 
           {/* ── Phone ── */}
@@ -425,6 +504,7 @@ export function RegisterScreen() {
                 value={phone}
                 onChangeText={(v) => {
                   clearAuthError();
+                  setPhoneError(null);
                   setPhone(v);
                 }}
                 keyboardType="phone-pad"
@@ -435,6 +515,7 @@ export function RegisterScreen() {
                 onSubmitEditing={() => passwordRef.current?.focus()}
               />
             </View>
+            <InlineFieldError message={phoneError} rtlText={rtlText} colors={colors} />
           </View>
 
           {/* ── Password ── */}
@@ -479,6 +560,8 @@ export function RegisterScreen() {
                 value={password}
                 onChangeText={(v) => {
                   clearAuthError();
+                  setPasswordError(null);
+                  setConfirmPasswordError(null);
                   setPassword(v);
                 }}
                 secureTextEntry={secureEntry}
@@ -497,6 +580,7 @@ export function RegisterScreen() {
                 />
               </Pressable>
             </View>
+            <InlineFieldError message={passwordError} rtlText={rtlText} colors={colors} />
           </View>
 
           {/* ── Confirm Password ── */}
@@ -541,6 +625,7 @@ export function RegisterScreen() {
                 value={confirmPassword}
                 onChangeText={(v) => {
                   clearAuthError();
+                  setConfirmPasswordError(null);
                   setConfirmPassword(v);
                 }}
                 secureTextEntry={secureEntry}
@@ -558,39 +643,47 @@ export function RegisterScreen() {
                 />
               </Pressable>
             </View>
+            <InlineFieldError message={confirmPasswordError} rtlText={rtlText} colors={colors} />
           </View>
 
           {/* ── Terms ── */}
-          <Pressable
-            style={rtlRow}
-            className="items-center gap-3 mb-6"
-            onPress={() => {
-              clearAuthError();
-              setTermsAccepted((v) => !v);
-            }}
-          >
-            <View
-              className="w-5 h-5 rounded border-2 items-center justify-center"
-              style={
-                termsAccepted
-                  ? { backgroundColor: colors.brand, borderColor: colors.brand }
-                  : { borderColor: colors.textSecondary }
-              }
+          <View className="mb-6">
+            <Pressable
+              style={rtlRow}
+              className="items-center gap-3"
+              onPress={() => {
+                clearAuthError();
+                setTermsError(null);
+                setTermsAccepted((v) => !v);
+              }}
             >
-              {termsAccepted && (
-                <Ionicons name="checkmark" size={14} color={colors.textInverse} />
-              )}
-            </View>
-            <Text style={[rtlText, { color: colors.textSecondary }]} className="text-sm flex-1">
-              <Text style={{ color: colors.danger }} accessibilityLabel="required">
-                *{" "}
+              <View
+                className="w-5 h-5 rounded border-2 items-center justify-center"
+                style={
+                  termsAccepted
+                    ? { backgroundColor: termsCheckboxAccent, borderColor: termsCheckboxAccent }
+                    : {
+                        borderColor: termsCheckboxUncheckedBorder,
+                        backgroundColor: isDark ? "rgba(255, 255, 255, 0.06)" : "transparent",
+                      }
+                }
+              >
+                {termsAccepted && (
+                  <Ionicons name="checkmark" size={14} color={onRegisterCtaLabel} />
+                )}
+              </View>
+              <Text style={[rtlText, { color: colors.textSecondary }]} className="text-sm flex-1">
+                <Text style={{ color: colors.danger }} accessibilityLabel="required">
+                  *{" "}
+                </Text>
+                {t("termsAgree")}{" "}
+                <Text style={{ color: colors.primary }} className="font-bold">
+                  {t("termsOfService")}
+                </Text>
               </Text>
-              {t("termsAgree")}{" "}
-              <Text style={{ color: colors.primary }} className="font-bold">
-                {t("termsOfService")}
-              </Text>
-            </Text>
-          </Pressable>
+            </Pressable>
+            <InlineFieldError message={termsError} rtlText={rtlText} colors={colors} />
+          </View>
 
           {errorMessage ? (
             <Text
@@ -613,16 +706,16 @@ export function RegisterScreen() {
           <Pressable
             className="h-14 rounded-xl items-center justify-center"
             style={{
-              backgroundColor: colors.brand,
+              backgroundColor: registerCtaBackground,
               opacity: loading || !canSubmit ? 0.45 : 1,
             }}
             onPress={handleRegister}
             disabled={loading || !canSubmit}
           >
             {loading ? (
-              <ActivityIndicator color={colors.textInverse} />
+              <ActivityIndicator color={onRegisterCtaLabel} />
             ) : (
-              <Text className="text-base font-bold" style={{ color: colors.textInverse }}>
+              <Text className="text-base font-bold" style={{ color: onRegisterCtaLabel }}>
                 {t("registerButton")}
               </Text>
             )}

@@ -458,6 +458,7 @@ export function CommunityScreen() {
   const [loading, setLoading] = useState(false);
   const [feedError, setFeedError] = useState(false);
   const [hasMore, setHasMore] = useState(false);
+  const [isFetchingNextPage, setIsFetchingNextPage] = useState(false);
   const [composerOpen, setComposerOpen] = useState(false);
   const [newPostContent, setNewPostContent] = useState("");
   const [newPostType, setNewPostType] = useState<PostKind>("Cute moment");
@@ -566,6 +567,7 @@ export function CommunityScreen() {
     async (p: number, replace: boolean) => {
       if (!focusedRef.current) return;
       if (replace) setLoading(true);
+      else setIsFetchingNextPage(true);
       setFeedError(false);
       try {
         const data = await postsApi.getFeed(p, PAGE_SIZE, { ranked: true });
@@ -577,7 +579,10 @@ export function CommunityScreen() {
         if (!focusedRef.current) return;
         setFeedError(true);
       } finally {
-        if (focusedRef.current) setLoading(false);
+        if (focusedRef.current) {
+          setLoading(false);
+          setIsFetchingNextPage(false);
+        }
       }
     },
     [focusedRef],
@@ -1223,8 +1228,8 @@ export function CommunityScreen() {
   }, []);
 
   const loadMore = useCallback(() => {
-    if (!loading && hasMore) loadFeed(page + 1, false);
-  }, [loading, hasMore, loadFeed, page]);
+    if (!loading && !isFetchingNextPage && hasMore) loadFeed(page + 1, false);
+  }, [loading, isFetchingNextPage, hasMore, loadFeed, page]);
 
   const handleCreateGroup = async () => {
     const name = newGroupName.trim();
@@ -1886,9 +1891,9 @@ export function CommunityScreen() {
     [search, feedError, appRowDirection, styles, colors, rtlText, rtlRow, rtlInput, copy, pets, t],
   );
 
-  /** Stable FlatList footer renderer — only recomputed when loading/pagination state changes. */
+  /** Stable FlatList footer renderer — only recomputed when pagination state changes. */
   const renderFeedFooter = useCallback(() => {
-    if (loading && posts.length > 0) {
+    if (isFetchingNextPage) {
       return (
         <ActivityIndicator
           size="small"
@@ -1897,15 +1902,8 @@ export function CommunityScreen() {
         />
       );
     }
-    if (hasMore && !loading) {
-      return (
-        <Pressable onPress={loadMore} style={styles.loadMoreBtn}>
-          <Text style={styles.loadMoreText}>{t("loadMore")}</Text>
-        </Pressable>
-      );
-    }
     return <View style={{ height: bottomContentPadding }} />;
-  }, [loading, posts.length, hasMore, loadMore, colors.text, styles, t, bottomContentPadding]);
+  }, [isFetchingNextPage, colors.text, bottomContentPadding]);
 
   if (!hydrated || !isDeferredReady) {
     return (
@@ -1970,6 +1968,8 @@ export function CommunityScreen() {
                 maxToRenderPerBatch={5}
                 windowSize={7}
                 removeClippedSubviews
+                onEndReached={loadMore}
+                onEndReachedThreshold={0.5}
                 refreshControl={
                   <RefreshControl
                     refreshing={refreshing}
@@ -2801,10 +2801,17 @@ function CreatePlaydateModal({
       <View style={styles.modalRoot}>
         <Pressable style={styles.modalBackdropFill} onPress={onClose} />
         <KeyboardAvoidingView behavior={keyboardAvoidBehavior} style={styles.keyboardSheet}>
-          <Pressable style={styles.detailSheet} onPress={(e) => e.stopPropagation()}>
+          <Pressable style={[styles.detailSheet, { paddingHorizontal: 0 }]} onPress={(e) => e.stopPropagation()}>
             <View style={styles.handle} />
-            <Text style={[styles.modalTitle, { textAlign: isRTL ? "right" : "left" }]}>{copy("createPlaydateTitle")}</Text>
-            <ScrollView style={{ maxHeight: 520 }} keyboardShouldPersistTaps="handled">
+            <View style={{ paddingHorizontal: 20 }}>
+              <Text style={[styles.modalTitle, { textAlign: isRTL ? "right" : "left" }]}>{copy("createPlaydateTitle")}</Text>
+              <Text style={[styles.modalFormSubtitle, { textAlign: isRTL ? "right" : "left" }]}>{copy("createPlaydateSubtitle")}</Text>
+            </View>
+            <ScrollView
+              style={{ maxHeight: 520 }}
+              contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 8 }}
+              keyboardShouldPersistTaps="handled"
+            >
               <TextInput style={[styles.input, rtlInput]} placeholder={copy("titleField")} placeholderTextColor={colors.textMuted} value={title} onChangeText={setTitle} />
               <Text style={[styles.label, { textAlign: isRTL ? "right" : "left" }]}>{copy("dog")}</Text>
               <View style={styles.modalChipWrap}>
@@ -2865,7 +2872,7 @@ function CreatePlaydateModal({
                 <Text style={styles.checkText}>{copy("requiresApproval")}</Text>
               </Pressable>
             </ScrollView>
-            <View style={styles.modalActions}>
+            <View style={[styles.modalActions, { paddingHorizontal: 20 }]}>
               <Pressable onPress={onClose} style={styles.composerCancel}>
                 <Text style={styles.composerCancelText}>{copy("cancel")}</Text>
               </Pressable>

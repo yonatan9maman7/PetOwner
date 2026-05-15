@@ -24,9 +24,6 @@ import type { ChatMessageDto } from "../../types/api";
 
 const READ_RECEIPT_BLUE = "#34B7F1";
 
-/** Matches the in-screen toolbar row below the status bar (`paddingTop: insets.top` + `height: 56`). */
-const CHAT_HEADER_ROW_HEIGHT = 56;
-
 function formatTime(dateStr: string): string {
   const d = new Date(dateStr);
   return d.toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit" });
@@ -77,17 +74,9 @@ export function ChatRoomScreen() {
   const [isKeyboardVisible, setKeyboardVisible] = useState(false);
   const insets = useSafeAreaInsets();
   const headerHeight = useHeaderHeight();
-  /**
-   * `headerShown: false` → `useHeaderHeight()` is often 0; match custom toolbar
-   * (`paddingTop: insets.top` + 56pt row) so `KeyboardAvoidingView` offsets correctly.
-   */
-  const keyboardVerticalOffset =
-    Platform.OS === "ios"
-      ? headerHeight > 0
-        ? headerHeight
-        : insets.top + CHAT_HEADER_ROW_HEIGHT
-      : 0;
-  /** iOS: strip bottom safe-area padding while the keyboard is up to avoid double gap with KAV. */
+  /** Stack `headerShown: false` → usually 0; custom header sits outside KAV. */
+  const keyboardVerticalOffset = Platform.OS === "ios" ? headerHeight : 0;
+  /** Strip bottom safe inset while the keyboard is up (iOS) so KAV + safe area do not double-pad. */
   const inputContainerPaddingBottom =
     Platform.OS === "ios" && isKeyboardVisible ? 0 : insets.bottom;
   const listRef = useRef<FlatList>(null);

@@ -23,13 +23,9 @@ import { MapViewWrapper, MarkerWrapper } from "../../components/MapViewWrapper";
 import { useTranslation, type TranslationKey, rowDirectionForAppLayout } from "../../i18n";
 import { useTheme } from "../../theme/ThemeContext";
 import { providerApi } from "../../api/client";
-import {
-  AddressAutocomplete,
-  type AddressAutocompleteSelection,
-} from "../../components/shared/AddressAutocomplete";
 import { ScreenLoadingCenter } from "../../components/shared/ScreenLoadingCenter";
-import { fetchReverseGeocode } from "../../api/googlePlaces";
 import { DogSizeCapacityEditor, toggleDogSize } from "../../features/provider-onboarding/DogSizeCapacityFields";
+import { AddressMapModal } from "../../features/provider-onboarding/AddressMapModal";
 import {
   SERVICES,
   servicesForProviderType,
@@ -41,7 +37,7 @@ import { pickImageWithSource } from "../../utils/imagePicker";
 import { getNormalizedApiError } from "../../utils/apiUtils";
 import { showApiErrorToast } from "../../services/apiErrorToast";
 import { useKeyboardAvoidingState } from "../../hooks/useKeyboardAvoidingState";
-import { grossFromProviderNet } from "../../utils/pricingDisplay";
+import { providerBreakdownFromBasePrice, providerNetFromBasePrice, roundMoney } from "../../utils/pricingDisplay";
 
 const NAVY = "#001a5a";
 const DEFAULT_LAT = 32.0809;
@@ -164,7 +160,7 @@ function ServiceRow({
           </Text>
           {state.enabled && (
             <Text style={{ fontSize: 11, color: colors.textMuted, marginTop: 1 }}>
-              {t("providerNetEarningsLabel")} · {t(service.unitKey)}
+              {t("basePriceLabel")} · {t(service.unitKey)}
             </Text>
           )}
         </View>
@@ -222,12 +218,13 @@ function ServiceRow({
 
       {state.enabled && (() => {
         const raw = String(state.rate ?? "").trim();
-        const net = parseFloat(raw);
-        if (!Number.isFinite(net) || net <= 0) return null;
-        const gross = grossFromProviderNet(net);
+        const basePrice = parseFloat(raw);
+        if (!Number.isFinite(basePrice) || basePrice <= 0) return null;
+        const { platformFee, netEarnings } = providerBreakdownFromBasePrice(basePrice);
         const hint = t("providerPriceEarningsHint")
-          .replace("{{net}}", net.toFixed(2))
-          .replace("{{gross}}", gross.toFixed(2));
+          .replace("{{basePrice}}", basePrice.toFixed(2))
+          .replace("{{platformFee}}", platformFee.toFixed(2))
+          .replace("{{netEarnings}}", netEarnings.toFixed(2));
         return (
           <Text
             style={{
@@ -533,290 +530,6 @@ function AddPackageModal({
   );
 }
 
-/* ───────────────────── Address Map Modal ───────────────────── */
-
-function AddressMapModal({
-  visible,
-  onClose,
-  lat,
-  lng,
-  city,
-  street,
-  building,
-  apartment,
-  onConfirm,
-  t,
-  isRTL,
-}: {
-  visible: boolean;
-  onClose: () => void;
-  lat: number;
-  lng: number;
-  city: string;
-  street: string;
-  building: string;
-  apartment: string;
-  onConfirm: (data: {
-    lat: number;
-    lng: number;
-    city: string;
-    street: string;
-    building: string;
-    apartment: string;
-  }) => void;
-  t: (key: TranslationKey) => string;
-  isRTL: boolean;
-}) {
-  const { colors } = useTheme();
-  const [localLat, setLocalLat] = useState(lat);
-  const [localLng, setLocalLng] = useState(lng);
-  const [localCity, setLocalCity] = useState(city);
-  const [localStreet, setLocalStreet] = useState(street);
-  const [localBuilding, setLocalBuilding] = useState(building);
-  const [localApartment, setLocalApartment] = useState(apartment);
-  const [searchText, setSearchText] = useState(
-    [street, building, city].filter(Boolean).join(" ").trim(),
-  );
-  const mapRef = useRef<any>(null);
-  /** Snapshot when modal opens — used on address clear (X) to reset map + fields like Report Lost SOS flow. */
-  const addressSnapshotRef = useRef({
-    lat,
-    lng,
-    city,
-    street,
-    building,
-    apartment,
-  });
-
-  useEffect(() => {
-    if (visible) {
-      addressSnapshotRef.current = { lat, lng, city, street, building, apartment };
-      setLocalLat(lat);
-      setLocalLng(lng);
-      setLocalCity(city);
-      setLocalStreet(street);
-      setLocalBuilding(building);
-      setLocalApartment(apartment);
-      setSearchText([street, building, city].filter(Boolean).join(" ").trim());
-    }
-  }, [visible, lat, lng, city, street, building, apartment]);
-
-  const handleAddressSearchClear = useCallback(() => {
-    const s = addressSnapshotRef.current;
-    setLocalLat(s.lat);
-    setLocalLng(s.lng);
-    setLocalCity(s.city);
-    setLocalStreet(s.street);
-    setLocalBuilding(s.building);
-    setLocalApartment(s.apartment);
-    mapRef.current?.animateToRegion?.(
-      { latitude: s.lat, longitude: s.lng, latitudeDelta: 0.012, longitudeDelta: 0.012 },
-      400,
-    );
-  }, []);
-
-  const applyPlace = useCallback(
-    (selection: AddressAutocompleteSelection) => {
-      setLocalLat(selection.latitude);
-      setLocalLng(selection.longitude);
-      if (selection.components.city) setLocalCity(selection.components.city);
-      if (selection.components.street) setLocalStreet(selection.components.street);
-      if (selection.components.streetNumber) {
-        setLocalBuilding(selection.components.streetNumber);
-      }
-    },
-    [],
-  );
-
-  const handleMapPress = useCallback(
-    async (e: any) => {
-      const { latitude: newLat, longitude: newLng } = e.nativeEvent.coordinate;
-      setLocalLat(newLat);
-      setLocalLng(newLng);
-      const result = await fetchReverseGeocode({
-        latitude: newLat,
-        longitude: newLng,
-        language: isRTL ? "he" : "en",
-      });
-      if (result) {
-        if (result.components.city) setLocalCity(result.components.city);
-        if (result.components.street) setLocalStreet(result.components.street);
-        if (result.components.streetNumber) {
-          setLocalBuilding(result.components.streetNumber);
-        }
-        if (result.formattedAddress) setSearchText(result.formattedAddress);
-      }
-    },
-    [isRTL],
-  );
-
-  const insets = useSafeAreaInsets();
-
-  return (
-    <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-      >
-        <View style={{ flex: 1, backgroundColor: colors.background }}>
-        {/* Header */}
-        <View
-          style={{
-            paddingTop: Math.max((insets.top || 12) - 8, 0),
-            backgroundColor: colors.surface,
-            borderBottomWidth: 1,
-            borderBottomColor: colors.border,
-          }}
-        >
-          <View
-            style={{
-              flexDirection: rowDirectionForAppLayout(isRTL),
-              alignItems: "center",
-              paddingHorizontal: 16,
-              paddingVertical: 12,
-            }}
-          >
-            <Pressable
-              onPress={onClose}
-              hitSlop={12}
-              style={{ padding: 4 }}
-            >
-              <Ionicons
-                name={isRTL ? "arrow-forward" : "arrow-back"}
-                size={20}
-                color={colors.text}
-              />
-            </Pressable>
-            <Text
-              style={{
-                flex: 1,
-                fontSize: 18,
-                fontWeight: "700",
-                color: colors.text,
-                textAlign: "center",
-              }}
-            >
-              {t("editAddress")}
-            </Text>
-            <View style={{ width: 36 }} />
-          </View>
-        </View>
-
-        {/* Scrollable content */}
-        <ScrollView
-          style={{ flex: 1 }}
-          contentContainerStyle={{ paddingBottom: 24 }}
-          keyboardShouldPersistTaps="always"
-          keyboardDismissMode="none"
-          showsVerticalScrollIndicator={false}
-        >
-          <View style={{ height: 200 }}>
-            <MapViewWrapper
-              ref={mapRef}
-              style={{ flex: 1 }}
-              region={{
-                latitude: localLat,
-                longitude: localLng,
-                latitudeDelta: 0.012,
-                longitudeDelta: 0.012,
-              }}
-              onPress={handleMapPress}
-            >
-              <MarkerWrapper
-                coordinate={{ latitude: localLat, longitude: localLng }}
-                pinColor={colors.primary}
-              />
-            </MapViewWrapper>
-          </View>
-
-          <Text
-            style={{
-              fontSize: 12,
-              color: colors.textMuted,
-              textAlign: "center",
-              paddingVertical: 8,
-            }}
-          >
-            {t("tapToPickLocation")}
-          </Text>
-
-          <View style={{ paddingHorizontal: 20, gap: 12, marginTop: 4 }}>
-            <AddressAutocomplete
-              label={t("searchAddress")}
-              required
-              value={searchText}
-              onChangeText={setSearchText}
-              onSelect={applyPlace}
-              onClear={handleAddressSearchClear}
-              placeholder={t("searchAddressPlaceholder")}
-              isRTL={isRTL}
-              type="address"
-              closeOnBlur={false}
-            />
-            <AddressField
-              label={t("addressCity")}
-              value={localCity}
-              onChangeText={setLocalCity}
-              isRTL={isRTL}
-            />
-            <AddressField
-              label={t("addressStreet")}
-              value={localStreet}
-              onChangeText={setLocalStreet}
-              isRTL={isRTL}
-            />
-            <View style={{ flexDirection: "row", gap: 12 }}>
-              <View style={{ flex: 1 }}>
-                <AddressField
-                  label={t("addressBuilding")}
-                  value={localBuilding}
-                  onChangeText={setLocalBuilding}
-                  isRTL={isRTL}
-                />
-              </View>
-              <View style={{ flex: 1 }}>
-                <AddressField
-                  label={t("addressApartment")}
-                  value={localApartment}
-                  onChangeText={setLocalApartment}
-                  isRTL={isRTL}
-                />
-              </View>
-            </View>
-          </View>
-
-          {/* Confirm button */}
-          <View style={{ paddingHorizontal: 20, marginTop: 24, paddingBottom: Math.max(insets.bottom, 20) }}>
-            <Pressable
-              onPress={() =>
-                onConfirm({
-                  lat: localLat,
-                  lng: localLng,
-                  city: localCity,
-                  street: localStreet,
-                  building: localBuilding,
-                  apartment: localApartment,
-                })
-              }
-              style={{
-                backgroundColor: colors.primary,
-                borderRadius: 14,
-                paddingVertical: 16,
-                alignItems: "center",
-              }}
-            >
-              <Text style={{ fontSize: 16, fontWeight: "700", color: "#fff" }}>
-                {t("confirmLocation")}
-              </Text>
-            </Pressable>
-          </View>
-        </ScrollView>
-        </View>
-      </KeyboardAvoidingView>
-    </Modal>
-  );
-}
-
 function AddressField({
   label,
   value,
@@ -967,7 +680,11 @@ export function ProviderEditScreen() {
                 description: p.description,
               }),
             );
-            loaded[typeNum] = { enabled: true, rate: String(rate.rate), packages: existingPkgs };
+            loaded[typeNum] = {
+              enabled: true,
+              rate: String(roundMoney(Number(rate.rate) / 0.9)),
+              packages: existingPkgs,
+            };
           }
         }
         setServiceStates(loaded);
@@ -1149,7 +866,7 @@ export function ProviderEditScreen() {
         const st = serviceStates[svc.serviceType];
         return {
           serviceType: svc.serviceTypeName,
-          rate: Number(st.rate),
+          rate: providerNetFromBasePrice(Number(st.rate)),
           pricingUnit: svc.pricingUnit,
           packages: st.packages.map((p) => ({
             title: p.title,
@@ -2043,15 +1760,15 @@ export function ProviderEditScreen() {
       <AddressMapModal
         visible={showMapModal}
         onClose={() => setShowMapModal(false)}
-        lat={latitude}
-        lng={longitude}
-        city={city}
-        street={street}
-        building={buildingNumber}
-        apartment={apartmentNumber}
+        initial={{
+          lat: latitude,
+          lng: longitude,
+          city,
+          street,
+          building: buildingNumber,
+          apartment: apartmentNumber,
+        }}
         onConfirm={handleAddressConfirm}
-        t={t}
-        isRTL={isRTL}
       />
 
       {/* Add Package Modal */}

@@ -12,6 +12,8 @@
  * (much cheaper than per-request). Always pair them via
  * {@link createPlacesSession}.
  */
+import { Platform } from "react-native";
+import * as Location from "expo-location";
 import {
   GOOGLE_PLACES_API_KEY,
   GOOGLE_PLACES_AVAILABLE,
@@ -332,26 +334,21 @@ export interface NearbyDogParksOptions {
   language?: "he" | "en";
 }
 
-/**
- * Reverse-geocode a lat/lng to the most relevant address using Google.
- * Used when the user taps the map to drop a pin and we want to backfill the
- * address fields.
- */
-export async function fetchReverseGeocode(
-  options: ReverseGeocodeOptions,
+async function googleReverseGeocodeOnce(
+  latitude: number,
+  longitude: number,
+  language: string,
+  extraParams: Record<string, string> | undefined,
+  signal: AbortSignal | undefined,
 ): Promise<PlaceDetails | null> {
-  if (!GOOGLE_PLACES_AVAILABLE) return null;
   const params = new URLSearchParams({
-    latlng: `${options.latitude},${options.longitude}`,
+    latlng: `${latitude},${longitude}`,
     key: GOOGLE_PLACES_API_KEY,
-    language: options.language ?? GOOGLE_PLACES_DEFAULT_LANGUAGE,
-    result_type: "street_address|route|premise|locality",
+    language,
+    ...(extraParams ?? {}),
   });
-
   try {
-    const res = await fetch(`${GEOCODE_URL}?${params.toString()}`, {
-      signal: options.signal,
-    });
+    const res = await fetch(`${GEOCODE_URL}?${params.toString()}`, { signal });
     if (!res.ok) return null;
     const data = (await res.json()) as GoogleGeocodeResponse;
     if (data.status !== "OK" || !data.results?.length) return null;
@@ -359,8 +356,8 @@ export async function fetchReverseGeocode(
     return {
       placeId: r.place_id,
       formattedAddress: r.formatted_address ?? "",
-      latitude: r.geometry?.location?.lat ?? options.latitude,
-      longitude: r.geometry?.location?.lng ?? options.longitude,
+      latitude: r.geometry?.location?.lat ?? latitude,
+      longitude: r.geometry?.location?.lng ?? longitude,
       components: parseAddressComponents(r.address_components ?? []),
     };
   } catch (err) {
@@ -368,6 +365,80 @@ export async function fetchReverseGeocode(
     if (__DEV__) {
       // eslint-disable-next-line no-console
       console.warn("[GooglePlaces] reverse geocode error", err);
+    }
+    return null;
+  }
+}
+
+function placeDetailsFromExpo(
+  r: Location.LocationGeocodedAddress,
+  latitude: number,
+  longitude: number,
+): PlaceDetails {
+  const street = r.street ?? undefined;
+  const streetNumber = r.streetNumber ?? undefined;
+  const city = r.city ?? r.subregion ?? r.district ?? undefined;
+  const formatted =
+    [street, streetNumber, city].filter(Boolean).join(" ").trim() ||
+    [r.name, r.postalCode].filter(Boolean).join(" ").trim();
+  return {
+    placeId: "",
+    formattedAddress: formatted,
+    latitude,
+    longitude,
+    components: {
+      city,
+      street,
+      streetNumber,
+      postalCode: r.postalCode ?? undefined,
+      countryCode: r.isoCountryCode?.toUpperCase(),
+      countryName: r.region ?? undefined,
+    },
+  };
+}
+
+/**
+ * Reverse-geocode a lat/lng for address form fields.
+ * Tries Google Geocoding (strict then loose filter), then `expo-location` on device.
+ */
+export async function fetchReverseGeocode(
+  options: ReverseGeocodeOptions,
+): Promise<PlaceDetails | null> {
+  const language = options.language ?? GOOGLE_PLACES_DEFAULT_LANGUAGE;
+  const signal = options.signal;
+
+  if (GOOGLE_PLACES_AVAILABLE) {
+    const strict = await googleReverseGeocodeOnce(
+      options.latitude,
+      options.longitude,
+      language,
+      { result_type: "street_address|route|premise|locality|sublocality" },
+      signal,
+    );
+    if (strict) return strict;
+    const loose = await googleReverseGeocodeOnce(
+      options.latitude,
+      options.longitude,
+      language,
+      undefined,
+      signal,
+    );
+    if (loose) return loose;
+  }
+
+  if (Platform.OS === "web") return null;
+  try {
+    const rows = await Location.reverseGeocodeAsync({
+      latitude: options.latitude,
+      longitude: options.longitude,
+    });
+    const r = rows[0];
+    if (!r) return null;
+    return placeDetailsFromExpo(r, options.latitude, options.longitude);
+  } catch (err) {
+    if (__DEV__) {
+      // eslint-disable-next-line no-console
+      console.warn("[GooglePlaces] expo reverse geocode error", err);
     }
     return null;
   }
@@ -489,6 +560,9 @@ function parseAddressComponents(
   return {
     city: find(
       "locality",
+      "sublocality_level_1",
+      "sublocality",
+      "neighborhood",
       "postal_town",
       "administrative_area_level_2",
       "administrative_area_level_3",

@@ -5,6 +5,7 @@ import {
   ScrollView,
   Image,
   Pressable,
+  TouchableOpacity,
   ActivityIndicator,
   Linking,
   Platform,
@@ -20,7 +21,11 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation, useRoute } from "@react-navigation/native";
-import { useTranslation, rowDirectionForAppLayout } from "../../i18n";
+import {
+  useTranslation,
+  rowDirectionForAppLayout,
+  type TranslationKey,
+} from "../../i18n";
 import { useAuthStore } from "../../store/authStore";
 import { useFavoritesStore } from "../../store/favoritesStore";
 import { useTheme } from "../../theme/ThemeContext";
@@ -57,6 +62,31 @@ const PRICING_UNIT_LABELS: Record<number, string> = {
 
 const HERO_HEIGHT = 300;
 
+const HERO_HEADER_ICON_SIZE = 26;
+const HERO_HEADER_ICON_HIT_SLOP = {
+  top: 15,
+  bottom: 15,
+  left: 15,
+  right: 15,
+};
+
+/** Joins service labels for the summary card (first two + “+N more”). */
+function formatProviderServicesSubtitle(
+  services: string[],
+  t: (key: TranslationKey) => string,
+): string | null {
+  const list = services.map((s) => s.trim()).filter(Boolean);
+  if (list.length === 0) return null;
+  const maxShown = 2;
+  const shown = list.slice(0, maxShown);
+  const rest = list.length - shown.length;
+  const sep = " \u2022 ";
+  const head = shown.join(sep);
+  if (rest <= 0) return head;
+  const more = t("providerProfileMoreServices").replace("{count}", String(rest));
+  return `${head}${sep}${more}`;
+}
+
 /* ─── Translucent circle button ─── */
 function GlassButton({
   onPress,
@@ -68,13 +98,13 @@ function GlassButton({
   return (
     <Pressable
       onPress={onPress}
-      hitSlop={8}
+      hitSlop={HERO_HEADER_ICON_HIT_SLOP}
       style={({ pressed }) => [
         s.glassBtn,
         pressed && { opacity: 0.75 },
       ]}
     >
-      <Ionicons name={icon as any} size={20} color="#fff" />
+      <Ionicons name={icon as any} size={HERO_HEADER_ICON_SIZE} color="#fff" />
     </Pressable>
   );
 }
@@ -161,7 +191,10 @@ function ActionBtn({
     >
       <Ionicons name={icon as any} size={24} color={colors.primary} />
       <Text
-        style={[s.actionBtnLabel, { color: colors.textSecondary }]}
+        style={[
+          s.actionBtnLabel,
+          { color: colors.textSecondary, marginTop: 4 },
+        ]}
         numberOfLines={1}
       >
         {label}
@@ -206,7 +239,7 @@ export function ProviderProfileScreen() {
   const requestedDate = route.params?.requestedDate as string | undefined;
   const requestedTime = route.params?.requestedTime as string | undefined;
   const { colors } = useTheme();
-  const { t, isRTL, rtlText } = useTranslation();
+  const { t, isRTL, rtlText, trailingFormLinkAlign } = useTranslation();
   const insets = useSafeAreaInsets();
   const { behavior: keyboardAvoidBehavior } = useKeyboardAvoidingState();
 
@@ -251,11 +284,21 @@ export function ProviderProfileScreen() {
   const [directComment, setDirectComment] = useState("");
   const [directFieldError, setDirectFieldError] = useState<string | null>(null);
   const [reviewSortBy, setReviewSortBy] = useState<ReviewSortBy>("newest");
+  const [showTranslation, setShowTranslation] = useState(false);
 
   const sortedRecentReviews = useMemo(() => {
     if (!profile?.recentReviews?.length) return [];
     return sortReviewsForProfile(profile.recentReviews, reviewSortBy).slice(0, 3);
   }, [profile?.recentReviews, reviewSortBy]);
+
+  const servicesSubtitle = useMemo(() => {
+    if (!profile?.services?.length) return null;
+    return formatProviderServicesSubtitle(profile.services, t);
+  }, [profile?.services, t]);
+
+  useEffect(() => {
+    setShowTranslation(false);
+  }, [providerId]);
 
   const openDirectReviewModal = useCallback(() => {
     clearSubmitError();
@@ -575,19 +618,23 @@ export function ProviderProfileScreen() {
 
         {/* ── Summary card (overlapping hero) ── */}
         <View style={[s.summaryCard, { backgroundColor: colors.surface }]}>
-          {/* Category badge */}
-          {profile.services.length > 0 && (
-            <View style={s.categoryBadge}>
-              <Text style={s.categoryBadgeText}>
-                {profile.services[0].toUpperCase()}
-              </Text>
-            </View>
-          )}
-
           {/* Provider name */}
           <Text style={[s.providerName, { color: colors.text }]}>
             {profile.name}
           </Text>
+
+          {servicesSubtitle != null && (
+            <Text
+              style={[
+                s.providerServicesSubtitle,
+                rtlText,
+                { color: colors.textMuted },
+              ]}
+              numberOfLines={2}
+            >
+              {servicesSubtitle}
+            </Text>
+          )}
 
           {/* Rating + availability row */}
           <View style={[s.metaRow, { flexDirection: rowDirectionForAppLayout(isRTL) }]}>
@@ -728,6 +775,30 @@ export function ProviderProfileScreen() {
                 <Text style={[s.bioText, rtlText, { color: colors.textSecondary }]}>
                   {profile.bio}
                 </Text>
+              )}
+              {!!profile.bio && (
+                <TouchableOpacity
+                  activeOpacity={0.7}
+                  onPress={() => setShowTranslation((v) => !v)}
+                  accessibilityRole="button"
+                  accessibilityLabel={t("seeTranslation")}
+                  accessibilityState={{ expanded: showTranslation }}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  style={[trailingFormLinkAlign, { marginTop: 10 }]}
+                >
+                  <Text
+                    style={[
+                      rtlText,
+                      {
+                        fontSize: 14,
+                        fontWeight: "600",
+                        color: colors.primary,
+                      },
+                    ]}
+                  >
+                    {t("seeTranslation")}
+                  </Text>
+                </TouchableOpacity>
               )}
               {profile.services.length > 0 && (
                 <View style={[s.tagsWrap, { flexDirection: rowDirectionForAppLayout(isRTL) }]}>
@@ -1240,25 +1311,17 @@ const s = StyleSheet.create({
     shadowRadius: 24,
     elevation: 12,
   },
-  categoryBadge: {
-    alignSelf: "flex-start",
-    backgroundColor: "#e0e7ff",
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 20,
-    marginBottom: 10,
-  },
-  categoryBadgeText: {
-    fontSize: 10,
-    fontWeight: "800",
-    color: "#3730a3",
-    letterSpacing: 1.2,
-  },
   providerName: {
     fontSize: 28,
     fontWeight: "800",
     letterSpacing: -0.5,
     lineHeight: 34,
+  },
+  providerServicesSubtitle: {
+    fontSize: 14,
+    fontWeight: "500",
+    lineHeight: 20,
+    marginTop: 6,
   },
   metaRow: {
     flexDirection: "row",
@@ -1314,18 +1377,17 @@ const s = StyleSheet.create({
   actionGrid: {
     width: "100%",
     flexDirection: "row",
-    justifyContent: "space-evenly",
-    alignItems: "center",
+    alignItems: "stretch",
     marginVertical: 16,
   },
   actionBtn: {
+    flex: 1,
+    minWidth: 0,
     alignItems: "center",
     justifyContent: "center",
     paddingVertical: 10,
-    paddingHorizontal: 12,
-    minWidth: 52,
+    paddingHorizontal: 4,
     borderRadius: 16,
-    gap: 4,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.04,
@@ -1336,6 +1398,7 @@ const s = StyleSheet.create({
     fontSize: 12,
     fontWeight: "700",
     textAlign: "center",
+    alignSelf: "stretch",
   },
 
   /* ─── Sections wrapper ─── */

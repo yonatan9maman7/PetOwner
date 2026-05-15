@@ -1,5 +1,6 @@
 import type { ProviderApplicationPayload } from "../../types/api";
 import { ServiceType } from "../../types/api";
+import { providerNetFromBasePrice } from "../../utils/pricingDisplay";
 import type { OnboardingFormValues } from "./schemas";
 import {
   servicesForProviderType,
@@ -59,7 +60,7 @@ export function formToPayload(values: OnboardingFormValues): ProviderApplication
       const state = values.services[String(svc.serviceType)];
       return {
         serviceType: svc.serviceTypeName,
-        rate: Number(state.rate),
+        rate: providerNetFromBasePrice(Number(state.rate)),
         pricingUnit: svc.pricingUnit,
         packages: state.packages
           .filter((p) => p.title.trim())

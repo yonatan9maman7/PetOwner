@@ -16,11 +16,12 @@ import { servicesForProviderType } from "./constants";
 import { FieldLabel } from "./FieldLabel";
 import { DogSizeCapacityFields } from "./DogSizeCapacityFields";
 import type { OnboardingFormValues } from "./schemas";
-import { grossFromProviderNet } from "../../utils/pricingDisplay";
+import { providerBreakdownFromBasePrice } from "../../utils/pricingDisplay";
 import { ServiceType } from "../../types/api";
 
-const MAX_PROVIDER_NET_RATE = 2000;
-const MAX_PROVIDER_NET_RATE_DIGITS = 4;
+/** Max sticker base price corresponding to prior max net rate (2000) after 10% fee. */
+const MAX_BASE_PRICE = Math.ceil(2000 / 0.9);
+const MAX_BASE_PRICE_DIGITS = 4;
 
 function serviceInfoDescriptionKey(serviceTypeName: ServiceType): TranslationKey {
   switch (serviceTypeName) {
@@ -49,12 +50,12 @@ function serviceInfoDescriptionKey(serviceTypeName: ServiceType): TranslationKey
   }
 }
 
-function normalizeProviderNetRateInput(raw: string): string {
+function normalizeBasePriceInput(raw: string): string {
   const digits = raw.replace(/\D/g, "");
   if (digits.length === 0) return "";
   let n = parseInt(digits, 10);
   if (!Number.isFinite(n)) return "";
-  if (n > MAX_PROVIDER_NET_RATE) n = MAX_PROVIDER_NET_RATE;
+  if (n > MAX_BASE_PRICE) n = MAX_BASE_PRICE;
   return String(n);
 }
 
@@ -170,7 +171,7 @@ export function ServicesStep() {
 
             {state.enabled && (
               <View style={{ marginTop: 12 }}>
-                <FieldLabel text={t("providerNetEarningsLabel")} isRTL={isRTL} required variant="small" />
+                <FieldLabel text={t("basePriceLabel")} isRTL={isRTL} required variant="small" />
                 <View
                   style={{
                     flexDirection: rowDirectionForAppLayout(isRTL),
@@ -181,10 +182,10 @@ export function ServicesStep() {
                   <Text style={{ fontSize: 13, fontWeight: "600", color: colors.text }}>₪</Text>
                   <TextInput
                     value={state.rate}
-                    onChangeText={(v) => setRate(key, normalizeProviderNetRateInput(v))}
+                    onChangeText={(v) => setRate(key, normalizeBasePriceInput(v))}
                     placeholder="0"
                     keyboardType="number-pad"
-                    maxLength={MAX_PROVIDER_NET_RATE_DIGITS}
+                    maxLength={MAX_BASE_PRICE_DIGITS}
                     style={{
                       flex: 1,
                       backgroundColor: colors.surfaceTertiary,
@@ -203,12 +204,13 @@ export function ServicesStep() {
                 </View>
                 {(() => {
                   const raw = String(state.rate ?? "").replace(",", ".").trim();
-                  const net = parseInt(raw, 10);
-                  if (!Number.isFinite(net) || net <= 0) return null;
-                  const gross = grossFromProviderNet(net);
+                  const basePrice = parseInt(raw, 10);
+                  if (!Number.isFinite(basePrice) || basePrice <= 0) return null;
+                  const { platformFee, netEarnings } = providerBreakdownFromBasePrice(basePrice);
                   const hint = t("providerPriceEarningsHint")
-                    .replace("{{net}}", net.toFixed(2))
-                    .replace("{{gross}}", gross.toFixed(2));
+                    .replace("{{basePrice}}", basePrice.toFixed(2))
+                    .replace("{{platformFee}}", platformFee.toFixed(2))
+                    .replace("{{netEarnings}}", netEarnings.toFixed(2));
                   return (
                     <Text
                       style={{

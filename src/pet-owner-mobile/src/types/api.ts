@@ -952,6 +952,21 @@ export interface HealthPassportShareDto {
   expiresAt: string;
 }
 
+/**
+ * Canonical booking price components for UI and payment gateway (e.g. Grow) splits.
+ * `BookingDto` uses API field names (`grossAmount`, `serviceFee`, `totalPrice`, `providerNetAmount`).
+ */
+export interface BookingPricingBreakdown {
+  /** Sticker / base service price (= `BookingDto.grossAmount`; providerNetAmount / 0.9). */
+  basePrice: number;
+  /** Platform cut from base (10%); maps to provider-side deduction. */
+  providerPlatformFee: number;
+  /** Customer processing fee (4% of base); maps to `BookingDto.serviceFee`. */
+  customerServiceFee: number;
+  /** Amount charged to customer; maps to `BookingDto.totalPrice`. */
+  finalTotal: number;
+}
+
 export interface CreateBookingRequest {
   providerId: string;
   serviceType: ServiceType;
@@ -970,12 +985,13 @@ export interface BookingDto {
   service: string;
   startDate: string;
   endDate: string;
+  /** Final total charged to customer (`grossAmount` + `serviceFee`). */
   totalPrice: number;
-  /** Provider net for this booking (server-computed). */
+  /** Net earnings for provider after 10% platform fee (`grossAmount` × 0.90; server-computed). */
   providerNetAmount: number;
-  /** Customer subtotal before 4% service fee. */
+  /** Base price of the service (provider sticker price; = providerNetAmount / 0.9). */
   grossAmount: number;
-  /** 4% customer service fee on gross. */
+  /** 4% customer service fee on top of `grossAmount`. */
   serviceFee: number;
   pricingUnit: string;
   status: string;

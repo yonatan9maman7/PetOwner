@@ -26,7 +26,7 @@ import { SmartCalendarPicker } from "../../components/shared/SmartCalendarPicker
 import { TimeSlotSelector } from "../../components/shared/TimeSlotSelector";
 import { ScreenLoadingCenter } from "../../components/shared/ScreenLoadingCenter";
 import { usePetsStore } from "../../store/petsStore";
-import { customerPriceBreakdownFromProviderNet } from "../../utils/pricingDisplay";
+import { customerBreakdownFromProviderNet } from "../../utils/pricingDisplay";
 
 const SERVICE_TYPE_BY_ORDINAL: Record<number, ServiceType> = {
   0: ServiceType.DogWalking,
@@ -535,8 +535,8 @@ export function BookingScreen() {
     );
     const providerNet = applyPetMultiplier(lineTotal, selectedPetIds.length);
     if (providerNet <= 0) return null;
-    const { gross, fee, total } = customerPriceBreakdownFromProviderNet(providerNet);
-    return { providerNet, gross, fee, total };
+    const breakdown = customerBreakdownFromProviderNet(providerNet);
+    return { providerNet, ...breakdown };
   }, [
     selectedRate,
     sr,
@@ -1031,7 +1031,7 @@ export function BookingScreen() {
           )}
         </View>
 
-        {/* Price estimate (server uses same net → gross + fee model) */}
+        {/* Price estimate (server: same base from provider net + 4% customer fee) */}
         {estimatedPricing !== null && (
           <View
             className="rounded-2xl p-5 mb-5"
@@ -1059,7 +1059,7 @@ export function BookingScreen() {
                   {t("bookingBreakdownBase")}
                 </Text>
                 <Text style={{ fontSize: 15, fontWeight: "700", color: colors.text }}>
-                  ₪{estimatedPricing.gross.toFixed(2)}
+                  ₪{estimatedPricing.basePrice.toFixed(2)}
                 </Text>
               </View>
               <View
@@ -1073,7 +1073,7 @@ export function BookingScreen() {
                   {t("bookingBreakdownFee")}
                 </Text>
                 <Text style={{ fontSize: 15, fontWeight: "700", color: colors.text }}>
-                  ₪{estimatedPricing.fee.toFixed(2)}
+                  ₪{estimatedPricing.customerServiceFee.toFixed(2)}
                 </Text>
               </View>
               <View
@@ -1091,7 +1091,7 @@ export function BookingScreen() {
                   {t("bookingBreakdownTotal")}
                 </Text>
                 <Text style={{ fontSize: 18, fontWeight: "800", color: colors.primary }}>
-                  ₪{estimatedPricing.total.toFixed(2)}
+                  ₪{estimatedPricing.finalTotal.toFixed(2)}
                 </Text>
               </View>
             </View>
@@ -1189,7 +1189,7 @@ export function BookingScreen() {
               <Ionicons name="checkmark-circle" size={20} color={colors.textInverse} />
               <Text style={{ color: colors.textInverse, fontSize: 16, fontWeight: "700" }}>
                 {t("confirmBooking")}
-                {estimatedPricing !== null ? ` — ₪${estimatedPricing.total.toFixed(2)}` : ""}
+                {estimatedPricing !== null ? ` — ₪${estimatedPricing.finalTotal.toFixed(2)}` : ""}
               </Text>
             </>
           )}

@@ -438,6 +438,14 @@ export function AppNavigator() {
           <Tab.Screen
             name="Profile"
             component={ProfileStackScreen}
+            listeners={({ navigation }) => ({
+              tabPress: (e) => {
+                e.preventDefault();
+                navigation.navigate("Profile", {
+                  screen: "ProfileMain",
+                });
+              },
+            })}
             options={({ route }) => ({
               tabBarButtonTestID: "tab-profile",
               tabBarLabel: t("tabProfile"),

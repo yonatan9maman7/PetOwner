@@ -198,6 +198,8 @@ export const HE = {
   addMedia: "הוסף תמונה / וידאו",
   publishPost: "פרסם בקהילה",
   createPlaydateTitle: "קביעת מפגש",
+  createPlaydateSubtitle:
+    "ארגן מפגש משחק מהנה ומצא כלבים מתאימים שישמחו להצטרף לכלב שלך.",
   titleField: "כותרת",
   dateField: "YYYY-MM-DD",
   timeField: "HH:mm",
@@ -367,6 +369,8 @@ export const EN: Record<keyof typeof HE, string> = {
   addMedia: "Add photo / video",
   publishPost: "Publish to community",
   createPlaydateTitle: "Create Playdate",
+  createPlaydateSubtitle:
+    "Organize a fun meetup and find the perfect playmates for your dog.",
   titleField: "Title",
   dateField: "YYYY-MM-DD",
   timeField: "HH:mm",
