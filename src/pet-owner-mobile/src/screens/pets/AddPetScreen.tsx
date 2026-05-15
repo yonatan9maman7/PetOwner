@@ -322,7 +322,10 @@ export function AddPetScreen() {
         camera: t("takePhoto"),
         gallery: t("chooseFromLibrary"),
         cancel: t("cancel"),
+        remove: t("removePhoto"),
       },
+      allowRemove: !!avatarUri,
+      onRemove: () => setAvatarUri(null),
       pickerOptions: {
         mediaTypes: ["images"],
         allowsEditing: true,

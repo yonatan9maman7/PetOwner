@@ -1,9 +1,10 @@
-import { useCallback, useMemo, useEffect } from "react";
+import { useCallback, useMemo, useEffect, useState } from "react";
 import {
   View,
   Text,
   Pressable,
   RefreshControl,
+  ScrollView,
 } from "react-native";
 import { FlashList } from "@shopify/flash-list";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -18,6 +19,22 @@ import { ReviewCard } from "./components/ReviewCard";
 
 const STAR_COLOR = "#f59e0b";
 const EMPTY_REVIEWS: ReviewDto[] = [];
+
+type ReviewSortBy = "newest" | "highest" | "lowest";
+
+function sortReviewsBy(reviewsList: ReviewDto[], sortBy: ReviewSortBy): ReviewDto[] {
+  const copy = [...reviewsList];
+  switch (sortBy) {
+    case "newest":
+      return copy.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+    case "highest":
+      return copy.sort((a, b) => b.rating - a.rating);
+    case "lowest":
+      return copy.sort((a, b) => a.rating - b.rating);
+    default:
+      return copy;
+  }
+}
 
 function useRatingDistribution(reviews: ReviewDto[]) {
   return useMemo(() => {
@@ -54,6 +71,13 @@ export function AllReviewsScreen() {
   const onRefresh = useCallback(() => {
     if (providerId) void fetchProviderReviews(providerId);
   }, [providerId, fetchProviderReviews]);
+
+  const [sortBy, setSortBy] = useState<ReviewSortBy>("newest");
+
+  const sortedReviews = useMemo(
+    () => (reviews.length === 0 ? EMPTY_REVIEWS : sortReviewsBy(reviews, sortBy)),
+    [reviews, sortBy],
+  );
 
   const average = useMemo(() => {
     if (!reviews.length) return null;
@@ -155,9 +179,46 @@ export function AllReviewsScreen() {
             </View>
           </View>
         ) : null}
+
+        {reviews.length > 0 ? (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{
+              flexDirection: rowDirectionForAppLayout(isRTL),
+              paddingHorizontal: 4,
+              paddingTop: 4,
+              paddingBottom: 12,
+              gap: 8,
+            }}
+          >
+            {(["newest", "highest", "lowest"] as const).map((opt) => (
+              <Pressable
+                key={opt}
+                onPress={() => setSortBy(opt)}
+                style={{
+                  paddingHorizontal: 14,
+                  paddingVertical: 6,
+                  borderRadius: 20,
+                  backgroundColor: sortBy === opt ? colors.primary : colors.surfaceSecondary,
+                }}
+              >
+                <Text
+                  style={{
+                    fontSize: 13,
+                    fontWeight: "600",
+                    color: sortBy === opt ? "#fff" : colors.textSecondary,
+                  }}
+                >
+                  {t(opt === "newest" ? "sortNewest" : opt === "highest" ? "sortHighest" : "sortLowest")}
+                </Text>
+              </Pressable>
+            ))}
+          </ScrollView>
+        ) : null}
       </View>
     ),
-    [error, loading, reviews.length, average, counts, max, colors, isRTL, rtlText, t, onRefresh],
+    [error, loading, reviews.length, average, counts, max, colors, isRTL, rtlText, t, onRefresh, sortBy],
   );
 
   const renderItem = useCallback(
@@ -209,7 +270,8 @@ export function AllReviewsScreen() {
 
       <FlashList<ReviewDto>
         className="flex-1"
-        data={loading && reviews.length === 0 ? [] : reviews}
+        data={loading && reviews.length === 0 ? [] : sortedReviews}
+        estimatedItemSize={150}
         keyExtractor={(r) => r.id}
         renderItem={renderItem}
         ListHeaderComponent={ListHeader}

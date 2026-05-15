@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.RegularExpressions;
 
 namespace PetOwner.Api.Services;
 
@@ -176,14 +177,8 @@ public class GeminiAiService : IGeminiAiService
     {
         try
         {
-            var cleaned = content.Trim();
-            if (cleaned.StartsWith("```"))
-            {
-                cleaned = cleaned.Split('\n', 2).Length > 1 ? cleaned.Split('\n', 2)[1] : cleaned;
-                if (cleaned.EndsWith("```"))
-                    cleaned = cleaned[..^3];
-                cleaned = cleaned.Trim();
-            }
+            var jsonMatch = Regex.Match(content, @"\{[\s\S]*\}", RegexOptions.Singleline);
+            var cleaned = jsonMatch.Success ? jsonMatch.Value : content.Trim();
 
             var json = JsonSerializer.Deserialize<JsonElement>(cleaned);
             return new TeletriageResult(

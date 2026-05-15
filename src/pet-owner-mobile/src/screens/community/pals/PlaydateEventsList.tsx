@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { View, Text, Pressable, ActivityIndicator, StyleSheet, RefreshControl } from "react-native";
 import { FlashList } from "@shopify/flash-list";
 import { Ionicons } from "@expo/vector-icons";
@@ -32,12 +32,15 @@ export function PlaydateEventsList() {
     setRefreshing(false);
   }, [load]);
 
-  useState(() => { load(); });
+  useEffect(() => {
+    void load();
+  }, [load]);
 
   return (
     <View style={{ flex: 1 }}>
       <FlashList
         data={events}
+        estimatedItemSize={140}
         keyExtractor={(item) => item.id}
         contentContainerStyle={{ paddingBottom: 140 }}
         refreshControl={

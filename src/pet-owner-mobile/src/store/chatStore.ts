@@ -89,6 +89,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     set({ loading: true });
     try {
       const data = await chatApi.getMessages(otherUserId, page);
+      if (get().activeOtherUserId !== otherUserId) return;
       set({
         activeMessages:
           page > 1 ? [...data, ...get().activeMessages] : data,
@@ -96,7 +97,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
         loading: false,
       });
     } catch (error) {
-      set({ loading: false });
+      if (get().activeOtherUserId === otherUserId) {
+        set({ loading: false });
+      }
       if (axios.isAxiosError(error) && error.response?.status === 401) return;
     }
   },

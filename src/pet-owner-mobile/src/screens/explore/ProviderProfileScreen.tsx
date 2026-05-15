@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import {
   View,
   Text,
@@ -29,7 +29,7 @@ import * as Clipboard from "expo-clipboard";
 import * as Sharing from "expo-sharing";
 import { appProviderProfileDeepLink, publicProviderProfileUrl } from "../../config/publicLinks";
 import { mapApi } from "../../api/client";
-import type { DogSize, ProviderPublicProfileDto } from "../../types/api";
+import type { DogSize, ProviderPublicProfileDto, ReviewDto } from "../../types/api";
 import { ProviderType } from "../../types/api";
 import { useReviewsStore } from "../../store/reviewsStore";
 import { StarRatingInput } from "./components/StarRatingInput";
@@ -135,18 +135,16 @@ function HeroSection({
   );
 }
 
-/* ─── Action button in the 4-col grid ─── */
+/* ─── Action button (summary card row) ─── */
 function ActionBtn({
   icon,
   label,
   onPress,
-  primary,
   disabled,
 }: {
   icon: string;
   label: string;
   onPress: () => void;
-  primary?: boolean;
   disabled?: boolean;
 }) {
   const { colors } = useTheme();
@@ -156,29 +154,36 @@ function ActionBtn({
       disabled={disabled}
       style={({ pressed }) => [
         s.actionBtn,
-        primary
-          ? { backgroundColor: colors.primary }
-          : { backgroundColor: colors.surfaceSecondary },
+        { backgroundColor: colors.surfaceSecondary },
         pressed && { transform: [{ scale: 0.96 }], opacity: 0.9 },
         disabled && { opacity: 0.4 },
       ]}
     >
-      <Ionicons
-        name={icon as any}
-        size={22}
-        color={primary ? "#fff" : colors.primary}
-      />
+      <Ionicons name={icon as any} size={24} color={colors.primary} />
       <Text
-        style={[
-          s.actionBtnLabel,
-          { color: primary ? "#fff" : colors.textSecondary },
-        ]}
+        style={[s.actionBtnLabel, { color: colors.textSecondary }]}
         numberOfLines={1}
       >
         {label}
       </Text>
     </Pressable>
   );
+}
+
+type ReviewSortBy = "newest" | "highest" | "lowest";
+
+function sortReviewsForProfile(reviewsList: ReviewDto[], sortBy: ReviewSortBy): ReviewDto[] {
+  const copy = [...reviewsList];
+  switch (sortBy) {
+    case "newest":
+      return copy.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+    case "highest":
+      return copy.sort((a, b) => b.rating - a.rating);
+    case "lowest":
+      return copy.sort((a, b) => a.rating - b.rating);
+    default:
+      return copy;
+  }
 }
 
 /* ─── Section header ─── */
@@ -222,14 +227,35 @@ export function ProviderProfileScreen() {
   const [shareCaptureKey, setShareCaptureKey] = useState(0);
   const shareCardRef = useRef<View>(null);
   const shareLayoutResolverRef = useRef<(() => void) | null>(null);
+  const isMountedRef = useRef(true);
+  const shareTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const onShareCardLayoutReady = useCallback(() => {
     shareLayoutResolverRef.current?.();
   }, []);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+      shareLayoutResolverRef.current = null;
+      if (shareTimeoutRef.current) {
+        clearTimeout(shareTimeoutRef.current);
+        shareTimeoutRef.current = null;
+      }
+    };
+  }, []);
+
   const [directReviewOpen, setDirectReviewOpen] = useState(false);
   const [directRating, setDirectRating] = useState(0);
   const [directComment, setDirectComment] = useState("");
   const [directFieldError, setDirectFieldError] = useState<string | null>(null);
+  const [reviewSortBy, setReviewSortBy] = useState<ReviewSortBy>("newest");
+
+  const sortedRecentReviews = useMemo(() => {
+    if (!profile?.recentReviews?.length) return [];
+    return sortReviewsForProfile(profile.recentReviews, reviewSortBy).slice(0, 3);
+  }, [profile?.recentReviews, reviewSortBy]);
 
   const openDirectReviewModal = useCallback(() => {
     clearSubmitError();
@@ -349,7 +375,7 @@ export function ProviderProfileScreen() {
         };
         shareLayoutResolverRef.current = finish;
         setShareCaptureKey((k) => k + 1);
-        setTimeout(finish, 14_000);
+        shareTimeoutRef.current = setTimeout(finish, 14_000);
       });
 
       await new Promise<void>((resolve) => {
@@ -398,8 +424,14 @@ export function ProviderProfileScreen() {
     } catch {
       showGlobalAlertCompat(t("errorTitle"), t("shareProviderCardFailed"));
     } finally {
-      setShareCaptureKey(0);
-      setShareCardBusy(false);
+      if (shareTimeoutRef.current) {
+        clearTimeout(shareTimeoutRef.current);
+        shareTimeoutRef.current = null;
+      }
+      if (isMountedRef.current) {
+        setShareCaptureKey(0);
+        setShareCardBusy(false);
+      }
     }
   };
 
@@ -595,8 +627,13 @@ export function ProviderProfileScreen() {
             )}
           </View>
 
-          {/* ── Action grid ── */}
-          <View style={s.actionGrid}>
+          {/* ── Action row ── */}
+          <View
+            style={[
+              s.actionGrid,
+              { flexDirection: rowDirectionForAppLayout(isRTL) },
+            ]}
+          >
             <ActionBtn
               icon="call"
               label={t("call")}
@@ -606,7 +643,6 @@ export function ProviderProfileScreen() {
               icon="navigate"
               label={t("navigateAction")}
               onPress={handleNavigate}
-              primary
             />
             <ActionBtn
               icon="globe-outline"
@@ -860,14 +896,50 @@ export function ProviderProfileScreen() {
                 {t("noReviews")}
               </Text>
             ) : (
-              profile.recentReviews.slice(0, 3).map((review, index) => (
-                <ReviewCard
-                  key={review.id}
-                  review={review}
-                  borderTop={index > 0}
-                  avatarSize={40}
-                />
-              ))
+              <>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={{
+                    flexDirection: rowDirectionForAppLayout(isRTL),
+                    paddingHorizontal: 16,
+                    paddingTop: 4,
+                    paddingBottom: 12,
+                    gap: 8,
+                  }}
+                >
+                  {(["newest", "highest", "lowest"] as const).map((opt) => (
+                    <Pressable
+                      key={opt}
+                      onPress={() => setReviewSortBy(opt)}
+                      style={{
+                        paddingHorizontal: 14,
+                        paddingVertical: 6,
+                        borderRadius: 20,
+                        backgroundColor: reviewSortBy === opt ? colors.primary : colors.surfaceSecondary,
+                      }}
+                    >
+                      <Text
+                        style={{
+                          fontSize: 13,
+                          fontWeight: "600",
+                          color: reviewSortBy === opt ? "#fff" : colors.textSecondary,
+                        }}
+                      >
+                        {t(opt === "newest" ? "sortNewest" : opt === "highest" ? "sortHighest" : "sortLowest")}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </ScrollView>
+                {sortedRecentReviews.map((review, index) => (
+                  <ReviewCard
+                    key={review.id}
+                    review={review}
+                    borderTop={index > 0}
+                    avatarSize={40}
+                  />
+                ))}
+              </>
             )}
 
             {profile.reviewCount > 3 && (
@@ -1238,28 +1310,32 @@ const s = StyleSheet.create({
     color: "#fff",
   },
 
-  /* ─── Action grid ─── */
+  /* ─── Action row ─── */
   actionGrid: {
+    width: "100%",
     flexDirection: "row",
-    gap: 10,
-    marginTop: 20,
+    justifyContent: "space-evenly",
+    alignItems: "center",
+    marginVertical: 16,
   },
   actionBtn: {
-    flex: 1,
     alignItems: "center",
     justifyContent: "center",
-    paddingVertical: 14,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    minWidth: 52,
     borderRadius: 16,
-    gap: 6,
+    gap: 4,
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 6,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 4,
+    elevation: 2,
   },
   actionBtnLabel: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: "700",
+    textAlign: "center",
   },
 
   /* ─── Sections wrapper ─── */

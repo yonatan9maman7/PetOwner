@@ -112,7 +112,7 @@ const dark: ThemeColors = {
   successLight: "#0d3326",
   warning: "#f97316",
   warningLight: "#3b2712",
-  tabBar: "#0c1322",
+  tabBar: "#1a2236",
   tabBarActive: "#ffffff",
   tabBarInactive: "rgba(255,255,255,0.55)",
   shadow: "#000000",

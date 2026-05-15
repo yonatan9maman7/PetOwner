@@ -229,9 +229,24 @@ export function ExploreScreen() {
   const { height: windowHeight } = useWindowDimensions();
   const isFocused = useIsFocused();
   const tabBarHeight = useBottomTabBarHeight();
-  /** When the scene bleeds under the tab bar after transitions, `bottom` must offset by tab height. */
-  const DEFAULT_TAB_BAR_FLOOR = 68;
-  const resolvedTabBarH = tabBarHeight > 0.5 ? tabBarHeight : DEFAULT_TAB_BAR_FLOOR;
+  /** Must match Android tab bar in `AppNavigator` (content + top padding + nav inset). */
+  const ANDROID_TAB_BAR_CONTENT = 60;
+  const ANDROID_TAB_BAR_PADDING_TOP = 8;
+  const androidTabBarFloor =
+    Platform.OS === "android"
+      ? ANDROID_TAB_BAR_CONTENT + ANDROID_TAB_BAR_PADDING_TOP + insets.bottom
+      : 0;
+  const defaultTabBarFloor = Platform.OS === "android" ? androidTabBarFloor : 68;
+  /**
+   * When the map layer is taller than `windowHeight - tabBar`, it steals touches on Android.
+   * `useBottomTabBarHeight()` is usually correct; `Math.max` guards under-measurement vs. the map.
+   */
+  const resolvedTabBarH =
+    tabBarHeight > 0.5
+      ? Platform.OS === "android"
+        ? Math.max(tabBarHeight, androidTabBarFloor)
+        : tabBarHeight
+      : defaultTabBarFloor;
 
   const isLoggedIn = useAuthStore((s) => s.isLoggedIn);
   const hasPets = usePetsStore((s) => s.pets.length > 0);

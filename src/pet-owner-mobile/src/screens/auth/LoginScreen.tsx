@@ -16,9 +16,6 @@ import { showGlobalAlertCompat } from "../../components/global-modal";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
-// Paused until Apple Developer Program enrollment — restore when enabling Sign in with Apple.
-// import * as AppleAuthentication from "expo-apple-authentication";
-// import * as Crypto from "expo-crypto";
 import * as WebBrowser from "expo-web-browser";
 import { makeRedirectUri } from "expo-auth-session";
 import * as Google from "expo-auth-session/providers/google";
@@ -175,10 +172,16 @@ function LoginForm() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [bioEnabled, setBioEnabled] = useState(false);
   const [bioTypeLabel, setBioTypeLabel] = useState<biometricService.BiometricTypeLabel>("generic");
-  const [autoPromptDone, setAutoPromptDone] = useState(false);
+  /** When false and biometrics are on, show biometric-first layout (no email/password). */
+  const [showPasswordForm, setShowPasswordForm] = useState(true);
+  const showPasswordFormRef = useRef(showPasswordForm);
 
   const emailRef = useRef<TextInput>(null);
   const passwordRef = useRef<TextInput>(null);
+
+  useEffect(() => {
+    showPasswordFormRef.current = showPasswordForm;
+  }, [showPasswordForm]);
   const navigation = useNavigation<any>();
   const setAuth = useAuthStore((s) => s.setAuth);
   const insets = useSafeAreaInsets();
@@ -215,21 +218,17 @@ function LoginForm() {
       setBioEnabled(available);
       setBioTypeLabel(label);
       if (available) {
-        bioTimer = setTimeout(() => runBiometricLogin(label), 400);
-        setAutoPromptDone(true);
+        setShowPasswordForm(false);
+        bioTimer = setTimeout(() => {
+          if (!showPasswordFormRef.current) {
+            void runBiometricLogin(label);
+          }
+        }, 400);
       }
     })();
     return () => { cancelled = true; if (bioTimer) clearTimeout(bioTimer); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  /* ── Check Apple availability on mount (iOS only) — paused with Sign in with Apple
-  useEffect(() => {
-    if (Platform.OS === "ios") {
-      AppleAuthentication.isAvailableAsync().then(setAppleAvailable).catch(() => {});
-    }
-  }, []);
-  ── */
 
   /* ── Biometric login helper ── */
   const runBiometricLogin = async (label?: biometricService.BiometricTypeLabel) => {
@@ -259,6 +258,7 @@ function LoginForm() {
         // Stored password is stale (changed elsewhere) — wipe and fall back.
         await biometricService.disable();
         setBioEnabled(false);
+        setShowPasswordForm(true);
         setErrorMessage(t("biometricFailedFallback"));
         emailRef.current?.focus();
       } else if (
@@ -367,6 +367,8 @@ function LoginForm() {
       : t("biometricFingerprintButton");
 
   const bioIcon = bioTypeLabel === "faceId" ? "scan-circle-outline" : "finger-print";
+  const showBiometricLanding = bioEnabled && !showPasswordForm;
+  const showCredentialForm = !bioEnabled || showPasswordForm;
   const heroBackgroundColor = "#081B3E";
   /**
    * Logo reveal tuning (local ≈ production; tunnel is slower before onLoad):
@@ -494,244 +496,309 @@ function LoginForm() {
           showsVerticalScrollIndicator={false}
           automaticallyAdjustKeyboardInsets={Platform.OS === "ios"}
         >
-          {/* ── Welcome + language (one row: EN title | toggle, HE toggle | title via rtlRow) ── */}
-          <View className="mb-5">
+          {showBiometricLanding ? (
             <View
               style={[
                 rtlRow,
                 {
-                  alignItems: "center",
-                  gap: 10,
+                  width: "100%",
+                  justifyContent: "flex-end",
                   marginBottom: 8,
                 },
               ]}
             >
-              <Text
-                style={[rtlText, { color: colors.text, flex: 1, minWidth: 0 }]}
-                className={`text-3xl font-bold ${alignCls}`}
-                numberOfLines={2}
-              >
-                {t("welcomeTitle")}
-              </Text>
               <LanguageToggle />
             </View>
-            <Text
-              style={[rtlText, { color: colors.textSecondary }]}
-              className={`text-base leading-6 ${alignCls}`}
-            >
-              {t("welcomeSubtitle")}
-            </Text>
-          </View>
-
-          {/* ── Email ── */}
-          <View className="mb-4">
-            <Text style={[rtlText, { color: colors.textSecondary }]} className={labelCls}>
-              {t("emailLabel")}
-            </Text>
-            <View
-              style={[
-                rtlRow,
-                {
-                  alignItems: "center",
-                  backgroundColor: colors.inputBg,
-                  borderRadius: 12,
-                  gap: 12,
-                  paddingHorizontal: 20,
-                  paddingVertical: 15,
-                  minHeight: 55,
-                },
-              ]}
-            >
-              <Ionicons name="mail-outline" size={20} color={colors.textSecondary} />
-              <TextInput
-                testID="login-email-input"
-                ref={emailRef}
-                style={[
-                  rtlInput,
-                  {
-                    flex: 1,
-                    fontSize: 16,
-                    lineHeight: 20,
-                    color: colors.text,
-                    padding: 0,
-                  },
-                ]}
-                placeholder={t("emailPlaceholder")}
-                placeholderTextColor={colors.textMuted}
-                value={email}
-                onChangeText={(v) => {
-                  clearAuthError();
-                  setEmail(v);
-                }}
-                keyboardType="email-address"
-                autoCapitalize="none"
-                autoComplete="email"
-                returnKeyType="next"
-                blurOnSubmit={false}
-                onSubmitEditing={() => passwordRef.current?.focus()}
-              />
-            </View>
-          </View>
-
-          {/* ── Password ── */}
-          <View className="mb-3">
-            <Text style={[rtlText, { color: colors.textSecondary }]} className={labelCls}>
-              {t("passwordLabel")}
-            </Text>
-            <View
-              style={[
-                rtlRow,
-                {
-                  alignItems: "center",
-                  backgroundColor: colors.inputBg,
-                  borderRadius: 12,
-                  gap: 12,
-                  paddingHorizontal: 20,
-                  paddingVertical: 15,
-                  minHeight: 55,
-                },
-              ]}
-            >
-              <Ionicons
-                name="lock-closed-outline"
-                size={20}
-                color={colors.textSecondary}
-              />
-              <TextInput
-                testID="login-password-input"
-                ref={passwordRef}
-                style={[
-                  rtlInput,
-                  {
-                    flex: 1,
-                    fontSize: 16,
-                    lineHeight: 20,
-                    color: colors.text,
-                    padding: 0,
-                  },
-                ]}
-                placeholder={t("passwordPlaceholder")}
-                placeholderTextColor={colors.textMuted}
-                value={password}
-                onChangeText={(v) => {
-                  clearAuthError();
-                  setPassword(v);
-                }}
-                secureTextEntry={secureEntry}
-                returnKeyType="done"
-                onSubmitEditing={handleLogin}
-              />
-              <Pressable
-                onPress={() => setSecureEntry((v) => !v)}
-                hitSlop={8}
-              >
-                <Ionicons
-                  name={secureEntry ? "eye-off-outline" : "eye-outline"}
-                  size={20}
-                  color={colors.textSecondary}
-                />
-              </Pressable>
-            </View>
-          </View>
-
-          {/* ── Forgot Password Link ── */}
-          <Pressable
-            className="mb-2"
-            style={trailingFormLinkAlign}
-            hitSlop={8}
-            onPress={() => navigation.navigate("ForgotPasswordScreen")}
-          >
-            <Text className="text-xs font-bold" style={{ color: colors.brand }}>
-              {t("forgotPassword")}
-            </Text>
-          </Pressable>
-
-          {errorMessage ? (
-            <Text
-              accessibilityRole="alert"
-              style={[
-                rtlText,
-                {
-                  color: colors.danger,
-                  marginBottom: 14,
-                  textAlign: isHebrew ? "right" : "left",
-                },
-              ]}
-              className="text-sm leading-5 px-1"
-            >
-              {errorMessage}
-            </Text>
           ) : (
-            <View style={{ height: 10 }} />
+            <View className="mb-5">
+              <View
+                style={[
+                  rtlRow,
+                  {
+                    alignItems: "center",
+                    gap: 10,
+                    marginBottom: 8,
+                  },
+                ]}
+              >
+                <Text
+                  style={[rtlText, { color: colors.text, flex: 1, minWidth: 0 }]}
+                  className={`text-3xl font-bold ${alignCls}`}
+                  numberOfLines={2}
+                >
+                  {t("welcomeTitle")}
+                </Text>
+                <LanguageToggle />
+              </View>
+              <Text
+                style={[rtlText, { color: colors.textSecondary }]}
+                className={`text-base leading-6 ${alignCls}`}
+              >
+                {t("welcomeSubtitle")}
+              </Text>
+            </View>
           )}
 
-          {/* ── Sign-In Button ── */}
-          <Pressable
-            testID="login-submit-button"
-            className="h-14 rounded-xl items-center justify-center active:opacity-90"
-            style={{ backgroundColor: colors.brand }}
-            onPress={handleLogin}
-            disabled={loading}
-          >
-            {loading ? (
-              <ActivityIndicator color={colors.textInverse} />
-            ) : (
-              <Text className="text-base font-bold" style={{ color: colors.textInverse }}>
-                {t("loginButton")}
-              </Text>
-            )}
-          </Pressable>
+          {showBiometricLanding ? (
+            <View style={{ alignItems: "center", marginBottom: 8 }}>
+              {errorMessage ? (
+                <Text
+                  accessibilityRole="alert"
+                  style={[
+                    rtlText,
+                    {
+                      color: colors.danger,
+                      marginBottom: 16,
+                      textAlign: isHebrew ? "right" : "left",
+                      width: "100%",
+                    },
+                  ]}
+                  className="text-sm leading-5 px-1"
+                >
+                  {errorMessage}
+                </Text>
+              ) : null}
 
-          {/* ── Biometric Button (shown only when enabled and supported) ── */}
-          {bioEnabled && (
-            <View style={{ marginTop: 12, alignItems: "center" }}>
               <Pressable
+                testID="login-biometric-primary"
                 onPress={() => runBiometricLogin()}
                 disabled={bioLoading}
                 style={({ pressed }) => ({
-                  ...rtlRow,
+                  width: "100%",
                   alignItems: "center",
                   justifyContent: "center",
-                  gap: 8,
-                  height: 52,
-                  borderRadius: 12,
-                  paddingHorizontal: 20,
-                  width: "100%",
-                  backgroundColor: pressed ? colors.inputBg : colors.surfaceSecondary,
-                  borderWidth: 1,
-                  borderColor: colors.border,
+                  paddingVertical: 32,
+                  paddingHorizontal: 24,
+                  borderRadius: 16,
+                  backgroundColor: colors.brand,
+                  opacity: pressed ? 0.9 : 1,
                 })}
               >
                 {bioLoading ? (
-                  <ActivityIndicator size="small" color={colors.brand} />
+                  <ActivityIndicator color={colors.textInverse} size="large" />
                 ) : (
                   <>
-                    <Ionicons name={bioIcon as any} size={22} color={colors.brand} />
-                    <Text style={{ fontSize: 15, fontWeight: "600", color: colors.brand }}>
+                    <Ionicons name={bioIcon as any} size={56} color={colors.textInverse} />
+                    <Text
+                      style={{
+                        marginTop: 14,
+                        fontSize: 17,
+                        fontWeight: "700",
+                        color: colors.textInverse,
+                        textAlign: "center",
+                      }}
+                    >
                       {bioButtonLabel}
                     </Text>
                   </>
                 )}
               </Pressable>
 
-              {/* "Use password instead" link — appears when auto-prompted */}
-              {autoPromptDone && (
+              <Pressable
+                onPress={() => {
+                  clearAuthError();
+                  setShowPasswordForm(true);
+                  requestAnimationFrame(() => emailRef.current?.focus());
+                }}
+                hitSlop={12}
+                style={{ marginTop: 20 }}
+              >
+                <Text style={{ fontSize: 15, fontWeight: "600", color: colors.brand }}>
+                  {t("usePasswordInstead")}
+                </Text>
+              </Pressable>
+            </View>
+          ) : null}
+
+          {showCredentialForm ? (
+            <>
+              {/* ── Email ── */}
+              <View className="mb-4">
+                <Text style={[rtlText, { color: colors.textSecondary }]} className={labelCls}>
+                  {t("emailLabel")}
+                </Text>
+                <View
+                  style={[
+                    rtlRow,
+                    {
+                      alignItems: "center",
+                      backgroundColor: colors.inputBg,
+                      borderRadius: 12,
+                      gap: 12,
+                      paddingHorizontal: 20,
+                      paddingVertical: 15,
+                      minHeight: 55,
+                    },
+                  ]}
+                >
+                  <Ionicons name="mail-outline" size={20} color={colors.textSecondary} />
+                  <TextInput
+                    testID="login-email-input"
+                    ref={emailRef}
+                    style={[
+                      rtlInput,
+                      {
+                        flex: 1,
+                        fontSize: 16,
+                        lineHeight: 20,
+                        color: colors.text,
+                        padding: 0,
+                      },
+                    ]}
+                    placeholder={t("emailPlaceholder")}
+                    placeholderTextColor={colors.textMuted}
+                    value={email}
+                    onChangeText={(v) => {
+                      clearAuthError();
+                      setEmail(v);
+                    }}
+                    keyboardType="email-address"
+                    autoCapitalize="none"
+                    autoComplete="email"
+                    returnKeyType="next"
+                    blurOnSubmit={false}
+                    onSubmitEditing={() => passwordRef.current?.focus()}
+                  />
+                </View>
+              </View>
+
+              {/* ── Password ── */}
+              <View className="mb-3">
+                <Text style={[rtlText, { color: colors.textSecondary }]} className={labelCls}>
+                  {t("passwordLabel")}
+                </Text>
+                <View
+                  style={[
+                    rtlRow,
+                    {
+                      alignItems: "center",
+                      backgroundColor: colors.inputBg,
+                      borderRadius: 12,
+                      gap: 12,
+                      paddingHorizontal: 20,
+                      paddingVertical: 15,
+                      minHeight: 55,
+                    },
+                  ]}
+                >
+                  <Ionicons
+                    name="lock-closed-outline"
+                    size={20}
+                    color={colors.textSecondary}
+                  />
+                  <TextInput
+                    testID="login-password-input"
+                    ref={passwordRef}
+                    style={[
+                      rtlInput,
+                      {
+                        flex: 1,
+                        fontSize: 16,
+                        lineHeight: 20,
+                        color: colors.text,
+                        padding: 0,
+                      },
+                    ]}
+                    placeholder={t("passwordPlaceholder")}
+                    placeholderTextColor={colors.textMuted}
+                    value={password}
+                    onChangeText={(v) => {
+                      clearAuthError();
+                      setPassword(v);
+                    }}
+                    secureTextEntry={secureEntry}
+                    returnKeyType="done"
+                    onSubmitEditing={handleLogin}
+                  />
+                  <Pressable
+                    onPress={() => setSecureEntry((v) => !v)}
+                    hitSlop={8}
+                  >
+                    <Ionicons
+                      name={secureEntry ? "eye-off-outline" : "eye-outline"}
+                      size={20}
+                      color={colors.textSecondary}
+                    />
+                  </Pressable>
+                </View>
+              </View>
+
+              {/* ── Forgot Password Link ── */}
+              <Pressable
+                className="mb-2"
+                style={trailingFormLinkAlign}
+                hitSlop={8}
+                onPress={() => navigation.navigate("ForgotPasswordScreen")}
+              >
+                <Text className="text-xs font-bold" style={{ color: colors.brand }}>
+                  {t("forgotPassword")}
+                </Text>
+              </Pressable>
+
+              {errorMessage ? (
+                <Text
+                  accessibilityRole="alert"
+                  style={[
+                    rtlText,
+                    {
+                      color: colors.danger,
+                      marginBottom: 14,
+                      textAlign: isHebrew ? "right" : "left",
+                    },
+                  ]}
+                  className="text-sm leading-5 px-1"
+                >
+                  {errorMessage}
+                </Text>
+              ) : (
+                <View style={{ height: 10 }} />
+              )}
+
+              {/* ── Sign-In Button ── */}
+              <Pressable
+                testID="login-submit-button"
+                className="h-14 rounded-xl items-center justify-center active:opacity-90"
+                style={{ backgroundColor: colors.brand }}
+                onPress={handleLogin}
+                disabled={loading}
+              >
+                {loading ? (
+                  <ActivityIndicator color={colors.textInverse} />
+                ) : (
+                  <Text className="text-base font-bold" style={{ color: colors.textInverse }}>
+                    {t("loginButton")}
+                  </Text>
+                )}
+              </Pressable>
+
+              {bioEnabled ? (
                 <Pressable
+                  testID="login-biometric-switch-back"
+                  accessibilityRole="button"
+                  accessibilityLabel={bioButtonLabel}
                   onPress={() => {
                     clearAuthError();
-                    setAutoPromptDone(false);
-                    emailRef.current?.focus();
+                    setShowPasswordForm(false);
                   }}
-                  hitSlop={8}
-                  style={{ marginTop: 10 }}
+                  hitSlop={12}
+                  style={[
+                    rtlRow,
+                    {
+                      marginTop: 14,
+                      alignSelf: "center",
+                      paddingVertical: 8,
+                      paddingHorizontal: 12,
+                      alignItems: "center",
+                      gap: 6,
+                    },
+                  ]}
                 >
-                  <Text style={{ fontSize: 13, color: colors.textSecondary }}>
-                    {t("usePasswordInstead")}
-                  </Text>
+                  <Ionicons name={bioIcon as any} size={20} color={colors.textSecondary} />
+                  <Text style={{ fontSize: 13, color: colors.textSecondary }}>{bioButtonLabel}</Text>
                 </Pressable>
-              )}
-            </View>
-          )}
+              ) : null}
+            </>
+          ) : null}
 
           {/* ── Divider + social (only when at least one provider is available) ── */}
           {showSocialSection && (

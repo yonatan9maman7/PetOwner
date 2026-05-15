@@ -12,6 +12,8 @@ import {
   Linking,
   Image,
 } from "react-native";
+import * as Clipboard from "expo-clipboard";
+import Toast from "react-native-toast-message";
 import { showGlobalAlertCompat } from "../../components/global-modal";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -1243,6 +1245,16 @@ export function TriageScreen() {
   /* ═══════════════ Sub-components ═══════════════ */
 
   function UserBubble({ msg }: { msg: UserMessage }) {
+    const handleLongPress = async () => {
+      await Clipboard.setStringAsync(msg.text);
+      Toast.show({
+        type: "success",
+        text1: "Message copied",
+        position: "bottom",
+        visibilityTime: 2000,
+      });
+    };
+
     return (
       <View
         style={{
@@ -1250,7 +1262,8 @@ export function TriageScreen() {
           maxWidth: "80%",
         }}
       >
-        <View
+        <Pressable
+          onLongPress={handleLongPress}
           style={{
             backgroundColor: colors.primary,
             borderRadius: 16,
@@ -1271,10 +1284,13 @@ export function TriageScreen() {
               resizeMode="cover"
             />
           )}
-          <Text style={{ fontSize: 14, color: "#fff", lineHeight: 20 }}>
+          <Text
+            selectable
+            style={{ fontSize: 14, color: "#fff", lineHeight: 20 }}
+          >
             {msg.text}
           </Text>
-        </View>
+        </Pressable>
         <Text
           style={{
             fontSize: 10,

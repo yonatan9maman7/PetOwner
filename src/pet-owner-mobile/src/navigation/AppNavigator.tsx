@@ -1,8 +1,10 @@
-import { View, Text } from "react-native";
+import { View, Text, Platform } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { PlatformPressable } from "@react-navigation/elements";
 import {
   createBottomTabNavigator,
   BottomTabBar,
+  type BottomTabBarButtonProps,
   type BottomTabBarProps,
 } from "@react-navigation/bottom-tabs";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
@@ -110,29 +112,49 @@ function shouldHideTabBar(route: any): boolean {
 /** SOS FAB must render inside tab navigator context (hooks); cannot be a sibling of Tab.Navigator. */
 function TabBarWithSos(props: BottomTabBarProps) {
   return (
-    <View style={{ position: "relative" }} collapsable={false}>
+    <View
+      pointerEvents="box-none"
+      style={{ position: "relative", alignSelf: "stretch" }}
+      collapsable={false}
+    >
       <BottomTabBar {...props} />
       <GlobalSosFab />
     </View>
   );
 }
 
-/** Standard tab row height used by @react-navigation/bottom-tabs (UIKit). */
-const TAB_BAR_CONTENT_HEIGHT = 50;
+/** Row height for icons+label (Android gets a taller row so presses are not “edge only”). */
+const TAB_BAR_CONTENT_HEIGHT_ANDROID = 60;
+const TAB_BAR_CONTENT_HEIGHT_IOS = 50;
+const TAB_BAR_PADDING_TOP_ANDROID = 8;
+const TAB_BAR_PADDING_TOP_IOS = 6;
 
 function useTabBarStyle() {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
-  const paddingTop = 6;
+  const isAndroid = Platform.OS === "android";
+  const paddingTop = isAndroid ? TAB_BAR_PADDING_TOP_ANDROID : TAB_BAR_PADDING_TOP_IOS;
+  const contentHeight = isAndroid ? TAB_BAR_CONTENT_HEIGHT_ANDROID : TAB_BAR_CONTENT_HEIGHT_IOS;
   const paddingBottom = insets.bottom;
+  const height = contentHeight + paddingTop + paddingBottom;
   return {
-    backgroundColor: colors.text,
+    backgroundColor: colors.tabBar,
     borderTopWidth: 1,
-    borderTopColor: colors.text,
+    borderTopColor: colors.border,
     paddingTop,
     paddingBottom,
-    height: TAB_BAR_CONTENT_HEIGHT + paddingTop + paddingBottom,
+    height,
   };
+}
+
+/** Wider press targets so tabs register away from the physical bottom edge. */
+function LooseTabBarButton(props: BottomTabBarButtonProps) {
+  const insets = useSafeAreaInsets();
+  const isAndroid = Platform.OS === "android";
+  const hitSlop = isAndroid
+    ? { top: 14, bottom: Math.max(14, insets.bottom), left: 10, right: 10 }
+    : { top: 10, bottom: 10, left: 8, right: 8 };
+  return <PlatformPressable {...props} hitSlop={hitSlop} />;
 }
 
 const TAB_BAR_HIDDEN = { display: "none" as const };
@@ -295,6 +317,7 @@ export function AppNavigator() {
   const unreadCount = useNotificationStore((s) => s.unreadCount);
   const { t } = useTranslation();
   const { colors } = useTheme();
+  const safeInsets = useSafeAreaInsets();
   const tabBarStyle = useTabBarStyle();
 
   // Social login users must complete phone before accessing any tab
@@ -319,6 +342,12 @@ export function AppNavigator() {
     <NotificationToast />
     <Tab.Navigator
       tabBar={(tabProps) => <TabBarWithSos {...tabProps} />}
+      safeAreaInsets={{
+        top: safeInsets.top,
+        right: safeInsets.right,
+        bottom: safeInsets.bottom,
+        left: safeInsets.left,
+      }}
       screenOptions={{
         headerShown: false,
         /** Inactive tabs skip re-renders while off-screen (saves CPU when switching tabs). */
@@ -339,6 +368,7 @@ export function AppNavigator() {
         tabBarItemStyle: {
           justifyContent: "center",
         },
+        tabBarButton: (btnProps) => <LooseTabBarButton {...btnProps} />,
         tabBarStyle,
       }}
     >

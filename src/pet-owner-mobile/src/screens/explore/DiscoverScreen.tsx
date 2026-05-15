@@ -208,6 +208,7 @@ export function DiscoverScreen() {
   const [serviceTypesError, setServiceTypesError] = useState(false);
   const [providersLoadFailed, setProvidersLoadFailed] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const providersAbortRef = useRef<AbortController | null>(null);
   const providersFetchGenRef = useRef(0);
@@ -237,12 +238,18 @@ export function DiscoverScreen() {
   );
 
   const loadProviders = useCallback(
-    async (search?: string) => {
+    async (
+      search?: string,
+      options?: { isSilentRefresh?: boolean },
+    ) => {
+      const isSilentRefresh = options?.isSilentRefresh ?? false;
       providersAbortRef.current?.abort();
       const controller = new AbortController();
       providersAbortRef.current = controller;
       const gen = ++providersFetchGenRef.current;
-      setLoading(true);
+      if (!isSilentRefresh) {
+        setLoading(true);
+      }
       try {
         const pins = await mapApi.fetchPins(buildFilters(search), controller.signal);
         if (gen !== providersFetchGenRef.current) return;
@@ -259,11 +266,14 @@ export function DiscoverScreen() {
         if (axios.isCancel(error) || (error as Error)?.name === "CanceledError") {
           return;
         }
-        console.error("[DiscoverScreen] fetchPins failed", {
-          search,
-          filters: buildFilters(search),
-          error,
-        });
+        if (__DEV__) {
+          // eslint-disable-next-line no-console
+          console.error("[DiscoverScreen] fetchPins failed", {
+            search,
+            filters: buildFilters(search),
+            error,
+          });
+        }
         setProvidersLoadFailed(true);
         if (!(axios.isAxiosError(error) && error.response?.status === 401)) {
           showApiErrorToast(getNormalizedApiError(error), {
@@ -271,7 +281,7 @@ export function DiscoverScreen() {
           });
         }
       } finally {
-        if (gen === providersFetchGenRef.current) {
+        if (gen === providersFetchGenRef.current && !isSilentRefresh) {
           setLoading(false);
         }
       }
@@ -377,14 +387,19 @@ export function DiscoverScreen() {
     [colors],
   );
 
-  const onRefresh = useCallback(() => {
-    void loadProviders(searchQuery);
+  const onRefresh = useCallback(async () => {
+    setIsRefreshing(true);
+    try {
+      await loadProviders(searchQuery, { isSilentRefresh: true });
+    } finally {
+      setIsRefreshing(false);
+    }
   }, [loadProviders, searchQuery]);
 
   const renderCard = useCallback(
     ({ item, index }: { item: MapPinDto; index: number }) => (
       <Animated.View
-        entering={FadeInDown.delay(index * 80).duration(500).springify()}
+        entering={FadeInDown.delay(Math.min(index, 10) * 80).duration(500).springify()}
         exiting={FadeOut.duration(200)}
         key={item.providerId}
       >
@@ -649,7 +664,7 @@ export function DiscoverScreen() {
           keyboardShouldPersistTaps="handled"
           ItemSeparatorComponent={ItemSeparator}
           onRefresh={onRefresh}
-          refreshing={false}
+          refreshing={isRefreshing}
           initialNumToRender={8}
           maxToRenderPerBatch={8}
           windowSize={5}

@@ -20,7 +20,6 @@ import { sendMessage } from "../../services/signalr";
 import { useTranslation } from "../../i18n";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import { useTheme } from "../../theme/ThemeContext";
-import { useKeyboardAvoidingState } from "../../hooks/useKeyboardAvoidingState";
 import type { ChatMessageDto } from "../../types/api";
 
 const READ_RECEIPT_BLUE = "#34B7F1";
@@ -75,28 +74,22 @@ export function ChatRoomScreen() {
   const currentUserId = useAuthStore((s) => s.userId);
   const activeMessages = useChatStore((s) => s.activeMessages);
   const [text, setText] = useState("");
-  const { keyboardVisible } = useKeyboardAvoidingState();
+  const [isKeyboardVisible, setKeyboardVisible] = useState(false);
   const insets = useSafeAreaInsets();
-  const { bottom: bottomInset } = insets;
-  const navHeaderHeight = useHeaderHeight();
+  const headerHeight = useHeaderHeight();
   /**
-   * Stack uses `headerShown: false` here — `useHeaderHeight()` is often 0.
-   * Fall back to the real chrome above `KeyboardAvoidingView` (status + toolbar).
+   * `headerShown: false` → `useHeaderHeight()` is often 0; match custom toolbar
+   * (`paddingTop: insets.top` + 56pt row) so `KeyboardAvoidingView` offsets correctly.
    */
   const keyboardVerticalOffset =
     Platform.OS === "ios"
-      ? (navHeaderHeight > 0 ? navHeaderHeight : insets.top + CHAT_HEADER_ROW_HEIGHT)
+      ? headerHeight > 0
+        ? headerHeight
+        : insets.top + CHAT_HEADER_ROW_HEIGHT
       : 0;
-  /**
-   * Keyboard closed: pad above system nav / home indicator.
-   * Keyboard open: no extra bottom inset on Android (`adjustResize` + disabled KAV);
-   * iOS keeps a small padding so KAV `padding` does not stack with the home indicator.
-   */
-  const inputContainerPaddingBottom = keyboardVisible
-    ? Platform.OS === "android"
-      ? 0
-      : 8
-    : Math.max(bottomInset, 12);
+  /** iOS: strip bottom safe-area padding while the keyboard is up to avoid double gap with KAV. */
+  const inputContainerPaddingBottom =
+    Platform.OS === "ios" && isKeyboardVisible ? 0 : insets.bottom;
   const listRef = useRef<FlatList>(null);
 
   const handleBack = useCallback(() => {
@@ -119,8 +112,19 @@ export function ChatRoomScreen() {
   }, [otherUserId]);
 
   useEffect(() => {
+    const showEvt = Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow";
+    const hideEvt = Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide";
+    const show = Keyboard.addListener(showEvt, () => setKeyboardVisible(true));
+    const hide = Keyboard.addListener(hideEvt, () => setKeyboardVisible(false));
+    return () => {
+      show.remove();
+      hide.remove();
+    };
+  }, []);
+
+  useEffect(() => {
     const sub = BackHandler.addEventListener("hardwareBackPress", () => {
-      if (keyboardVisible) {
+      if (isKeyboardVisible) {
         Keyboard.dismiss();
         return true;
       }
@@ -128,7 +132,7 @@ export function ChatRoomScreen() {
       return true;
     });
     return () => sub.remove();
-  }, [handleBack, keyboardVisible]);
+  }, [handleBack, isKeyboardVisible]);
 
   const handleSend = async () => {
     const content = text.trim();

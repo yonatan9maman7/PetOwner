@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { View, Text, Pressable, ActivityIndicator, StyleSheet, RefreshControl } from "react-native";
 import { FlashList } from "@shopify/flash-list";
 import { Ionicons } from "@expo/vector-icons";
@@ -39,8 +39,9 @@ export function NearbyPalsList() {
     setRefreshing(false);
   }, [load]);
 
-  // load on first render
-  useState(() => { load(); });
+  useEffect(() => {
+    void load();
+  }, [load]);
 
   if (loading && pals.length === 0) {
     return (
@@ -53,6 +54,7 @@ export function NearbyPalsList() {
   return (
       <FlashList
         data={pals}
+        estimatedItemSize={150}
         keyExtractor={(item) => item.userId}
         contentContainerStyle={{ paddingBottom: 120 }}
       refreshControl={
@@ -60,7 +62,11 @@ export function NearbyPalsList() {
       }
       ListEmptyComponent={
         error === "noLocation" ? (
-          <ListEmptyState icon="location-outline" title={t("errorTitle")} message="Set your location in your profile to find nearby pals." />
+          <ListEmptyState
+            icon="location-outline"
+            title={t("errorTitle")}
+            message={t("palsNearbySetLocationHint")}
+          />
         ) : (
           <ListEmptyState icon="paw-outline" title={t("noNearbyPals")} message={t("noNearbyPalsSubtitle")} />
         )

@@ -434,6 +434,7 @@ export function CommentsBottomSheet({
           ) : (
             <FlashList
               data={listData}
+              estimatedItemSize={88}
               keyExtractor={(item) => item.comment.id}
               contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 12 }}
               renderItem={({ item }) => renderCommentRow(item.comment, item.isReply)}

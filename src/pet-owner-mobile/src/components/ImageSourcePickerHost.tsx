@@ -13,6 +13,7 @@ import { Ionicons } from "@expo/vector-icons";
 import {
   detachPendingImageSource,
   getImageSourceSheetSnapshot,
+  removeLabelFor,
   runResolvedPickFromCamera,
   runResolvedPickFromGallery,
   subscribeImageSourceSheet,
@@ -71,10 +72,17 @@ export function ImageSourcePickerHost() {
     })();
   };
 
+  const onRemovePhoto = () => {
+    const p = detachPendingImageSource();
+    if (!p) return;
+    p.options.onRemove?.();
+    p.resolve(null);
+  };
+
   if (Platform.OS === "ios") return null;
   if (!pending) return null;
 
-  const { title, message, labels } = pending.options;
+  const { title, message, labels, allowRemove } = pending.options;
 
   return (
     <Modal
@@ -123,6 +131,27 @@ export function ImageSourcePickerHost() {
             </View>
             <Text style={[styles.optionLabel, { color: colors.text, textAlign }]}>{labels.gallery}</Text>
           </Pressable>
+
+          {allowRemove ? (
+            <>
+              <View style={[styles.divider, { backgroundColor: colors.borderLight }]} />
+              <Pressable
+                onPress={onRemovePhoto}
+                style={({ pressed }) => [
+                  styles.optionRow,
+                  { flexDirection: rowDir, backgroundColor: pressed ? colors.surfaceSecondary : "transparent" },
+                ]}
+                android_ripple={{ color: colors.surfaceSecondary }}
+              >
+                <View style={[styles.iconWrap, { backgroundColor: colors.dangerLight }]}>
+                  <Ionicons name="trash-outline" size={22} color={colors.danger} />
+                </View>
+                <Text style={[styles.optionLabel, { color: colors.danger, textAlign }]}>
+                  {removeLabelFor(pending.options)}
+                </Text>
+              </Pressable>
+            </>
+          ) : null}
 
           <Pressable
             onPress={onCancel}

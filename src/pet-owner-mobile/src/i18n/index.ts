@@ -513,6 +513,23 @@ const he = {
   serviceDogWalking: "טיולים",
   serviceHouseSitting: "שמירה בבית הבעלים",
   serviceDoggyDayCare: "מעון יום לכלבים",
+  serviceInfoDogWalking:
+    "לקיחת הכלב לטיול בשכונה שלו למשך זמן מוגדר.",
+  serviceInfoBoarding: "טיפול בחיית מחמד ללילה בביתך.",
+  serviceInfoDropInVisit:
+    "ביקור קצר בבית הבעלים למשחק, האכלה או יציאה לשירותים.",
+  serviceInfoPetSitting:
+    "מתן שירותי טיפול בחיות מחמד בבית הלקוח לפי לו״ז.",
+  serviceInfoInsurance:
+    "הצעה לתוכניות ביטוח לחיות מחמד או מוצרי כיסוי נלווים.",
+  serviceInfoPetStore: "מכירת מוצרים לחיות מחמד, אספקה או חבילות.",
+  serviceInfoTraining:
+    "מפגשים מובנים המתמקדים בצייתנות, מיומנות או התנהגות.",
+  serviceInfoHouseSitting:
+    "שהייה לילית בבית הבעלים לטיפול בחי המחמד ובבית.",
+  serviceInfoDoggyDayCare:
+    "שהות יומית בפיקוח לחיות מחמד במקום העבודה שלך בשעות הפעילות.",
+
   sizeSmall: "קטן (1-10 ק״ג)",
   sizeMedium: "בינוני (10-20 ק״ג)",
   sizeLarge: "גדול (20-40 ק״ג)",
@@ -650,6 +667,8 @@ const he = {
   nearbyTitle: "פאלים בסביבה",
   noNearbyPals: "לא נמצאו פאלים בסביבה",
   noNearbyPalsSubtitle: "נסה להגדיל את רדיוס החיפוש בהגדרות.",
+  palsNearbySetLocationHint:
+    "הגדר את המיקום בפרופיל כדי למצוא פאלים בסביבה.",
   filterBySpecies: "סנן לפי סוג",
   filterBySize: "סנן לפי גודל",
   palsBio: "ביוגרפיה",
@@ -949,6 +968,9 @@ const he = {
   reviews: "ביקורות",
   noReviews: "אין ביקורות עדיין",
   seeAllReviews: "ראה את כל הביקורות",
+  sortNewest: "חדש ביותר",
+  sortHighest: "גבוה ביותר",
+  sortLowest: "נמוך ביותר",
   leaveReview: "כתוב ביקורת",
   markCompleted: "סמן כהושלם",
   writeReviewTitle: "כתיבת ביקורת",
@@ -1849,6 +1871,24 @@ const en: Record<keyof typeof he, string> = {
   serviceDogWalking: "Dog Walking",
   serviceHouseSitting: "House Sitting",
   serviceDoggyDayCare: "Doggy Day Care",
+  serviceInfoDogWalking:
+    "Taking a dog for a walk around their neighborhood for a specific duration.",
+  serviceInfoBoarding: "Caring for a pet overnight at your own home.",
+  serviceInfoDropInVisit:
+    "Stopping by the owner's home for a short time to play, feed, or give potty breaks.",
+  serviceInfoPetSitting:
+    "Providing pet care at the client's home on a scheduled basis.",
+  serviceInfoInsurance:
+    "Offering pet insurance plans or related coverage products.",
+  serviceInfoPetStore:
+    "Selling pet products, supplies, or bundled packages.",
+  serviceInfoTraining:
+    "Structured sessions focused on obedience, skills, or behavior.",
+  serviceInfoHouseSitting:
+    "Staying overnight at the owner's home to care for their pets and home.",
+  serviceInfoDoggyDayCare:
+    "Supervised daytime care for pets at your location during business hours.",
+
   sizeSmall: "Small (1-10 kg)",
   sizeMedium: "Medium (10-20 kg)",
   sizeLarge: "Large (20-40 kg)",
@@ -1986,6 +2026,8 @@ const en: Record<keyof typeof he, string> = {
   nearbyTitle: "Nearby Pals",
   noNearbyPals: "No pals found nearby",
   noNearbyPalsSubtitle: "Try increasing your search radius in settings.",
+  palsNearbySetLocationHint:
+    "Set your location in your profile to find nearby pals.",
   filterBySpecies: "Filter by Species",
   filterBySize: "Filter by Size",
   palsBio: "Bio",
@@ -2284,6 +2326,9 @@ const en: Record<keyof typeof he, string> = {
   reviews: "Reviews",
   noReviews: "No reviews yet",
   seeAllReviews: "See all reviews",
+  sortNewest: "Newest",
+  sortHighest: "Highest",
+  sortLowest: "Lowest",
   leaveReview: "Leave a review",
   markCompleted: "Mark as Completed",
   writeReviewTitle: "Write a review",

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   View,
   Text,
@@ -34,7 +34,7 @@ function formatTimeAgo(dateStr: string, t: (k: string) => string): string {
 }
 
 export function MessagesScreen() {
-  const { t, rtlText, rtlRow, isRTL } = useTranslation();
+  const { t, rtlText, rtlRow } = useTranslation();
   const navigation = useNavigation<any>();
   const { colors } = useTheme();
 
@@ -68,10 +68,14 @@ export function MessagesScreen() {
     setRefreshing(false);
   }, []);
 
-  const sorted = [...conversations].sort(
-    (a, b) =>
-      new Date(b.lastMessageAt).getTime() -
-      new Date(a.lastMessageAt).getTime(),
+  const sorted = useMemo(
+    () =>
+      [...conversations].sort(
+        (a, b) =>
+          new Date(b.lastMessageAt).getTime() -
+          new Date(a.lastMessageAt).getTime(),
+      ),
+    [conversations],
   );
 
   const handlePress = useCallback(
@@ -81,90 +85,93 @@ export function MessagesScreen() {
     [navigation],
   );
 
-  const renderItem = ({ item }: { item: ChatConversationDto }) => {
-    const initials = item.otherUserName
-      .split(" ")
-      .map((w) => w[0])
-      .join("")
-      .slice(0, 2)
-      .toUpperCase();
+  const renderItem = useCallback(
+    ({ item }: { item: ChatConversationDto }) => {
+      const initials = item.otherUserName
+        .split(" ")
+        .map((w) => w[0])
+        .join("")
+        .slice(0, 2)
+        .toUpperCase();
 
-    const snippet = item.lastMessageSnippet
-      ? item.lastMessageSnippet.length > 40
-        ? item.lastMessageSnippet.slice(0, 40) + "\u2026"
-        : item.lastMessageSnippet
-      : "";
+      const snippet = item.lastMessageSnippet
+        ? item.lastMessageSnippet.length > 40
+          ? item.lastMessageSnippet.slice(0, 40) + "\u2026"
+          : item.lastMessageSnippet
+        : "";
 
-    return (
-      <TouchableOpacity
-        onPress={() => handlePress(item.otherUserId, item.otherUserName)}
-        activeOpacity={0.7}
-        style={{ paddingHorizontal: BRAND_HEADER_HORIZONTAL_PAD, paddingVertical: 16 }}
-      >
-        <View style={[rtlRow, { alignItems: "center", gap: 12 }]}>
-          <View
-            style={{
-              width: 48,
-              height: 48,
-              borderRadius: 24,
-              alignItems: "center",
-              justifyContent: "center",
-              backgroundColor: colors.primary,
-            }}
-          >
-            {item.otherUserAvatar ? (
-              <Ionicons name="person-circle" size={48} color={colors.textInverse} />
-            ) : (
-              <Text style={{ color: colors.textInverse, fontWeight: "bold", fontSize: 16 }}>
-                {initials}
-              </Text>
-            )}
-          </View>
-
-          <View style={{ flex: 1 }}>
-            <View style={[rtlRow, { alignItems: "center", justifyContent: "space-between", marginBottom: 4 }]}>
-              <Text
-                style={[rtlText, { fontSize: 16, fontWeight: "600", color: colors.text }]}
-                numberOfLines={1}
-              >
-                {item.otherUserName}
-              </Text>
-              <Text style={{ fontSize: 12, color: colors.textMuted }}>
-                {formatTimeAgo(item.lastMessageAt, t as (k: string) => string)}
-              </Text>
-            </View>
-
-            <View style={[rtlRow, { alignItems: "center", justifyContent: "space-between" }]}>
-              <Text
-                style={[rtlText, { fontSize: 14, color: colors.textMuted, flex: 1 }]}
-                numberOfLines={1}
-              >
-                {snippet}
-              </Text>
-              {item.unreadCount > 0 && (
-                <View
-                  style={{
-                    marginLeft: 8,
-                    minWidth: 22,
-                    height: 22,
-                    borderRadius: 11,
-                    backgroundColor: colors.primary,
-                    alignItems: "center",
-                    justifyContent: "center",
-                    paddingHorizontal: 6,
-                  }}
-                >
-                  <Text style={{ color: colors.textInverse, fontSize: 12, fontWeight: "bold" }}>
-                    {item.unreadCount}
-                  </Text>
-                </View>
+      return (
+        <TouchableOpacity
+          onPress={() => handlePress(item.otherUserId, item.otherUserName)}
+          activeOpacity={0.7}
+          style={{ paddingHorizontal: BRAND_HEADER_HORIZONTAL_PAD, paddingVertical: 16 }}
+        >
+          <View style={[rtlRow, { alignItems: "center", gap: 12 }]}>
+            <View
+              style={{
+                width: 48,
+                height: 48,
+                borderRadius: 24,
+                alignItems: "center",
+                justifyContent: "center",
+                backgroundColor: colors.primary,
+              }}
+            >
+              {item.otherUserAvatar ? (
+                <Ionicons name="person-circle" size={48} color={colors.textInverse} />
+              ) : (
+                <Text style={{ color: colors.textInverse, fontWeight: "bold", fontSize: 16 }}>
+                  {initials}
+                </Text>
               )}
             </View>
+
+            <View style={{ flex: 1 }}>
+              <View style={[rtlRow, { alignItems: "center", justifyContent: "space-between", marginBottom: 4 }]}>
+                <Text
+                  style={[rtlText, { fontSize: 16, fontWeight: "600", color: colors.text }]}
+                  numberOfLines={1}
+                >
+                  {item.otherUserName}
+                </Text>
+                <Text style={{ fontSize: 12, color: colors.textMuted }}>
+                  {formatTimeAgo(item.lastMessageAt, t as (k: string) => string)}
+                </Text>
+              </View>
+
+              <View style={[rtlRow, { alignItems: "center", justifyContent: "space-between" }]}>
+                <Text
+                  style={[rtlText, { fontSize: 14, color: colors.textMuted, flex: 1 }]}
+                  numberOfLines={1}
+                >
+                  {snippet}
+                </Text>
+                {item.unreadCount > 0 && (
+                  <View
+                    style={{
+                      marginLeft: 8,
+                      minWidth: 22,
+                      height: 22,
+                      borderRadius: 11,
+                      backgroundColor: colors.primary,
+                      alignItems: "center",
+                      justifyContent: "center",
+                      paddingHorizontal: 6,
+                    }}
+                  >
+                    <Text style={{ color: colors.textInverse, fontSize: 12, fontWeight: "bold" }}>
+                      {item.unreadCount}
+                    </Text>
+                  </View>
+                )}
+              </View>
+            </View>
           </View>
-        </View>
-      </TouchableOpacity>
-    );
-  };
+        </TouchableOpacity>
+      );
+    },
+    [colors.primary, colors.text, colors.textInverse, colors.textMuted, handlePress, rtlRow, rtlText, t],
+  );
 
   const renderEmpty = () => (
     <ListEmptyState
@@ -199,6 +206,7 @@ export function MessagesScreen() {
       ) : (
         <FlashList
           data={sorted}
+          estimatedItemSize={88}
           keyExtractor={(item) => item.conversationId}
           renderItem={renderItem}
           ListEmptyComponent={renderEmpty}

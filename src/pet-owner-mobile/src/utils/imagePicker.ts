@@ -7,6 +7,8 @@ export type ImagePickerSourceLabels = {
   camera: string;
   gallery: string;
   cancel: string;
+  /** Shown when `allowRemove` is true; defaults to `translate("removePhoto")`. */
+  remove?: string;
 };
 
 type PermissionDeniedAlert = {
@@ -20,6 +22,9 @@ export type PickImageWithSourceOptions = {
   title?: string;
   message?: string;
   permissionDeniedAlert?: PermissionDeniedAlert;
+  /** When true, show "remove" before cancel; `onRemove` runs then promise resolves with `null`. */
+  allowRemove?: boolean;
+  onRemove?: () => void;
 };
 
 export type ResolvedPickImageWithSourceOptions = PickImageWithSourceOptions & {
@@ -117,24 +122,43 @@ export async function runResolvedPickFromGallery(
   return pickFromGallery(options.pickerOptions ?? {}, options.permissionDeniedAlert);
 }
 
+/** Label for the optional remove row (sheet host + iOS). */
+export function removeLabelFor(options: ResolvedPickImageWithSourceOptions): string {
+  return options.labels.remove ?? translate("removePhoto");
+}
+
 function presentIosActionSheet(
   options: ResolvedPickImageWithSourceOptions,
 ): Promise<string | null> {
   return new Promise((resolve) => {
+    const withRemove = Boolean(options.allowRemove);
+    const sheetOptions = withRemove
+      ? [
+          options.labels.camera,
+          options.labels.gallery,
+          removeLabelFor(options),
+          options.labels.cancel,
+        ]
+      : [options.labels.camera, options.labels.gallery, options.labels.cancel];
+    const cancelButtonIndex = sheetOptions.length - 1;
+    const removeButtonIndex = withRemove ? 2 : -1;
+
     ActionSheetIOS.showActionSheetWithOptions(
       {
         title: options.title,
         message: options.message,
-        options: [
-          options.labels.camera,
-          options.labels.gallery,
-          options.labels.cancel,
-        ],
-        cancelButtonIndex: 2,
+        options: sheetOptions,
+        cancelButtonIndex,
+        ...(withRemove ? { destructiveButtonIndex: removeButtonIndex } : {}),
       },
       (buttonIndex) => {
         void (async () => {
-          if (buttonIndex === undefined || buttonIndex === 2) {
+          if (buttonIndex === undefined || buttonIndex === cancelButtonIndex) {
+            resolve(null);
+            return;
+          }
+          if (withRemove && buttonIndex === removeButtonIndex) {
+            options.onRemove?.();
             resolve(null);
             return;
           }
