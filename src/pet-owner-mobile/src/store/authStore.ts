@@ -3,6 +3,7 @@ import { create } from "zustand";
 import * as SecureStore from "expo-secure-store";
 import { jwtDecode } from "jwt-decode";
 import type { Language } from "../i18n";
+import { setSentryUser } from "../services/sentry";
 
 const storage = {
   async get(key: string): Promise<string | null> {
@@ -173,6 +174,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     await storage.set("requires_phone", requiresPhone ? "1" : "0");
     const user = decodeUser(token);
     set({ token, userId, user, isLoggedIn: true, requiresPhone });
+    setSentryUser(userId);
     if (!requiresPhone) startHubs();
   },
 
@@ -198,6 +200,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     // Wipe biometric credentials on explicit logout — security signal.
     import("../services/biometricService").then((m) => m.disable().catch(() => {}));
     set({ token: null, userId: null, user: null, isLoggedIn: false, requiresPhone: false });
+    setSentryUser(null);
   },
 
   setLanguage: async (lang) => {
@@ -246,6 +249,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       language: (lang as Language) ?? "he",
       hydrated: true,
     });
+
+    if (loggedIn && userId) {
+      setSentryUser(userId);
+    }
 
     if (loggedIn) {
       // Refresh phone status from server when online

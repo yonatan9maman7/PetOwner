@@ -19,8 +19,23 @@ module.exports = ({ config }) => {
     process.env.EXPO_PUBLIC_GOOGLE_PLACES_API_KEY?.trim() ||
     "";
 
+  const sentryOrg = process.env.SENTRY_ORG?.trim() || "YOUR_SENTRY_ORG";
+  const sentryProject = process.env.SENTRY_PROJECT?.trim() || "YOUR_SENTRY_PROJECT";
+  const plugins = [
+    ...(config.plugins ?? []),
+    [
+      "@sentry/react-native/expo",
+      {
+        organization: sentryOrg,
+        project: sentryProject,
+        url: "https://sentry.io/",
+      },
+    ],
+  ];
+
   return {
     ...config,
+    plugins,
     android: {
       ...config.android,
       config: {

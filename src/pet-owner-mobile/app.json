@@ -3,7 +3,7 @@
     "name": "pet-owner-mobile",
     "slug": "pet-owner-mobile",
     "scheme": "petowner",
-    "version": "1.0.6",
+    "version": "1.0.7",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -28,7 +28,7 @@
     },
     "android": {
       "package": "com.petowner.app",
-      "versionCode": 7,
+      "versionCode": 8,
       "softwareKeyboardLayoutMode": "resize",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
@@ -36,11 +36,6 @@
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "useNextNotificationsApi": true,
-      "notification": {
-        "icon": "./assets/adaptive-icon.png",
-        "color": "#000000"
-      },
       "permissions": [
         "android.permission.USE_BIOMETRIC",
         "android.permission.USE_FINGERPRINT"

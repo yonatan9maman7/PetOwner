@@ -3,7 +3,7 @@ import { getNormalizedApiError } from "./apiUtils";
 
 const SENSITIVE_KEY = /password|token|authorization|secret|otp|cvv|cardnumber|creditcard|refresh/i;
 
-function redactDeep(value: unknown, depth = 0): unknown {
+export function redactDeep(value: unknown, depth = 0): unknown {
   if (depth > 8) return "[max-depth]";
   if (value === null || value === undefined) return value;
   if (typeof value === "string") {

@@ -11,6 +11,7 @@ import {
   attachNormalizedApiError,
 } from "../utils/apiUtils";
 import { logAxiosErrorDev } from "../utils/apiErrorLogger";
+import { logger } from "../utils/logger";
 import {
   shouldToastApiError,
   showApiErrorToast,
@@ -131,6 +132,12 @@ apiClient.interceptors.response.use(
     const normalized = normalizeApiError(error);
     attachNormalizedApiError(error, normalized);
     logAxiosErrorDev(error);
+    logger.apiError(error, {
+      method: error.config?.method,
+      url: error.config?.url,
+      status: error.response?.status,
+      traceId: normalized.traceId,
+    });
 
     if (shouldToastApiError(error, error.config)) {
       showApiErrorToast(normalized, {

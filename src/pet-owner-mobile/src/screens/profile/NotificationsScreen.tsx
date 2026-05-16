@@ -269,27 +269,6 @@ export function NotificationsScreen() {
                 >
                   {resolveNotificationApiText(item.message, language)}
                 </Text>
-
-                <View
-                  style={{
-                    alignSelf: isRTL ? "flex-end" : "flex-start",
-                    backgroundColor: colors.surfaceSecondary,
-                    paddingHorizontal: 8,
-                    paddingVertical: 2,
-                    borderRadius: 6,
-                    marginTop: 6,
-                  }}
-                >
-                  <Text
-                    style={{
-                      fontSize: 10,
-                      fontWeight: "600",
-                      color: colors.textMuted,
-                    }}
-                  >
-                    {item.type}
-                  </Text>
-                </View>
               </View>
             </Pressable>
           )}

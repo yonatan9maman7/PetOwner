@@ -5,6 +5,8 @@ import { NavigationContainer, DefaultTheme, DarkTheme } from "@react-navigation/
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { ErrorBoundary } from "react-error-boundary";
+import * as Sentry from "@sentry/react-native";
+import { isSentryEnabled, navigationIntegration } from "./src/services/sentry";
 
 // react-native-maps on iOS triggers this warning when MapKit's native gesture
 // recognizer absorbs touches before RN Gesture Handler can count them.
@@ -68,6 +70,11 @@ function AppInner() {
       <NavigationContainer
         ref={navigationRef}
         theme={navTheme}
+        onReady={() => {
+          if (isSentryEnabled()) {
+            navigationIntegration.registerNavigationContainer(navigationRef);
+          }
+        }}
         onStateChange={() => {
           if (Platform.OS !== "web") {
             Keyboard.dismiss();
@@ -85,7 +92,7 @@ function AppInner() {
   );
 }
 
-export default function App() {
+function App() {
   const hydrateAuth = useAuthStore((s) => s.hydrate);
   const authHydrated = useAuthStore((s) => s.hydrated);
   const language = useAuthStore((s) => s.language);
@@ -179,7 +186,16 @@ export default function App() {
   }
 
   return (
-    <ErrorBoundary FallbackComponent={ErrorFallback}>
+    <ErrorBoundary
+      FallbackComponent={ErrorFallback}
+      onError={(error, info) => {
+        if (isSentryEnabled()) {
+          Sentry.captureException(error, {
+            extra: { componentStack: info.componentStack },
+          });
+        }
+      }}
+    >
       <GestureHandlerRootView style={{ flex: 1 }}>
         <SafeAreaProvider>
           <ThemeProvider>
@@ -192,3 +208,5 @@ export default function App() {
     </ErrorBoundary>
   );
 }
+
+export default Sentry.wrap(App);
