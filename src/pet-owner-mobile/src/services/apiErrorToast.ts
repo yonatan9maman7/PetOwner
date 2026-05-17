@@ -45,7 +45,9 @@ export function showApiErrorToast(
 ): void {
   if (options?.silent) return;
   const title = options?.title ?? normalized.title ?? translate("errorTitle");
-  const text2 = normalized.message;
+  const text2 = normalized.isServerError
+    ? translate("apiErrorServer")
+    : normalized.message;
   Toast.show({
     type: "error",
     text1: title,

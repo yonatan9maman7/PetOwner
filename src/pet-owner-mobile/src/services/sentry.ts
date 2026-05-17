@@ -1,6 +1,7 @@
 import { Platform } from "react-native";
 import Constants from "expo-constants";
 import * as Sentry from "@sentry/react-native";
+import { isApiErrorHandledByInterceptor } from "../utils/apiUtils";
 
 const PLACEHOLDER_DSN = "YOUR_DSN_HERE";
 
@@ -36,6 +37,21 @@ export function initSentry(): void {
     tracesSampleRate: 0.2,
     enableLogs: true,
     integrations: [navigationIntegration],
+    beforeSend(event, hint) {
+      const original = hint.originalException;
+      if (!isApiErrorHandledByInterceptor(original)) return event;
+
+      const mechanism = event.exception?.values?.[0]?.mechanism;
+      const isUnhandledRejection =
+        mechanism?.type === "onunhandledrejection" ||
+        mechanism?.type === "unhandledrejection" ||
+        mechanism?.handled === false;
+
+      if (isUnhandledRejection) {
+        return null;
+      }
+      return event;
+    },
   });
 }
 

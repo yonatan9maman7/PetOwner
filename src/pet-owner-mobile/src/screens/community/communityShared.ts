@@ -201,6 +201,8 @@ export const HE = {
   createPlaydateSubtitle:
     "ארגן מפגש משחק מהנה ומצא כלבים מתאימים שישמחו להצטרף לכלב שלך.",
   titleField: "כותרת",
+  dateLabel: "תאריך",
+  timeLabel: "שעה",
   dateField: "YYYY-MM-DD",
   timeField: "HH:mm",
   sizeFit: "התאמת גודל",
@@ -372,6 +374,8 @@ export const EN: Record<keyof typeof HE, string> = {
   createPlaydateSubtitle:
     "Organize a fun meetup and find the perfect playmates for your dog.",
   titleField: "Title",
+  dateLabel: "Date",
+  timeLabel: "Time",
   dateField: "YYYY-MM-DD",
   timeField: "HH:mm",
   sizeFit: "Size fit",

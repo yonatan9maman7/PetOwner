@@ -24,6 +24,9 @@ import { useTranslation, type TranslationKey, rowDirectionForAppLayout } from ".
 import { useTheme } from "../../theme/ThemeContext";
 import { providerApi } from "../../api/client";
 import { ScreenLoadingCenter } from "../../components/shared/ScreenLoadingCenter";
+import { StackBackHeader } from "../../components/StackBackHeader";
+import { CompactTimeChip, toApiTimeSpan } from "../../components/shared/CompactTimeChip";
+import { DAY_FULL_KEYS } from "../../features/provider-onboarding/constants";
 import { DogSizeCapacityEditor, toggleDogSize } from "../../features/provider-onboarding/DogSizeCapacityFields";
 import { AddressMapModal } from "../../features/provider-onboarding/AddressMapModal";
 import {
@@ -77,6 +80,25 @@ function resolveServiceTypeIndex(rate: {
 const DAYS: TranslationKey[] = [
   "daySun", "dayMon", "dayTue", "dayWed", "dayThu", "dayFri", "daySat",
 ];
+
+function normalizeScheduleSlots(raw: AvailabilitySlotDto[]): AvailabilitySlotDto[] {
+  return raw.map((s) => ({
+    ...s,
+    dayOfWeek: Number(s.dayOfWeek),
+    startTime: toApiTimeSpan(s.startTime),
+    endTime: toApiTimeSpan(s.endTime),
+  }));
+}
+
+function slotMinutes(time: string): number {
+  const match = time.match(/^(\d{1,2}):(\d{2})/);
+  if (!match) return 0;
+  return Number(match[1]) * 60 + Number(match[2]);
+}
+
+function isSlotRangeValid(slot: AvailabilitySlotDto): boolean {
+  return slotMinutes(slot.startTime) < slotMinutes(slot.endTime);
+}
 
 interface ServicePackage {
   id: string;
@@ -607,7 +629,7 @@ export function ProviderEditScreen() {
   const [longitude, setLongitude] = useState(DEFAULT_LNG);
   const [slots, setSlots] = useState<AvailabilitySlotDto[]>([]);
   const [deletedSlotIds, setDeletedSlotIds] = useState<string[]>([]);
-  const [editingSlot, setEditingSlot] = useState<{ slotId: string; field: "start" | "end" } | null>(null);
+  const [availabilityError, setAvailabilityError] = useState<string | null>(null);
   const [visibleOnMap, setVisibleOnMap] = useState(false);
   const [togglingMapVisibility, setTogglingMapVisibility] = useState(false);
   const [acceptedDogSizes, setAcceptedDogSizes] = useState<DogSize[]>([]);
@@ -688,7 +710,7 @@ export function ProviderEditScreen() {
           }
         }
         setServiceStates(loaded);
-        setSlots(schedule);
+        setSlots(normalizeScheduleSlots(schedule ?? []));
       } catch {
         /* 404 for new providers is expected */
       } finally {
@@ -791,6 +813,7 @@ export function ProviderEditScreen() {
   };
 
   const handleAddSlot = () => {
+    setAvailabilityError(null);
     const tempId = `temp_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
     setSlots((prev) => [
       ...prev,
@@ -812,10 +835,12 @@ export function ProviderEditScreen() {
   };
 
   const updateSlotTime = (slotId: string, field: "start" | "end", timeStr: string) => {
+    const normalized = toApiTimeSpan(timeStr);
+    setAvailabilityError(null);
     setSlots((prev) =>
       prev.map((sl) =>
         sl.id === slotId
-          ? { ...sl, [field === "start" ? "startTime" : "endTime"]: timeStr }
+          ? { ...sl, [field === "start" ? "startTime" : "endTime"]: normalized }
           : sl
       )
     );
@@ -857,8 +882,29 @@ export function ProviderEditScreen() {
 
   const handleSave = async () => {
     setSaving(true);
+    setAvailabilityError(null);
     try {
       const editable = servicesForProviderType(isBusiness ? 1 : 0);
+
+      for (const svc of editable) {
+        const st = serviceStates[svc.serviceType];
+        if (st.enabled && (!st.rate.trim() || Number(st.rate) <= 0)) {
+          showGlobalAlertCompat(t("errorTitle"), t("serviceRateRequired"));
+          setSaving(false);
+          return;
+        }
+      }
+
+      for (const slot of slots) {
+        if (!isSlotRangeValid(slot)) {
+          const msg = t("providerSlotTimeInvalid");
+          setAvailabilityError(msg);
+          showGlobalAlertCompat(t("errorTitle"), msg);
+          setSaving(false);
+          return;
+        }
+      }
+
       const selectedServices = editable.filter((svc) => {
         const st = serviceStates[svc.serviceType];
         return st.enabled && st.rate && Number(st.rate) > 0;
@@ -958,29 +1004,52 @@ export function ProviderEditScreen() {
         }
         setDeletedSlotIds([]);
 
+        let slotSaveFailures = 0;
+        const existingSlots = slots.filter((s) => !s.id.startsWith("temp_"));
+        for (const s of existingSlots) {
+          try {
+            await providerApi.updateSlot(s.id, {
+              dayOfWeek: s.dayOfWeek,
+              startTime: toApiTimeSpan(s.startTime),
+              endTime: toApiTimeSpan(s.endTime),
+            });
+          } catch {
+            slotSaveFailures += 1;
+          }
+        }
+
         const newSlots = slots.filter((s) => s.id.startsWith("temp_"));
         const createdSlots: typeof slots = [];
         for (const s of newSlots) {
           try {
             const created = await providerApi.createSlot({
               dayOfWeek: s.dayOfWeek,
-              startTime: s.startTime,
-              endTime: s.endTime,
+              startTime: toApiTimeSpan(s.startTime),
+              endTime: toApiTimeSpan(s.endTime),
             });
-            createdSlots.push(created);
-          } catch { /* slot overlap or other issue — silently skip */ }
+            createdSlots.push(normalizeScheduleSlots([created])[0]);
+          } catch {
+            slotSaveFailures += 1;
+          }
         }
 
         if (createdSlots.length > 0) {
           setSlots((prev) =>
-            prev
-              .filter((s) => !s.id.startsWith("temp_") || !newSlots.some((ns) => ns.id === s.id))
-              .concat(createdSlots),
+            normalizeScheduleSlots(
+              prev
+                .filter((s) => !s.id.startsWith("temp_") || !newSlots.some((ns) => ns.id === s.id))
+                .concat(createdSlots),
+            ),
           );
+        } else if (existingSlots.length > 0) {
+          setSlots((prev) => normalizeScheduleSlots(prev));
         }
 
         const msg = t("profileSaved");
         showGlobalAlertCompat(msg);
+        if (slotSaveFailures > 0) {
+          showGlobalAlertCompat(t("errorTitle"), t("providerSlotSaveFailed"));
+        }
       }
     } catch (e: unknown) {
       showApiErrorToast(getNormalizedApiError(e), { title: t("errorTitle") });
@@ -989,7 +1058,7 @@ export function ProviderEditScreen() {
     }
   };
 
-  const daySlots = slots.filter((s) => s.dayOfWeek === selectedDay);
+  const daySlots = slots.filter((s) => Number(s.dayOfWeek) === selectedDay);
 
   const addressLabel = [city, street, buildingNumber]
     .filter(Boolean)
@@ -1005,40 +1074,11 @@ export function ProviderEditScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      {/* Header */}
-      <View
-        style={{
-          paddingTop: Math.max(insets.top - 8, 0),
-          backgroundColor: colors.surface,
-          shadowColor: colors.shadow,
-          shadowOffset: { width: 0, height: 2 },
-          shadowOpacity: 0.06,
-          shadowRadius: 8,
-          elevation: 4,
-          zIndex: 10,
-        }}
-      >
-        <View
-          style={{
-            flexDirection: rowDirectionForAppLayout(isRTL),
-            alignItems: "center",
-            justifyContent: "space-between",
-            paddingHorizontal: 24,
-            paddingVertical: 14,
-          }}
-        >
-          <Pressable onPress={() => navigation.goBack()} hitSlop={12}>
-            <Ionicons
-              name={isRTL ? "arrow-forward" : "arrow-back"}
-              size={24}
-              color={colors.text}
-            />
-          </Pressable>
-          <Text style={{ fontSize: 17, fontWeight: "700", color: colors.text }}>
-            {t("providerEditTitle")}
-          </Text>
-          <View style={{ width: 24 }} />
-        </View>
+      <View style={{ paddingTop: Math.max(insets.top - 8, 0), zIndex: 10 }}>
+        <StackBackHeader
+          title={t("providerEditTitle")}
+          onBack={() => navigation.goBack()}
+        />
       </View>
 
       <KeyboardAvoidingView
@@ -1501,13 +1541,32 @@ export function ProviderEditScreen() {
                   {t("weeklyAvailability")}
                 </Text>
 
-                <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 16 }}>
+                <Text
+                  style={[
+                    rtlText,
+                    { fontSize: 12, color: colors.textSecondary, marginBottom: 10 },
+                  ]}
+                >
+                  {t("onbAvailabilityHint")}
+                </Text>
+
+                <View
+                  style={{
+                    flexDirection: rowDirectionForAppLayout(isRTL),
+                    justifyContent: "space-between",
+                    marginBottom: 8,
+                  }}
+                >
                   {DAYS.map((dayKey, i) => {
                     const active = i === selectedDay;
+                    const hasHours = slots.some((s) => Number(s.dayOfWeek) === i);
                     return (
                       <Pressable
                         key={dayKey}
-                        onPress={() => setSelectedDay(i)}
+                        onPress={() => {
+                          setSelectedDay(i);
+                          setAvailabilityError(null);
+                        }}
                         style={{
                           width: 42,
                           height: 42,
@@ -1515,6 +1574,8 @@ export function ProviderEditScreen() {
                           alignItems: "center",
                           justifyContent: "center",
                           backgroundColor: active ? colors.primary : colors.surface,
+                          borderWidth: hasHours && !active ? 1 : 0,
+                          borderColor: colors.primary,
                           ...(active
                             ? {
                                 shadowColor: colors.shadow,
@@ -1534,11 +1595,27 @@ export function ProviderEditScreen() {
                   })}
                 </View>
 
+                <Text
+                  style={[
+                    rtlText,
+                    {
+                      fontSize: 13,
+                      fontWeight: "600",
+                      color: colors.textSecondary,
+                      marginBottom: 12,
+                    },
+                  ]}
+                >
+                  {t("providerEditEditingHoursFor")} {t(DAY_FULL_KEYS[selectedDay])}
+                </Text>
+
                 <View
                   style={{
                     backgroundColor: colors.surface,
                     borderRadius: 14,
                     padding: 16,
+                    borderWidth: availabilityError ? 1 : 0,
+                    borderColor: availabilityError ? colors.danger : "transparent",
                     shadowColor: colors.shadow,
                     shadowOffset: { width: 0, height: 1 },
                     shadowOpacity: 0.04,
@@ -1546,7 +1623,14 @@ export function ProviderEditScreen() {
                     elevation: 1,
                   }}
                 >
-                  <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+                  <View
+                    style={{
+                      flexDirection: rowDirectionForAppLayout(isRTL),
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      marginBottom: 12,
+                    }}
+                  >
                     <Text style={[rtlText, { fontSize: 14, fontWeight: "600", color: colors.text }]}>
                       {t("activeHours")}
                     </Text>
@@ -1563,153 +1647,108 @@ export function ProviderEditScreen() {
                   </View>
 
                   {daySlots.length === 0 ? (
-                    <Text style={{ fontSize: 12, color: colors.textMuted, textAlign: "center", paddingVertical: 12 }}>
-                      —
-                    </Text>
-                  ) : (
-                    daySlots.map((slot) => (
-                      <View
-                        key={slot.id}
+                    <View style={{ alignItems: "center", paddingVertical: 12, gap: 10 }}>
+                      <Text style={[rtlText, { fontSize: 13, color: colors.textMuted }]}>
+                        {t("onbUnavailable")}
+                      </Text>
+                      <Pressable
+                        onPress={handleAddSlot}
                         style={{
-                          flexDirection: "row",
+                          flexDirection: rowDirectionForAppLayout(isRTL),
                           alignItems: "center",
-                          justifyContent: "space-between",
-                          marginBottom: 10,
+                          gap: 6,
+                          paddingVertical: 8,
+                          paddingHorizontal: 12,
+                          borderRadius: 10,
+                          backgroundColor: colors.primaryLight,
                         }}
                       >
-                        <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
-                          {Platform.OS === "web" ? (
-                            <input
-                              type="time"
-                              value={slot.startTime?.slice(0, 5) ?? "09:00"}
-                              onChange={(e: any) => updateSlotTime(slot.id, "start", e.target.value + ":00")}
-                              style={{
-                                backgroundColor: colors.surfaceSecondary,
-                                border: `1px solid ${colors.border}`,
-                                borderRadius: 8,
-                                padding: "8px 12px",
-                                fontSize: 13,
-                                fontWeight: 700,
-                                color: colors.text,
-                                fontFamily: "inherit",
-                              }}
+                        <Ionicons name="add-circle-outline" size={20} color={colors.primary} />
+                        <Text style={{ fontSize: 13, fontWeight: "600", color: colors.primary }}>
+                          {t("onbAddHours")}
+                        </Text>
+                      </Pressable>
+                    </View>
+                  ) : (
+                    daySlots.map((slot) => {
+                      const slotInvalid = !isSlotRangeValid(slot);
+                      return (
+                        <View
+                          key={slot.id}
+                          style={{
+                            flexDirection: rowDirectionForAppLayout(isRTL),
+                            alignItems: "center",
+                            justifyContent: "space-between",
+                            flexWrap: "wrap",
+                            gap: 8,
+                            marginBottom: 10,
+                          }}
+                        >
+                          <View
+                            style={{
+                              flexDirection: rowDirectionForAppLayout(isRTL),
+                              alignItems: "center",
+                              flexWrap: "wrap",
+                              gap: 8,
+                              flex: 1,
+                              minWidth: 0,
+                            }}
+                          >
+                            <CompactTimeChip
+                              value={slot.startTime}
+                              isRTL={isRTL}
+                              onChange={(v) => updateSlotTime(slot.id, "start", v)}
                             />
-                          ) : (
-                            <Pressable
-                              onPress={() => setEditingSlot({ slotId: slot.id, field: "start" })}
+                            <Text style={{ color: colors.textMuted, fontSize: 15 }}>–</Text>
+                            <CompactTimeChip
+                              value={slot.endTime}
+                              isRTL={isRTL}
+                              onChange={(v) => updateSlotTime(slot.id, "end", v)}
+                            />
+                          </View>
+                          <Pressable onPress={() => handleDeleteSlot(slot.id)} hitSlop={8}>
+                            <Ionicons name="trash-outline" size={18} color={colors.danger} />
+                          </Pressable>
+                          {slotInvalid ? (
+                            <Text
                               style={{
-                                backgroundColor: editingSlot?.slotId === slot.id && editingSlot?.field === "start" ? colors.primaryLight : colors.surfaceSecondary,
-                                paddingHorizontal: 12,
-                                paddingVertical: 8,
-                                borderRadius: 8,
-                                borderWidth: 1,
-                                borderColor: editingSlot?.slotId === slot.id && editingSlot?.field === "start" ? colors.primary : "transparent",
+                                width: "100%",
+                                fontSize: 11,
+                                color: colors.danger,
+                                textAlign: isRTL ? "right" : "left",
                               }}
                             >
-                              <Text style={{ fontSize: 13, fontWeight: "700", color: colors.text }}>
-                                {slot.startTime?.slice(0, 5) ?? "—"}
-                              </Text>
-                            </Pressable>
-                          )}
-                          <Text style={{ color: colors.textMuted }}>—</Text>
-                          {Platform.OS === "web" ? (
-                            <input
-                              type="time"
-                              value={slot.endTime?.slice(0, 5) ?? "17:00"}
-                              onChange={(e: any) => updateSlotTime(slot.id, "end", e.target.value + ":00")}
-                              style={{
-                                backgroundColor: colors.surfaceSecondary,
-                                border: `1px solid ${colors.border}`,
-                                borderRadius: 8,
-                                padding: "8px 12px",
-                                fontSize: 13,
-                                fontWeight: 700,
-                                color: colors.text,
-                                fontFamily: "inherit",
-                              }}
-                            />
-                          ) : (
-                            <Pressable
-                              onPress={() => setEditingSlot({ slotId: slot.id, field: "end" })}
-                              style={{
-                                backgroundColor: editingSlot?.slotId === slot.id && editingSlot?.field === "end" ? colors.primaryLight : colors.surfaceSecondary,
-                                paddingHorizontal: 12,
-                                paddingVertical: 8,
-                                borderRadius: 8,
-                                borderWidth: 1,
-                                borderColor: editingSlot?.slotId === slot.id && editingSlot?.field === "end" ? colors.primary : "transparent",
-                              }}
-                            >
-                              <Text style={{ fontSize: 13, fontWeight: "700", color: colors.text }}>
-                                {slot.endTime?.slice(0, 5) ?? "—"}
-                              </Text>
-                            </Pressable>
-                          )}
+                              {t("providerSlotTimeInvalid")}
+                            </Text>
+                          ) : null}
                         </View>
-                        <Pressable onPress={() => handleDeleteSlot(slot.id)} hitSlop={8}>
-                          <Ionicons name="trash-outline" size={18} color={colors.danger} />
-                        </Pressable>
-                      </View>
-                    ))
+                      );
+                    })
                   )}
 
-                  {editingSlot && Platform.OS !== "web" && (() => {
-                    const DateTimePicker = require("@react-native-community/datetimepicker").default;
-                    const targetSlot = daySlots.find((s) => s.id === editingSlot.slotId);
-                    if (!targetSlot) return null;
-                    const raw = (editingSlot.field === "start" ? targetSlot.startTime : targetSlot.endTime) || "09:00:00";
-                    const [hh, mm] = raw.split(":").map(Number);
-                    const dateVal = new Date();
-                    dateVal.setHours(hh, mm, 0, 0);
-
-                    const handleChange = (_: any, d?: Date) => {
-                      if (Platform.OS === "android") setEditingSlot(null);
-                      if (!d) return;
-                      const t24 = `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}:00`;
-                      updateSlotTime(editingSlot.slotId, editingSlot.field, t24);
-                    };
-
-                    if (Platform.OS === "ios") {
-                      return (
-                        <Modal transparent animationType="slide">
-                          <Pressable
-                            style={{ flex: 1, backgroundColor: colors.overlay, justifyContent: "flex-end" }}
-                            onPress={() => setEditingSlot(null)}
-                          >
-                            <View style={{ backgroundColor: colors.surface, borderTopLeftRadius: 16, borderTopRightRadius: 16, paddingBottom: 32 }}>
-                              <View style={{ flexDirection: "row", justifyContent: "flex-end", padding: 12 }}>
-                                <Pressable onPress={() => setEditingSlot(null)}>
-                                  <Text style={{ fontSize: 16, fontWeight: "600", color: "#007AFF" }}>Done</Text>
-                                </Pressable>
-                              </View>
-                              <DateTimePicker
-                                value={dateVal}
-                                mode="time"
-                                display="spinner"
-                                is24Hour
-                                onChange={handleChange}
-                              />
-                            </View>
-                          </Pressable>
-                        </Modal>
-                      );
-                    }
-
-                    return (
-                      <DateTimePicker
-                        value={dateVal}
-                        mode="time"
-                        display="default"
-                        is24Hour
-                        onChange={handleChange}
-                      />
-                    );
-                  })()}
+                  {availabilityError ? (
+                    <Text
+                      style={{
+                        fontSize: 12,
+                        color: colors.danger,
+                        marginTop: 8,
+                        textAlign: isRTL ? "right" : "left",
+                      }}
+                    >
+                      {availabilityError}
+                    </Text>
+                  ) : null}
 
                   <View style={{ height: 1, backgroundColor: colors.borderLight, marginVertical: 12 }} />
 
-                  <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
-                    <Text style={[rtlText, { flex: 1, fontSize: 13, fontWeight: "600", color: colors.text, marginRight: 16 }]}>
+                  <View
+                    style={{
+                      flexDirection: rowDirectionForAppLayout(isRTL),
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                    }}
+                  >
+                    <Text style={[rtlText, { flex: 1, fontSize: 13, fontWeight: "600", color: colors.text, marginEnd: 16 }]}>
                       {t("urgentRequests")}
                     </Text>
                     <Switch

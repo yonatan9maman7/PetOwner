@@ -26,6 +26,11 @@ import {
   rowDirectionForAppLayout,
   type TranslationKey,
 } from "../../i18n";
+import { translateServiceLabel } from "../../i18n/serviceLabels";
+import {
+  pricingUnitShortLabel,
+  serviceRateDisplayName,
+} from "../../i18n/serviceRateDisplay";
 import { useAuthStore } from "../../store/authStore";
 import { useFavoritesStore } from "../../store/favoritesStore";
 import { useTheme } from "../../theme/ThemeContext";
@@ -51,15 +56,6 @@ import { navigateToLoginClearingStack } from "../../navigation/navigateToLoginCl
 
 const DAY_KEYS = ["daySun", "dayMon", "dayTue", "dayWed", "dayThu", "dayFri", "daySat"] as const;
 
-const SERVICE_TYPE_NAMES: Record<number, string> = {
-  0: "Dog Walking", 1: "Pet Sitting", 2: "Boarding",
-  3: "Drop-in Visit", 4: "Training", 5: "Insurance", 6: "Pet Store",
-};
-
-const PRICING_UNIT_LABELS: Record<number, string> = {
-  0: "hour", 1: "night", 2: "visit", 3: "session", 4: "package",
-};
-
 const HERO_HEIGHT = 300;
 
 const HERO_HEADER_ICON_SIZE = 26;
@@ -70,12 +66,15 @@ const HERO_HEADER_ICON_HIT_SLOP = {
   right: 15,
 };
 
-/** Joins service labels for the summary card (first two + “+N more”). */
+/** Joins localized service labels for the summary card (first two + “+N more”). */
 function formatProviderServicesSubtitle(
   services: string[],
   t: (key: TranslationKey) => string,
 ): string | null {
-  const list = services.map((s) => s.trim()).filter(Boolean);
+  const list = services
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .map((s) => translateServiceLabel(s, t));
   if (list.length === 0) return null;
   const maxShown = 2;
   const shown = list.slice(0, maxShown);
@@ -179,27 +178,24 @@ function ActionBtn({
 }) {
   const { colors } = useTheme();
   return (
-    <Pressable
+    <TouchableOpacity
       onPress={onPress}
       disabled={disabled}
-      style={({ pressed }) => [
+      activeOpacity={0.7}
+      style={[
         s.actionBtn,
         { backgroundColor: colors.surfaceSecondary },
-        pressed && { transform: [{ scale: 0.96 }], opacity: 0.9 },
         disabled && { opacity: 0.4 },
       ]}
     >
       <Ionicons name={icon as any} size={24} color={colors.primary} />
       <Text
-        style={[
-          s.actionBtnLabel,
-          { color: colors.textSecondary, marginTop: 4 },
-        ]}
+        style={[s.actionBtnLabel, { color: colors.textSecondary }]}
         numberOfLines={1}
       >
         {label}
       </Text>
-    </Pressable>
+    </TouchableOpacity>
   );
 }
 
@@ -385,11 +381,46 @@ export function ProviderProfileScreen() {
     } catch {}
   };
 
-  const handleNavigate = useCallback(() => {
+  const handleShowLocation = useCallback(() => {
     navigation.navigate("ExploreMain", {
       focusProviderId: providerId,
     });
   }, [navigation, providerId]);
+
+  const handleOpenDirections = useCallback(async () => {
+    if (!profile) return;
+    const lat = profile.latitude;
+    const lng = profile.longitude;
+    const hasCoords =
+      typeof lat === "number"
+      && typeof lng === "number"
+      && Number.isFinite(lat)
+      && Number.isFinite(lng);
+
+    try {
+      if (hasCoords) {
+        const waze = `https://waze.com/ul?ll=${lat},${lng}&navigate=yes`;
+        const gmaps = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`;
+        try {
+          await Linking.openURL(waze);
+        } catch {
+          await Linking.openURL(gmaps);
+        }
+        return;
+      }
+
+      const address = profile.addressLine?.trim();
+      if (address) {
+        const url = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(address)}`;
+        await Linking.openURL(url);
+        return;
+      }
+
+      showGlobalAlertCompat(t("errorTitle"), t("providerDirectionsUnavailable"));
+    } catch {
+      showGlobalAlertCompat(t("errorTitle"), t("providerDirectionsUnavailable"));
+    }
+  }, [profile, t]);
 
   const handleWebsite = () => {
     if (profile?.websiteUrl) {
@@ -687,20 +718,20 @@ export function ProviderProfileScreen() {
               onPress={handleCall}
             />
             <ActionBtn
+              icon="location"
+              label={t("locationAction")}
+              onPress={handleShowLocation}
+            />
+            <ActionBtn
               icon="navigate"
               label={t("navigateAction")}
-              onPress={handleNavigate}
+              onPress={handleOpenDirections}
             />
             <ActionBtn
               icon="globe-outline"
               label={t("websiteAction")}
               onPress={handleWebsite}
               disabled={!profile.websiteUrl}
-            />
-            <ActionBtn
-              icon="share-outline"
-              label={t("share")}
-              onPress={handleShare}
             />
           </View>
         </View>
@@ -808,7 +839,7 @@ export function ProviderProfileScreen() {
                       style={[s.tag, { backgroundColor: colors.surfaceSecondary }]}
                     >
                       <Text style={[s.tagText, { color: colors.textSecondary }]}>
-                        {svc}
+                        {translateServiceLabel(svc, t)}
                       </Text>
                     </View>
                   ))}
@@ -896,11 +927,9 @@ export function ProviderProfileScreen() {
           {profile.serviceRates.length > 0 && (
             <View style={[s.sectionCard, { backgroundColor: colors.surface }]}>
               <SectionHeader title={t("servicesOffered")} />
-              {profile.serviceRates.map((sr: any, idx: number) => {
-                const name =
-                  sr.service ?? SERVICE_TYPE_NAMES[sr.serviceType] ?? `Service ${sr.serviceType}`;
-                const unit =
-                  sr.unit ?? PRICING_UNIT_LABELS[sr.pricingUnit] ?? "";
+              {profile.serviceRates.map((sr, idx) => {
+                const name = serviceRateDisplayName(sr, t);
+                const unit = pricingUnitShortLabel(sr, t);
                 return (
                   <View
                     key={idx}
@@ -913,14 +942,22 @@ export function ProviderProfileScreen() {
                       },
                     ]}
                   >
-                    <Text style={[s.rateName, { color: colors.textSecondary }]}>
+                    <Text
+                      style={[
+                        s.rateName,
+                        rtlText,
+                        { color: colors.textSecondary },
+                      ]}
+                    >
                       {name}
                     </Text>
                     <Text style={[s.ratePrice, { color: colors.text }]}>
                       ₪{sr.rate}
-                      <Text style={[s.rateUnit, { color: colors.textMuted }]}>
-                        {" "}/{" "}{unit}
-                      </Text>
+                      {unit ? (
+                        <Text style={[s.rateUnit, { color: colors.textMuted }]}>
+                          {" "}/ {unit}
+                        </Text>
+                      ) : null}
                     </Text>
                   </View>
                 );
@@ -1377,12 +1414,15 @@ const s = StyleSheet.create({
   actionGrid: {
     width: "100%",
     flexDirection: "row",
-    alignItems: "stretch",
+    justifyContent: "space-around",
+    alignItems: "flex-start",
+    gap: 8,
     marginVertical: 16,
   },
   actionBtn: {
     flex: 1,
     minWidth: 0,
+    flexDirection: "column",
     alignItems: "center",
     justifyContent: "center",
     paddingVertical: 10,
@@ -1395,10 +1435,10 @@ const s = StyleSheet.create({
     elevation: 2,
   },
   actionBtnLabel: {
+    marginTop: 4,
     fontSize: 12,
     fontWeight: "700",
     textAlign: "center",
-    alignSelf: "stretch",
   },
 
   /* ─── Sections wrapper ─── */

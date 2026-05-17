@@ -69,9 +69,12 @@ function InfoCard({
   );
 }
 
-export function PetInfoSection({ pet }: { pet: PetDto }) {
+export function PetInfoSection({ pet }: { pet: PetDto | null | undefined }) {
   const { t, isRTL } = useTranslation();
   const { colors } = useTheme();
+
+  if (!pet) return null;
+
   const hasMedical =
     pet.medicalNotes ||
     pet.feedingSchedule ||

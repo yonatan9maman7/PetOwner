@@ -207,6 +207,7 @@ public class BookingsController : ControllerBase
 
         var booking = await _db.Bookings
             .Include(b => b.ProviderProfile).ThenInclude(p => p.User)
+            .AsSplitQuery()
             .FirstOrDefaultAsync(b => b.Id == id);
 
         if (booking is null)

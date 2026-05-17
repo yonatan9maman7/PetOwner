@@ -5,7 +5,7 @@ import { WidgetCard } from "./WidgetCard";
 import { useTheme } from "../../../../theme/ThemeContext";
 
 interface PetInfoWidgetProps {
-  pet: PetDto;
+  pet: PetDto | null;
   onPress: () => void;
   disabled?: boolean;
 }
@@ -14,7 +14,8 @@ export function PetInfoWidget({ pet, onPress, disabled }: PetInfoWidgetProps) {
   const { t } = useTranslation();
   const { colors } = useTheme();
 
-  const microchipSlot = pet.microchipNumber ? (
+  const microchip = pet?.microchipNumber?.trim();
+  const microchipSlot = microchip ? (
     <View style={{ alignItems: "flex-end", gap: 1 }}>
       <Text style={{ fontSize: 10, color: colors.textMuted, fontWeight: "500" }}>
         {t("microchipShort")}
@@ -28,12 +29,12 @@ export function PetInfoWidget({ pet, onPress, disabled }: PetInfoWidgetProps) {
           letterSpacing: 0.5,
         }}
       >
-        ···· {pet.microchipNumber.slice(-4)}
+        ···· {microchip.slice(-4)}
       </Text>
     </View>
   ) : undefined;
 
-  const subtitle = pet.vetName
+  const subtitle = pet?.vetName
     ? `${t("vetInfo")}: ${pet.vetName}`
     : t("petInfo");
 

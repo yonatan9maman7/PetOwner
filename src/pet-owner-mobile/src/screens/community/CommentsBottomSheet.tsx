@@ -14,7 +14,9 @@ import {
 import { showGlobalAlertCompat } from "../../components/global-modal";
 import { FlashList } from "@shopify/flash-list";
 import { Ionicons } from "@expo/vector-icons";
+import { SafeAreaProvider } from "react-native-safe-area-context";
 import { useTheme } from "../../theme/ThemeContext";
+import { useBottomSafeInset } from "../../hooks/useBottomSafeInset";
 import { useKeyboardAvoidingState } from "../../hooks/useKeyboardAvoidingState";
 import { useTranslation, rowDirectionForAppLayout } from "../../i18n";
 import { useAuthStore } from "../../store/authStore";
@@ -89,6 +91,7 @@ export function CommentsBottomSheet({
   const { t, rtlText, rtlRow, rtlInput, isRTL } = useTranslation();
   const me = useAuthStore((s) => s.user);
   const styles = getStyles(colors);
+  const bottomInset = useBottomSafeInset();
   const { behavior: keyboardAvoidBehavior } = useKeyboardAvoidingState();
 
   const [comments, setComments] = useState<CommentDto[]>([]);
@@ -404,13 +407,14 @@ export function CommentsBottomSheet({
       animationType="slide"
       onRequestClose={onClose}
     >
+      <SafeAreaProvider>
       <View style={styles.overlay}>
         <Pressable style={styles.overlayBackdrop} onPress={onClose} />
 
         <KeyboardAvoidingView
           style={styles.sheet}
           behavior={keyboardAvoidBehavior}
-          keyboardVerticalOffset={0}
+          keyboardVerticalOffset={Platform.OS === "ios" ? bottomInset : 0}
         >
           {/* Drag handle + header */}
           <View style={styles.handle} />
@@ -454,7 +458,7 @@ export function CommentsBottomSheet({
           )}
 
           {/* Composer */}
-          <View style={[styles.composer, rtlRow]}>
+          <View style={[styles.composer, rtlRow, { paddingBottom: 10 + bottomInset }]}>
             <TextInput
               ref={inputRef}
               style={[styles.composerInput, rtlInput]}
@@ -485,6 +489,7 @@ export function CommentsBottomSheet({
           </View>
         </KeyboardAvoidingView>
       </View>
+      </SafeAreaProvider>
     </Modal>
   );
 }
@@ -505,7 +510,6 @@ const getStyles = (colors: any) =>
       borderTopRightRadius: 24,
       maxHeight: "92%",
       minHeight: 300,
-      paddingBottom: 8,
     },
     handle: {
       width: 40,

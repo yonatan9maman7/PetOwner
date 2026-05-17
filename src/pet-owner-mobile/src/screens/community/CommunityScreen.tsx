@@ -18,7 +18,9 @@ import {
   InteractionManager,
 } from "react-native";
 import { showGlobalAlertCompat } from "../../components/global-modal";
-import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+import { SafeAreaProvider, SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+import { FormFieldLabel } from "../../components/FormFieldLabel";
+import { useBottomSafeInset } from "../../hooks/useBottomSafeInset";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect, useNavigation, useRoute } from "@react-navigation/native";
 import * as Location from "expo-location";
@@ -507,6 +509,29 @@ export function CommunityScreen() {
   const [newPlaydateDescription, setNewPlaydateDescription] = useState("");
   const [newPlaydateApproval, setNewPlaydateApproval] = useState(false);
   const [creatingPlaydate, setCreatingPlaydate] = useState(false);
+
+  const resetPlaydateForm = useCallback(() => {
+    setNewPlaydateTitle("");
+    setNewPlaydateDate("");
+    setNewPlaydateTime("");
+    setNewPlaydateLocation("");
+    setNewPlaydateSize("All");
+    setNewPlaydateAge("All");
+    setNewPlaydateEnergy("Medium");
+    setNewPlaydateMax("8");
+    setNewPlaydateDescription("");
+    setNewPlaydateApproval(false);
+  }, []);
+
+  const closePlaydateModal = useCallback(() => {
+    resetPlaydateForm();
+    setPlaydateModalOpen(false);
+  }, [resetPlaydateForm]);
+
+  const openPlaydateModal = useCallback(() => {
+    resetPlaydateForm();
+    openPlaydateModal();
+  }, [resetPlaydateForm]);
 
   const [beacons, setBeacons] = useState<LiveBeaconDto[]>([]);
   const [beaconsLoading, setBeaconsLoading] = useState(false);
@@ -1299,10 +1324,7 @@ export function CommunityScreen() {
         maxPets: Number.parseInt(newPlaydateMax, 10) || undefined,
       });
       setPlaydates((prev) => [created, ...prev]);
-      setPlaydateModalOpen(false);
-      setNewPlaydateTitle("");
-      setNewPlaydateLocation("");
-      setNewPlaydateDescription("");
+      closePlaydateModal();
       showGlobalAlertCompat(copy("playdateCreated"), copy("playdateCreatedDesc"));
     } catch {
       const local: PlaydateEventDto = {
@@ -1327,7 +1349,7 @@ export function CommunityScreen() {
         isCancelled: false,
       };
       setPlaydates((prev) => [local, ...prev]);
-      setPlaydateModalOpen(false);
+      closePlaydateModal();
       showGlobalAlertCompat(copy("savedLocal"), copy("playdateSavedLocal"));
     } finally {
       setCreatingPlaydate(false);
@@ -1847,7 +1869,7 @@ export function CommunityScreen() {
               <Ionicons name="create-outline" size={18} color={colors.textInverse} />
               <Text style={styles.quickActionPrimaryText}>{copy("createPost")}</Text>
             </Pressable>
-            <Pressable onPress={() => setPlaydateModalOpen(true)} style={[styles.quickActionSecondary, rtlRow]}>
+            <Pressable onPress={() => openPlaydateModal()} style={[styles.quickActionSecondary, rtlRow]}>
               <Ionicons name="calendar-outline" size={18} color={colors.text} />
               <Text style={styles.quickActionSecondaryText}>{copy("createPlaydate")}</Text>
             </Pressable>
@@ -2014,7 +2036,7 @@ export function CommunityScreen() {
             bottomContentPadding={bottomContentPadding}
             selectedPet={selectedPet}
             onRefresh={loadPlaydates}
-            onCreatePlaydate={() => setPlaydateModalOpen(true)}
+            onCreatePlaydate={() => openPlaydateModal()}
             onRsvp={handleRsvp}
             onOpenComments={setPlaydateCommentsOpenFor}
             copy={copy}
@@ -2037,7 +2059,7 @@ export function CommunityScreen() {
             onViewPark={setSelectedPark}
             onCreatePlaydateAtPark={(parkName) => {
               setNewPlaydateLocation(parkName);
-              setPlaydateModalOpen(true);
+              openPlaydateModal();
             }}
             copy={copy}
           />
@@ -2078,7 +2100,7 @@ export function CommunityScreen() {
             playdatesLoading={playdatesLoading}
             bottomContentPadding={bottomContentPadding}
             onRefresh={loadPlaydates}
-            onCreatePlaydate={() => setPlaydateModalOpen(true)}
+            onCreatePlaydate={() => openPlaydateModal()}
             onJoinEvent={handleJoinEvent}
             copy={copy}
           />
@@ -2146,7 +2168,7 @@ export function CommunityScreen() {
       {playdateModalOpen && (
       <CreatePlaydateModal
         visible
-        onClose={() => setPlaydateModalOpen(false)}
+        onClose={closePlaydateModal}
         colors={colors}
         styles={styles}
         rtlInput={rtlInput}
@@ -2178,6 +2200,7 @@ export function CommunityScreen() {
         creating={creatingPlaydate}
         onCreate={handleCreatePlaydate}
         keyboardAvoidBehavior={keyboardAvoidBehavior}
+        rowDirection={appRowDirection}
       />
       )}
 
@@ -2230,7 +2253,7 @@ export function CommunityScreen() {
                   onPress={() => {
                     setNewPlaydateLocation(selectedPark.name);
                     setSelectedPark(null);
-                    setPlaydateModalOpen(true);
+                    openPlaydateModal();
                   }}
                   style={styles.primarySmallBtn}
                 >
@@ -2727,6 +2750,15 @@ function CreatePostModal({
   );
 }
 
+const PLAYDATE_SIZE_OPTIONS: DogSizeSuitability[] = ["Small", "Medium", "Large", "All"];
+const PLAYDATE_AGE_OPTIONS = ["Puppies", "Adults", "Seniors", "All"] as const;
+const PLAYDATE_ENERGY_OPTIONS: EnergyLevel[] = ["Calm", "Medium", "High"];
+
+/** In RTL, reverse chip order so defaults like "All" sit on the logical start (right). */
+function playdateChipOrder<T>(options: readonly T[], rtl: boolean): T[] {
+  return rtl ? [...options].reverse() : [...options];
+}
+
 function CreatePlaydateModal({
   visible,
   onClose,
@@ -2761,6 +2793,7 @@ function CreatePlaydateModal({
   creating,
   onCreate,
   keyboardAvoidBehavior,
+  rowDirection,
 }: {
   visible: boolean;
   onClose: () => void;
@@ -2769,6 +2802,7 @@ function CreatePlaydateModal({
   styles: ReturnType<typeof getStyles>;
   rtlInput: object;
   isRTL: boolean;
+  rowDirection: "row" | "row-reverse";
   copy: (key: CopyKey) => string;
   pets: PetDto[];
   selectedPetId: string | null;
@@ -2796,33 +2830,51 @@ function CreatePlaydateModal({
   creating: boolean;
   onCreate: () => void;
 }) {
+  const insets = useSafeAreaInsets();
+  const bottomInset = Math.max(insets.bottom, useBottomSafeInset());
+  const labelWrapStyle = {
+    alignSelf: "stretch" as const,
+    alignItems: (isRTL ? "flex-end" : "flex-start") as "flex-end" | "flex-start",
+  };
+  const chipWrapStyle = [styles.modalChipWrap, { flexDirection: rowDirection }];
+
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <SafeAreaProvider>
       <View style={styles.modalRoot}>
         <Pressable style={styles.modalBackdropFill} onPress={onClose} />
         <KeyboardAvoidingView behavior={keyboardAvoidBehavior} style={styles.keyboardSheet}>
           <Pressable style={[styles.detailSheet, { paddingHorizontal: 0 }]} onPress={(e) => e.stopPropagation()}>
             <View style={styles.handle} />
-            <View style={{ paddingHorizontal: 20 }}>
-              <Text style={[styles.modalTitle, { textAlign: isRTL ? "right" : "left" }]}>{copy("createPlaydateTitle")}</Text>
-              <Text style={[styles.modalFormSubtitle, { textAlign: isRTL ? "right" : "left" }]}>{copy("createPlaydateSubtitle")}</Text>
+            <View style={{ paddingHorizontal: 20, alignSelf: "stretch" }}>
+              <Text style={[styles.modalTitle, { textAlign: isRTL ? "right" : "left", alignSelf: "stretch" }]}>{copy("createPlaydateTitle")}</Text>
+              <Text style={[styles.modalFormSubtitle, { textAlign: isRTL ? "right" : "left", alignSelf: "stretch" }]}>{copy("createPlaydateSubtitle")}</Text>
             </View>
             <ScrollView
               style={{ maxHeight: 520 }}
-              contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 8 }}
+              contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 14 + bottomInset }}
               keyboardShouldPersistTaps="handled"
+              keyboardDismissMode="on-drag"
             >
+              <View style={labelWrapStyle}>
+                <FormFieldLabel text={copy("titleField")} isRTL={isRTL} isRequired variant="modal" style={{ marginTop: 4, alignSelf: "stretch" }} />
+              </View>
               <TextInput style={[styles.input, rtlInput]} placeholder={copy("titleField")} placeholderTextColor={colors.textMuted} value={title} onChangeText={setTitle} />
-              <Text style={[styles.label, { textAlign: isRTL ? "right" : "left" }]}>{copy("dog")}</Text>
-              <View style={styles.modalChipWrap}>
+              <View style={labelWrapStyle}>
+                <FormFieldLabel text={copy("dog")} isRTL={isRTL} isRequired variant="modal" style={{ alignSelf: "stretch" }} />
+              </View>
+              <View style={chipWrapStyle}>
                 {pets.map((pet) => (
                   <Pressable key={pet.id} onPress={() => setSelectedPetId(pet.id)} style={[styles.modalChip, selectedPetId === pet.id && styles.modalChipActive]}>
                     <Text style={[styles.modalChipText, selectedPetId === pet.id && styles.modalChipTextActive]}>{pet.name}</Text>
                   </Pressable>
                 ))}
               </View>
-              <View style={styles.twoCol}>
+              <View style={[styles.twoCol, { flexDirection: rowDirection }]}>
                 <View style={styles.colInput}>
+                  <View style={labelWrapStyle}>
+                    <FormFieldLabel text={copy("dateLabel")} isRTL={isRTL} isRequired variant="modal" style={{ alignSelf: "stretch" }} />
+                  </View>
                   <DatePickerField
                     value={date}
                     onChange={setDate}
@@ -2832,6 +2884,9 @@ function CreatePlaydateModal({
                   />
                 </View>
                 <View style={styles.colInput}>
+                  <View style={labelWrapStyle}>
+                    <FormFieldLabel text={copy("timeLabel")} isRTL={isRTL} isRequired variant="modal" style={{ alignSelf: "stretch" }} />
+                  </View>
                   <TimePickerField
                     value={time}
                     onChange={setTime}
@@ -2840,26 +2895,35 @@ function CreatePlaydateModal({
                   />
                 </View>
               </View>
+              <View style={labelWrapStyle}>
+                <FormFieldLabel text={copy("locationOrPark")} isRTL={isRTL} isRequired variant="modal" style={{ alignSelf: "stretch" }} />
+              </View>
               <TextInput style={[styles.input, rtlInput]} placeholder={copy("locationOrPark")} placeholderTextColor={colors.textMuted} value={location} onChangeText={setLocation} />
-              <Text style={[styles.label, { textAlign: isRTL ? "right" : "left" }]}>{copy("sizeFit")}</Text>
-              <View style={styles.modalChipWrap}>
-                {(["Small", "Medium", "Large", "All"] as DogSizeSuitability[]).map((option) => (
+              <View style={labelWrapStyle}>
+                <FormFieldLabel text={copy("sizeFit")} isRTL={isRTL} variant="modal" style={{ alignSelf: "stretch" }} />
+              </View>
+              <View style={chipWrapStyle}>
+                {playdateChipOrder(PLAYDATE_SIZE_OPTIONS, isRTL).map((option) => (
                   <Pressable key={option} onPress={() => setSize(option)} style={[styles.modalChip, size === option && styles.modalChipActive]}>
                     <Text style={[styles.modalChipText, size === option && styles.modalChipTextActive]}>{sizeLabel(option, isRTL)}</Text>
                   </Pressable>
                 ))}
               </View>
-              <Text style={[styles.label, { textAlign: isRTL ? "right" : "left" }]}>{copy("ageFit")}</Text>
-              <View style={styles.modalChipWrap}>
-                {["Puppies", "Adults", "Seniors", "All"].map((option) => (
+              <View style={labelWrapStyle}>
+                <FormFieldLabel text={copy("ageFit")} isRTL={isRTL} variant="modal" style={{ alignSelf: "stretch" }} />
+              </View>
+              <View style={chipWrapStyle}>
+                {playdateChipOrder(PLAYDATE_AGE_OPTIONS, isRTL).map((option) => (
                   <Pressable key={option} onPress={() => setAge(option)} style={[styles.modalChip, age === option && styles.modalChipActive]}>
                     <Text style={[styles.modalChipText, age === option && styles.modalChipTextActive]}>{ageLabel(option, isRTL)}</Text>
                   </Pressable>
                 ))}
               </View>
-              <Text style={[styles.label, { textAlign: isRTL ? "right" : "left" }]}>{copy("energyLevel")}</Text>
-              <View style={styles.modalChipWrap}>
-                {(["Calm", "Medium", "High"] as EnergyLevel[]).map((option) => (
+              <View style={labelWrapStyle}>
+                <FormFieldLabel text={copy("energyLevel")} isRTL={isRTL} variant="modal" style={{ alignSelf: "stretch" }} />
+              </View>
+              <View style={chipWrapStyle}>
+                {playdateChipOrder(PLAYDATE_ENERGY_OPTIONS, isRTL).map((option) => (
                   <Pressable key={option} onPress={() => setEnergy(option)} style={[styles.modalChip, energy === option && styles.modalChipActive]}>
                     <Text style={[styles.modalChipText, energy === option && styles.modalChipTextActive]}>{energyLabel(option, isRTL)}</Text>
                   </Pressable>
@@ -2867,22 +2931,26 @@ function CreatePlaydateModal({
               </View>
               <TextInput style={[styles.input, rtlInput]} placeholder={copy("maxParticipants")} placeholderTextColor={colors.textMuted} value={maxParticipants} onChangeText={setMaxParticipants} keyboardType="number-pad" />
               <TextInput style={[styles.input, styles.textArea, rtlInput]} placeholder={copy("description")} placeholderTextColor={colors.textMuted} value={description} onChangeText={setDescription} multiline />
-              <Pressable onPress={() => setRequiresApproval(!requiresApproval)} style={styles.checkRow}>
+              <Pressable
+                onPress={() => setRequiresApproval(!requiresApproval)}
+                style={[styles.checkRow, { flexDirection: rowDirection, alignSelf: isRTL ? "flex-end" : "flex-start" }]}
+              >
                 <Ionicons name={requiresApproval ? "checkbox" : "square-outline"} size={20} color={colors.text} />
-                <Text style={styles.checkText}>{copy("requiresApproval")}</Text>
+                <Text style={[styles.checkText, { textAlign: isRTL ? "right" : "left" }]}>{copy("requiresApproval")}</Text>
               </Pressable>
+              <View style={[styles.modalActions, { flexDirection: rowDirection, marginTop: 18 }]}>
+                <Pressable onPress={onClose} style={styles.composerCancel}>
+                  <Text style={styles.composerCancelText}>{copy("cancel")}</Text>
+                </Pressable>
+                <Pressable onPress={onCreate} disabled={creating} style={[styles.publishBtn, creating && { opacity: 0.5 }]}>
+                  {creating ? <ActivityIndicator size="small" color={colors.textInverse} /> : <Text style={styles.publishText}>{copy("createPlaydate")}</Text>}
+                </Pressable>
+              </View>
             </ScrollView>
-            <View style={[styles.modalActions, { paddingHorizontal: 20 }]}>
-              <Pressable onPress={onClose} style={styles.composerCancel}>
-                <Text style={styles.composerCancelText}>{copy("cancel")}</Text>
-              </Pressable>
-              <Pressable onPress={onCreate} disabled={creating} style={[styles.publishBtn, creating && { opacity: 0.5 }]}>
-                {creating ? <ActivityIndicator size="small" color={colors.textInverse} /> : <Text style={styles.publishText}>{copy("createPlaydate")}</Text>}
-              </Pressable>
-            </View>
           </Pressable>
         </KeyboardAvoidingView>
       </View>
+      </SafeAreaProvider>
     </Modal>
   );
 }

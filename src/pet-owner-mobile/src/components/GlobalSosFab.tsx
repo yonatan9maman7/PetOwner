@@ -8,6 +8,7 @@ import {
   useWindowDimensions,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useBottomSafeInset } from "../hooks/useBottomSafeInset";
 import {
   useNavigation,
   useNavigationState,
@@ -54,6 +55,7 @@ function useSosFabVisible(): boolean {
 export function GlobalSosFab() {
   const navigation = useNavigation<any>();
   const insets = useSafeAreaInsets();
+  const bottomInset = useBottomSafeInset();
   const { width } = useWindowDimensions();
   const { t, isRTL } = useTranslation();
   const { colors } = useTheme();
@@ -64,7 +66,7 @@ export function GlobalSosFab() {
   const visible = navAllowsFab && !sectionDetailOpen;
   const [menuOpen, setMenuOpen] = useState(false);
 
-  const bottom = insets.bottom + TAB_BAR_OFFSET;
+  const bottom = bottomInset + TAB_BAR_OFFSET;
   const edge = 20;
   const horizontalStyle = isRTL
     ? { left: Math.max(edge, insets.left) }

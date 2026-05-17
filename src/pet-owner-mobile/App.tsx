@@ -2,7 +2,10 @@ import "./global.css";
 import { useEffect, useRef } from "react";
 import { DevSettings, I18nManager, Keyboard, Platform, View, LogBox } from "react-native";
 import { NavigationContainer, DefaultTheme, DarkTheme } from "@react-navigation/native";
-import { SafeAreaProvider } from "react-native-safe-area-context";
+import {
+  initialWindowMetrics,
+  SafeAreaProvider,
+} from "react-native-safe-area-context";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { ErrorBoundary } from "react-error-boundary";
 import * as Sentry from "@sentry/react-native";
@@ -197,7 +200,7 @@ function App() {
       }}
     >
       <GestureHandlerRootView style={{ flex: 1 }}>
-        <SafeAreaProvider>
+        <SafeAreaProvider initialWindowMetrics={initialWindowMetrics}>
           <ThemeProvider>
             <GlobalModalProvider>
               <AppInner />

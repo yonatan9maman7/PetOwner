@@ -63,9 +63,9 @@ export function HealthHubList({ activePet, summary, onSelectSection, onOpenTriag
     />,
     <PetInfoWidget
       key="info"
-      pet={activePet!}
+      pet={activePet}
       onPress={() => { if (!disabled) onSelectSection("health"); }}
-      disabled={disabled || !activePet}
+      disabled={disabled}
     />,
   ];
 

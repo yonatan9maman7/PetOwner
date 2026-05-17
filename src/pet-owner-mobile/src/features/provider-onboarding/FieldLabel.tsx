@@ -7,15 +7,19 @@ export function FieldLabel({
   text,
   isRTL,
   required,
+  isRequired,
   variant = "section",
 }: {
   text: string;
   isRTL: boolean;
+  /** @deprecated Prefer `isRequired` */
   required?: boolean;
+  isRequired?: boolean;
   variant?: Variant;
 }) {
   const { colors } = useTheme();
   const isSmall = variant === "small";
+  const showRequired = isRequired ?? required;
   return (
     <Text
       style={{
@@ -28,7 +32,7 @@ export function FieldLabel({
       }}
     >
       {text}
-      {required ? <Text style={{ color: colors.danger }}> *</Text> : null}
+      {showRequired ? <Text style={{ color: colors.danger }}> *</Text> : null}
     </Text>
   );
 }

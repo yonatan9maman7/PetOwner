@@ -83,6 +83,11 @@ import {
   viewportPinsSearchParamsFromRegion,
 } from "./exploreMapLayoutConstants";
 import {
+  applyExploreMapPinFilters,
+  buildExploreMapFilterCriteria,
+  buildMapSearchFiltersForApi,
+} from "./exploreMapFilters";
+import {
   navigateToLoginClearingStack,
   EXPLORE_CLEAR_BEFORE_LOGIN_EVENT,
 } from "../../navigation/navigateToLoginClearingStack";
@@ -639,47 +644,36 @@ export function ExploreScreen() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  /* ─── Build filters ─── */
+  /* ─── Map filter criteria (strict AND on client; API params for server pre-filter) ─── */
+  const exploreFilterCriteria = useMemo(
+    () =>
+      buildExploreMapFilterCriteria({
+        activeServices,
+        filterMinRating,
+        filterMaxRate,
+        filterRadiusKm,
+        userLat,
+        userLng,
+      }),
+    [
+      activeServices,
+      filterMinRating,
+      filterMaxRate,
+      filterRadiusKm,
+      userLat,
+      userLng,
+    ],
+  );
+
   const buildFilters = useCallback((): MapSearchFilters | undefined => {
-    const f: MapSearchFilters = {};
-
-    if (searchText.trim()) f.searchTerm = searchText.trim();
-    if (activeServices.size > 0) f.serviceType = [...activeServices].join(",");
-    if (filterMinRating) f.minRating = filterMinRating;
-    if (filterMaxRate && Number(filterMaxRate) > 0)
-      f.maxRate = Number(filterMaxRate);
-
-    if (filterDate && filterTime) {
-      f.requestedTime = `${filterDate}T${filterTime}:00`;
-    }
-
-    if (filterRadiusKm && userLat != null && userLng != null) {
-      f.radiusKm = filterRadiusKm;
-      f.latitude = userLat;
-      f.longitude = userLng;
-    } else {
-      const raw = mapRegionRef.current;
-      const region = isValidMapRegion(raw) ? raw : EXPLORE_MAP_INITIAL_REGION;
-      const geo = viewportPinsSearchParamsFromRegion(region);
-      if (geo) {
-        f.latitude = geo.latitude;
-        f.longitude = geo.longitude;
-        f.radiusKm = geo.radiusKm;
-      }
-    }
-
-    return Object.keys(f).length > 0 ? f : undefined;
-  }, [
-    searchText,
-    activeServices,
-    filterMinRating,
-    filterMaxRate,
-    filterRadiusKm,
-    filterDate,
-    filterTime,
-    userLat,
-    userLng,
-  ]);
+    return buildMapSearchFiltersForApi(exploreFilterCriteria, {
+      searchText,
+      filterDate,
+      filterTime,
+      mapRegion: mapRegionRef.current,
+      fallbackRegion: EXPLORE_MAP_INITIAL_REGION,
+    });
+  }, [exploreFilterCriteria, searchText, filterDate, filterTime]);
 
   /**
    * Commit a new pins list to state only when something actually changed, and only
@@ -779,8 +773,14 @@ export function ExploreScreen() {
           mapDiag("fetchPins.unfocused", { gen, dur, count: data.length });
           return;
         }
-        mapDiag("fetchPins.ok", { gen, dur, count: data.length });
-        commitPins(data);
+        const filtered = applyExploreMapPinFilters(data, exploreFilterCriteria);
+        mapDiag("fetchPins.ok", {
+          gen,
+          dur,
+          count: data.length,
+          filtered: filtered.length,
+        });
+        commitPins(filtered);
       } catch (error) {
         const dur = Date.now() - startedAt;
         if (gen !== pinsFetchGenRef.current) {
@@ -804,7 +804,7 @@ export function ExploreScreen() {
         }
       }
     },
-    [t, commitPins],
+    [t, commitPins, exploreFilterCriteria],
   );
 
   const loadPins = useCallback(

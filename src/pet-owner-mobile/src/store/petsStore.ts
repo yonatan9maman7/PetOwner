@@ -71,6 +71,7 @@ export const usePetsStore = create<PetsState>((set, get) => ({
       });
     } catch (e: unknown) {
       set({ error: getApiErrorMessage(e), loading: false });
+      throw e;
     }
   },
 

@@ -1,4 +1,3 @@
-import { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -6,8 +5,6 @@ import {
   Pressable,
   ScrollView,
   Switch,
-  Platform,
-  Modal,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useFormContext } from "react-hook-form";
@@ -15,6 +12,7 @@ import { useTranslation, rowDirectionForAppLayout } from "../../i18n";
 import { useTheme } from "../../theme/ThemeContext";
 import { servicesForProviderType, DAY_FULL_KEYS } from "./constants";
 import { FieldLabel } from "./FieldLabel";
+import { CompactTimeChip } from "../../components/shared/CompactTimeChip";
 import type { OnboardingFormValues } from "./schemas";
 
 type Slot = { dayOfWeek: number; startTime: string; endTime: string };
@@ -44,23 +42,6 @@ const PRESETS: Preset[] = [
     ],
   },
 ];
-
-function parseHHMM(hhmm: string): Date {
-  const d = new Date();
-  if (hhmm) {
-    const [h, m] = hhmm.split(":").map(Number);
-    if (!Number.isNaN(h) && !Number.isNaN(m)) {
-      d.setHours(h, m, 0, 0);
-      return d;
-    }
-  }
-  d.setSeconds(0, 0);
-  return d;
-}
-
-function toHHMM(d: Date): string {
-  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
-}
 
 function sortSlotsForDisplay(slots: Slot[]): Slot[] {
   return [...slots].sort((a, b) =>
@@ -468,127 +449,6 @@ function SmallInput({
         </Text>
       )}
     </View>
-  );
-}
-
-function CompactTimeChip({
-  value,
-  onChange,
-  isRTL,
-}: {
-  value: string;
-  onChange: (v: string) => void;
-  isRTL: boolean;
-}) {
-  const { colors, isDark } = useTheme();
-  const [show, setShow] = useState(false);
-  const [draft, setDraft] = useState(() => parseHHMM(value));
-
-  useEffect(() => {
-    if (!show) setDraft(parseHHMM(value));
-  }, [value, show]);
-
-  const display = value || "--:--";
-
-  if (Platform.OS === "web") {
-    return (
-      <TextInput
-        value={value}
-        onChangeText={onChange}
-        placeholder="09:00"
-        placeholderTextColor={colors.textMuted}
-        style={{
-          borderWidth: 1,
-          borderColor: colors.border,
-          borderRadius: 8,
-          paddingHorizontal: 10,
-          paddingVertical: 8,
-          backgroundColor: colors.surfaceSecondary,
-          minWidth: 72,
-          fontSize: 14,
-          fontWeight: "600",
-          color: colors.text,
-          textAlign: "center",
-        }}
-      />
-    );
-  }
-
-  const DateTimePicker = require("@react-native-community/datetimepicker").default;
-
-  return (
-    <>
-      <Pressable
-        onPress={() => {
-          setDraft(parseHHMM(value));
-          setShow(true);
-        }}
-        style={{
-          borderWidth: 1,
-          borderColor: colors.border,
-          borderRadius: 8,
-          paddingHorizontal: 12,
-          paddingVertical: 8,
-          backgroundColor: colors.surfaceSecondary,
-          minWidth: 72,
-        }}
-      >
-        <Text style={{ fontSize: 14, fontWeight: "600", color: colors.text, textAlign: "center" }}>{display}</Text>
-      </Pressable>
-
-      {show && Platform.OS === "ios" && (
-        <Modal transparent animationType="slide" onRequestClose={() => setShow(false)}>
-          <View style={{ flex: 1, justifyContent: "flex-end" }}>
-            <Pressable style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.4)" }} onPress={() => setShow(false)} />
-            <View
-              style={{
-                backgroundColor: colors.surface,
-                borderTopLeftRadius: 16,
-                borderTopRightRadius: 16,
-                paddingBottom: 28,
-              }}
-            >
-              <View style={{ flexDirection: rowDirectionForAppLayout(isRTL), justifyContent: "flex-end", padding: 12 }}>
-                <Pressable
-                  onPress={() => {
-                    onChange(toHHMM(draft));
-                    setShow(false);
-                  }}
-                >
-                  <Text style={{ fontSize: 16, fontWeight: "600", color: "#007AFF" }}>Done</Text>
-                </Pressable>
-              </View>
-              <View style={{ alignItems: "center", minHeight: 216 }}>
-                <DateTimePicker
-                  value={draft}
-                  mode="time"
-                  display="spinner"
-                  is24Hour
-                  themeVariant={isDark ? "dark" : "light"}
-                  style={{ height: 216, width: "100%" }}
-                  onChange={(_: unknown, d?: Date) => {
-                    if (d) setDraft(d);
-                  }}
-                />
-              </View>
-            </View>
-          </View>
-        </Modal>
-      )}
-
-      {show && Platform.OS === "android" && (
-        <DateTimePicker
-          value={parseHHMM(value)}
-          mode="time"
-          display="default"
-          is24Hour
-          onChange={(ev: { type: string }, d?: Date) => {
-            setShow(false);
-            if (ev.type === "set" && d) onChange(toHHMM(d));
-          }}
-        />
-      )}
-    </>
   );
 }
 

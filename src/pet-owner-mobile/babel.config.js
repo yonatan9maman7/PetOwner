@@ -5,6 +5,7 @@ module.exports = function (api) {
       ["babel-preset-expo", { jsxImportSource: "nativewind" }],
       "nativewind/babel",
     ],
-    plugins: ["@sentry/react-native/babel", "react-native-reanimated/plugin"],
+  // Reanimated must be last. Sentry uses the Expo plugin in app.config.js + runtime init (no @sentry/react-native/babel in v7).
+    plugins: ["react-native-reanimated/plugin"],
   };
 };

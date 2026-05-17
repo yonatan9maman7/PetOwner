@@ -91,10 +91,15 @@ export function useActivePetSummary(
     inflightRef.current = token;
     setState((prev) => ({ ...prev, loading: true }));
 
-    fetchSummaryData(petId, reloadNonce).then((data) => {
-      if (inflightRef.current !== token) return;
-      setState({ ...data, loading: false });
-    });
+    fetchSummaryData(petId, reloadNonce)
+      .then((data) => {
+        if (inflightRef.current !== token) return;
+        setState({ ...data, loading: false });
+      })
+      .catch(() => {
+        if (inflightRef.current !== token) return;
+        setState(EMPTY);
+      });
   }, [petId, reloadNonce]);
 
   return state;

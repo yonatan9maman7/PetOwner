@@ -14,7 +14,7 @@ type NonNullSection = Exclude<Section, null>;
 
 interface SectionShellProps {
   section: NonNullSection;
-  pet: PetDto;
+  pet: PetDto | null | undefined;
   onBack: () => void;
   onExportPdf: () => void;
   onShare: () => void;
@@ -33,6 +33,8 @@ export function SectionShell({
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const { behavior: keyboardAvoidBehavior } = useKeyboardAvoidingState();
+
+  if (!pet) return null;
 
   const sectionMeta: {
     icon: keyof typeof Ionicons.glyphMap;

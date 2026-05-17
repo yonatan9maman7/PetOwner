@@ -14,6 +14,11 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { CommonActions, useNavigation, useRoute } from "@react-navigation/native";
 import { useTranslation, rowDirectionForAppLayout, type TranslationKey } from "../../i18n";
+import {
+  pricingUnitShortLabel,
+  resolveServiceType,
+  serviceRateDisplayName,
+} from "../../i18n/serviceRateDisplay";
 import { useTheme } from "../../theme/ThemeContext";
 import { bookingsApi, mapApi } from "../../api/client";
 import {
@@ -25,53 +30,9 @@ import {
 import { SmartCalendarPicker } from "../../components/shared/SmartCalendarPicker";
 import { TimeSlotSelector } from "../../components/shared/TimeSlotSelector";
 import { ScreenLoadingCenter } from "../../components/shared/ScreenLoadingCenter";
+import { StackBackHeader } from "../../components/StackBackHeader";
 import { usePetsStore } from "../../store/petsStore";
 import { customerBreakdownFromProviderNet } from "../../utils/pricingDisplay";
-
-const SERVICE_TYPE_BY_ORDINAL: Record<number, ServiceType> = {
-  0: ServiceType.DogWalking,
-  1: ServiceType.PetSitting,
-  2: ServiceType.Boarding,
-  3: ServiceType.DropInVisit,
-  4: ServiceType.Training,
-  5: ServiceType.Insurance,
-  6: ServiceType.PetStore,
-  7: ServiceType.HouseSitting,
-  8: ServiceType.DoggyDayCare,
-};
-
-/** English display names for matching API strings in `resolveServiceType` only */
-const SERVICE_TYPE_NAMES: Record<ServiceType, string> = {
-  [ServiceType.DogWalking]: "Dog Walking",
-  [ServiceType.PetSitting]: "Pet Sitting",
-  [ServiceType.Boarding]: "Boarding",
-  [ServiceType.DropInVisit]: "Drop-in Visit",
-  [ServiceType.Training]: "Training",
-  [ServiceType.Insurance]: "Insurance",
-  [ServiceType.PetStore]: "Pet Store",
-  [ServiceType.HouseSitting]: "House Sitting",
-  [ServiceType.DoggyDayCare]: "Doggy Day Care",
-};
-
-const SERVICE_TYPE_TO_TRANSLATION_KEY: Record<ServiceType, TranslationKey> = {
-  [ServiceType.DogWalking]: "serviceDogWalking",
-  [ServiceType.PetSitting]: "servicePetSitting",
-  [ServiceType.Boarding]: "serviceBoarding",
-  [ServiceType.DropInVisit]: "serviceDropInVisit",
-  [ServiceType.Training]: "serviceTraining",
-  [ServiceType.Insurance]: "serviceInsurance",
-  [ServiceType.PetStore]: "servicePetStore",
-  [ServiceType.HouseSitting]: "serviceHouseSitting",
-  [ServiceType.DoggyDayCare]: "serviceDoggyDayCare",
-};
-
-const PRICING_UNIT_NUM_TO_KEY: Record<number, TranslationKey> = {
-  0: "rateUnitHour",
-  1: "rateUnitNight",
-  2: "rateUnitVisit",
-  3: "rateUnitSession",
-  4: "rateUnitPackage",
-};
 
 const PET_SPECIES_TO_KEY: Partial<Record<PetSpecies, TranslationKey>> = {
   [PetSpecies.Dog]: "speciesDog",
@@ -221,36 +182,6 @@ function petSpeciesDisplay(pet: PetDto, t: (key: TranslationKey) => string): str
   return t("speciesOther");
 }
 
-function serviceRateDisplayName(rate: any, t: (key: TranslationKey) => string): string {
-  const serviceType = resolveServiceType(rate);
-  if (serviceType) return t(SERVICE_TYPE_TO_TRANSLATION_KEY[serviceType]);
-  const raw = rate?.service;
-  if (typeof raw === "string" && raw.trim()) return raw.trim();
-  return t("bookingServiceFallback").replace("{{n}}", String(rate?.serviceType ?? "?"));
-}
-
-function pricingUnitShortLabel(rate: any, t: (key: TranslationKey) => string): string {
-  const rawPu = rate?.pricingUnit;
-  if (typeof rawPu === "number" && PRICING_UNIT_NUM_TO_KEY[rawPu]) {
-    return t(PRICING_UNIT_NUM_TO_KEY[rawPu]);
-  }
-  if (typeof rawPu === "string") {
-    const s = rawPu.replace(/\s+/g, "").toLowerCase();
-    if (s === "perhour" || s === "0") return t("rateUnitHour");
-    if (s === "pernight" || s === "1") return t("rateUnitNight");
-    if (s === "pervisit" || s === "2") return t("rateUnitVisit");
-    if (s === "persession" || s === "3") return t("rateUnitSession");
-    if (s === "perpackage" || s === "4") return t("rateUnitPackage");
-  }
-  const unit = String(rate?.unit ?? "").toLowerCase();
-  if (unit === "hour" || unit === "hours") return t("rateUnitHour");
-  if (unit === "night" || unit === "nights") return t("rateUnitNight");
-  if (unit === "visit") return t("rateUnitVisit");
-  if (unit === "session") return t("rateUnitSession");
-  if (unit === "package") return t("rateUnitPackage");
-  return "";
-}
-
 /**
  * Resolves local start/end for the booking window.
  * If end is before start on the same calendar day, end is moved forward by one day (overnight / next-morning end).
@@ -281,32 +212,43 @@ function resolveBookingRange(
   return { start, end };
 }
 
-/** Resolve API `ServiceType` to the exact PascalCase enum string expected by the backend. */
-function resolveServiceType(rate: any): ServiceType | null {
-  if (typeof rate?.serviceType === "number" && !Number.isNaN(rate.serviceType)) {
-    return SERVICE_TYPE_BY_ORDINAL[rate.serviceType] ?? null;
+const FLAT_BOOKING_DAY_START = "00:00";
+const FLAT_BOOKING_DAY_END = "23:59";
+
+/** Hourly, nightly, fixed-duration walks, and multi-day stays need explicit time slots. */
+function serviceNeedsTimeSelection(
+  rate: any,
+  serviceType: ServiceType | null,
+): boolean {
+  if (getFixedDurationMinutes(rate)) return true;
+  const mode = getBillingMode(rate);
+  if (mode === "perHour" || mode === "perNight") return true;
+  if (isMultiDayStayService(serviceType)) return true;
+  return false;
+}
+
+/** Package / visit / insurance-style services: date only, default day window for the API. */
+function resolveFlatBookingRange(startDate: string): { start: Date; end: Date } | null {
+  if (!startDate) return null;
+  const start = new Date(combineDateAndTime(startDate, FLAT_BOOKING_DAY_START));
+  let end = new Date(combineDateAndTime(startDate, FLAT_BOOKING_DAY_END));
+  if (isNaN(start.getTime()) || isNaN(end.getTime())) return null;
+  if (end <= start) {
+    end = new Date(start.getTime() + 60_000);
   }
+  return { start, end };
+}
 
-  const label = rate?.service ?? rate?.serviceType;
-  if (typeof label !== "string") return null;
-
-  const trimmed = label.trim();
-  const numeric = Number(trimmed);
-  if (Number.isInteger(numeric)) return SERVICE_TYPE_BY_ORDINAL[numeric] ?? null;
-
-  const enumMatch = Object.values(ServiceType).find((type) => type === trimmed);
-  if (enumMatch) return enumMatch;
-
-  const compact = trimmed.replace(/[\s-]/g, "").toLowerCase();
-  const compactEnumMatch = Object.values(ServiceType).find(
-    (type) => type.toLowerCase() === compact,
-  );
-  if (compactEnumMatch) return compactEnumMatch;
-
-  const displayMatch = Object.entries(SERVICE_TYPE_NAMES).find(
-    ([, displayName]) => displayName.replace(/[\s-]/g, "").toLowerCase() === compact,
-  );
-  return displayMatch ? displayMatch[0] as ServiceType : null;
+function resolveBookingRangeForRate(
+  startDate: string,
+  startTime: string,
+  endDate: string,
+  endTime: string,
+  fixedDurationMinutes: number | null | undefined,
+  needsTime: boolean,
+): { start: Date; end: Date } | null {
+  if (!needsTime) return resolveFlatBookingRange(startDate);
+  return resolveBookingRange(startDate, startTime, endDate, endTime, fixedDurationMinutes);
 }
 
 /** Reset current stack, then switch to Profile -> MyBookings (outgoing). */
@@ -403,6 +345,10 @@ export function BookingScreen() {
   const isDogOnlyService = selectedServiceType === ServiceType.DogWalking
     || selectedServiceType === ServiceType.DoggyDayCare;
   const isMultiDayService = isMultiDayStayService(selectedServiceType);
+  const needsTimeSelection = useMemo(
+    () => (sr ? serviceNeedsTimeSelection(sr, selectedServiceType) : false),
+    [sr, selectedServiceType],
+  );
 
   useEffect(() => {
     if (!isDogOnlyService) return;
@@ -415,7 +361,7 @@ export function BookingScreen() {
     let cancelled = false;
 
     setStartAvailableTimes([]);
-    if (!startDate || !selectedServiceType) {
+    if (!needsTimeSelection || !startDate || !selectedServiceType) {
       setStartAvailabilityLoading(false);
       return;
     }
@@ -436,14 +382,15 @@ export function BookingScreen() {
     return () => {
       cancelled = true;
     };
-  }, [profile.providerId, selectedServiceType, startDate]);
+  }, [needsTimeSelection, profile.providerId, selectedServiceType, startDate]);
 
   useEffect(() => {
     let cancelled = false;
 
     setEndAvailableTimes([]);
     const needsCheckoutDaySlots =
-      !isFixedDuration
+      needsTimeSelection
+      && !isFixedDuration
       && !!endDate
       && !!selectedServiceType
       && (isMultiDayService || selectedBillingMode === "perNight");
@@ -468,19 +415,34 @@ export function BookingScreen() {
     return () => {
       cancelled = true;
     };
-  }, [profile.providerId, isFixedDuration, isMultiDayService, selectedBillingMode, selectedServiceType, endDate]);
+  }, [
+    needsTimeSelection,
+    profile.providerId,
+    isFixedDuration,
+    isMultiDayService,
+    selectedBillingMode,
+    selectedServiceType,
+    endDate,
+  ]);
 
   useEffect(() => {
     if (
-      startTime &&
-      selectedServiceType &&
-      !startAvailabilityLoading &&
-      !startAvailableTimes.includes(startTime)
+      needsTimeSelection
+      && startTime
+      && selectedServiceType
+      && !startAvailabilityLoading
+      && !startAvailableTimes.includes(startTime)
     ) {
       setStartTime("");
       setEndTime("");
     }
-  }, [selectedServiceType, startAvailabilityLoading, startAvailableTimes, startTime]);
+  }, [
+    needsTimeSelection,
+    selectedServiceType,
+    startAvailabilityLoading,
+    startAvailableTimes,
+    startTime,
+  ]);
 
   /** End-time slots must be after start only on the same calendar day; multi-day boarding allows early pickup on the last day. */
   const endTimeDisableAtOrBefore = useMemo(() => {
@@ -497,15 +459,32 @@ export function BookingScreen() {
 
   /** True when a prefill time was requested but falls outside this provider's working hours */
   const prefillTimeInvalid = useMemo(() => {
+    if (!needsTimeSelection) return false;
     if (!prefillTime || !prefillDate || prefillDate !== startDate || startAvailabilityLoading) return false;
     return selectedServiceType !== null && !startAvailableTimes.includes(prefillTime);
-  }, [prefillTime, prefillDate, startDate, startAvailabilityLoading, selectedServiceType, startAvailableTimes]);
+  }, [
+    needsTimeSelection,
+    prefillTime,
+    prefillDate,
+    startDate,
+    startAvailabilityLoading,
+    selectedServiceType,
+    startAvailableTimes,
+  ]);
 
   /** True when the selected start time is no longer returned by real-time availability. */
   const startTimeInvalid = useMemo(() => {
+    if (!needsTimeSelection) return false;
     if (!startTime || !startDate || !selectedServiceType || startAvailabilityLoading) return false;
     return !startAvailableTimes.includes(startTime);
-  }, [startTime, startDate, selectedServiceType, startAvailabilityLoading, startAvailableTimes]);
+  }, [
+    needsTimeSelection,
+    startTime,
+    startDate,
+    selectedServiceType,
+    startAvailabilityLoading,
+    startAvailableTimes,
+  ]);
 
   const togglePetSelection = (petId: string) => {
     setSelectedPetIds((ids) =>
@@ -516,14 +495,22 @@ export function BookingScreen() {
   };
 
   const estimatedPricing = useMemo(() => {
-    if (!selectedRate || !startDate || !startTime) return null;
+    if (!selectedRate || !startDate) return null;
+    if (needsTimeSelection && !startTime) return null;
     const billingMode = getBillingMode(sr);
-    if (!fixedDurationMinutes) {
+    if (needsTimeSelection && !fixedDurationMinutes) {
       const needsExplicitCheckoutRange = billingMode === "perNight" || isMultiDayService;
       if (needsExplicitCheckoutRange && (!endDate || !endTime)) return null;
       if (!needsExplicitCheckoutRange && !endTime) return null;
     }
-    const range = resolveBookingRange(startDate, startTime, endDate, endTime, fixedDurationMinutes);
+    const range = resolveBookingRangeForRate(
+      startDate,
+      startTime,
+      endDate,
+      endTime,
+      fixedDurationMinutes,
+      needsTimeSelection,
+    );
     if (!range) return null;
     const lineTotal = calculateBookingTotal(
       billingMode,
@@ -546,6 +533,7 @@ export function BookingScreen() {
     endTime,
     fixedDurationMinutes,
     isMultiDayService,
+    needsTimeSelection,
     selectedPetIds.length,
   ]);
 
@@ -559,7 +547,11 @@ export function BookingScreen() {
       showGlobalAlertCompat(t("errorTitle"), t("bookingSelectPetRequired"));
       return;
     }
-    if (!startDate || !startTime) {
+    if (!startDate) {
+      showGlobalAlertCompat(t("errorTitle"), t("invalidDates"));
+      return;
+    }
+    if (needsTimeSelection && !startTime) {
       showGlobalAlertCompat(t("errorTitle"), t("invalidDates"));
       return;
     }
@@ -591,7 +583,7 @@ export function BookingScreen() {
       return;
     }
     const billingMode = getBillingMode(sr);
-    if (!fixedDurationMinutes) {
+    if (needsTimeSelection && !fixedDurationMinutes) {
       const needsExplicitCheckoutRange = billingMode === "perNight" || isMultiDayService;
       if (needsExplicitCheckoutRange && (!endDate || !endTime)) {
         showGlobalAlertCompat(t("errorTitle"), t("invalidDates"));
@@ -602,7 +594,14 @@ export function BookingScreen() {
         return;
       }
     }
-    const range = resolveBookingRange(startDate, startTime, endDate, endTime, fixedDurationMinutes);
+    const range = resolveBookingRangeForRate(
+      startDate,
+      startTime,
+      endDate,
+      endTime,
+      fixedDurationMinutes,
+      needsTimeSelection,
+    );
     if (!range) {
       showGlobalAlertCompat(t("errorTitle"), t("invalidDates"));
       return;
@@ -658,36 +657,10 @@ export function BookingScreen() {
 
   return (
     <SafeAreaView className="flex-1" edges={["top"]} style={{ marginTop: -8, backgroundColor: colors.background }}>
-      {/* Header */}
-      <View
-        style={{
-          flexDirection: rowDirectionForAppLayout(isRTL),
-          alignItems: "center",
-          paddingHorizontal: 20,
-          paddingVertical: 14,
-          backgroundColor: colors.surface,
-          shadowColor: colors.shadow,
-          shadowOffset: { width: 0, height: 2 },
-          shadowOpacity: 0.06,
-          shadowRadius: 8,
-          elevation: 4,
-        }}
-      >
-        <Pressable onPress={() => navigation.goBack()} hitSlop={12}>
-          <Ionicons
-            name={isRTL ? "arrow-forward" : "arrow-back"}
-            size={24}
-            color={colors.text}
-          />
-        </Pressable>
-        <Text
-          style={{ flex: 1, fontSize: 17, fontWeight: "700", color: colors.text, textAlign: "center" }}
-          numberOfLines={1}
-        >
-          {t("bookNow")} — {profile.name}
-        </Text>
-        <View style={{ width: 24 }} />
-      </View>
+      <StackBackHeader
+        title={`${t("bookNow")} — ${profile.name}`}
+        onBack={() => navigation.goBack()}
+      />
 
       {showPetsLoading ? (
         <ScreenLoadingCenter />
@@ -751,7 +724,14 @@ export function BookingScreen() {
             return (
               <Pressable
                 key={idx}
-                onPress={() => setSelectedRateIdx(idx)}
+                onPress={() => {
+                  setSelectedRateIdx(idx);
+                  const type = resolveServiceType(rate);
+                  if (!serviceNeedsTimeSelection(rate, type)) {
+                    setStartTime("");
+                    setEndTime("");
+                  }
+                }}
                 style={{
                   flexDirection: rowDirectionForAppLayout(isRTL),
                   justifyContent: "space-between",
@@ -784,8 +764,12 @@ export function BookingScreen() {
                   <Text style={{ fontSize: 15, fontWeight: "600", color: colors.text }}>{name}</Text>
                 </View>
                 <Text style={{ fontSize: 15, fontWeight: "700", color: colors.text }}>
-                  ₪{rate.rate}{" "}
-                  <Text style={{ fontSize: 12, fontWeight: "500", color: colors.textMuted }}>/ {unit}</Text>
+                  ₪{rate.rate}
+                  {unit ? (
+                    <Text style={{ fontSize: 12, fontWeight: "500", color: colors.textMuted }}>
+                      {" "}/ {unit}
+                    </Text>
+                  ) : null}
                 </Text>
               </Pressable>
             );
@@ -936,7 +920,7 @@ export function BookingScreen() {
             }}
           />
 
-          {startDate ? (
+          {startDate && needsTimeSelection ? (
             <>
               <Text style={[rtlText, { color: colors.text, fontSize: 14, fontWeight: "700", marginTop: 18, marginBottom: 10 }]}>
                 {isMultiDayService ? t("bookingCheckInTime") : t("startTime")}
@@ -957,7 +941,23 @@ export function BookingScreen() {
             </>
           ) : null}
 
-          {fixedDurationMinutes ? (
+          {startDate && !needsTimeSelection ? (
+            <Text
+              style={[
+                rtlText,
+                {
+                  color: colors.textMuted,
+                  fontSize: 13,
+                  marginTop: 14,
+                  lineHeight: 20,
+                },
+              ]}
+            >
+              {t("bookingDateOnlyHint")}
+            </Text>
+          ) : null}
+
+          {needsTimeSelection && fixedDurationMinutes ? (
             <View
               style={{
                 flexDirection: rowDirectionForAppLayout(isRTL),
@@ -975,7 +975,7 @@ export function BookingScreen() {
                 {t("bookingWalkDuration").replace("{{minutes}}", String(fixedDurationMinutes))}
               </Text>
             </View>
-          ) : sr && isMultiDayService ? (
+          ) : needsTimeSelection && sr && isMultiDayService ? (
             <>
               <Text style={[rtlText, { color: colors.text, fontSize: 16, fontWeight: "700", marginTop: 22, marginBottom: 14 }]}>
                 {t("bookingCheckOutDate")}
@@ -1008,8 +1008,8 @@ export function BookingScreen() {
                 </>
               ) : null}
             </>
-          ) : (
-            /* For hourly/per-visit services, end time is on the same day */
+          ) : needsTimeSelection ? (
+            /* Hourly services: end time on the same day */
             startDate && startTime ? (
               <>
                 <Text style={[rtlText, { color: colors.text, fontSize: 14, fontWeight: "700", marginTop: 18, marginBottom: 10 }]}>
@@ -1028,7 +1028,7 @@ export function BookingScreen() {
                 />
               </>
             ) : null
-          )}
+          ) : null}
         </View>
 
         {/* Price estimate (server: same base from provider net + 4% customer fee) */}
@@ -1158,9 +1158,12 @@ export function BookingScreen() {
       >
         <Pressable
           onPress={handleSubmit}
-          disabled={submitting || startTimeInvalid}
+          disabled={submitting || (needsTimeSelection && startTimeInvalid)}
           style={{
-            backgroundColor: submitting || startTimeInvalid ? colors.textMuted : colors.text,
+            backgroundColor:
+              submitting || (needsTimeSelection && startTimeInvalid)
+                ? colors.textMuted
+                : colors.text,
             paddingVertical: 16,
             borderRadius: 14,
             alignItems: "center",
@@ -1169,15 +1172,17 @@ export function BookingScreen() {
             gap: 8,
             shadowColor: colors.text,
             shadowOffset: { width: 0, height: 4 },
-            shadowOpacity: submitting || startTimeInvalid ? 0 : 0.25,
+            shadowOpacity:
+              submitting || (needsTimeSelection && startTimeInvalid) ? 0 : 0.25,
             shadowRadius: 12,
-            elevation: submitting || startTimeInvalid ? 0 : 6,
-            opacity: startTimeInvalid ? 0.55 : 1,
+            elevation:
+              submitting || (needsTimeSelection && startTimeInvalid) ? 0 : 6,
+            opacity: needsTimeSelection && startTimeInvalid ? 0.55 : 1,
           }}
         >
           {submitting ? (
             <ActivityIndicator color={colors.textInverse} />
-          ) : startTimeInvalid ? (
+          ) : needsTimeSelection && startTimeInvalid ? (
             <>
               <Ionicons name="ban-outline" size={20} color={colors.textInverse} />
               <Text style={{ color: colors.textInverse, fontSize: 16, fontWeight: "700" }}>

@@ -32,7 +32,6 @@ import {
   View,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { rowDirectionForAppLayout } from "../../i18n";
 import { useTheme } from "../../theme/ThemeContext";
 import {
   createPlacesSession,
@@ -107,6 +106,18 @@ export interface AddressAutocompleteProps {
 }
 
 const DEBOUNCE_MS = 250;
+
+/** Logical row direction — does not rely on `I18nManager` (Modal subtrees often stay LTR). */
+function layoutDirection(isRTL: boolean | undefined | null): "ltr" | "rtl" {
+  return isRTL ? "rtl" : "ltr";
+}
+
+function rtlTextStyle(isRTL: boolean) {
+  return {
+    textAlign: (isRTL ? "right" : "left") as "right" | "left",
+    writingDirection: (isRTL ? "rtl" : "ltr") as "rtl" | "ltr",
+  };
+}
 
 export function AddressAutocomplete({
   label,
@@ -276,6 +287,8 @@ export function AddressAutocomplete({
   }, [closeOnBlur]);
 
   const isOpen = focused && predictions.length > 0;
+  const rtl = !!isRTL;
+  const dir = layoutDirection(isRTL);
   const trailing = useMemo(() => {
     if (resolving || searching) {
       return (
@@ -293,7 +306,7 @@ export function AddressAutocomplete({
   }, [resolving, searching, value, colors.primary, colors.textMuted, handleClear]);
 
   return (
-    <View style={{ position: "relative", zIndex: 50 }}>
+    <View style={{ position: "relative", zIndex: 50, direction: dir }}>
       {label ? (
         <Text
           style={{
@@ -301,7 +314,7 @@ export function AddressAutocomplete({
             fontWeight: "600",
             color: colors.text,
             marginBottom: 6,
-            textAlign: isRTL ? "right" : "left",
+            ...rtlTextStyle(rtl),
           }}
         >
           {label}
@@ -311,10 +324,11 @@ export function AddressAutocomplete({
         </Text>
       ) : null}
 
-      {/* Input row */}
+      {/* Input row — explicit `direction` so RTL works inside Modal (no I18nManager mirroring). */}
       <View
         style={{
-          flexDirection: rowDirectionForAppLayout(isRTL),
+          flexDirection: "row",
+          direction: dir,
           alignItems: "center",
           backgroundColor: disabled ? colors.surfaceSecondary : colors.surface,
           borderRadius: 12,
@@ -326,11 +340,12 @@ export function AddressAutocomplete({
               : colors.border,
           paddingHorizontal: 12,
           opacity: disabled ? 0.6 : 1,
-          gap: 8,
         }}
       >
         {!hideLeadingIcon ? (
-          <Ionicons name="search" size={18} color={colors.textMuted} />
+          <View style={{ marginEnd: 8 }}>
+            <Ionicons name="search" size={18} color={colors.textMuted} />
+          </View>
         ) : null}
         <TextInput
           value={value}
@@ -347,11 +362,10 @@ export function AddressAutocomplete({
             paddingVertical: 14,
             fontSize: 15,
             color: colors.text,
-            textAlign: isRTL ? "right" : "left",
-            writingDirection: isRTL ? "rtl" : "ltr",
+            ...rtlTextStyle(rtl),
           }}
         />
-        {trailing}
+        {trailing ? <View style={{ marginStart: 8 }}>{trailing}</View> : null}
       </View>
 
       {errorText ? (
@@ -360,7 +374,7 @@ export function AddressAutocomplete({
             marginTop: 4,
             fontSize: 12,
             color: colors.danger,
-            textAlign: isRTL ? "right" : "left",
+            ...rtlTextStyle(rtl),
           }}
         >
           {errorText}
@@ -376,6 +390,7 @@ export function AddressAutocomplete({
             left: 0,
             right: 0,
             marginTop: 6,
+            direction: dir,
             backgroundColor: colors.surface,
             borderRadius: 12,
             borderWidth: 1,
@@ -422,13 +437,19 @@ function SuggestionRow({
   onPress,
 }: SuggestionRowProps) {
   const { colors } = useTheme();
+  const rtl = isRTL;
+  const dir = layoutDirection(isRTL);
+  const textAlignStyle = rtlTextStyle(rtl);
+  const androidTextFix =
+    Platform.OS === "android" ? { includeFontPadding: false as const } : {};
+
   return (
     <Pressable
       onPress={onPress}
       style={({ pressed }) => ({
-        flexDirection: rowDirectionForAppLayout(isRTL),
+        flexDirection: "row",
+        direction: dir,
         alignItems: "center",
-        gap: 12,
         paddingHorizontal: 14,
         paddingVertical: 14,
         minHeight: 62,
@@ -447,21 +468,30 @@ function SuggestionRow({
           backgroundColor: colors.primaryLight,
           alignItems: "center",
           justifyContent: "center",
+          flexShrink: 0,
+          marginEnd: 12,
         }}
       >
         <Ionicons name="location-sharp" size={14} color={colors.primary} />
       </View>
-      <View style={{ flex: 1, overflow: "visible" }}>
+      <View
+        style={{
+          flex: 1,
+          minWidth: 0,
+          overflow: "hidden",
+          alignItems: rtl ? "flex-end" : "flex-start",
+        }}
+      >
         <Text
           numberOfLines={1}
           style={{
+            width: "100%",
             fontSize: 14,
             fontWeight: "700",
             lineHeight: 21,
             color: colors.text,
-            textAlign: isRTL ? "right" : "left",
-            writingDirection: isRTL ? "rtl" : "ltr",
-            ...(Platform.OS === "android" ? { includeFontPadding: false } : {}),
+            ...textAlignStyle,
+            ...androidTextFix,
           }}
         >
           {prediction.mainText}
@@ -470,14 +500,14 @@ function SuggestionRow({
           <Text
             numberOfLines={1}
             style={{
+              width: "100%",
               marginTop: 3,
               fontSize: 12,
               lineHeight: 18,
               color: colors.textMuted,
               paddingBottom: 2,
-              textAlign: isRTL ? "right" : "left",
-              writingDirection: isRTL ? "rtl" : "ltr",
-              ...(Platform.OS === "android" ? { includeFontPadding: false } : {}),
+              ...textAlignStyle,
+              ...androidTextFix,
             }}
           >
             {prediction.secondaryText}

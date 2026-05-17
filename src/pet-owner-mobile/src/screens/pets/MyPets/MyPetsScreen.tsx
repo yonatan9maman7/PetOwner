@@ -101,6 +101,12 @@ export function MyPetsScreen() {
 
   const activePet = pets[activePetIndex] ?? null;
 
+  useEffect(() => {
+    if (activeSection && !activePet) {
+      setActiveSection(null);
+    }
+  }, [activeSection, activePet]);
+
   const summary = useActivePetSummary(activePet?.id, sectionReloadNonce);
 
   const handleRefresh = useCallback(async () => {
@@ -155,9 +161,27 @@ export function MyPetsScreen() {
         style: "destructive",
         onPress: async () => {
           try {
+            const deletedIndex = allPets.findIndex((p) => p.id === pet.id);
+            const remaining = allPets.filter((p) => p.id !== pet.id);
+
+            setActiveSection(null);
+            if (shareModalPetId === pet.id) setShareModalPetId(null);
+
+            let nextIndex = activePetIndex;
+            if (deletedIndex >= 0) {
+              if (deletedIndex < activePetIndex) {
+                nextIndex = activePetIndex - 1;
+              } else if (deletedIndex === activePetIndex) {
+                nextIndex = Math.min(activePetIndex, Math.max(0, remaining.length - 1));
+              }
+            }
+            if (nextIndex >= remaining.length) {
+              nextIndex = Math.max(0, remaining.length - 1);
+            }
+            setActivePetIndex(nextIndex);
+
             await usePetsStore.getState().deletePet(pet.id);
             showGlobalAlertCompat(t("petDeleted"));
-            if (activePetIndex >= pets.length - 1) setActivePetIndex(Math.max(0, pets.length - 2));
           } catch {
             showGlobalAlertCompat(t("errorTitle"), t("profileSaveError"));
           }
@@ -210,7 +234,15 @@ export function MyPetsScreen() {
     );
   }
 
-  if (activeSection && activePet) {
+  if (activeSection) {
+    if (!activePet) {
+      return (
+        <SafeAreaView style={{ flex: 1, backgroundColor: colors.background, marginTop: -8 }} edges={["top"]}>
+          <ScreenLoadingCenter />
+        </SafeAreaView>
+      );
+    }
+
     return (
       <View style={{ flex: 1 }}>
         <SectionShell

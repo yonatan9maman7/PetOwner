@@ -1,11 +1,25 @@
 import React, { useCallback, useEffect, useRef, useState, memo, useMemo } from "react";
-import { View, StyleSheet, Text, Platform } from "react-native";
+import {
+  View,
+  Image,
+  StyleSheet,
+  Text,
+  Platform,
+  type ImageSourcePropType,
+} from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import Svg, { Circle, Path } from "react-native-svg";
+import Svg, { Circle, Path, Text as SvgText } from "react-native-svg";
 import { MarkerWrapper } from "../../components/MapViewWrapper";
 import type { MapPinDto } from "../../types/api";
 import { mapDiag } from "./exploreMapDiag";
 import { IONICONS_PAW_PATHS } from "./exploreMapIoniconsPawPaths";
+
+/** Bundled paw pins — sized via `<Image>` inside `<Marker>` on Android. */
+const PAW_PROVIDER_IMAGE = require("../../../assets/map-marker-provider.png");
+const PAW_SELECTED_IMAGE = require("../../../assets/map-marker-provider-selected.png");
+
+/** Fixed logical size — native `image` prop ignores RN layout and uses physical pixels. */
+const ANDROID_PAW_IMAGE_SIZE = 40;
 
 /* ── Constants ──────────────────────────────────────────────────────────── */
 
@@ -25,10 +39,18 @@ const CLUSTER_INNER_SIZE = 44;
 const CLUSTER_ICON_SIZE = 20;
 const TRACKS_TIMEOUT_MS = Platform.OS === "android" ? 2000 : 1000;
 
-/** Ionicons paw artwork uses a 512 canvas; scale circle to match `PAW_INNER_SIZE` inside `MARKER_OUTER_SIZE`. */
+/** Ionicons paw artwork uses a 512 canvas; cluster SVG scales from `CLUSTER_OUTER_SIZE`. */
 const PAW_SVG_VIEWBOX = 512;
-const PAW_SVG_CIRCLE_R = (PAW_INNER_SIZE / 2) * (PAW_SVG_VIEWBOX / MARKER_OUTER_SIZE);
-const PAW_SVG_STROKE_W = 2 * (PAW_SVG_VIEWBOX / MARKER_OUTER_SIZE);
+
+const CLUSTER_SVG_SCALE = PAW_SVG_VIEWBOX / CLUSTER_OUTER_SIZE;
+const CLUSTER_SVG_CIRCLE_R = (CLUSTER_INNER_SIZE / 2) * CLUSTER_SVG_SCALE;
+const CLUSTER_SVG_STROKE_W = 2 * CLUSTER_SVG_SCALE;
+/** Matches `S.badge` top:5, right:5, 18×18 on `CLUSTER_OUTER_SIZE`. */
+const CLUSTER_BADGE_R = 9 * CLUSTER_SVG_SCALE;
+const CLUSTER_BADGE_CX = (CLUSTER_OUTER_SIZE - 5 - 9) * CLUSTER_SVG_SCALE;
+const CLUSTER_BADGE_CY = (5 + 9) * CLUSTER_SVG_SCALE;
+const CLUSTER_BADGE_STROKE_W = 1.5 * CLUSTER_SVG_SCALE;
+const CLUSTER_BADGE_FONT_SIZE = 10 * CLUSTER_SVG_SCALE;
 
 /* ── Styles ─────────────────────────────────────────────────────────────── */
 
@@ -103,6 +125,15 @@ const S = StyleSheet.create({
     fontWeight: "800",
     color: "#ffffff",
   },
+  androidPawWrap: {
+    width: ANDROID_PAW_IMAGE_SIZE,
+    height: ANDROID_PAW_IMAGE_SIZE,
+    backgroundColor: "transparent",
+  },
+  androidPawImage: {
+    width: "100%",
+    height: "100%",
+  },
 });
 
 /* ── Pool slot type ─────────────────────────────────────────────────────── */
@@ -116,31 +147,99 @@ export type MarkerPoolSlot = {
   clusterPins: MapPinDto[] | null;
 };
 
+/* ── Android paw markers (`<Image>` + load-gated `tracksViewChanges`) ─── */
+
+type AndroidPawImageMarkerProps = {
+  identifier: string;
+  coordinate: { latitude: number; longitude: number };
+  source: ImageSourcePropType;
+  onPress?: () => void;
+  zIndex?: number;
+};
+
+/** Holds `imageLoaded` so the parent `Marker` can stop snapshotting after the bitmap paints. */
+const AndroidPawImageMarker = memo(function AndroidPawImageMarker({
+  identifier,
+  coordinate,
+  source,
+  onPress,
+  zIndex,
+}: AndroidPawImageMarkerProps) {
+  const [imageLoaded, setImageLoaded] = useState(false);
+
+  useEffect(() => {
+    setImageLoaded(false);
+  }, [source]);
+
+  return (
+    <MarkerWrapper
+      identifier={identifier}
+      coordinate={coordinate}
+      anchor={ANCHOR_CENTER}
+      tracksViewChanges={!imageLoaded}
+      onPress={onPress}
+      zIndex={zIndex}
+    >
+      <View style={S.androidPawWrap} collapsable={false}>
+        <Image
+          source={source}
+          style={S.androidPawImage}
+          resizeMode="contain"
+          onLoad={() => setImageLoaded(true)}
+        />
+      </View>
+    </MarkerWrapper>
+  );
+});
+
 /* ── Visual bubbles (static, memo'd) ────────────────────────────────────── */
 
-/** Android: same Ionicons geometry as iOS, drawn with SVG (avoids `Marker` view-snapshot bugs). */
-const PawMarkerSvg = memo(function PawMarkerSvg({ variant }: { variant: "default" | "selected" }) {
-  const sel = variant === "selected";
+/** Android clusters: pure SVG (dynamic count) — font icons fail in map snapshots. */
+const ClusterMarkerSvg = memo(function ClusterMarkerSvg({ count }: { count: number }) {
   const cx = PAW_SVG_VIEWBOX / 2;
   const cy = PAW_SVG_VIEWBOX / 2;
+  const label = count > 99 ? "99+" : String(count);
   return (
-    <View style={S.markerOuter} collapsable={false}>
+    <View
+      style={S.clusterOuter}
+      collapsable={false}
+      renderToHardwareTextureAndroid
+      needsOffscreenAlphaCompositing
+    >
       <Svg
-        width={MARKER_OUTER_SIZE}
-        height={MARKER_OUTER_SIZE}
+        width={CLUSTER_OUTER_SIZE}
+        height={CLUSTER_OUTER_SIZE}
         viewBox={`0 0 ${PAW_SVG_VIEWBOX} ${PAW_SVG_VIEWBOX}`}
       >
         <Circle
           cx={cx}
           cy={cy}
-          r={PAW_SVG_CIRCLE_R}
-          fill={sel ? "#1a1a2e" : "#ffffff"}
-          stroke={sel ? "#1a1a2e" : "#e2e2e2"}
-          strokeWidth={PAW_SVG_STROKE_W}
+          r={CLUSTER_SVG_CIRCLE_R}
+          fill="#ffffff"
+          stroke="#e2e2e2"
+          strokeWidth={CLUSTER_SVG_STROKE_W}
         />
         {IONICONS_PAW_PATHS.map((d, i) => (
-          <Path key={i} d={d} fill={sel ? "#ffffff" : "#1a1a2e"} />
+          <Path key={i} d={d} fill="#1a1a2e" />
         ))}
+        <Circle
+          cx={CLUSTER_BADGE_CX}
+          cy={CLUSTER_BADGE_CY}
+          r={CLUSTER_BADGE_R}
+          fill="#ef4444"
+          stroke="#ffffff"
+          strokeWidth={CLUSTER_BADGE_STROKE_W}
+        />
+        <SvgText
+          x={CLUSTER_BADGE_CX}
+          y={CLUSTER_BADGE_CY + CLUSTER_BADGE_FONT_SIZE * 0.35}
+          textAnchor="middle"
+          fill="#ffffff"
+          fontSize={CLUSTER_BADGE_FONT_SIZE}
+          fontWeight="800"
+        >
+          {label}
+        </SvgText>
       </Svg>
     </View>
   );
@@ -239,7 +338,19 @@ const PooledMarker = memo(
       }
     }, [onPressProviderId, onPressClusterPins]);
 
-    const androidSvg = Platform.OS === "android";
+    const isAndroid = Platform.OS === "android";
+
+    if (isAndroid && slot.kind === "single") {
+      return (
+        <AndroidPawImageMarker
+          identifier={`pool-${index}`}
+          coordinate={slot.coordinate}
+          source={PAW_PROVIDER_IMAGE}
+          onPress={handlePress}
+          zIndex={MARKER_Z_INDEX}
+        />
+      );
+    }
 
     return (
       <MarkerWrapper
@@ -251,9 +362,11 @@ const PooledMarker = memo(
         zIndex={MARKER_Z_INDEX}
       >
         {slot.kind === "cluster" ? (
-          <ClusterBubble count={slot.clusterCount} />
-        ) : androidSvg ? (
-          <PawMarkerSvg variant="default" />
+          isAndroid ? (
+            <ClusterMarkerSvg count={slot.clusterCount} />
+          ) : (
+            <ClusterBubble count={slot.clusterCount} />
+          )
         ) : (
           <PawBubble />
         )}
@@ -361,7 +474,16 @@ export const ExploreSelectedMarkerOverlay = memo(
       }
     }, [isActive, providerId]);
 
-    const androidSvg = Platform.OS === "android";
+    if (Platform.OS === "android") {
+      return (
+        <AndroidPawImageMarker
+          identifier="selected-overlay"
+          coordinate={coordinate}
+          source={PAW_SELECTED_IMAGE}
+          zIndex={SELECTED_MARKER_Z_INDEX}
+        />
+      );
+    }
 
     return (
       <MarkerWrapper
@@ -371,7 +493,7 @@ export const ExploreSelectedMarkerOverlay = memo(
         tracksViewChanges={isTracking}
         zIndex={SELECTED_MARKER_Z_INDEX}
       >
-        {androidSvg ? <PawMarkerSvg variant="selected" /> : <SelectedPawBubble />}
+        <SelectedPawBubble />
       </MarkerWrapper>
     );
   },

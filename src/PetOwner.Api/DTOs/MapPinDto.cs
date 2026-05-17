@@ -2,6 +2,8 @@ using PetOwner.Data.Models;
 
 namespace PetOwner.Api.DTOs;
 
+public record MapPinServiceRateDto(string Service, decimal Rate);
+
 public record MapPinDto(
     Guid ProviderId,
     string Name,
@@ -16,7 +18,8 @@ public record MapPinDto(
     string ProviderType,
     string? WhatsAppNumber,
     string? WebsiteUrl,
-    bool IsEmergencyService);
+    bool IsEmergencyService,
+    IReadOnlyList<MapPinServiceRateDto>? ServiceRates = null);
 
 public record ProviderPublicProfileDto(
     Guid ProviderId,
@@ -37,7 +40,10 @@ public record ProviderPublicProfileDto(
     string? OpeningHours,
     bool IsEmergencyService,
     List<DogSize> AcceptedDogSizes,
-    int? MaxDogsCapacity
+    int? MaxDogsCapacity,
+    double? Latitude,
+    double? Longitude,
+    string? AddressLine
 );
 
 public record PublicAvailabilitySlotDto(int DayOfWeek, string StartTime, string EndTime);

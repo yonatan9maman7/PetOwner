@@ -1,4 +1,4 @@
-import { useCallback, useState, useMemo } from "react";
+import { useCallback, useState, useMemo, useEffect } from "react";
 import { View, Text, Pressable, ActivityIndicator, RefreshControl } from "react-native";
 import { FlashList } from "@shopify/flash-list";
 import { useRoute, useNavigation, useFocusEffect } from "@react-navigation/native";
@@ -137,7 +137,15 @@ export function ActivityLogScreen() {
   const petId = route.params?.petId;
 
   const pets = usePetsStore((s) => s.pets);
+  const petsLoading = usePetsStore((s) => s.loading);
   const pet = petId ? pets.find((p) => p.id === petId) ?? null : null;
+
+  useEffect(() => {
+    if (!petId || petsLoading) return;
+    if (!pet && navigation.canGoBack()) {
+      navigation.goBack();
+    }
+  }, [petId, pet, petsLoading, navigation]);
 
   const bucket = useActivitiesStore((s) => (petId ? s.byPetId[petId] : undefined));
   const items = bucket?.items ?? [];
@@ -295,7 +303,7 @@ export function ActivityLogScreen() {
     ],
   );
 
-  if (!petId) {
+  if (!petId || !pet) {
     return null;
   }
 

@@ -169,7 +169,8 @@ public class MapService : IMapService
                 r.Type.ToString(),
                 r.WhatsAppNumber,
                 r.WebsiteUrl,
-                r.IsEmergencyService);
+                r.IsEmergencyService,
+                rates.Select(x => new MapPinServiceRateDto(ServiceTypeCatalog.ToDisplayName(x.Service), x.Rate)).ToList());
         }).ToList();
     }
 }

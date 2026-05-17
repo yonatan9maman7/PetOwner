@@ -9,7 +9,9 @@ import {
   isConnectivityAxiosError,
   normalizeApiError,
   attachNormalizedApiError,
+  markApiErrorHandledByInterceptor,
 } from "../utils/apiUtils";
+import { installApiUnhandledRejectionGuard } from "./apiErrorResilience";
 import { logAxiosErrorDev } from "../utils/apiErrorLogger";
 import { logger } from "../utils/logger";
 import {
@@ -118,36 +120,43 @@ function requestHadBearerToken(config: InternalAxiosRequestConfig | undefined): 
 apiClient.interceptors.response.use(
   (response) => response,
   async (error: AxiosError) => {
-    if (isConnectivityAxiosError(error)) {
-      (
-        error as AxiosError & { userFriendlyMessage?: string }
-      ).userFriendlyMessage = translate("apiNetworkTimeout");
-    }
+    try {
+      if (isConnectivityAxiosError(error)) {
+        (
+          error as AxiosError & { userFriendlyMessage?: string }
+        ).userFriendlyMessage = translate("apiNetworkTimeout");
+      }
 
-    if (error.response?.status === 401 && requestHadBearerToken(error.config)) {
-      await useAuthStore.getState().logout();
-      showSessionExpiredToast();
-    }
+      if (error.response?.status === 401 && requestHadBearerToken(error.config)) {
+        await useAuthStore.getState().logout();
+        showSessionExpiredToast();
+      }
 
-    const normalized = normalizeApiError(error);
-    attachNormalizedApiError(error, normalized);
-    logAxiosErrorDev(error);
-    logger.apiError(error, {
-      method: error.config?.method,
-      url: error.config?.url,
-      status: error.response?.status,
-      traceId: normalized.traceId,
-    });
-
-    if (shouldToastApiError(error, error.config)) {
-      showApiErrorToast(normalized, {
-        title: error.config?.errorToastTitle ?? normalized.title,
+      const normalized = normalizeApiError(error);
+      attachNormalizedApiError(error, normalized);
+      markApiErrorHandledByInterceptor(error);
+      logAxiosErrorDev(error);
+      logger.apiError(error, {
+        method: error.config?.method,
+        url: error.config?.url,
+        status: error.response?.status,
+        traceId: normalized.traceId,
       });
+
+      if (shouldToastApiError(error, error.config)) {
+        showApiErrorToast(normalized, {
+          title: error.config?.errorToastTitle ?? normalized.title,
+        });
+      }
+    } catch (interceptorFailure) {
+      logger.error(interceptorFailure, { scope: "api.response.interceptor" });
     }
 
     return Promise.reject(error);
   },
 );
+
+installApiUnhandledRejectionGuard();
 
 export const authApi = {
   login: (data: LoginDto) =>

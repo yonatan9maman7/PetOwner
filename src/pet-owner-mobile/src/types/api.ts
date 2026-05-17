@@ -140,6 +140,12 @@ export interface DogParkDto {
   isActive: boolean;
 }
 
+export interface MapPinServiceRateDto {
+  /** Display name aligned with GET /map/service-types (e.g. "Dog Walker"). */
+  service: string;
+  rate: number;
+}
+
 export interface MapPinDto {
   providerId: string;
   name: string;
@@ -148,6 +154,8 @@ export interface MapPinDto {
   minRate: number;
   profileImageUrl?: string;
   services: string;
+  /** Per-service rates for client-side price filtering when a service is selected. */
+  serviceRates?: MapPinServiceRateDto[];
   averageRating?: number;
   reviewCount: number;
   acceptsOffHoursRequests: boolean;
@@ -242,6 +250,9 @@ export interface ProviderPublicProfileDto {
   isEmergencyService: boolean;
   acceptedDogSizes?: DogSize[];
   maxDogsCapacity?: number | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  addressLine?: string | null;
 }
 
 export interface UserMiniProfileDto {

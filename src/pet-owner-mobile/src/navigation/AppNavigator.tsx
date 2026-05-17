@@ -1,5 +1,6 @@
 import { View, Text, Platform } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useBottomSafeInset } from "../hooks/useBottomSafeInset";
 import { PlatformPressable } from "@react-navigation/elements";
 import {
   createBottomTabNavigator,
@@ -131,11 +132,11 @@ const TAB_BAR_PADDING_TOP_IOS = 6;
 
 function useTabBarStyle() {
   const { colors } = useTheme();
-  const insets = useSafeAreaInsets();
+  const bottomInset = useBottomSafeInset();
   const isAndroid = Platform.OS === "android";
   const paddingTop = isAndroid ? TAB_BAR_PADDING_TOP_ANDROID : TAB_BAR_PADDING_TOP_IOS;
   const contentHeight = isAndroid ? TAB_BAR_CONTENT_HEIGHT_ANDROID : TAB_BAR_CONTENT_HEIGHT_IOS;
-  const paddingBottom = insets.bottom;
+  const paddingBottom = bottomInset;
   const height = contentHeight + paddingTop + paddingBottom;
   return {
     backgroundColor: colors.tabBar,
@@ -149,10 +150,10 @@ function useTabBarStyle() {
 
 /** Wider press targets so tabs register away from the physical bottom edge. */
 function LooseTabBarButton(props: BottomTabBarButtonProps) {
-  const insets = useSafeAreaInsets();
+  const bottomInset = useBottomSafeInset();
   const isAndroid = Platform.OS === "android";
   const hitSlop = isAndroid
-    ? { top: 14, bottom: Math.max(14, insets.bottom), left: 10, right: 10 }
+    ? { top: 14, bottom: Math.max(14, bottomInset), left: 10, right: 10 }
     : { top: 10, bottom: 10, left: 8, right: 8 };
   return <PlatformPressable {...props} hitSlop={hitSlop} />;
 }
@@ -345,7 +346,8 @@ export function AppNavigator() {
       safeAreaInsets={{
         top: safeInsets.top,
         right: safeInsets.right,
-        bottom: safeInsets.bottom,
+        /** Bottom padding is applied via `tabBarStyle` so tab items stay tappable. */
+        bottom: 0,
         left: safeInsets.left,
       }}
       screenOptions={{

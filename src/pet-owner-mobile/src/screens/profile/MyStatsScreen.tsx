@@ -407,7 +407,6 @@ function OwnerStatsView({
         sub={`${stats.paidBookings} ${t("statsServices")}`}
         icon="wallet-outline"
         accent="#0f172a"
-        colors={colors}
         isRTL={isRTL}
       />
 
@@ -515,7 +514,6 @@ function ProviderStatsView({
         sub={`${stats.completedBookings} ${t("statsServices")}`}
         icon="cash-outline"
         accent="#0f172a"
-        colors={colors}
         isRTL={isRTL}
       />
 
@@ -731,13 +729,17 @@ function ProviderStatsView({
 
 // ── Reusable bits ────────────────────────────────────────────────────────────
 
+/** Hero cards use a fixed dark accent; icon area must not use theme textInverse (dark in dark mode). */
+const HERO_ICON_COLOR = "#ffffff";
+const HERO_ICON_WRAP_LIGHT = "rgba(255, 255, 255, 0.18)";
+const HERO_ICON_WRAP_DARK = "#334155"; // slate-700 — stands out on the navy hero card
+
 function HeroCard({
   label,
   value,
   sub,
   icon,
   accent,
-  colors,
   isRTL,
 }: {
   label: string;
@@ -745,9 +747,10 @@ function HeroCard({
   sub: string;
   icon: keyof typeof Ionicons.glyphMap;
   accent: string;
-  colors: any;
   isRTL: boolean;
 }) {
+  const { isDark } = useTheme();
+
   return (
     <View
       style={{
@@ -795,12 +798,12 @@ function HeroCard({
           width: 56,
           height: 56,
           borderRadius: 16,
-          backgroundColor: "rgba(255,255,255,0.12)",
+          backgroundColor: isDark ? HERO_ICON_WRAP_DARK : HERO_ICON_WRAP_LIGHT,
           alignItems: "center",
           justifyContent: "center",
         }}
       >
-        <Ionicons name={icon} size={28} color={colors.textInverse} />
+        <Ionicons name={icon} size={28} color={HERO_ICON_COLOR} />
       </View>
     </View>
   );

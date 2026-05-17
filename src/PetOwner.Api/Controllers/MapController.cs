@@ -231,7 +231,10 @@ public class MapController : ControllerBase
                 u.ProviderProfile.OpeningHours,
                 u.ProviderProfile.IsEmergencyService,
                 u.ProviderProfile.AcceptedDogSizes,
-                u.ProviderProfile.MaxDogsCapacity))
+                u.ProviderProfile.MaxDogsCapacity,
+                u.ProviderProfile.Latitude,
+                u.ProviderProfile.Longitude,
+                (u.ProviderProfile.Street.Trim() + " " + u.ProviderProfile.BuildingNumber.Trim() + ", " + u.ProviderProfile.City.Trim()).Trim(' ', ',')))
             .FirstOrDefaultAsync();
 
         if (provider is null)

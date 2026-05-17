@@ -5,6 +5,8 @@ import {
   normalizeApiError,
   attachNormalizedApiError,
   getNormalizedApiError,
+  markApiErrorHandledByInterceptor,
+  isApiErrorHandledByInterceptor,
 } from "../utils/apiUtils";
 
 jest.mock("../i18n", () => ({
@@ -105,6 +107,25 @@ describe("apiUtils", () => {
         config: { headers: {} },
       } as AxiosError;
       expect(getApiErrorMessage(err)).toBe("t:apiErrorNotFound");
+    });
+
+    it("prefers server fallback over raw Axios message for 500", () => {
+      jest.spyOn(axios, "isAxiosError").mockReturnValue(true);
+      const err = {
+        message: "Request failed with status code 500",
+        response: { status: 500, data: {} },
+        config: { headers: {} },
+      } as AxiosError;
+      expect(getApiErrorMessage(err)).toBe("t:apiErrorServer");
+    });
+  });
+
+  describe("api error handled flag", () => {
+    it("marks and detects interceptor-handled errors", () => {
+      const err = { response: { status: 500 } };
+      expect(isApiErrorHandledByInterceptor(err)).toBe(false);
+      markApiErrorHandledByInterceptor(err);
+      expect(isApiErrorHandledByInterceptor(err)).toBe(true);
     });
   });
 

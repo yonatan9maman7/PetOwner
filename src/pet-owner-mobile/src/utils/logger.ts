@@ -72,9 +72,24 @@ export const logger = {
         return;
       }
 
-      logger.error(error, {
-        ...meta,
-        response: redactDeep(error.response?.data),
+      const level: Sentry.SeverityLevel =
+        typeof status === "number" && status >= 500 ? "error" : "warning";
+
+      withScope((scope) => {
+        scope.setLevel(level);
+        scope.setTag("api.handled", "interceptor");
+        if (status != null) scope.setTag("api.status", String(status));
+        if (meta?.method) scope.setTag("api.method", meta.method);
+        if (meta?.url) scope.setTag("api.url", meta.url);
+        if (meta?.traceId) scope.setTag("api.traceId", meta.traceId);
+        scope.setContext(
+          "api",
+          redactDeep({
+            ...meta,
+            response: error.response?.data,
+          }) as Record<string, unknown>,
+        );
+        Sentry.captureException(error);
       });
       return;
     }

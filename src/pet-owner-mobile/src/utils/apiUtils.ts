@@ -2,6 +2,22 @@ import axios, { type AxiosError, type InternalAxiosRequestConfig } from "axios";
 import { translate } from "../i18n";
 
 const NORMALIZED_KEY = "__normalizedApiError" as const;
+/** Set on Axios errors in the global response interceptor (toast + Sentry already ran). */
+export const API_ERROR_HANDLED_KEY = "__apiErrorHandledByInterceptor" as const;
+
+export function markApiErrorHandledByInterceptor(error: unknown): void {
+  if (error && typeof error === "object") {
+    (error as Record<string, unknown>)[API_ERROR_HANDLED_KEY] = true;
+  }
+}
+
+export function isApiErrorHandledByInterceptor(error: unknown): boolean {
+  return (
+    error != null &&
+    typeof error === "object" &&
+    (error as Record<string, unknown>)[API_ERROR_HANDLED_KEY] === true
+  );
+}
 
 /** True when the failure is likely due to no connectivity, timeout, or transport error (no HTTP response body to parse). */
 export function isConnectivityAxiosError(error: unknown): error is AxiosError {
@@ -186,7 +202,11 @@ export function normalizeApiError(error: unknown): NormalizedApiError {
       message = translate(statusFallbackKey(status, hadBearer));
     }
 
-    if (!message && error.message.trim()) {
+    const useAxiosMessage =
+      !message &&
+      error.message.trim() &&
+      (typeof status !== "number" || status < 400 || status >= 600);
+    if (useAxiosMessage) {
       message = error.message.trim();
     }
     if (!message) {

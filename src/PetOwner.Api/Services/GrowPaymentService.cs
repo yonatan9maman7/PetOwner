@@ -44,7 +44,15 @@ public class GrowPaymentService : IGrowPaymentService
 
     public async Task<string> GeneratePaymentLinkAsync(Booking booking)
     {
-        ValidateSettings();
+        if (!IsGrowConfigured())
+        {
+            _logger.LogWarning("Grow payment configuration is missing. Using mock payment link generator.");
+            var mockUrl = $"https://mock.payment.sandbox/pay?bookingId={booking.Id}";
+            _logger.LogInformation("Mock Grow payment URL for booking {BookingId}", booking.Id);
+            return mockUrl;
+        }
+
+        LogCallbackUrlWarningIfNeeded();
 
         var owner = booking.Owner ?? await _db.Users.AsNoTracking()
             .FirstOrDefaultAsync(u => u.Id == booking.OwnerId)
@@ -111,17 +119,14 @@ public class GrowPaymentService : IGrowPaymentService
         return parsed.Url!;
     }
 
-    private void ValidateSettings()
-    {
-        if (string.IsNullOrWhiteSpace(_settings.ApiUrl))
-            throw new InvalidOperationException("Grow:ApiUrl is not configured.");
-        if (string.IsNullOrWhiteSpace(_settings.PageCode))
-            throw new InvalidOperationException("Grow:PageCode is not configured.");
-        if (string.IsNullOrWhiteSpace(_settings.UserId))
-            throw new InvalidOperationException("Grow:UserId is not configured.");
-        if (string.IsNullOrWhiteSpace(_settings.ApiKey))
-            throw new InvalidOperationException("Grow:ApiKey is not configured.");
+    private bool IsGrowConfigured() =>
+        !string.IsNullOrWhiteSpace(_settings.ApiUrl)
+        && !string.IsNullOrWhiteSpace(_settings.PageCode)
+        && !string.IsNullOrWhiteSpace(_settings.UserId)
+        && !string.IsNullOrWhiteSpace(_settings.ApiKey);
 
+    private void LogCallbackUrlWarningIfNeeded()
+    {
         if (string.IsNullOrWhiteSpace(_settings.CallbackUrl))
             _logger.LogWarning(
                 "Grow:CallbackUrl is empty — notifyUrl will not be sent to Grow; payment status will rely on client polling only.");

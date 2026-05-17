@@ -469,9 +469,11 @@ export function AddPetScreen() {
         style: "destructive",
         onPress: async () => {
           try {
+            if (navigation.canGoBack()) {
+              navigation.goBack();
+            }
             await usePetsStore.getState().deletePet(petId!);
             showGlobalAlertCompat(t("petDeleted"));
-            navigation.goBack();
           } catch {
             showGlobalAlertCompat(t("errorTitle"), t("profileSaveError"));
           }
