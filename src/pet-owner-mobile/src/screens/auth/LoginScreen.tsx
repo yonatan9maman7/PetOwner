@@ -326,7 +326,7 @@ function LoginForm() {
   };
 
   const handleAppleSignIn = async () => {
-    showGlobalAlertCompat("בפיתוח", "התחברות עם אפל תתאפשר בעדכון הבא");
+    showGlobalAlertCompat(t("appleSignInComingSoonTitle"), t("appleSignInComingSoonMessage"));
 
     // ── Sign in with Apple (restore when enrolled in Apple Developer Program) ──
     // try {

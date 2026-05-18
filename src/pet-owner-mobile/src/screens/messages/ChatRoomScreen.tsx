@@ -20,6 +20,7 @@ import { sendMessage } from "../../services/signalr";
 import { useTranslation } from "../../i18n";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import { useTheme } from "../../theme/ThemeContext";
+import { useKeyboardAvoidingState } from "../../hooks/useKeyboardAvoidingState";
 import type { ChatMessageDto } from "../../types/api";
 
 const READ_RECEIPT_BLUE = "#34B7F1";
@@ -71,14 +72,13 @@ export function ChatRoomScreen() {
   const currentUserId = useAuthStore((s) => s.userId);
   const activeMessages = useChatStore((s) => s.activeMessages);
   const [text, setText] = useState("");
-  const [isKeyboardVisible, setKeyboardVisible] = useState(false);
+  const { behavior: keyboardAvoidBehavior, keyboardVisible } = useKeyboardAvoidingState();
   const insets = useSafeAreaInsets();
   const headerHeight = useHeaderHeight();
   /** Stack `headerShown: false` → usually 0; custom header sits outside KAV. */
   const keyboardVerticalOffset = Platform.OS === "ios" ? headerHeight : 0;
-  /** Strip bottom safe inset while the keyboard is up (iOS) so KAV + safe area do not double-pad. */
-  const inputContainerPaddingBottom =
-    Platform.OS === "ios" && isKeyboardVisible ? 0 : insets.bottom;
+  /** Strip bottom safe inset while the keyboard is up so KAV + safe area do not double-pad. */
+  const inputContainerPaddingBottom = keyboardVisible ? 0 : insets.bottom;
   const listRef = useRef<FlatList>(null);
 
   const handleBack = useCallback(() => {
@@ -101,19 +101,8 @@ export function ChatRoomScreen() {
   }, [otherUserId]);
 
   useEffect(() => {
-    const showEvt = Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow";
-    const hideEvt = Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide";
-    const show = Keyboard.addListener(showEvt, () => setKeyboardVisible(true));
-    const hide = Keyboard.addListener(hideEvt, () => setKeyboardVisible(false));
-    return () => {
-      show.remove();
-      hide.remove();
-    };
-  }, []);
-
-  useEffect(() => {
     const sub = BackHandler.addEventListener("hardwareBackPress", () => {
-      if (isKeyboardVisible) {
+      if (keyboardVisible) {
         Keyboard.dismiss();
         return true;
       }
@@ -121,7 +110,7 @@ export function ChatRoomScreen() {
       return true;
     });
     return () => sub.remove();
-  }, [handleBack, isKeyboardVisible]);
+  }, [handleBack, keyboardVisible]);
 
   const handleSend = async () => {
     const content = text.trim();
@@ -291,8 +280,7 @@ export function ChatRoomScreen() {
 
       <KeyboardAvoidingView
         style={{ flex: 1 }}
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-        enabled={Platform.OS === "ios"}
+        behavior={keyboardAvoidBehavior}
         keyboardVerticalOffset={keyboardVerticalOffset}
       >
         <FlatList

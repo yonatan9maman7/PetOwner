@@ -17,6 +17,7 @@ import { isSentryEnabled, navigationIntegration } from "./src/services/sentry";
 LogBox.ignoreLogs(["Ended a touch event which was not counted in"]);
 import { StatusBar } from "expo-status-bar";
 import * as Notifications from "expo-notifications";
+import * as SecureStore from "expo-secure-store";
 import { AppNavigator, navigationRef } from "./src/navigation/AppNavigator";
 import { useAuthStore } from "./src/store/authStore";
 import { useThemeStore } from "./src/store/themeStore";
@@ -40,6 +41,35 @@ if (Platform.OS !== "web") {
     }),
   });
 }
+
+const RELOAD_SCREEN_KEY = "LAST_ACTIVE_SCREEN_BEFORE_RELOAD";
+
+const reloadStorage = {
+  async get(): Promise<string | null> {
+    if (Platform.OS === "web") return localStorage.getItem(RELOAD_SCREEN_KEY);
+    return SecureStore.getItemAsync(RELOAD_SCREEN_KEY);
+  },
+  async set(value: string): Promise<void> {
+    if (Platform.OS === "web") {
+      localStorage.setItem(RELOAD_SCREEN_KEY, value);
+      return;
+    }
+    await SecureStore.setItemAsync(RELOAD_SCREEN_KEY, value);
+  },
+  async remove(): Promise<void> {
+    if (Platform.OS === "web") {
+      localStorage.removeItem(RELOAD_SCREEN_KEY);
+      return;
+    }
+    await SecureStore.deleteItemAsync(RELOAD_SCREEN_KEY);
+  },
+};
+
+const UNAUTHENTICATED_SCREENS = new Set([
+  "LoginScreen",
+  "RegisterScreen",
+  "ForgotPasswordScreen",
+]);
 
 function AppInner() {
   const { colors, isDark } = useTheme();
@@ -77,6 +107,18 @@ function AppInner() {
           if (isSentryEnabled()) {
             navigationIntegration.registerNavigationContainer(navigationRef);
           }
+          (async () => {
+            const screenName = await reloadStorage.get();
+            if (!screenName) return;
+            await reloadStorage.remove();
+            const isLoggedIn = useAuthStore.getState().isLoggedIn;
+            if (!isLoggedIn && !UNAUTHENTICATED_SCREENS.has(screenName)) return;
+            try {
+              navigationRef.navigate(screenName as never);
+            } catch {
+              // Screen may not exist in current auth tree; fail silently.
+            }
+          })();
         }}
         onStateChange={() => {
           if (Platform.OS !== "web") {
@@ -116,15 +158,21 @@ function App() {
     if (I18nManager.isRTL !== shouldBeRTL) {
       I18nManager.forceRTL(shouldBeRTL);
       I18nManager.allowRTL(true);
-      if (!__DEV__) {
-        import("expo-updates").then((Updates) =>
-          Updates.reloadAsync().catch(() => {}),
-        );
-      } else if (Platform.OS === "android") {
-        // `forceRTL` on Android is only fully applied after restart; in dev a reload syncs
-        // `I18nManager.isRTL` with the in-app language (without this, LTR/RTL can appear inverted).
-        DevSettings.reload();
-      }
+      const doReload = async () => {
+        const currentRoute = navigationRef.getCurrentRoute();
+        if (currentRoute?.name) {
+          await reloadStorage.set(currentRoute.name);
+        }
+        if (!__DEV__) {
+          const Updates = await import("expo-updates");
+          Updates.reloadAsync().catch(() => {});
+        } else if (Platform.OS === "android") {
+          // `forceRTL` on Android is only fully applied after restart; in dev a reload syncs
+          // `I18nManager.isRTL` with the in-app language (without this, LTR/RTL can appear inverted).
+          DevSettings.reload();
+        }
+      };
+      doReload();
     }
   }, [authHydrated, language]);
 

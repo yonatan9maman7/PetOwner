@@ -1,14 +1,15 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import {
   View, Text, Modal, Pressable, TextInput, ScrollView,
-  ActivityIndicator, StyleSheet, KeyboardAvoidingView,
+  ActivityIndicator, StyleSheet, KeyboardAvoidingView, Platform,
 } from "react-native";
 import { showGlobalAlertCompat } from "../../../components/global-modal";
 import { Ionicons } from "@expo/vector-icons";
-import type { PalPetDto } from "../../../types/api";
+import * as Location from "expo-location";
+import type { PetDto } from "../../../types/api";
 import { palsApi, petsApi } from "../../../api/client";
 import { useTheme } from "../../../theme/ThemeContext";
-import { useTranslation } from "../../../i18n";
+import { useTranslation, type TranslationKey } from "../../../i18n";
 import { useKeyboardAvoidingState } from "../../../hooks/useKeyboardAvoidingState";
 
 const DURATION_OPTIONS = [
@@ -16,12 +17,49 @@ const DURATION_OPTIONS = [
   { label: "beaconDuration60", value: 60 },
   { label: "beaconDuration120", value: 120 },
   { label: "beaconDuration180", value: 180 },
-] as const;
+] as const satisfies ReadonlyArray<{ label: TranslationKey; value: number }>;
 
 interface Props {
   visible: boolean;
   onClose: () => void;
   onStarted: () => void;
+}
+
+async function resolveBeaconCoordinates(
+  t: (key: TranslationKey) => string,
+): Promise<{ latitude: number; longitude: number } | null> {
+  if (Platform.OS === "web") {
+    showGlobalAlertCompat(t("errorTitle"), t("beaconLocationUnavailable"));
+    return null;
+  }
+
+  const { status: existing } = await Location.getForegroundPermissionsAsync();
+  let status = existing;
+  if (status !== "granted") {
+    const requested = await Location.requestForegroundPermissionsAsync();
+    status = requested.status;
+  }
+
+  if (status !== "granted") {
+    showGlobalAlertCompat(
+      t("locationPermissionAlertTitle"),
+      t("locationPermissionAlertDesc"),
+    );
+    return null;
+  }
+
+  try {
+    const loc = await Location.getCurrentPositionAsync({
+      accuracy: Location.Accuracy.Balanced,
+    });
+    return {
+      latitude: loc.coords.latitude,
+      longitude: loc.coords.longitude,
+    };
+  } catch {
+    showGlobalAlertCompat(t("errorTitle"), t("beaconLocationUnavailable"));
+    return null;
+  }
 }
 
 export function StartBeaconSheet({ visible, onClose, onStarted }: Props) {
@@ -31,7 +69,7 @@ export function StartBeaconSheet({ visible, onClose, onStarted }: Props) {
 
   const [placeName, setPlaceName] = useState("");
   const [duration, setDuration] = useState(60);
-  const [myPets, setMyPets] = useState<any[]>([]);
+  const [myPets, setMyPets] = useState<PetDto[]>([]);
   const [selectedPetIds, setSelectedPetIds] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [loadingPets, setLoadingPets] = useState(false);
@@ -41,13 +79,20 @@ export function StartBeaconSheet({ visible, onClose, onStarted }: Props) {
     try {
       const pets = await petsApi.getMyPets();
       setMyPets(pets);
-      setSelectedPetIds(pets.map((p: any) => p.id));
-    } catch {}
-    setLoadingPets(false);
+      setSelectedPetIds(pets.map((p) => p.id));
+    } catch {
+      setMyPets([]);
+      setSelectedPetIds([]);
+    } finally {
+      setLoadingPets(false);
+    }
   }, []);
 
-  // load pets when sheet opens
-  useState(() => { if (visible) loadPets(); });
+  useEffect(() => {
+    if (visible) {
+      void loadPets();
+    }
+  }, [visible, loadPets]);
 
   const togglePet = (id: string) =>
     setSelectedPetIds((prev) => prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]);
@@ -58,15 +103,19 @@ export function StartBeaconSheet({ visible, onClose, onStarted }: Props) {
       return;
     }
     if (selectedPetIds.length === 0) {
-      showGlobalAlertCompat(t("errorTitle"), "Select at least one pet.");
+      showGlobalAlertCompat(t("errorTitle"), t("beaconSelectPetRequired"));
       return;
     }
+
     setLoading(true);
     try {
+      const coords = await resolveBeaconCoordinates(t);
+      if (!coords) return;
+
       await palsApi.startBeacon({
         placeName: placeName.trim(),
-        latitude: 0,  // In a real app, use expo-location to get the user's current position
-        longitude: 0,
+        latitude: coords.latitude,
+        longitude: coords.longitude,
         durationMinutes: duration,
         petIds: selectedPetIds,
         species: "DOG",
@@ -74,8 +123,15 @@ export function StartBeaconSheet({ visible, onClose, onStarted }: Props) {
       setPlaceName("");
       onStarted();
       onClose();
-    } catch (e: any) {
-      const msg = e?.response?.data?.message ?? t("beaconStartError");
+    } catch (e: unknown) {
+      const msg =
+        typeof e === "object" &&
+        e !== null &&
+        "response" in e &&
+        typeof (e as { response?: { data?: { message?: string } } }).response?.data?.message ===
+          "string"
+          ? (e as { response: { data: { message: string } } }).response.data.message
+          : t("beaconStartError");
       showGlobalAlertCompat(t("errorTitle"), msg);
     } finally {
       setLoading(false);
@@ -112,7 +168,7 @@ export function StartBeaconSheet({ visible, onClose, onStarted }: Props) {
                 <Pressable key={opt.value} onPress={() => setDuration(opt.value)}
                   style={[styles.pill, { backgroundColor: active ? colors.text : colors.surface, borderColor: colors.border }]}>
                   <Text style={{ fontSize: 13, fontWeight: "600", color: active ? colors.textInverse : colors.textSecondary }}>
-                    {t(opt.label as any)}
+                    {t(opt.label)}
                   </Text>
                 </Pressable>
               );
@@ -120,10 +176,10 @@ export function StartBeaconSheet({ visible, onClose, onStarted }: Props) {
           </View>
 
           {/* Pet selection */}
-          <Text style={[styles.label, { color: colors.textSecondary }]}>Your pets</Text>
+          <Text style={[styles.label, { color: colors.textSecondary }]}>{t("beaconYourPets")}</Text>
           {loadingPets ? <ActivityIndicator color={colors.text} /> : (
             <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 20 }}>
-              {myPets.map((pet: any) => {
+              {myPets.map((pet) => {
                 const active = selectedPetIds.includes(pet.id);
                 return (
                   <Pressable key={pet.id} onPress={() => togglePet(pet.id)}

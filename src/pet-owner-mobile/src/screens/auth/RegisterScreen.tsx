@@ -213,11 +213,11 @@ export function RegisterScreen() {
         languagePreference: language,
       });
       showGlobalAlertCompat(
-        "הרשמה הושלמה!",
-        "החשבון שלך נוצר בהצלחה. כעת תוכל להתחבר.",
+        t("registerSuccessTitle"),
+        t("registerSuccessMessage"),
         [
           {
-            text: "המשך",
+            text: t("alertDismissOk"),
             style: "default",
             onPress: () =>
               navigation.reset({

@@ -33,6 +33,7 @@ import { ScreenLoadingCenter } from "../../components/shared/ScreenLoadingCenter
 import { StackBackHeader } from "../../components/StackBackHeader";
 import { usePetsStore } from "../../store/petsStore";
 import { customerBreakdownFromProviderNet } from "../../utils/pricingDisplay";
+import Toast from "react-native-toast-message";
 
 const PET_SPECIES_TO_KEY: Partial<Record<PetSpecies, TranslationKey>> = {
   [PetSpecies.Dog]: "speciesDog",
@@ -322,8 +323,10 @@ export function BookingScreen() {
   const [submitting, setSubmitting] = useState(false);
   const [startAvailableTimes, setStartAvailableTimes] = useState<string[]>([]);
   const [startAvailabilityLoading, setStartAvailabilityLoading] = useState(false);
+  const [startAvailabilityError, setStartAvailabilityError] = useState(false);
   const [endAvailableTimes, setEndAvailableTimes] = useState<string[]>([]);
   const [endAvailabilityLoading, setEndAvailabilityLoading] = useState(false);
+  const [endAvailabilityError, setEndAvailabilityError] = useState(false);
   const [selectedPetIds, setSelectedPetIds] = useState<string[]>([]);
   const submitLockRef = useRef(false);
 
@@ -361,6 +364,7 @@ export function BookingScreen() {
     let cancelled = false;
 
     setStartAvailableTimes([]);
+    setStartAvailabilityError(false);
     if (!needsTimeSelection || !startDate || !selectedServiceType) {
       setStartAvailabilityLoading(false);
       return;
@@ -370,10 +374,23 @@ export function BookingScreen() {
     mapApi
       .getProviderAvailability(profile.providerId, startDate, selectedServiceType)
       .then((times) => {
-        if (!cancelled) setStartAvailableTimes(times);
+        if (!cancelled) {
+          setStartAvailableTimes(times);
+          setStartAvailabilityError(false);
+        }
       })
       .catch(() => {
-        if (!cancelled) setStartAvailableTimes([]);
+        if (!cancelled) {
+          setStartAvailableTimes([]);
+          setStartAvailabilityError(true);
+          Toast.show({
+            type: "error",
+            text1: t("errorTitle"),
+            text2: t("bookingAvailabilityLoadFailed"),
+            position: "top",
+            visibilityTime: 5500,
+          });
+        }
       })
       .finally(() => {
         if (!cancelled) setStartAvailabilityLoading(false);
@@ -382,12 +399,13 @@ export function BookingScreen() {
     return () => {
       cancelled = true;
     };
-  }, [needsTimeSelection, profile.providerId, selectedServiceType, startDate]);
+  }, [needsTimeSelection, profile.providerId, selectedServiceType, startDate, t]);
 
   useEffect(() => {
     let cancelled = false;
 
     setEndAvailableTimes([]);
+    setEndAvailabilityError(false);
     const needsCheckoutDaySlots =
       needsTimeSelection
       && !isFixedDuration
@@ -403,10 +421,23 @@ export function BookingScreen() {
     mapApi
       .getProviderAvailability(profile.providerId, endDate, selectedServiceType)
       .then((times) => {
-        if (!cancelled) setEndAvailableTimes(times);
+        if (!cancelled) {
+          setEndAvailableTimes(times);
+          setEndAvailabilityError(false);
+        }
       })
       .catch(() => {
-        if (!cancelled) setEndAvailableTimes([]);
+        if (!cancelled) {
+          setEndAvailableTimes([]);
+          setEndAvailabilityError(true);
+          Toast.show({
+            type: "error",
+            text1: t("errorTitle"),
+            text2: t("bookingAvailabilityLoadFailed"),
+            position: "top",
+            visibilityTime: 5500,
+          });
+        }
       })
       .finally(() => {
         if (!cancelled) setEndAvailabilityLoading(false);
@@ -423,6 +454,7 @@ export function BookingScreen() {
     selectedBillingMode,
     selectedServiceType,
     endDate,
+    t,
   ]);
 
   useEffect(() => {
@@ -936,6 +968,11 @@ export function BookingScreen() {
                   selectedTime={startTime}
                   onTimeSelect={setStartTime}
                   loading={startAvailabilityLoading}
+                  emptyMessage={
+                    startAvailabilityError
+                      ? t("bookingAvailabilityLoadFailed")
+                      : t("bookingNoTimeSlotsForDate")
+                  }
                 />
               )}
             </>
@@ -1004,6 +1041,11 @@ export function BookingScreen() {
                     onTimeSelect={setEndTime}
                     loading={endAvailabilityLoading}
                     disableTimesAtOrBefore={endTimeDisableAtOrBefore}
+                    emptyMessage={
+                      endAvailabilityError
+                        ? t("bookingAvailabilityLoadFailed")
+                        : t("bookingNoTimeSlotsForDate")
+                    }
                   />
                 </>
               ) : null}
@@ -1019,12 +1061,17 @@ export function BookingScreen() {
                   availableTimes={startAvailableTimes}
                   selectedDate={startDate}
                   selectedTime={endTime}
-                  onTimeSelect={(t) => {
-                    setEndTime(t);
+                  onTimeSelect={(time) => {
+                    setEndTime(time);
                     setEndDate(startDate);
                   }}
                   loading={startAvailabilityLoading}
                   disableTimesAtOrBefore={endTimeDisableAtOrBefore}
+                  emptyMessage={
+                    startAvailabilityError
+                      ? t("bookingAvailabilityLoadFailed")
+                      : t("bookingNoTimeSlotsForDate")
+                  }
                 />
               </>
             ) : null

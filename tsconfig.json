@@ -1,0 +1,9 @@
+{
+  "extends": "./src/pet-owner-mobile/tsconfig.json",
+  "include": [
+    "src/pet-owner-mobile/**/*.ts",
+    "src/pet-owner-mobile/**/*.tsx",
+    "src/pet-owner-mobile/**/*.d.ts"
+  ],
+  "exclude": ["src/pet-owner-mobile/node_modules"]
+}

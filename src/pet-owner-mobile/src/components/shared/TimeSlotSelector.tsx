@@ -14,6 +14,8 @@ interface Props {
   label?: string;
   /** True while the parent is loading real-time availability from the API. */
   loading?: boolean;
+  /** Shown when the API returned successfully but there are no slots (localized by parent). */
+  emptyMessage?: string;
   /**
    * When set (HH:mm), slots at or before this time are disabled — e.g. same-calendar-day end
    * must be strictly after start.
@@ -34,6 +36,7 @@ export function TimeSlotSelector({
   onTimeSelect,
   label,
   loading = false,
+  emptyMessage = "No available time slots for this day",
   disableTimesAtOrBefore,
 }: Props) {
   const { colors } = useTheme();
@@ -66,7 +69,7 @@ export function TimeSlotSelector({
     return (
       <View style={{ paddingVertical: 12 }}>
         <Text style={{ color: colors.textMuted, fontSize: 13, textAlign: "center" }}>
-          No available time slots for this day
+          {emptyMessage}
         </Text>
       </View>
     );
