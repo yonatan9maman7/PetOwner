@@ -819,7 +819,7 @@ export interface AdminUserDto {
   id: string;
   name: string;
   email: string;
-  phone: string;
+  phone: string | null;
   role: string;
   createdAt: string;
   isActive: boolean;

@@ -98,7 +98,7 @@ public class UsersController : ControllerBase
         var location = await _db.Locations.FirstOrDefaultAsync(l => l.UserId == userId);
         if (location is null)
         {
-            location = new Location { UserId = userId };
+            location = new PetOwner.Data.Models.Location { UserId = userId };
             _db.Locations.Add(location);
         }
 
