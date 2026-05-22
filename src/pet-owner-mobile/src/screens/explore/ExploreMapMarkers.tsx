@@ -1,69 +1,116 @@
-import React, { useCallback, useEffect, useRef, useState, memo, useMemo } from "react";
+import React, { memo, useCallback, useState } from "react";
 import { View, Image, StyleSheet, Text, Platform } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { MarkerWrapper } from "../../components/MapViewWrapper";
 import type { MapPinDto } from "../../types/api";
-import { mapDiag } from "./exploreMapDiag";
 
 const PAW_PROVIDER_IMAGE = require("../../../assets/map-marker-provider.png");
 const PAW_SELECTED_IMAGE = require("../../../assets/map-marker-provider-selected.png");
+
+const IS_ANDROID = Platform.OS === "android";
 
 /* ── Constants ──────────────────────────────────────────────────────────── */
 
 export const OFFSCREEN_COORDINATE = { latitude: -90, longitude: 0 } as const;
 
-/** Pin tip at coordinate — matches MapKit native `image` anchoring on iOS. */
 const ANCHOR_PIN_TIP = { x: 0.5, y: 1 } as const;
-const MARKER_Z_INDEX = 1;
-const SELECTED_MARKER_Z_INDEX = 1000;
+const ANCHOR_CENTER = { x: 0.5, y: 0.5 } as const;
 
-/** Logical dp size — iOS native image scales similarly; Android needs explicit layout. */
-const PAW_MARKER_SIZE = 48;
+const PAW_SIZE = 110;
+const PAW_SELECTED_SIZE = 114;
 
-const CLUSTER_OUTER_SIZE = 70;
-const CLUSTER_INNER_SIZE = 54;
-const CLUSTER_ICON_SIZE = 24;
-const TRACKS_TIMEOUT_MS = Platform.OS === "android" ? 2000 : 1000;
+const MARKER_Z = 1;
+const SELECTED_Z = 1000;
+
+const CLUSTER_OUTER = 52;
+const CLUSTER_INNER = 40;
+const CLUSTER_ICON = 20;
+
+/* ── Image preload flags (iOS only) ─────────────────────────────────────────
+ *
+ * iOS MapKit: Once any marker loads the paw PNG, subsequent markers can start
+ * with tracksViewChanges=false immediately, avoiding the red-balloon fallback.
+ *
+ * Android Google Maps: Each marker must independently wait for its OWN onLoad
+ * to fire before freezing (tracksViewChanges=false). Google Maps snapshots the
+ * bitmap on mount — if the Image hasn't rendered in this specific marker's view
+ * tree yet, the snapshot is empty and the marker is invisible.
+ *
+ * ────────────────────────────────────────────────────────────────────────── */
+
+let pawPreloaded = false;
+let selectedPreloaded = false;
+
+/* ── Types ──────────────────────────────────────────────────────────────── */
+
+export type MarkerPoolSlot = {
+  kind: "single" | "cluster" | "offscreen";
+  coordinate: { latitude: number; longitude: number };
+  providerId: string | null;
+  clusterKey: string | null;
+  clusterCount: number;
+  clusterPins: MapPinDto[] | null;
+};
+
+export type ExploreMapMarkersProps = {
+  pool: MarkerPoolSlot[];
+  onPressProviderId: (providerId: string) => void;
+  onPressClusterPins: (
+    pins: MapPinDto[],
+    coordinate: { latitude: number; longitude: number },
+  ) => void;
+};
+
+export type ExploreSelectedMarkerOverlayProps = {
+  providerId: string | null;
+  latitude: number | null;
+  longitude: number | null;
+};
 
 /* ── Styles ─────────────────────────────────────────────────────────────── */
 
 const S = StyleSheet.create({
-  androidPawRoot: {
-    width: PAW_MARKER_SIZE,
-    height: PAW_MARKER_SIZE,
-    backgroundColor: "transparent",
+  markerRoot: {
+    width: PAW_SIZE,
+    height: PAW_SIZE,
     alignItems: "center",
     justifyContent: "center",
-    overflow: "hidden",
   },
-  androidPawImage: {
-    width: PAW_MARKER_SIZE,
-    height: PAW_MARKER_SIZE,
+  markerImage: {
+    width: PAW_SIZE,
+    height: PAW_SIZE,
+  },
+  selectedRoot: {
+    width: PAW_SELECTED_SIZE,
+    height: PAW_SELECTED_SIZE,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  selectedImage: {
+    width: PAW_SELECTED_SIZE,
+    height: PAW_SELECTED_SIZE,
   },
   clusterOuter: {
-    width: CLUSTER_OUTER_SIZE,
-    height: CLUSTER_OUTER_SIZE,
-    backgroundColor: "transparent",
+    width: CLUSTER_OUTER,
+    height: CLUSTER_OUTER,
     justifyContent: "center",
     alignItems: "center",
-    overflow: "visible",
   },
-  clusterBubbleInner: {
-    width: CLUSTER_INNER_SIZE,
-    height: CLUSTER_INNER_SIZE,
-    borderRadius: CLUSTER_INNER_SIZE / 2,
-    overflow: "hidden",
+  clusterInner: {
+    width: CLUSTER_INNER,
+    height: CLUSTER_INNER,
+    borderRadius: CLUSTER_INNER / 2,
     backgroundColor: "#ffffff",
     justifyContent: "center",
     alignItems: "center",
     borderWidth: 2,
     borderColor: "#e2e2e2",
-    ...Platform.select({ android: { elevation: 0 } }),
+    ...Platform.select({ android: { elevation: 0 }, default: {} }),
   },
   badge: {
     position: "absolute",
-    top: 5,
-    right: 5,
+    top: 2,
+    right: 2,
     minWidth: 18,
     height: 18,
     borderRadius: 9,
@@ -81,258 +128,145 @@ const S = StyleSheet.create({
   },
 });
 
-/* ── Pool slot type ─────────────────────────────────────────────────────── */
+/* ── PooledMarker ───────────────────────────────────────────────────────────
+ *
+ * POOL INVARIANT: This component must never unmount. Returning null for
+ * offscreen slots causes native Marker nodes to be added/removed from the
+ * MapView, which triggers crashes in Google Maps (Android) when many markers
+ * change state simultaneously during a zoom. Every slot stays mounted;
+ * only its coordinate and content change.
+ *
+ * RED-PIN FIX: The paw Image is rendered in BOTH "single" AND "offscreen"
+ * states. While a slot is offscreen the image pre-warms (onLoad fires,
+ * pawPreloaded=true). When the slot becomes "single" the image is already
+ * in the system image cache, so tracksViewChanges is false immediately and
+ * iOS MapKit never falls back to its default red-balloon pin.
+ *
+ * ────────────────────────────────────────────────────────────────────────── */
 
-export type MarkerPoolSlot = {
-  kind: "single" | "cluster" | "offscreen";
-  coordinate: { latitude: number; longitude: number };
-  providerId: string | null;
-  clusterKey: string | null;
-  clusterCount: number;
-  clusterPins: MapPinDto[] | null;
+type PooledMarkerProps = {
+  slot: MarkerPoolSlot;
+  index: number;
+  onPressProviderId: (id: string) => void;
+  onPressClusterPins: (
+    pins: MapPinDto[],
+    coordinate: { latitude: number; longitude: number },
+  ) => void;
 };
 
-/* ── Paw markers ────────────────────────────────────────────────────────── */
+const PooledMarker = memo(function PooledMarker({
+  slot,
+  index,
+  onPressProviderId,
+  onPressClusterPins,
+}: PooledMarkerProps) {
+  // Android: never trust the preload flag — each marker must wait for its own onLoad.
+  const [imageLoaded, setImageLoaded] = useState(IS_ANDROID ? false : pawPreloaded);
 
-type PawMarkerProps = {
-  identifier: string;
-  coordinate: { latitude: number; longitude: number };
-  source: number;
-  tracksViewChanges: boolean;
-  onPress?: () => void;
-  zIndex?: number;
-};
+  const handleImageLoad = useCallback(() => {
+    if (!IS_ANDROID) pawPreloaded = true;
+    setImageLoaded(true);
+  }, []);
 
-/** iOS: native bitmap (no snapshot). Android: fixed dp view — matches size + hit box. */
-const PawMarker = memo(function PawMarker({
-  identifier,
-  coordinate,
-  source,
-  tracksViewChanges,
-  onPress,
-  zIndex,
-}: PawMarkerProps) {
-  if (Platform.OS === "ios") {
+  const handlePress = useCallback(() => {
+    if (slot.kind === "single" && slot.providerId) {
+      onPressProviderId(slot.providerId);
+    } else if (slot.kind === "cluster" && slot.clusterPins) {
+      onPressClusterPins(slot.clusterPins, slot.coordinate);
+    }
+  }, [slot, onPressProviderId, onPressClusterPins]);
+
+  // ── Cluster ────────────────────────────────────────────────────────────
+  if (slot.kind === "cluster") {
     return (
       <MarkerWrapper
-        identifier={identifier}
+        identifier={`pool-${index}`}
+        coordinate={slot.coordinate}
+        anchor={ANCHOR_CENTER}
+        tracksViewChanges={false}
+        onPress={handlePress}
+        zIndex={MARKER_Z}
+      >
+        <View style={S.clusterOuter} collapsable={false}>
+          <View style={S.clusterInner} collapsable={false}>
+            <Ionicons name="paw" size={CLUSTER_ICON} color="#1a1a2e" />
+          </View>
+          <View style={S.badge} collapsable={false}>
+            <Text style={S.badgeText}>
+              {slot.clusterCount > 99 ? "99+" : slot.clusterCount}
+            </Text>
+          </View>
+        </View>
+      </MarkerWrapper>
+    );
+  }
+
+  // ── Single or offscreen ──────────────────────────────────────────────
+  const isVisible = slot.kind === "single";
+  const coordinate = isVisible ? slot.coordinate : OFFSCREEN_COORDINATE;
+
+  if (IS_ANDROID) {
+    // Android: use the native `image` prop — Google Maps renders
+    // BitmapDescriptor directly without needing a View snapshot.
+    // Requires properly-sized @1x/@2x/@3x density variants.
+    return (
+      <MarkerWrapper
+        identifier={`pool-${index}`}
         coordinate={coordinate}
         anchor={ANCHOR_PIN_TIP}
-        image={source}
+        image={PAW_PROVIDER_IMAGE}
         tracksViewChanges={false}
-        onPress={onPress}
-        zIndex={zIndex}
+        onPress={isVisible ? handlePress : undefined}
+        zIndex={MARKER_Z}
       />
     );
   }
 
+  // iOS: use <Image> child to avoid the red-balloon pin flash.
   return (
     <MarkerWrapper
-      identifier={identifier}
+      identifier={`pool-${index}`}
       coordinate={coordinate}
       anchor={ANCHOR_PIN_TIP}
-      tracksViewChanges={tracksViewChanges}
-      onPress={onPress}
-      zIndex={zIndex}
+      tracksViewChanges={isVisible ? !imageLoaded : false}
+      onPress={isVisible ? handlePress : undefined}
+      zIndex={MARKER_Z}
     >
-      <View style={S.androidPawRoot} collapsable={false}>
+      <View style={S.markerRoot} collapsable={false}>
         <Image
-          source={source}
-          style={S.androidPawImage}
+          source={PAW_PROVIDER_IMAGE}
+          style={S.markerImage}
           resizeMode="contain"
+          onLoad={handleImageLoad}
         />
       </View>
     </MarkerWrapper>
   );
 });
 
-/* ── Cluster bubble (custom view — dynamic count badge) ─────────────────── */
+/* ── ExploreMapMarkers ──────────────────────────────────────────────────── */
 
-const ClusterBubble = memo(function ClusterBubble({
-  count,
-  onLayout,
-}: {
-  count: number;
-  onLayout?: () => void;
-}) {
+export const ExploreMapMarkers = memo(function ExploreMapMarkers({
+  pool,
+  onPressProviderId,
+  onPressClusterPins,
+}: ExploreMapMarkersProps) {
   return (
-    <View
-      style={S.clusterOuter}
-      collapsable={false}
-      onLayout={onLayout}
-      {...Platform.select({
-        ios: { needsOffscreenAlphaCompositing: true },
-        default: {},
-      })}
-    >
-      <View style={S.clusterBubbleInner} collapsable={false}>
-        <Ionicons name="paw" size={CLUSTER_ICON_SIZE} color="#1a1a2e" />
-      </View>
-      <View style={S.badge} collapsable={false}>
-        <Text style={S.badgeText}>{count > 99 ? "99+" : count}</Text>
-      </View>
-    </View>
+    <>
+      {pool.map((slot, i) => (
+        <PooledMarker
+          key={i}
+          slot={slot}
+          index={i}
+          onPressProviderId={onPressProviderId}
+          onPressClusterPins={onPressClusterPins}
+        />
+      ))}
+    </>
   );
 });
 
-/* ── Pooled marker (never unmounts — RecyclerView pattern) ──────────────── */
-
-type PooledMarkerProps = {
-  slot: MarkerPoolSlot;
-  index: number;
-  onPressProviderId: (id: string) => void;
-  onPressClusterPins: (pins: MapPinDto[], coordinate: { latitude: number; longitude: number }) => void;
-};
-
-const PooledMarker = memo(
-  function PooledMarker({
-    slot,
-    index,
-    onPressProviderId,
-    onPressClusterPins,
-  }: PooledMarkerProps) {
-    const visualKey = slot.kind === "cluster" ? `c${slot.clusterCount}` : "paw";
-    const prevVisualKeyRef = useRef(visualKey);
-    const [isTracking, setIsTracking] = useState(true);
-
-    useEffect(() => {
-      if (visualKey !== prevVisualKeyRef.current) {
-        prevVisualKeyRef.current = visualKey;
-        setIsTracking(true);
-      }
-    }, [visualKey]);
-
-    useEffect(() => {
-      if (!isTracking) return;
-      const t = setTimeout(() => setIsTracking(false), TRACKS_TIMEOUT_MS);
-      return () => clearTimeout(t);
-    }, [isTracking]);
-
-    const handleClusterLayout = useCallback(() => {
-      setIsTracking(false);
-    }, []);
-
-    const slotRef = useRef(slot);
-    slotRef.current = slot;
-
-    const handlePress = useCallback(() => {
-      const s = slotRef.current;
-      if (s.kind === "single" && s.providerId) {
-        onPressProviderId(s.providerId);
-      } else if (s.kind === "cluster" && s.clusterPins) {
-        onPressClusterPins(s.clusterPins, s.coordinate);
-      }
-    }, [onPressProviderId, onPressClusterPins]);
-
-    const markerId = `pool-${index}`;
-    const androidTracksPaw = Platform.OS === "android" && isTracking;
-
-    if (slot.kind === "cluster") {
-      return (
-        <MarkerWrapper
-          identifier={markerId}
-          coordinate={slot.coordinate}
-          anchor={ANCHOR_PIN_TIP}
-          tracksViewChanges={isTracking}
-          onPress={handlePress}
-          zIndex={MARKER_Z_INDEX}
-        >
-          <ClusterBubble
-            count={slot.clusterCount}
-            onLayout={handleClusterLayout}
-          />
-        </MarkerWrapper>
-      );
-    }
-
-    if (slot.kind === "single") {
-      return (
-        <PawMarker
-          identifier={markerId}
-          coordinate={slot.coordinate}
-          source={PAW_PROVIDER_IMAGE}
-          tracksViewChanges={androidTracksPaw}
-          onPress={handlePress}
-          zIndex={MARKER_Z_INDEX}
-        />
-      );
-    }
-
-    return (
-      <MarkerWrapper
-        identifier={markerId}
-        coordinate={slot.coordinate}
-        anchor={ANCHOR_PIN_TIP}
-        tracksViewChanges={false}
-        onPress={handlePress}
-        zIndex={MARKER_Z_INDEX}
-      />
-    );
-  },
-  (prev, next) => {
-    if (prev.slot.kind !== next.slot.kind) return false;
-    if (prev.slot.kind === "offscreen" && next.slot.kind === "offscreen") return true;
-    if (prev.slot.providerId !== next.slot.providerId) return false;
-    if (prev.slot.clusterKey !== next.slot.clusterKey) return false;
-    if (prev.slot.clusterCount !== next.slot.clusterCount) return false;
-    const dLat = Math.abs(
-      prev.slot.coordinate.latitude - next.slot.coordinate.latitude,
-    );
-    const dLng = Math.abs(
-      prev.slot.coordinate.longitude - next.slot.coordinate.longitude,
-    );
-    if (dLat >= 1e-5 || dLng >= 1e-5) return false;
-    if (prev.onPressProviderId !== next.onPressProviderId) return false;
-    if (prev.onPressClusterPins !== next.onPressClusterPins) return false;
-    return true;
-  },
-);
-
-/* ── Container ──────────────────────────────────────────────────────────── */
-
-export type ExploreMapMarkersProps = {
-  pool: MarkerPoolSlot[];
-  onPressProviderId: (providerId: string) => void;
-  onPressClusterPins: (pins: MapPinDto[], coordinate: { latitude: number; longitude: number }) => void;
-};
-
-export const ExploreMapMarkers = memo(
-  function ExploreMapMarkers({
-    pool,
-    onPressProviderId,
-    onPressClusterPins,
-  }: ExploreMapMarkersProps) {
-    let active = 0;
-    for (const s of pool) if (s.kind !== "offscreen") active++;
-    mapDiag("markers.render", { poolSize: pool.length, active });
-
-    return (
-      <>
-        {pool.map((slot, index) => (
-          <PooledMarker
-            key={index}
-            slot={slot}
-            index={index}
-            onPressProviderId={onPressProviderId}
-            onPressClusterPins={onPressClusterPins}
-          />
-        ))}
-      </>
-    );
-  },
-  (prev, next) =>
-    prev.pool === next.pool &&
-    prev.onPressProviderId === next.onPressProviderId &&
-    prev.onPressClusterPins === next.onPressClusterPins,
-);
-
-/* ── Selected-marker overlay (always mounted, coordinate-hidden) ─────── */
-
-export type ExploreSelectedMarkerOverlayProps = {
-  providerId: string | null;
-  latitude: number | null;
-  longitude: number | null;
-};
+/* ── ExploreSelectedMarkerOverlay ───────────────────────────────────────── */
 
 export const ExploreSelectedMarkerOverlay = memo(
   function ExploreSelectedMarkerOverlay({
@@ -340,50 +274,50 @@ export const ExploreSelectedMarkerOverlay = memo(
     latitude,
     longitude,
   }: ExploreSelectedMarkerOverlayProps) {
-    const isActive = providerId != null && latitude != null && longitude != null;
+    const [imageLoaded, setImageLoaded] = useState(IS_ANDROID ? false : selectedPreloaded);
 
-    const coordinate = useMemo(
-      () =>
-        isActive
-          ? { latitude: Number(latitude), longitude: Number(longitude) }
-          : OFFSCREEN_COORDINATE,
-      [isActive, latitude, longitude],
-    );
+    const handleImageLoad = useCallback(() => {
+      if (!IS_ANDROID) selectedPreloaded = true;
+      setImageLoaded(true);
+    }, []);
 
-    const [isTracking, setIsTracking] = useState(true);
+    const isActive =
+      providerId != null && latitude != null && longitude != null;
 
-    useEffect(() => {
-      if (isActive) setIsTracking(true);
-    }, [isActive, providerId]);
+    const coordinate = isActive
+      ? { latitude: Number(latitude), longitude: Number(longitude) }
+      : OFFSCREEN_COORDINATE;
 
-    useEffect(() => {
-      if (!isTracking) return;
-      const t = setTimeout(() => setIsTracking(false), TRACKS_TIMEOUT_MS);
-      return () => clearTimeout(t);
-    }, [isTracking]);
-
-    useEffect(() => {
-      if (isActive) {
-        mapDiag("overlay.activate", { providerId });
-      } else {
-        mapDiag("overlay.deactivate");
-      }
-    }, [isActive, providerId]);
-
-    const androidTracks = Platform.OS === "android" && isTracking;
+    if (IS_ANDROID) {
+      return (
+        <MarkerWrapper
+          identifier="selected-overlay"
+          coordinate={coordinate}
+          anchor={ANCHOR_PIN_TIP}
+          image={PAW_SELECTED_IMAGE}
+          tracksViewChanges={false}
+          zIndex={SELECTED_Z}
+        />
+      );
+    }
 
     return (
-      <PawMarker
+      <MarkerWrapper
         identifier="selected-overlay"
         coordinate={coordinate}
-        source={PAW_SELECTED_IMAGE}
-        tracksViewChanges={androidTracks}
-        zIndex={SELECTED_MARKER_Z_INDEX}
-      />
+        anchor={ANCHOR_PIN_TIP}
+        tracksViewChanges={!imageLoaded}
+        zIndex={SELECTED_Z}
+      >
+        <View style={S.selectedRoot} collapsable={false}>
+          <Image
+            source={PAW_SELECTED_IMAGE}
+            style={S.selectedImage}
+            resizeMode="contain"
+            onLoad={handleImageLoad}
+          />
+        </View>
+      </MarkerWrapper>
     );
   },
-  (prev, next) =>
-    prev.providerId === next.providerId &&
-    prev.latitude === next.latitude &&
-    prev.longitude === next.longitude,
 );

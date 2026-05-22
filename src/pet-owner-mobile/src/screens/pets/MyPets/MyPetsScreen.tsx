@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useRef, startTransition } from "react";
+import { useEffect, useState, useCallback, useRef, useMemo } from "react";
 import {
   View,
   Pressable,
@@ -16,10 +16,6 @@ import { useAuthStore } from "../../../store/authStore";
 import { useMyPetsUiStore } from "../../../store/myPetsUiStore";
 import { useTranslation, rowDirectionForAppLayout } from "../../../i18n";
 import { usePetsStore } from "../../../store/petsStore";
-import { medicalApi, postsApi, triageApi } from "../../../api/client";
-import * as Print from "expo-print";
-import * as Sharing from "expo-sharing";
-import { generateHealthPassportHtml } from "../../../utils/HealthPassportPdf";
 import { ShareHealthPassportModal } from "../../../components/ShareHealthPassportModal";
 import { AuthPlaceholder } from "../../../components/AuthPlaceholder";
 import { BrandedAppHeader } from "../../../components/BrandedAppHeader";
@@ -43,8 +39,6 @@ import { HealthHubList } from "./components/HealthHubList";
 import { prefetchActivePetSummary, useActivePetSummary } from "./hooks/useActivePetSummary";
 import type { Section } from "./types";
 import { useDeferredMount } from "../../../hooks/useDeferredMount";
-import { getNormalizedApiError } from "../../../utils/apiUtils";
-import { showApiErrorToast } from "../../../services/apiErrorToast";
 import { showGlobalAlertCompat } from "../../../components/global-modal";
 import {
   CelebrationConfettiBurst,
@@ -61,13 +55,30 @@ export function MyPetsScreen() {
   const navigation = useNavigation<any>();
   const { colors } = useTheme();
 
+  // activePetIndex updates immediately on tap — drives the avatar ring highlight only.
+  // committedPetIndex lags behind by one interaction tick — drives all heavy content.
+  // This makes the avatar switcher feel instantaneous while deferring the expensive
+  // sub-tree reconciliation until after the tap animation has finished.
   const [activePetIndex, setActivePetIndex] = useState(0);
+  const [committedPetIndex, setCommittedPetIndex] = useState(0);
+
   const [activeSection, setActiveSection] = useState<Section>(null);
   const [shareModalPetId, setShareModalPetId] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [sectionReloadNonce, setSectionReloadNonce] = useState(0);
   const [markFoundBusy, setMarkFoundBusy] = useState(false);
   const markFoundConfettiRef = useRef<CelebrationConfettiBurstRef>(null);
+
+  // After each tap the heavy content area shows a skeleton until this resolves.
+  const isSwitching = activePetIndex !== committedPetIndex;
+
+  useEffect(() => {
+    if (!isSwitching) return;
+    const task = InteractionManager.runAfterInteractions(() => {
+      setCommittedPetIndex(activePetIndex);
+    });
+    return () => task.cancel();
+  }, [activePetIndex, isSwitching]);
 
   useEffect(() => {
     if (isLoggedIn) usePetsStore.getState().fetchPets();
@@ -99,7 +110,8 @@ export function MyPetsScreen() {
     return () => setSectionDetailOpen(false);
   }, [isLoggedIn, activeSection, setSectionDetailOpen]);
 
-  const activePet = pets[activePetIndex] ?? null;
+  // All heavy rendering is gated on the committed index.
+  const activePet = useMemo(() => pets[committedPetIndex] ?? null, [pets, committedPetIndex]);
 
   useEffect(() => {
     if (activeSection && !activePet) {
@@ -109,6 +121,7 @@ export function MyPetsScreen() {
 
   const summary = useActivePetSummary(activePet?.id, sectionReloadNonce);
 
+  // ── Stable callbacks ──────────────────────────────────────────────────────
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
     try {
@@ -118,6 +131,39 @@ export function MyPetsScreen() {
       setRefreshing(false);
     }
   }, []);
+
+  const handleRetry = useCallback(() => usePetsStore.getState().fetchPets(), []);
+
+  const handleAddPet = useCallback(() => navigation.navigate("AddPet"), [navigation]);
+
+  const handleSectionBack = useCallback(() => setActiveSection(null), []);
+
+  const handleSectionShare = useCallback(() => {
+    if (activePet) setShareModalPetId(activePet.id);
+  }, [activePet]);
+
+  const handleShareOpen = useCallback(() => {
+    if (activePet) setShareModalPetId(activePet.id);
+  }, [activePet]);
+
+  const handleShareModalClose = useCallback(() => setShareModalPetId(null), []);
+
+  const handleEditPet = useCallback(() => {
+    if (activePet) navigation.navigate("AddPet", { petId: activePet.id });
+  }, [activePet, navigation]);
+
+  const handleOpenTriage = useCallback(() => navigation.navigate("Triage"), [navigation]);
+
+  const handleSelectSection = useCallback(
+    (s: Section) => {
+      if (activePet) setActiveSection(s);
+    },
+    [activePet],
+  );
+
+  const handleVaccineAlertPress = useCallback(() => {
+    if (activePet) setActiveSection("vaccines");
+  }, [activePet]);
 
   const handleMarkFoundFromBanner = useCallback(
     (pet: PetDto) => {
@@ -133,9 +179,6 @@ export function MyPetsScreen() {
                 setTimeout(resolve, MARK_FOUND_SOS_CELEBRATION_DELAY_MS),
               );
               await usePetsStore.getState().markFound(pet.id);
-              if (pet.communityPostId) {
-                await postsApi.resolveSos(pet.communityPostId).catch(() => {});
-              }
             } catch {
               showGlobalAlertCompat(t("errorTitle"), t("profileSaveError"));
             } finally {
@@ -148,74 +191,61 @@ export function MyPetsScreen() {
     [t],
   );
 
-  const handleDelete = (pet: PetDto) => {
-    const allPets = usePetsStore.getState().pets;
-    if (allPets.length <= 1) {
-      showGlobalAlertCompat(t("errorTitle"), t("cannotDeleteLast"));
-      return;
-    }
-    showGlobalAlertCompat(t("softDeleteTitle"), t("softDeleteMessage"), [
-      { text: t("softDeleteCancel"), style: "cancel" },
-      {
-        text: t("softDeleteConfirm"),
-        style: "destructive",
-        onPress: async () => {
-          try {
-            const deletedIndex = allPets.findIndex((p) => p.id === pet.id);
-            const remaining = allPets.filter((p) => p.id !== pet.id);
+  const handleMarkFoundPress = useCallback(() => {
+    if (activePet) handleMarkFoundFromBanner(activePet);
+  }, [activePet, handleMarkFoundFromBanner]);
 
-            setActiveSection(null);
-            if (shareModalPetId === pet.id) setShareModalPetId(null);
+  const handleDelete = useCallback(
+    (pet: PetDto) => {
+      const allPets = usePetsStore.getState().pets;
+      if (allPets.length <= 1) {
+        showGlobalAlertCompat(t("errorTitle"), t("cannotDeleteLast"));
+        return;
+      }
+      showGlobalAlertCompat(t("softDeleteTitle"), t("softDeleteMessage"), [
+        { text: t("softDeleteCancel"), style: "cancel" },
+        {
+          text: t("softDeleteConfirm"),
+          style: "destructive",
+          onPress: async () => {
+            try {
+              const deletedIndex = allPets.findIndex((p) => p.id === pet.id);
+              const remaining = allPets.filter((p) => p.id !== pet.id);
 
-            let nextIndex = activePetIndex;
-            if (deletedIndex >= 0) {
-              if (deletedIndex < activePetIndex) {
-                nextIndex = activePetIndex - 1;
-              } else if (deletedIndex === activePetIndex) {
-                nextIndex = Math.min(activePetIndex, Math.max(0, remaining.length - 1));
+              setActiveSection(null);
+              if (shareModalPetId === pet.id) setShareModalPetId(null);
+
+              let nextIndex = committedPetIndex;
+              if (deletedIndex >= 0) {
+                if (deletedIndex < committedPetIndex) {
+                  nextIndex = committedPetIndex - 1;
+                } else if (deletedIndex === committedPetIndex) {
+                  nextIndex = Math.min(committedPetIndex, Math.max(0, remaining.length - 1));
+                }
               }
-            }
-            if (nextIndex >= remaining.length) {
-              nextIndex = Math.max(0, remaining.length - 1);
-            }
-            setActivePetIndex(nextIndex);
+              if (nextIndex >= remaining.length) {
+                nextIndex = Math.max(0, remaining.length - 1);
+              }
+              setActivePetIndex(nextIndex);
+              setCommittedPetIndex(nextIndex);
 
-            await usePetsStore.getState().deletePet(pet.id);
-            showGlobalAlertCompat(t("petDeleted"));
-          } catch {
-            showGlobalAlertCompat(t("errorTitle"), t("profileSaveError"));
-          }
+              await usePetsStore.getState().deletePet(pet.id);
+              showGlobalAlertCompat(t("petDeleted"));
+            } catch {
+              showGlobalAlertCompat(t("errorTitle"), t("profileSaveError"));
+            }
+          },
         },
-      },
-    ]);
-  };
-
-  const handleExportPdf = async (pet: PetDto) => {
-    try {
-      const user = useAuthStore.getState().user;
-      const lang = useAuthStore.getState().language;
-      const [vaccineStatuses, weightHistory, medicalRecords, triageHistory] = await Promise.all([
-        medicalApi.getVaccineStatus(pet.id),
-        medicalApi.getWeightHistory(pet.id),
-        medicalApi.getMedicalRecords(pet.id),
-        triageApi.getHistory(pet.id, { backgroundRequest: true }).catch(() => []),
       ]);
-      const html = generateHealthPassportHtml({
-        pet,
-        ownerName: user?.name ?? "",
-        ownerEmail: user?.email,
-        vaccineStatuses,
-        weightHistory,
-        medicalRecords,
-        triageHistory,
-        language: lang,
-      });
-      const { uri } = await Print.printToFileAsync({ html });
-      await Sharing.shareAsync(uri, { mimeType: "application/pdf", UTI: "com.adobe.pdf" });
-    } catch (e: unknown) {
-      showApiErrorToast(getNormalizedApiError(e), { title: t("errorTitle") });
-    }
-  };
+    },
+    [committedPetIndex, shareModalPetId, t],
+  );
+
+  const handleDeletePet = useCallback(() => {
+    if (activePet) handleDelete(activePet);
+  }, [activePet, handleDelete]);
+
+  // ── Render ────────────────────────────────────────────────────────────────
 
   if (!isLoggedIn) {
     return (
@@ -248,9 +278,8 @@ export function MyPetsScreen() {
         <SectionShell
           section={activeSection}
           pet={activePet}
-          onBack={() => setActiveSection(null)}
-          onExportPdf={() => handleExportPdf(activePet)}
-          onShare={() => setShareModalPetId(activePet.id)}
+          onBack={handleSectionBack}
+          onShare={handleSectionShare}
         >
           {activeSection === "health" && <PetInfoSection pet={activePet} />}
           {activeSection === "vaccines" && <VaccinesSection petId={activePet.id} reloadNonce={sectionReloadNonce} />}
@@ -259,7 +288,7 @@ export function MyPetsScreen() {
           {activeSection === "triage" && <TriageSection petId={activePet.id} reloadNonce={sectionReloadNonce} />}
         </SectionShell>
         {shareModalPetId && (
-          <ShareHealthPassportModal petId={shareModalPetId} visible onClose={() => setShareModalPetId(null)} />
+          <ShareHealthPassportModal pet={activePet} petId={shareModalPetId} visible onClose={handleShareModalClose} />
         )}
       </View>
     );
@@ -277,12 +306,12 @@ export function MyPetsScreen() {
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
         >
           {error ? (
-            <InlineError message={error} onRetry={() => usePetsStore.getState().fetchPets()} />
+            <InlineError message={error} onRetry={handleRetry} />
           ) : null}
           <View style={{ flex: 1, justifyContent: "center", paddingHorizontal: 28, minHeight: 320 }}>
             <ListEmptyState icon="paw-outline" title={t("noPets")} message={t("noPetsSubtitle")} />
             <Pressable
-              onPress={() => navigation.navigate("AddPet")}
+              onPress={handleAddPet}
               style={{
                 flexDirection: rowDirectionForAppLayout(isRTL),
                 alignItems: "center",
@@ -309,57 +338,61 @@ export function MyPetsScreen() {
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
         >
           {error ? (
-            <InlineError message={error} onRetry={() => usePetsStore.getState().fetchPets()} />
+            <InlineError message={error} onRetry={handleRetry} />
           ) : null}
 
-          {/* Avatar switcher row */}
+          {/* Avatar switcher always reflects the immediate tap — activePetIndex */}
           <PetAvatarSwitcher
             pets={pets}
             activeIndex={activePetIndex}
-            onSelect={(idx) => startTransition(() => setActivePetIndex(idx))}
-            onAddPress={() => navigation.navigate("AddPet")}
+            onSelect={setActivePetIndex}
+            onAddPress={handleAddPet}
           />
 
-          {activePet?.isLost ? (
-            <LostPetAlertBanner
-              isRTL={isRTL}
-              loading={markFoundBusy}
-              onMarkFoundPress={() => handleMarkFoundFromBanner(activePet)}
-            />
-          ) : null}
+          {/* Everything below is deferred to committedPetIndex — no blocking on the UI thread */}
+          {isSwitching ? (
+            <ListSkeleton count={4} style={{ marginTop: 14, marginHorizontal: 20 }} />
+          ) : (
+            <>
+              {activePet?.isLost ? (
+                <LostPetAlertBanner
+                  isRTL={isRTL}
+                  loading={markFoundBusy}
+                  onMarkFoundPress={handleMarkFoundPress}
+                />
+              ) : null}
 
-          {/* Passport card */}
-          {activePet && (
-            <View style={{ marginTop: 14 }}>
-              <PetPassportCard
-                pet={activePet}
-                onShare={() => setShareModalPetId(activePet.id)}
-                onEdit={() => navigation.navigate("AddPet", { petId: activePet.id })}
-                onDelete={() => handleDelete(activePet)}
-                onExportPdf={() => handleExportPdf(activePet)}
+              {activePet && (
+                <View style={{ marginTop: 14 }}>
+                  <PetPassportCard
+                    pet={activePet}
+                    onShare={handleShareOpen}
+                    onEdit={handleEditPet}
+                    onDelete={handleDeletePet}
+                  />
+                </View>
+              )}
+
+              {activePet && (
+                <VaccineAlertBanner
+                  vaccineStatuses={summary.vaccineStatuses}
+                  onPress={handleVaccineAlertPress}
+                />
+              )}
+
+              <HealthHubList
+                activePet={activePet}
+                summary={summary}
+                onSelectSection={handleSelectSection}
+                onOpenTriage={handleOpenTriage}
               />
-            </View>
+            </>
           )}
-
-          {/* Vaccine alert banners */}
-          {activePet && (
-            <VaccineAlertBanner vaccineStatuses={summary.vaccineStatuses} onPress={() => setActiveSection("vaccines")} />
-          )}
-
-          {/* Health hub dashboard */}
-          <HealthHubList
-            activePet={activePet}
-            summary={summary}
-            onSelectSection={(s) => {
-              if (activePet) setActiveSection(s);
-            }}
-            onOpenTriage={() => navigation.navigate("Triage")}
-          />
         </ScrollView>
       )}
 
-      {shareModalPetId && (
-        <ShareHealthPassportModal petId={shareModalPetId} visible onClose={() => setShareModalPetId(null)} />
+      {shareModalPetId && activePet && (
+        <ShareHealthPassportModal pet={activePet} petId={shareModalPetId} visible onClose={handleShareModalClose} />
       )}
       <View pointerEvents="box-none" style={StyleSheet.absoluteFillObject}>
         <CelebrationConfettiBurst ref={markFoundConfettiRef} />

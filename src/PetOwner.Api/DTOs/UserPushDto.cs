@@ -2,6 +2,7 @@ namespace PetOwner.Api.DTOs;
 
 public record RegisterPushTokenDto(string Token, string Platform);
 public record RemovePushTokenDto(string Token);
+public record UpdateUserLocationDto(double Latitude, double Longitude);
 
 public record NotificationPrefsDto(
     bool Push,

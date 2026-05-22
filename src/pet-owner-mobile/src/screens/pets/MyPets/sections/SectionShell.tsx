@@ -16,7 +16,6 @@ interface SectionShellProps {
   section: NonNullSection;
   pet: PetDto | null | undefined;
   onBack: () => void;
-  onExportPdf: () => void;
   onShare: () => void;
   children: ReactNode;
 }
@@ -25,7 +24,6 @@ export function SectionShell({
   section,
   pet,
   onBack,
-  onExportPdf,
   onShare,
   children,
 }: SectionShellProps) {
@@ -141,26 +139,8 @@ export function SectionShell({
             justifyContent: "flex-end",
             paddingHorizontal: 16,
             paddingVertical: 8,
-            gap: 8,
           }}
         >
-          <Pressable
-            onPress={onExportPdf}
-            style={{
-              flexDirection: "row",
-              alignItems: "center",
-              gap: 4,
-              backgroundColor: colors.surfaceSecondary,
-              paddingHorizontal: 12,
-              paddingVertical: 8,
-              borderRadius: 10,
-            }}
-          >
-            <Ionicons name="document-text-outline" size={16} color={colors.primary} />
-            <Text style={{ fontSize: 12, fontWeight: "600", color: colors.primary }}>
-              {t("exportHealthPassport")}
-            </Text>
-          </Pressable>
           <Pressable
             onPress={onShare}
             style={{

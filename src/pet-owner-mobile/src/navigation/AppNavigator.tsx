@@ -1,6 +1,5 @@
+import { useEffect, useRef } from "react";
 import { View, Text, Platform } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useBottomSafeInset } from "../hooks/useBottomSafeInset";
 import { PlatformPressable } from "@react-navigation/elements";
 import {
   createBottomTabNavigator,
@@ -9,7 +8,7 @@ import {
   type BottomTabBarProps,
 } from "@react-navigation/bottom-tabs";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
-import { createNavigationContainerRef, getFocusedRouteNameFromRoute } from "@react-navigation/native";
+import { getFocusedRouteNameFromRoute } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuthStore } from "../store/authStore";
 import { useNotificationStore } from "../store/notificationStore";
@@ -17,6 +16,7 @@ import { useChatStore } from "../store/chatStore";
 import { useTranslation } from "../i18n";
 import { useTheme } from "../theme/ThemeContext";
 import { GlobalSosFab } from "../components/GlobalSosFab";
+import { tabBarRowHeight } from "./tabBarLayout";
 import { NotificationToast } from "../components/NotificationToast";
 import { DiscoverScreen } from "../screens/explore/DiscoverScreen";
 import { ExploreScreen } from "../screens/explore/ExploreScreen";
@@ -63,9 +63,10 @@ import { MyBookingsScreen } from "../screens/profile/MyBookingsScreen";
 import { MyStatsScreen } from "../screens/profile/MyStatsScreen";
 import { PaymentCheckoutScreen } from "../screens/profile/PaymentCheckoutScreen";
 import { FavoritesScreen } from "../screens/profile/FavoritesScreen";
+import { navigationRef } from "./navigationRef";
+import { whenNavigationReady } from "./rootNavigation";
 
-/** Module-level ref used by App.tsx to route deep-links from push notification taps. */
-export const navigationRef = createNavigationContainerRef();
+export { navigationRef };
 
 const HIDDEN_TAB_SCREENS = new Set([
   "AddPet",
@@ -110,52 +111,51 @@ function shouldHideTabBar(route: any): boolean {
   return routeName != null && HIDDEN_TAB_SCREENS.has(routeName);
 }
 
-/** SOS FAB must render inside tab navigator context (hooks); cannot be a sibling of Tab.Navigator. */
+/**
+ * Thin wrapper: provides navigation context for GlobalSosFab (useNavigationState),
+ * but does NOT override BottomTabBar's internal layout — tabBarStyle in screenOptions
+ * controls all sizing/colors.
+ */
 function TabBarWithSos(props: BottomTabBarProps) {
   return (
-    <View
-      pointerEvents="box-none"
-      style={{ position: "relative", alignSelf: "stretch" }}
-      collapsable={false}
-    >
+    <>
       <BottomTabBar {...props} />
       <GlobalSosFab />
-    </View>
+    </>
   );
 }
 
-/** Row height for icons+label (Android gets a taller row so presses are not “edge only”). */
-const TAB_BAR_CONTENT_HEIGHT_ANDROID = 60;
-const TAB_BAR_CONTENT_HEIGHT_IOS = 50;
-const TAB_BAR_PADDING_TOP_ANDROID = 8;
-const TAB_BAR_PADDING_TOP_IOS = 6;
-
 function useTabBarStyle() {
   const { colors } = useTheme();
-  const bottomInset = useBottomSafeInset();
+  const height = tabBarRowHeight();
   const isAndroid = Platform.OS === "android";
-  const paddingTop = isAndroid ? TAB_BAR_PADDING_TOP_ANDROID : TAB_BAR_PADDING_TOP_IOS;
-  const contentHeight = isAndroid ? TAB_BAR_CONTENT_HEIGHT_ANDROID : TAB_BAR_CONTENT_HEIGHT_IOS;
-  const paddingBottom = bottomInset;
-  const height = contentHeight + paddingTop + paddingBottom;
   return {
     backgroundColor: colors.tabBar,
-    borderTopWidth: 1,
     borderTopColor: colors.border,
-    paddingTop,
-    paddingBottom,
-    height,
+    borderTopWidth: 1,
+    paddingTop: isAndroid ? 8 : 6,
+    // iOS: let React Navigation manage height + safe-area padding naturally.
+    // Android: fix height and strip bottom padding (safe area handled by system nav bar).
+    ...(isAndroid && {
+      height,
+      paddingBottom: 0,
+      elevation: 48,
+    }),
   };
 }
 
-/** Wider press targets so tabs register away from the physical bottom edge. */
-function LooseTabBarButton(props: BottomTabBarButtonProps) {
-  const bottomInset = useBottomSafeInset();
-  const isAndroid = Platform.OS === "android";
-  const hitSlop = isAndroid
-    ? { top: 14, bottom: Math.max(14, bottomInset), left: 10, right: 10 }
-    : { top: 10, bottom: 10, left: 8, right: 8 };
-  return <PlatformPressable {...props} hitSlop={hitSlop} />;
+/**
+ * Tab press targets centered on icon+label.
+ * Do NOT extend hitSlop into the wrapper's paddingBottom (system nav zone) — that
+ * shifted Android taps ~48px below the visible icons.
+ */
+function LooseTabBarButton({ style, ...rest }: BottomTabBarButtonProps) {
+  return (
+    <PlatformPressable
+      {...rest}
+      style={[style, { flex: 1, justifyContent: "center", alignItems: "center" }]}
+    />
+  );
 }
 
 const TAB_BAR_HIDDEN = { display: "none" as const };
@@ -312,14 +312,35 @@ function MessagesTabIcon({ focused, color }: { focused: boolean; color: string }
   );
 }
 
+/** After login the tab tree remounts; route from the root ref once it is ready. */
+function useNavigateToExploreAfterLogin(isLoggedIn: boolean, requiresPhone: boolean): void {
+  const wasLoggedInRef = useRef(isLoggedIn);
+
+  useEffect(() => {
+    const justLoggedIn = !wasLoggedInRef.current && isLoggedIn && !requiresPhone;
+    wasLoggedInRef.current = isLoggedIn;
+
+    if (!justLoggedIn) return;
+
+    return whenNavigationReady(() => {
+      if (!navigationRef.isReady()) return;
+      navigationRef.dispatch({
+        type: "NAVIGATE",
+        payload: { name: "Explore" },
+      });
+    });
+  }, [isLoggedIn, requiresPhone]);
+}
+
 export function AppNavigator() {
   const isLoggedIn = useAuthStore((s) => s.isLoggedIn);
   const requiresPhone = useAuthStore((s) => s.requiresPhone);
   const unreadCount = useNotificationStore((s) => s.unreadCount);
   const { t } = useTranslation();
   const { colors } = useTheme();
-  const safeInsets = useSafeAreaInsets();
   const tabBarStyle = useTabBarStyle();
+
+  useNavigateToExploreAfterLogin(isLoggedIn, requiresPhone);
 
   // Social login users must complete phone before accessing any tab
   if (isLoggedIn && requiresPhone) {
@@ -343,13 +364,6 @@ export function AppNavigator() {
     <NotificationToast />
     <Tab.Navigator
       tabBar={(tabProps) => <TabBarWithSos {...tabProps} />}
-      safeAreaInsets={{
-        top: safeInsets.top,
-        right: safeInsets.right,
-        /** Bottom padding is applied via `tabBarStyle` so tab items stay tappable. */
-        bottom: 0,
-        left: safeInsets.left,
-      }}
       screenOptions={{
         headerShown: false,
         /** Inactive tabs skip re-renders while off-screen (saves CPU when switching tabs). */
@@ -362,13 +376,16 @@ export function AppNavigator() {
         tabBarLabelStyle: {
           fontSize: 10,
           fontWeight: "700",
-          marginTop: -2,
+          marginTop: Platform.OS === "android" ? 2 : -2,
         },
         tabBarIconStyle: {
-          marginBottom: -2,
+          marginBottom: Platform.OS === "android" ? 0 : -2,
         },
         tabBarItemStyle: {
           justifyContent: "center",
+          alignItems: "center",
+          paddingTop: 0,
+          paddingBottom: 0,
         },
         tabBarButton: (btnProps) => <LooseTabBarButton {...btnProps} />,
         tabBarStyle,

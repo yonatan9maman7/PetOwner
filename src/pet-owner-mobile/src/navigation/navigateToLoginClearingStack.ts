@@ -1,6 +1,8 @@
 import { DeviceEventEmitter } from "react-native";
 import type { NavigationProp, ParamListBase } from "@react-navigation/native";
 import { StackActions } from "@react-navigation/native";
+import { navigationRef } from "./navigationRef";
+import { rootNavigate } from "./rootNavigation";
 
 /** ExploreScreen listens to clear map overlays before switching to the Login tab. */
 export const EXPLORE_CLEAR_BEFORE_LOGIN_EVENT = "petowner/explore/clearBeforeLogin";
@@ -18,8 +20,18 @@ function stackRouteCount(nav: NavigationProp<ParamListBase>): number {
  */
 export function navigateToLoginClearingStack(navigation: NavigationProp<ParamListBase>): void {
   DeviceEventEmitter.emit(EXPLORE_CLEAR_BEFORE_LOGIN_EVENT);
-  if (stackRouteCount(navigation) > 1) {
-    navigation.dispatch(StackActions.popToTop());
+
+  if (navigationRef.isReady()) {
+    rootNavigate("Login");
+    return;
   }
-  navigation.navigate("Login" as never);
+
+  try {
+    if (stackRouteCount(navigation) > 1) {
+      navigation.dispatch(StackActions.popToTop());
+    }
+    navigation.navigate("Login" as never);
+  } catch {
+    // Tab navigator may still be mounting; root ref path handles the common case.
+  }
 }

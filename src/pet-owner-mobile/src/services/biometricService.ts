@@ -1,13 +1,22 @@
 import { Platform } from "react-native";
 import * as LocalAuthentication from "expo-local-authentication";
 import * as SecureStore from "expo-secure-store";
-import { showGlobalAlert, showGlobalModal } from "../components/global-modal";
+import { showGlobalAlert } from "../components/global-modal";
 
 const KEYS = {
   enabled: "bio_enabled",
-  email: "bio_email",
+  identifier: "bio_identifier",
   password: "bio_password",
 } as const;
+
+/** Legacy key name — kept only for migration reads in authenticateAndGetCredentials. */
+const LEGACY_EMAIL_KEY = "bio_email";
+
+const CANCEL_ERRORS = new Set<LocalAuthentication.LocalAuthenticationError>([
+  "user_cancel",
+  "system_cancel",
+  "app_cancel",
+]);
 
 /** Intentionally no `keychainAccessible`: WHEN_UNLOCKED_THIS_DEVICE_ONLY often fails silently in Expo Go. */
 function secureStoreErrorMessage(error: unknown): string {
@@ -29,6 +38,98 @@ function showBiometricErrorAlert(error: unknown): void {
 
 export type BiometricTypeLabel = "faceId" | "fingerprint" | "iris" | "generic";
 
+export type BiometricPromptLabels = {
+  promptMessage: string;
+  cancelLabel: string;
+  fallbackLabel?: string;
+};
+
+export type BiometricAvailabilityMessages = {
+  unavailable: string;
+  notEnrolled: string;
+  failed: string;
+};
+
+/** Thrown when the user dismisses the system biometric prompt. */
+export class BiometricCancelledError extends Error {
+  constructor(
+    code: LocalAuthentication.LocalAuthenticationError = "user_cancel",
+  ) {
+    super(code);
+    this.name = "BiometricCancelledError";
+  }
+}
+
+function isCancelError(
+  error?: LocalAuthentication.LocalAuthenticationError,
+): boolean {
+  return error != null && CANCEL_ERRORS.has(error);
+}
+
+function buildAuthenticateOptions(
+  labels: BiometricPromptLabels,
+): LocalAuthentication.LocalAuthenticationOptions {
+  return {
+    promptMessage: labels.promptMessage,
+    cancelLabel: labels.cancelLabel,
+    disableDeviceFallback: false,
+    ...(labels.fallbackLabel ? { fallbackLabel: labels.fallbackLabel } : {}),
+    ...(Platform.OS === "android" ? { requireConfirmation: false } : {}),
+  };
+}
+
+async function ensureBiometricsReady(
+  messages: BiometricAvailabilityMessages,
+): Promise<boolean> {
+  const [hasHardware, enrolled] = await Promise.all([
+    LocalAuthentication.hasHardwareAsync(),
+    LocalAuthentication.isEnrolledAsync(),
+  ]);
+
+  if (!hasHardware) {
+    showGlobalAlert(messages.unavailable);
+    return false;
+  }
+  if (!enrolled) {
+    showGlobalAlert(messages.notEnrolled);
+    return false;
+  }
+  return true;
+}
+
+async function runBiometricPrompt(
+  labels: BiometricPromptLabels,
+  messages: BiometricAvailabilityMessages,
+): Promise<LocalAuthentication.LocalAuthenticationResult | null> {
+  if (!(await ensureBiometricsReady(messages))) {
+    return null;
+  }
+
+  const result = await LocalAuthentication.authenticateAsync(
+    buildAuthenticateOptions(labels),
+  );
+
+  if (result.success) {
+    return result;
+  }
+
+  if (isCancelError(result.error)) {
+    return result;
+  }
+
+  if (
+    result.error === "not_enrolled" ||
+    result.error === "not_available" ||
+    result.error === "passcode_not_set"
+  ) {
+    showGlobalAlert(messages.notEnrolled);
+    return result;
+  }
+
+  showGlobalAlert(messages.failed);
+  return result;
+}
+
 /** True when the device has biometric hardware AND at least one enrolled credential. */
 export async function isSupported(): Promise<boolean> {
   if (Platform.OS === "web") return false;
@@ -41,28 +142,6 @@ export async function isSupported(): Promise<boolean> {
   } catch {
     return false;
   }
-}
-
-/** QA: confirm OS reports hardware + enrollment before the system biometric prompt. */
-function showDebugHardwareAlert(): Promise<void> {
-  return new Promise((resolve) => {
-    void (async () => {
-      let supported = false;
-      try {
-        supported = await isSupported();
-      } catch (e) {
-        showBiometricErrorAlert(e);
-        resolve();
-        return;
-      }
-      showGlobalModal({
-        title: "Debug",
-        message: `Hardware supported: ${supported}`,
-        dismissible: false,
-        buttons: [{ text: "OK", role: "primary", onPress: () => resolve() }],
-      });
-    })();
-  });
 }
 
 /** Human-readable label for the primary supported type. */
@@ -102,33 +181,37 @@ export async function isEnabled(): Promise<boolean> {
 /**
  * Enable biometric login.
  * Triggers a biometric prompt to confirm device ownership, then persists
- * the supplied credentials. Throws if the user cancels or if hardware is
- * unavailable.
+ * the supplied credentials. Throws BiometricCancelledError if the user cancels.
  */
 export async function enable(
-  email: string,
+  identifier: string,
   password: string,
-  promptMessage: string,
+  labels: BiometricPromptLabels,
+  messages: BiometricAvailabilityMessages,
 ): Promise<void> {
   try {
-    await showDebugHardwareAlert();
+    const result = await runBiometricPrompt(labels, messages);
 
-    const result = await LocalAuthentication.authenticateAsync({
-      promptMessage,
-      cancelLabel: "Cancel",
-      disableDeviceFallback: false,
-    });
+    if (result == null) {
+      throw new BiometricCancelledError("not_available");
+    }
 
     if (!result.success) {
-      throw new Error(result.error ?? "biometric_cancelled");
+      if (isCancelError(result.error)) {
+        throw new BiometricCancelledError(result.error);
+      }
+      throw new Error(result.error ?? "biometric_failed");
     }
 
     await Promise.all([
-      SecureStore.setItemAsync(KEYS.email, email),
+      SecureStore.setItemAsync(KEYS.identifier, identifier),
       SecureStore.setItemAsync(KEYS.password, password),
       SecureStore.setItemAsync(KEYS.enabled, "1"),
     ]);
   } catch (error) {
+    if (error instanceof BiometricCancelledError) {
+      throw error;
+    }
     showBiometricErrorAlert(error);
     throw error;
   }
@@ -143,8 +226,9 @@ export async function disable(): Promise<void> {
   try {
     await Promise.all([
       SecureStore.deleteItemAsync(KEYS.enabled),
-      SecureStore.deleteItemAsync(KEYS.email),
+      SecureStore.deleteItemAsync(KEYS.identifier),
       SecureStore.deleteItemAsync(KEYS.password),
+      SecureStore.deleteItemAsync(LEGACY_EMAIL_KEY),
     ]);
   } catch {
     // already absent — ignore
@@ -153,35 +237,45 @@ export async function disable(): Promise<void> {
 
 /**
  * Prompt the user for biometrics and, on success, return the stored
- * credentials.  Returns null if the user cancels or biometric fails.
+ * credentials. Returns null if the user cancels or biometric fails.
+ *
+ * Automatically migrates credentials stored under the legacy `bio_email` key
+ * (from before the identifier-based auth refactor) to `bio_identifier`.
  */
 export async function authenticateAndGetCredentials(
-  promptMessage: string,
-): Promise<{ email: string; password: string } | null> {
+  labels: BiometricPromptLabels,
+  messages: BiometricAvailabilityMessages,
+): Promise<{ identifier: string; password: string } | null> {
   try {
-    await showDebugHardwareAlert();
+    const result = await runBiometricPrompt(labels, messages);
 
-    const result = await LocalAuthentication.authenticateAsync({
-      promptMessage,
-      cancelLabel: "Cancel",
-      disableDeviceFallback: false,
-    });
-
-    if (!result.success) {
+    if (result == null || !result.success) {
       return null;
     }
 
-    const [email, password] = await Promise.all([
-      SecureStore.getItemAsync(KEYS.email),
+    const [storedIdentifier, password] = await Promise.all([
+      SecureStore.getItemAsync(KEYS.identifier),
       SecureStore.getItemAsync(KEYS.password),
     ]);
 
-    if (!email || !password) {
+    // Migrate from legacy bio_email key if the new key is absent.
+    if (!storedIdentifier) {
+      const legacyEmail = await SecureStore.getItemAsync(LEGACY_EMAIL_KEY);
+      if (legacyEmail && password) {
+        await SecureStore.setItemAsync(KEYS.identifier, legacyEmail);
+        await SecureStore.deleteItemAsync(LEGACY_EMAIL_KEY);
+        return { identifier: legacyEmail, password };
+      }
       await SecureStore.deleteItemAsync(KEYS.enabled);
       return null;
     }
 
-    return { email, password };
+    if (!password) {
+      await SecureStore.deleteItemAsync(KEYS.enabled);
+      return null;
+    }
+
+    return { identifier: storedIdentifier, password };
   } catch (error) {
     showBiometricErrorAlert(error);
     throw error;

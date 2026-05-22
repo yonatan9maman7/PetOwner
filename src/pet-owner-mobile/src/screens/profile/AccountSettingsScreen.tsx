@@ -47,6 +47,10 @@ interface RowProps {
   iconBg?: string;
 }
 
+const SETTINGS_ROW_PADDING_H = 18;
+const SETTINGS_ROW_ICON_SIZE = 38;
+const SETTINGS_ROW_GAP = 16;
+
 function SettingsRow({
   icon,
   label,
@@ -56,7 +60,7 @@ function SettingsRow({
   iconColor,
   iconBg,
 }: RowProps) {
-  const { isRTL, rtlText, rowIconGapEnd } = useTranslation();
+  const { isRTL, rtlText } = useTranslation();
   const { colors } = useTheme();
   const fg = disabled ? colors.textMuted : colors.text;
   const defaultIconColor = disabled ? colors.textMuted : colors.primary;
@@ -68,26 +72,28 @@ function SettingsRow({
       style={{
         flexDirection: rowDirectionForAppLayout(isRTL),
         alignItems: "center",
+        alignSelf: "stretch",
+        width: "100%",
+        gap: SETTINGS_ROW_GAP,
         paddingVertical: 14,
-        paddingHorizontal: 18,
+        paddingHorizontal: SETTINGS_ROW_PADDING_H,
         opacity: disabled ? 0.5 : 1,
       }}
     >
       <View
         style={{
-          width: 38,
-          height: 38,
+          width: SETTINGS_ROW_ICON_SIZE,
+          height: SETTINGS_ROW_ICON_SIZE,
           borderRadius: 11,
           alignItems: "center",
           justifyContent: "center",
-          ...rowIconGapEnd,
           backgroundColor: iconBg ?? (disabled ? colors.surfaceSecondary : colors.iconBlueBg),
         }}
       >
         <Ionicons name={icon} size={19} color={iconColor ?? defaultIconColor} />
       </View>
 
-      <View style={{ flex: 1 }}>
+      <View style={{ flex: 1, minWidth: 0 }}>
         <Text
           style={{
             fontSize: 15,
@@ -143,7 +149,8 @@ function RowDivider() {
       style={{
         height: StyleSheet.hairlineWidth,
         backgroundColor: colors.border,
-        marginStart: 68,
+        marginStart:
+          SETTINGS_ROW_PADDING_H + SETTINGS_ROW_ICON_SIZE + SETTINGS_ROW_GAP,
       }}
     />
   );

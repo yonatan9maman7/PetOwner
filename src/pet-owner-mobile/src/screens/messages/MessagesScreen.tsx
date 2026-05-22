@@ -185,21 +185,28 @@ export function MessagesScreen() {
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background, marginTop: -8 }} edges={["top"]}>
       <BrandedAppHeader />
 
-      <Text
-        style={[
-          rtlText,
-          {
-            fontSize: 20,
-            fontWeight: "bold",
-            color: colors.text,
-            paddingHorizontal: BRAND_HEADER_HORIZONTAL_PAD,
-            paddingTop: 16,
-            paddingBottom: 8,
-          },
-        ]}
+      <View
+        style={{
+          width: "100%",
+          paddingHorizontal: BRAND_HEADER_HORIZONTAL_PAD,
+          paddingTop: 16,
+          paddingBottom: 8,
+        }}
       >
-        {t("messagesTitle")}
-      </Text>
+        <Text
+          style={[
+            rtlText,
+            {
+              fontSize: 20,
+              fontWeight: "bold",
+              color: colors.text,
+              alignSelf: "stretch",
+            },
+          ]}
+        >
+          {t("messagesTitle")}
+        </Text>
+      </View>
 
       {loading && conversations.length === 0 ? (
         <ScreenLoadingCenter title={`${t("messagesTitle")}…`} />

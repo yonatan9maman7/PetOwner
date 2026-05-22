@@ -8,12 +8,12 @@ export interface RegisterDto {
 }
 
 export interface LoginDto {
-  email: string;
+  identifier: string;
   password: string;
 }
 
 export interface ForgotPasswordDto {
-  email: string;
+  identifier: string;
 }
 
 export interface AuthResponse {

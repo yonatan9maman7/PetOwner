@@ -53,7 +53,7 @@ function SettingsRow({
   isFirst,
   badge,
 }: SettingsRowProps) {
-  const { isRTL } = useTranslation();
+  const { isRTL, rtlText } = useTranslation();
   const { colors } = useTheme();
   const chevron = isRTL ? "chevron-back" : "chevron-forward";
 
@@ -61,49 +61,60 @@ function SettingsRow({
     <TouchableOpacity
       onPress={onPress}
       activeOpacity={0.7}
-      className="flex-row items-center justify-between p-5"
-      style={
-        !isFirst
+      style={{
+        flexDirection: rowDirectionForAppLayout(isRTL),
+        alignItems: "center",
+        alignSelf: "stretch",
+        width: "100%",
+        gap: 16,
+        padding: 20,
+        ...(!isFirst
           ? { borderTopWidth: 1, borderTopColor: colors.borderLight }
-          : undefined
-      }
+          : {}),
+      }}
     >
-      <View className="flex-row items-center gap-4">
-        <View style={{ position: "relative" }}>
+      <View style={{ position: "relative" }}>
+        <View
+          style={{
+            width: 40,
+            height: 40,
+            borderRadius: 20,
+            alignItems: "center",
+            justifyContent: "center",
+            backgroundColor: colors.cardHighlight,
+          }}
+        >
+          <Ionicons name={icon} size={22} color={colors.text} />
+        </View>
+        {!!badge && badge > 0 && (
           <View
-            className="w-10 h-10 rounded-full items-center justify-center"
-            style={{ backgroundColor: colors.cardHighlight }}
+            style={{
+              position: "absolute",
+              top: -4,
+              right: -4,
+              backgroundColor: colors.danger,
+              borderRadius: 10,
+              minWidth: 20,
+              height: 20,
+              alignItems: "center",
+              justifyContent: "center",
+              paddingHorizontal: 4,
+              borderWidth: 2,
+              borderColor: colors.surface,
+            }}
           >
-            <Ionicons name={icon} size={22} color={colors.text} />
+            <Text style={{ color: colors.textInverse, fontSize: 11, fontWeight: "700" }}>
+              {badge > 99 ? "99+" : badge}
+            </Text>
           </View>
-          {!!badge && badge > 0 && (
-            <View
-              style={{
-                position: "absolute",
-                top: -4,
-                right: -4,
-                backgroundColor: colors.danger,
-                borderRadius: 10,
-                minWidth: 20,
-                height: 20,
-                alignItems: "center",
-                justifyContent: "center",
-                paddingHorizontal: 4,
-                borderWidth: 2,
-                borderColor: colors.surface,
-              }}
-            >
-              <Text style={{ color: colors.textInverse, fontSize: 11, fontWeight: "700" }}>
-                {badge > 99 ? "99+" : badge}
-              </Text>
-            </View>
-          )}
-        </View>
-        <View>
-          <Text className="font-semibold" style={{ color: colors.text }}>{label}</Text>
-          {trailing}
-        </View>
+        )}
       </View>
+
+      <View style={{ flex: 1, minWidth: 0 }}>
+        <Text style={{ fontWeight: "600", color: colors.text, ...rtlText }}>{label}</Text>
+        {trailing}
+      </View>
+
       <Ionicons name={chevron} size={20} color={colors.textMuted} />
     </TouchableOpacity>
   );

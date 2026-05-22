@@ -2,11 +2,11 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { View, Text, Pressable, Animated, Platform } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
-import { useNavigation } from "@react-navigation/native";
 import {
   setToastCallback,
   useNotificationStore,
 } from "../store/notificationStore";
+import { rootNavigate } from "../navigation/rootNavigation";
 import { useAuthStore } from "../store/authStore";
 import { useTheme } from "../theme/ThemeContext";
 import type { NotificationDto } from "../types/api";
@@ -30,7 +30,6 @@ const DEFAULT_CONFIG = { icon: "notifications", bg: "#f8fafc", accent: "#6366f1"
 
 export function NotificationToast() {
   const insets = useSafeAreaInsets();
-  const navigation = useNavigation<any>();
   const isLoggedIn = useAuthStore((s) => s.isLoggedIn);
   const language = useAuthStore((s) => s.language);
   const { colors } = useTheme();
@@ -100,24 +99,30 @@ export function NotificationToast() {
 
     switch (current.type) {
       case "ProviderApplication":
-        navigation.navigate("Profile", { screen: "AdminDashboard" });
+        rootNavigate("Profile", { screen: "AdminDashboard" });
         break;
       case "BookingCreated":
       case "NewRequest":
-        navigation.navigate("Profile", { screen: "MyBookings", params: { tab: "incoming" } });
+        rootNavigate("Profile", {
+          screen: "MyBookings",
+          params: { tab: "incoming" },
+        });
         break;
       case "BookingConfirmed":
       case "BookingCompleted":
       case "RequestCompleted":
       case "RequestCancelled":
       case "RequestAccepted":
-        navigation.navigate("Profile", { screen: "MyBookings", params: { tab: "outgoing" } });
+        rootNavigate("Profile", {
+          screen: "MyBookings",
+          params: { tab: "outgoing" },
+        });
         break;
       default:
-        navigation.navigate("Profile", { screen: "Notifications" });
+        rootNavigate("Profile", { screen: "Notifications" });
         break;
     }
-  }, [current, dismiss, navigation]);
+  }, [current, dismiss]);
 
   if (!isLoggedIn || !visible || !current) return null;
 

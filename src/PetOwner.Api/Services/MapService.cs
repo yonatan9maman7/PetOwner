@@ -23,6 +23,8 @@ public class MapService : IMapService
 
     public async Task<List<MapPinDto>> SearchProvidersAsync(MapSearchFilter filter)
     {
+        ArgumentNullException.ThrowIfNull(filter);
+
         // Approved + location + not admin-suspended. Do not require IsAvailableNow — that toggle is for
         // "I'm online right now" and would hide most providers on the explore map (default is false).
         var query = _db.Locations
@@ -85,11 +87,26 @@ public class MapService : IMapService
             }
         }
 
+        var applyRadiusInMemory = false;
+        double? radiusKmFilter = null;
+        double? centerLat = null;
+        double? centerLng = null;
+
         if (filter.RadiusKm.HasValue && filter.Latitude.HasValue && filter.Longitude.HasValue)
         {
-            var center = new Point(filter.Longitude.Value, filter.Latitude.Value) { SRID = 4326 };
-            var radiusMeters = filter.RadiusKm.Value * 1000;
-            query = query.Where(l => l.GeoLocation!.Distance(center) <= radiusMeters);
+            if (IsInMemoryDatabase(_db))
+            {
+                applyRadiusInMemory = true;
+                radiusKmFilter = filter.RadiusKm.Value;
+                centerLat = filter.Latitude.Value;
+                centerLng = filter.Longitude.Value;
+            }
+            else
+            {
+                var center = new Point(filter.Longitude.Value, filter.Latitude.Value) { SRID = 4326 };
+                var radiusMeters = filter.RadiusKm.Value * 1000;
+                query = query.Where(l => l.GeoLocation!.Distance(center) <= radiusMeters);
+            }
         }
 
         if (!string.IsNullOrWhiteSpace(filter.SearchTerm))
@@ -134,6 +151,13 @@ public class MapService : IMapService
             })
             .ToListAsync();
 
+        if (applyRadiusInMemory && radiusKmFilter.HasValue && centerLat.HasValue && centerLng.HasValue)
+        {
+            baseRows = baseRows
+                .Where(r => HaversineKm(centerLat.Value, centerLng.Value, r.Latitude, r.Longitude) <= radiusKmFilter.Value)
+                .ToList();
+        }
+
         if (baseRows.Count == 0)
             return [];
 
@@ -172,5 +196,19 @@ public class MapService : IMapService
                 r.IsEmergencyService,
                 rates.Select(x => new MapPinServiceRateDto(ServiceTypeCatalog.ToDisplayName(x.Service), x.Rate)).ToList());
         }).ToList();
+    }
+
+    private static bool IsInMemoryDatabase(ApplicationDbContext db) =>
+        db.Database.ProviderName?.Contains("InMemory", StringComparison.Ordinal) == true;
+
+    private static double HaversineKm(double lat1, double lng1, double lat2, double lng2)
+    {
+        const double R = 6371.0;
+        var dLat = (lat2 - lat1) * Math.PI / 180.0;
+        var dLng = (lng2 - lng1) * Math.PI / 180.0;
+        var a = Math.Sin(dLat / 2) * Math.Sin(dLat / 2)
+              + Math.Cos(lat1 * Math.PI / 180.0) * Math.Cos(lat2 * Math.PI / 180.0)
+              * Math.Sin(dLng / 2) * Math.Sin(dLng / 2);
+        return 2 * R * Math.Asin(Math.Sqrt(a));
     }
 }

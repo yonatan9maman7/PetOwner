@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { View, Text, Pressable } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useTranslation, rowDirectionForAppLayout } from "../../../../i18n";
@@ -9,7 +10,7 @@ interface VaccineAlertBannerProps {
   onPress: () => void;
 }
 
-export function VaccineAlertBanner({ vaccineStatuses, onPress }: VaccineAlertBannerProps) {
+function VaccineAlertBannerInner({ vaccineStatuses, onPress }: VaccineAlertBannerProps) {
   const { t, isRTL } = useTranslation();
   const { colors } = useTheme();
 
@@ -101,3 +102,5 @@ export function VaccineAlertBanner({ vaccineStatuses, onPress }: VaccineAlertBan
     </View>
   );
 }
+
+export const VaccineAlertBanner = memo(VaccineAlertBannerInner);

@@ -102,10 +102,20 @@ const he = {
   forgotError: "שגיאה בשליחת הקישור, נסה שנית",
   errorEmailExists: "כתובת האימייל כבר רשומה במערכת.",
   errorPhoneExists: "מספר הטלפון כבר רשום במערכת.",
-  errorInvalidCredentials: "אימייל או סיסמה שגויים.",
+  errorInvalidCredentials: "אימייל/טלפון או סיסמה שגויים.",
   errorAccountSuspended: "החשבון הושעה. צור קשר עם התמיכה.",
-  errorUserNotFound: "לא נמצא חשבון עם כתובת האימייל הזו.",
+  errorUserNotFound: "לא נמצא חשבון עם האימייל או מספר הטלפון שהוזנו.",
   errorGeneric: "לא הצלחנו להשלים את הבקשה. נסה שוב.",
+  identifierLabel: "אימייל או טלפון",
+  identifierPlaceholder: "05XXXXXXXX או name@example.com",
+  invalidIdentifier: "נא להזין אימייל או מספר טלפון תקין",
+  forgotIdentifierSubtitle: "הזן אימייל או מספר טלפון ונשלח קישור לאיפוס לכתובת האימייל הרשומה.",
+  accountExistsTitle: "חשבון קיים",
+  accountExistsEmailMsg: "כתובת האימייל כבר רשומה. נסה להתחבר או פנה לתמיכה.",
+  accountExistsPhoneMsg: "מספר הטלפון כבר רשום. נסה להתחבר או פנה לתמיכה.",
+  goToLogin: "להתחברות",
+  contactSupport: "צור קשר",
+  cancelButton: "ביטול",
 
   searchPlaceholder: "חפש מטפל או שירות...",
   filterByService: "סנן לפי שירות",
@@ -218,6 +228,7 @@ const he = {
   biometricFailed: "אימות ביומטרי נכשל. נסה שנית",
   biometricFailedFallback: "פרטי הכניסה שמורים כבר לא תקינים. אנא כנס שוב עם הסיסמה",
   biometricPasswordWrong: "הסיסמה שגויה. נסה שנית",
+  biometricFallback: "השתמש בקוד גישה",
   biometricDisabledAfterPasswordChange: "הכניסה הביומטרית בוטלה. הפעל מחדש מהגדרות האבטחה",
   usePasswordInstead: "כניסה עם סיסמה",
   changePassword: "שנה סיסמה",
@@ -1481,10 +1492,20 @@ const en: Record<keyof typeof he, string> = {
   forgotError: "Failed to send reset link, please try again",
   errorEmailExists: "This email address is already registered.",
   errorPhoneExists: "This phone number is already registered.",
-  errorInvalidCredentials: "Invalid email or password.",
+  errorInvalidCredentials: "Invalid email, phone, or password.",
   errorAccountSuspended: "Your account has been suspended. Please contact support.",
-  errorUserNotFound: "No account found with this email address.",
+  errorUserNotFound: "No account found with this email or phone number.",
   errorGeneric: "We couldn't complete this request. Please try again.",
+  identifierLabel: "Email or Phone",
+  identifierPlaceholder: "name@example.com or 05XXXXXXXX",
+  invalidIdentifier: "Please enter a valid email or phone number",
+  forgotIdentifierSubtitle: "Enter your email or phone and we'll send a reset link to your registered email.",
+  accountExistsTitle: "Account Exists",
+  accountExistsEmailMsg: "This email is already registered. Go to Login or contact support.",
+  accountExistsPhoneMsg: "This phone number is already registered. Go to Login or contact support.",
+  goToLogin: "Go to Login",
+  contactSupport: "Contact Support",
+  cancelButton: "Cancel",
 
   searchPlaceholder: "Search for a caretaker or service...",
   filterByService: "Filter by Service",
@@ -1598,6 +1619,7 @@ const en: Record<keyof typeof he, string> = {
   biometricFailed: "Biometric authentication failed. Please try again",
   biometricFailedFallback: "Your saved credentials are no longer valid. Please sign in with your password",
   biometricPasswordWrong: "Wrong password. Please try again",
+  biometricFallback: "Use Passcode",
   biometricDisabledAfterPasswordChange: "Biometric sign-in was disabled. Re-enable it in Security settings",
   usePasswordInstead: "Use password instead",
   changePassword: "Change Password",
@@ -2813,21 +2835,33 @@ export function resolveNotificationApiText(
 }
 
 /**
- * When `I18nManager.isRTL` is in sync with the in-app language (`forceRTL` etc.),
- * Android applies native flex mirroring; a plain `isHebrew ? "row-reverse" : "row"`
- * would double-mirror. iOS is unchanged here so we keep the previous LTR/RTL split.
+ * When `I18nManager.isRTL` is true the OS (both iOS and Android) applies native
+ * flex mirroring to all flex containers. A plain `appWantsRTL ? "row-reverse" : "row"`
+ * would therefore double-mirror on those devices.  We counter-flip so the visual
+ * result is always correct regardless of the system RTL setting.
  */
 export function rowDirectionForAppLayout(
   appWantsRTL: boolean | undefined | null,
 ): "row" | "row-reverse" {
   const rtl = appWantsRTL === true;
-  if (Platform.OS !== "android") {
-    return rtl ? "row-reverse" : "row";
-  }
   if (I18nManager.isRTL) {
     return rtl ? "row" : "row-reverse";
   }
   return rtl ? "row-reverse" : "row";
+}
+
+/**
+ * Physical `textAlign` for labels / TextInputs when the OS has RTL active.
+ * Mirrors the counter-flip logic in `rowDirectionForAppLayout`.
+ */
+export function textAlignForAppLayout(
+  appWantsRTL: boolean | undefined | null,
+): "left" | "right" {
+  const rtl = appWantsRTL === true;
+  if (I18nManager.isRTL) {
+    return rtl ? "left" : "right";
+  }
+  return rtl ? "right" : "left";
 }
 
 export function useTranslation() {
@@ -2854,7 +2888,7 @@ export function useTranslation() {
     },
     /** Apply to Text with explicit start-aligned text (labels, headings). */
     rtlText: {
-      textAlign: (isHebrew ? "right" : "left") as "right" | "left",
+      textAlign: textAlignForAppLayout(isHebrew),
       writingDirection: (isHebrew ? "rtl" : "ltr") as "rtl" | "ltr",
     },
     /** Apply to Text that uses `text-center` — sets writingDirection only. */
@@ -2867,7 +2901,7 @@ export function useTranslation() {
     },
     /** Apply to TextInput for correct cursor/text alignment. */
     rtlInput: {
-      textAlign: (isHebrew ? "right" : "left") as "right" | "left",
+      textAlign: textAlignForAppLayout(isHebrew),
       writingDirection: (isHebrew ? "rtl" : "ltr") as "rtl" | "ltr",
     },
     /** Tailwind class for label alignment. */

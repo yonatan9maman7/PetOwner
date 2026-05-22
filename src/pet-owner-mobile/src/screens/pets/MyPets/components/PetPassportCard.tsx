@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { View, Text, Pressable, ScrollView, useWindowDimensions } from "react-native";
 import { Image } from "expo-image";
 import { Ionicons } from "@expo/vector-icons";
@@ -16,7 +17,6 @@ interface PetPassportCardProps {
   onShare: () => void;
   onEdit: () => void;
   onDelete: () => void;
-  onExportPdf: () => void;
 }
 
 function formatAllergySegment(raw: string, t: (k: TranslationKey) => string): string {
@@ -30,12 +30,11 @@ function formatAllergySegment(raw: string, t: (k: TranslationKey) => string): st
   return s;
 }
 
-export function PetPassportCard({
+function PetPassportCardInner({
   pet,
   onShare,
   onEdit,
   onDelete,
-  onExportPdf,
 }: PetPassportCardProps) {
   const { t, isRTL } = useTranslation();
   const { colors } = useTheme();
@@ -44,16 +43,10 @@ export function PetPassportCard({
   const CARD_W = screenWidth - 40;
 
   const handleMore = () => {
-    const options: string[] = [t("exportHealthPassport")];
-    if (pet.isLost) options.push(t("markFoundBtn"));
-    options.push(t("deletePet"));
-    options.push(t("softDeleteCancel"));
-
     showGlobalAlertCompat(
       pet.name,
       undefined,
       [
-        { text: t("exportHealthPassport"), onPress: onExportPdf },
         ...(pet.isLost
           ? [
               {
@@ -365,3 +358,5 @@ export function PetPassportCard({
     </View>
   );
 }
+
+export const PetPassportCard = memo(PetPassportCardInner);

@@ -1,3 +1,4 @@
+import { memo } from "react";
 import {
   View,
   Text,
@@ -15,7 +16,7 @@ type Props = {
   loading?: boolean;
 };
 
-export function LostPetAlertBanner({
+function LostPetAlertBannerInner({
   isRTL,
   onMarkFoundPress,
   loading,
@@ -63,6 +64,8 @@ export function LostPetAlertBanner({
     </View>
   );
 }
+
+export const LostPetAlertBanner = memo(LostPetAlertBannerInner);
 
 const styles = StyleSheet.create({
   outer: {

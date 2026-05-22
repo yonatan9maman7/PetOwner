@@ -97,8 +97,17 @@ public class AuthController : ControllerBase
     [HttpPost("login")]
     public async Task<IActionResult> Login([FromBody] LoginDto dto)
     {
-        var emailNorm = NormalizeEmail(dto.Email);
-        var user = await _db.Users.FirstOrDefaultAsync(u => u.Email.ToLower() == emailNorm);
+        User? user;
+        if (IsEmailIdentifier(dto.Identifier))
+        {
+            var emailNorm = NormalizeEmail(dto.Identifier);
+            user = await _db.Users.FirstOrDefaultAsync(u => u.Email.ToLower() == emailNorm);
+        }
+        else
+        {
+            var phone = dto.Identifier.Trim();
+            user = await _db.Users.FirstOrDefaultAsync(u => u.Phone == phone);
+        }
 
         if (user is null || string.IsNullOrEmpty(user.PasswordHash) ||
             !BCrypt.Net.BCrypt.Verify(dto.Password, user.PasswordHash))
@@ -230,13 +239,25 @@ public class AuthController : ControllerBase
     [HttpPost("forgot-password")]
     public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordDto dto)
     {
-        var emailNorm = NormalizeEmail(dto.Email);
-        var user = await _db.Users.FirstOrDefaultAsync(u => u.Email.ToLower() == emailNorm);
+        User? user;
+        string targetEmail;
+
+        if (IsEmailIdentifier(dto.Identifier))
+        {
+            targetEmail = NormalizeEmail(dto.Identifier);
+            user = await _db.Users.FirstOrDefaultAsync(u => u.Email.ToLower() == targetEmail);
+        }
+        else
+        {
+            var phone = dto.Identifier.Trim();
+            user = await _db.Users.FirstOrDefaultAsync(u => u.Phone == phone);
+            targetEmail = user is not null ? NormalizeEmail(user.Email) : string.Empty;
+        }
 
         if (user is null)
             return NotFound(new
             {
-                message = "No account found with this email address.",
+                message = "No account found with this email or phone number.",
                 code = "USER_NOT_FOUND"
             });
 
@@ -248,13 +269,13 @@ public class AuthController : ControllerBase
         await _db.SaveChangesAsync();
 
         var encodedToken = Uri.EscapeDataString(resetToken);
-        var encodedEmail = Uri.EscapeDataString(emailNorm);
+        var encodedEmail = Uri.EscapeDataString(targetEmail);
         var baseUrl = (_config["FrontendBaseUrl"] ?? "http://localhost:4200").TrimEnd('/');
         var resetLink = $"{baseUrl}/reset-password?token={encodedToken}&email={encodedEmail}";
 
         _logger.LogInformation(
             "Password reset requested for {Email}. Dev/test reset link: {ResetLink}",
-            emailNorm,
+            targetEmail,
             resetLink);
 
         const string subject = "איפוס סיסמה למערכת";
@@ -265,7 +286,7 @@ public class AuthController : ControllerBase
             $"<p><a href='{resetLink}'>לחץ כאן לאיפוס הסיסמה</a></p>" +
             "<p>אם לא ביקשת לאפס את הסיסמה, התעלם מהודעה זו.</p></div>";
 
-        await _emailService.SendEmailAsync(emailNorm, subject, body);
+        await _emailService.SendEmailAsync(targetEmail, subject, body);
 
         return Ok(new { message = "If the email exists in our system, a reset link has been sent." });
     }
@@ -353,4 +374,6 @@ public class AuthController : ControllerBase
     }
 
     private static string NormalizeEmail(string email) => email.Trim().ToLowerInvariant();
+
+    private static bool IsEmailIdentifier(string s) => s.Contains('@');
 }

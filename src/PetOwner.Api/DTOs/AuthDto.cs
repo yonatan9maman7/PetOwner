@@ -12,12 +12,12 @@ public record RegisterDto(
 );
 
 public record LoginDto(
-    [Required, EmailAddress] string Email,
+    [Required] string Identifier,
     [Required] string Password
 );
 
 public record ForgotPasswordDto(
-    [Required, EmailAddress] string Email
+    [Required] string Identifier
 );
 
 public record ResetPasswordDto(

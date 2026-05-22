@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, memo, useMemo } from "react";
 import { View, Text, Pressable, ScrollView } from "react-native";
 import { Image } from "expo-image";
 import { Ionicons } from "@expo/vector-icons";
@@ -61,7 +61,7 @@ function ActiveRing({ color }: { color: string }) {
   );
 }
 
-function PetAvatar({
+const PetAvatar = memo(function PetAvatar({
   pet,
   isActive,
   activeColor,
@@ -118,11 +118,18 @@ function PetAvatar({
       </Text>
     </Pressable>
   );
-}
+});
 
-export function PetAvatarSwitcher({ pets, activeIndex, onSelect, onAddPress }: PetAvatarSwitcherProps) {
+function PetAvatarSwitcherInner({ pets, activeIndex, onSelect, onAddPress }: PetAvatarSwitcherProps) {
   const { colors } = useTheme();
   const { isRTL } = useTranslation();
+
+  // One stable callback per pet index — only recreated when the pets array length changes.
+  const pressHandlers = useMemo(
+    () => pets.map((_, i) => () => onSelect(i)),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [pets.length, onSelect],
+  );
 
   return (
     <ScrollView
@@ -144,7 +151,7 @@ export function PetAvatarSwitcher({ pets, activeIndex, onSelect, onAddPress }: P
           pet={p}
           isActive={i === activeIndex}
           activeColor={colors.brand}
-          onPress={() => onSelect(i)}
+          onPress={pressHandlers[i]}
         />
       ))}
 
@@ -183,3 +190,5 @@ export function PetAvatarSwitcher({ pets, activeIndex, onSelect, onAddPress }: P
     </ScrollView>
   );
 }
+
+export const PetAvatarSwitcher = memo(PetAvatarSwitcherInner);

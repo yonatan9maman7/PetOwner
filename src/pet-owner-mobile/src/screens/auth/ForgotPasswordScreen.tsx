@@ -27,7 +27,7 @@ import { useKeyboardAvoidingState } from "../../hooks/useKeyboardAvoidingState";
 const AUTH_PETCARE_HERO_LOGO = require("../../../assets/petcare-logo-transparent.png");
 
 export function ForgotPasswordScreen() {
-  const [email, setEmail] = useState("");
+  const [identifier, setIdentifier] = useState("");
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -93,7 +93,7 @@ export function ForgotPasswordScreen() {
   }, [isLoggedIn, navigation]);
 
   const handleForgotPassword = async () => {
-    if (!email.trim()) {
+    if (!identifier.trim()) {
       showGlobalAlertCompat(t("errorTitle"), t("fillAllFields"));
       return;
     }
@@ -101,7 +101,7 @@ export function ForgotPasswordScreen() {
     setErrorMessage(null);
     setLoading(true);
     try {
-      await authApi.forgotPassword(email);
+      await authApi.forgotPassword(identifier);
       showGlobalAlertCompat(t("resetSentTitle"), t("resetSentMessage"), [
         { text: "OK", onPress: () => navigation.goBack() },
       ]);
@@ -112,8 +112,6 @@ export function ForgotPasswordScreen() {
       setLoading(false);
     }
   };
-
-  const labelCls = `text-xs font-bold mb-2 px-1 ${alignCls} ${!isHebrew ? "uppercase tracking-widest" : ""}`;
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.surface }}>
@@ -187,7 +185,7 @@ export function ForgotPasswordScreen() {
           contentContainerStyle={{
             flexGrow: 1,
             paddingHorizontal: 28,
-            paddingTop: 8,
+            paddingTop: 28,
             paddingBottom: 120,
           }}
           keyboardShouldPersistTaps="handled"
@@ -217,14 +215,11 @@ export function ForgotPasswordScreen() {
               style={[rtlText, { color: colors.textSecondary }]}
               className={`text-sm leading-5 ${alignCls}`}
             >
-              {t("forgotSubtitle")}
+              {t("forgotIdentifierSubtitle")}
             </Text>
           </View>
 
           <View className="mb-6">
-            <Text style={[rtlText, { color: colors.textSecondary }]} className={labelCls}>
-              {t("forgotEmailLabel")}
-            </Text>
             <View
               style={[
                 rtlRow,
@@ -239,7 +234,7 @@ export function ForgotPasswordScreen() {
                 },
               ]}
             >
-              <Ionicons name="mail-outline" size={20} color={colors.textSecondary} />
+              <Ionicons name="person-outline" size={20} color={colors.textSecondary} />
               <TextInput
                 style={[
                   rtlInput,
@@ -251,16 +246,17 @@ export function ForgotPasswordScreen() {
                     padding: 0,
                   },
                 ]}
-                placeholder={t("forgotEmailPlaceholder")}
+                placeholder={t("identifierLabel")}
                 placeholderTextColor={colors.textMuted}
-                value={email}
+                value={identifier}
                 onChangeText={(v) => {
                   clearAuthError();
-                  setEmail(v);
+                  setIdentifier(v);
                 }}
-                keyboardType="email-address"
+                keyboardType={isHebrew ? "default" : "email-address"}
                 autoCapitalize="none"
                 autoComplete="email"
+                textContentType="username"
               />
             </View>
           </View>

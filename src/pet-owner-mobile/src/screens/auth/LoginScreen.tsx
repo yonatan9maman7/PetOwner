@@ -163,7 +163,7 @@ export function LoginScreen() {
 /* ─── LoginForm ──────────────────────────────────────────────────── */
 
 function LoginForm() {
-  const [email, setEmail] = useState("");
+  const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [bioLoading, setBioLoading] = useState(false);
@@ -176,7 +176,7 @@ function LoginForm() {
   const [showPasswordForm, setShowPasswordForm] = useState(true);
   const showPasswordFormRef = useRef(showPasswordForm);
 
-  const emailRef = useRef<TextInput>(null);
+  const identifierRef = useRef<TextInput>(null);
   const passwordRef = useRef<TextInput>(null);
 
   useEffect(() => {
@@ -209,6 +209,27 @@ function LoginForm() {
     }
   }, []);
 
+  const biometricMessages = useMemo(
+    (): biometricService.BiometricAvailabilityMessages => ({
+      unavailable: t("biometricUnavailable"),
+      notEnrolled: t("biometricNotEnrolled"),
+      failed: t("biometricFailed"),
+    }),
+    [t],
+  );
+
+  const biometricLabelsFor = useCallback(
+    (label: biometricService.BiometricTypeLabel): biometricService.BiometricPromptLabels => ({
+      promptMessage:
+        label === "faceId"
+          ? t("biometricLoginButton")
+          : t("biometricFingerprintButton"),
+      cancelLabel: t("cancel"),
+      fallbackLabel: t("biometricFallback"),
+    }),
+    [t],
+  );
+
   /* ── Check biometric availability on mount ── */
   useEffect(() => {
     let cancelled = false;
@@ -220,9 +241,15 @@ function LoginForm() {
         biometricService.getSupportedTypeLabel(),
       ]);
       if (cancelled) return;
+      setBioTypeLabel(label);
+      if (en && !sup) {
+        setBioEnabled(false);
+        setShowPasswordForm(true);
+        showGlobalAlertCompat(t("errorTitle"), t("biometricNotEnrolled"));
+        return;
+      }
       const available = sup && en;
       setBioEnabled(available);
-      setBioTypeLabel(label);
       if (available) {
         setShowPasswordForm(false);
         bioTimer = setTimeout(() => {
@@ -239,21 +266,19 @@ function LoginForm() {
   /* ── Biometric login helper ── */
   const runBiometricLogin = async (label?: biometricService.BiometricTypeLabel) => {
     const effectiveLabel = label ?? bioTypeLabel;
-    const promptMessage =
-      effectiveLabel === "faceId"
-        ? t("biometricLoginButton")
-        : t("biometricFingerprintButton");
 
     setBioLoading(true);
     try {
-      const creds = await biometricService.authenticateAndGetCredentials(promptMessage);
+      const creds = await biometricService.authenticateAndGetCredentials(
+        biometricLabelsFor(effectiveLabel),
+        biometricMessages,
+      );
       if (!creds) {
         // User cancelled — silently return to form.
         return;
       }
-      const data = await authApi.login(creds);
+      const data = await authApi.login({ identifier: creds.identifier, password: creds.password });
       await setAuth(data.token, data.userId);
-      navigation.navigate("Explore");
     } catch (err: unknown) {
       if (
         typeof err === "object" &&
@@ -266,7 +291,7 @@ function LoginForm() {
         setBioEnabled(false);
         setShowPasswordForm(true);
         setErrorMessage(t("biometricFailedFallback"));
-        emailRef.current?.focus();
+        identifierRef.current?.focus();
       } else if (
         typeof err === "object" &&
         err !== null &&
@@ -284,7 +309,7 @@ function LoginForm() {
 
   const handleLogin = async () => {
     if (loading) return;
-    if (!email.trim() || !password.trim()) {
+    if (!identifier.trim() || !password.trim()) {
       showGlobalAlertCompat(t("errorTitle"), t("fillAllFields"));
       return;
     }
@@ -292,9 +317,8 @@ function LoginForm() {
     setErrorMessage(null);
     setLoading(true);
     try {
-      const data = await authApi.login({ email, password });
+      const data = await authApi.login({ identifier, password });
       await setAuth(data.token, data.userId);
-      navigation.navigate("Explore");
     } catch (err: unknown) {
       const key = mapAuthApiErrorToTranslationKey(getNormalizedApiError(err));
       setErrorMessage(t(key));
@@ -364,8 +388,6 @@ function LoginForm() {
     //   showGlobalAlertCompat(t("errorTitle"), t("socialLoginFailed"));
     // }
   };
-
-  const labelCls = `text-xs font-bold mb-2 px-1 ${alignCls} ${!isHebrew ? "uppercase tracking-widest" : ""}`;
 
   const bioButtonLabel =
     bioTypeLabel === "faceId"
@@ -494,7 +516,7 @@ function LoginForm() {
           contentContainerStyle={{
             flexGrow: 1,
             paddingHorizontal: 28,
-            paddingTop: 8,
+            paddingTop: 28,
             paddingBottom: 120 + insets.bottom,
           }}
           keyboardShouldPersistTaps="handled"
@@ -604,7 +626,7 @@ function LoginForm() {
                 onPress={() => {
                   clearAuthError();
                   setShowPasswordForm(true);
-                  requestAnimationFrame(() => emailRef.current?.focus());
+                  requestAnimationFrame(() => identifierRef.current?.focus());
                 }}
                 hitSlop={12}
                 style={{ marginTop: 20 }}
@@ -618,11 +640,8 @@ function LoginForm() {
 
           {showCredentialForm ? (
             <>
-              {/* ── Email ── */}
+              {/* ── Identifier (Email or Phone) ── */}
               <View className="mb-4">
-                <Text style={[rtlText, { color: colors.textSecondary }]} className={labelCls}>
-                  {t("emailLabel")}
-                </Text>
                 <View
                   style={[
                     rtlRow,
@@ -637,10 +656,10 @@ function LoginForm() {
                     },
                   ]}
                 >
-                  <Ionicons name="mail-outline" size={20} color={colors.textSecondary} />
+                  <Ionicons name="person-outline" size={20} color={colors.textSecondary} />
                   <TextInput
-                    testID="login-email-input"
-                    ref={emailRef}
+                    testID="login-identifier-input"
+                    ref={identifierRef}
                     style={[
                       rtlInput,
                       {
@@ -651,14 +670,14 @@ function LoginForm() {
                         padding: 0,
                       },
                     ]}
-                    placeholder={t("emailPlaceholder")}
+                    placeholder={t("identifierLabel")}
                     placeholderTextColor={colors.textMuted}
-                    value={email}
+                    value={identifier}
                     onChangeText={(v) => {
                       clearAuthError();
-                      setEmail(v);
+                      setIdentifier(v);
                     }}
-                    keyboardType="email-address"
+                    keyboardType={isHebrew ? "default" : "email-address"}
                     autoCapitalize="none"
                     textContentType="username"
                     autoComplete="email"
@@ -671,9 +690,6 @@ function LoginForm() {
 
               {/* ── Password ── */}
               <View className="mb-3">
-                <Text style={[rtlText, { color: colors.textSecondary }]} className={labelCls}>
-                  {t("passwordLabel")}
-                </Text>
                 <View
                   style={[
                     rtlRow,
@@ -706,7 +722,7 @@ function LoginForm() {
                         padding: 0,
                       },
                     ]}
-                    placeholder={t("passwordPlaceholder")}
+                    placeholder={t("passwordLabel")}
                     placeholderTextColor={colors.textMuted}
                     value={password}
                     onChangeText={(v) => {

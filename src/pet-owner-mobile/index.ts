@@ -1,7 +1,4 @@
 import "react-native-gesture-handler";
-import { initSentry } from "./src/services/sentry";
-
-initSentry();
 import "./src/api/client";
 
 import { enableScreens } from "react-native-screens";

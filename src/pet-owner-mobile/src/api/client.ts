@@ -167,8 +167,8 @@ export const authApi = {
     apiClient
       .post<AuthResponse>("/auth/register", data, { skipGlobalErrorToast: true })
       .then((r) => r.data),
-  forgotPassword: (email: string) =>
-    apiClient.post("/auth/forgot-password", { email }, { skipGlobalErrorToast: true }),
+  forgotPassword: (identifier: string) =>
+    apiClient.post("/auth/forgot-password", { identifier }, { skipGlobalErrorToast: true }),
   getMe: () =>
     apiClient
       .get<{ name: string; email: string; phone: string | null }>("/auth/me")
@@ -391,6 +391,14 @@ export const usersApi = {
         responseType: "arraybuffer",
       })
       .then((r) => new Uint8Array(r.data)),
+
+  /**
+   * Silently persist the user's current GPS position.
+   * Populates the Locations table so the user receives geofenced SOS notifications.
+   * Fire-and-forget — errors are intentionally swallowed by the caller.
+   */
+  updateLocation: (latitude: number, longitude: number) =>
+    apiClient.put("/users/me/location", { latitude, longitude }),
 };
 
 export const triageApi = {

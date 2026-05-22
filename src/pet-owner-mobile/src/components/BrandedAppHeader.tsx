@@ -1,11 +1,23 @@
 import type { ReactNode } from "react";
-import { View, Text, type StyleProp, type ViewStyle } from "react-native";
+import { View, Text, Platform, I18nManager, type StyleProp, type ViewStyle } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../theme/ThemeContext";
-import { useAuthStore } from "../store/authStore";
-import { rowDirectionForAppLayout } from "../i18n";
 
 export const BRAND_HEADER_HORIZONTAL_PAD = 28;
+
+/**
+ * Brand header rows must not flip with app RTL on Android — counter native flex mirroring.
+ * Parent containers should also set `direction: "ltr"` (see `BRAND_HEADER_LTR_CONTAINER`).
+ */
+export function brandHeaderRowFlexDirection(): "row" | "row-reverse" {
+  return Platform.OS === "android" && I18nManager.isRTL ? "row-reverse" : "row";
+}
+
+/** Locks the whole header strip to physical LTR (logo stays on the default/left edge). */
+export const BRAND_HEADER_LTR_CONTAINER = {
+  direction: "ltr" as const,
+  flexDirection: "row" as const,
+};
 
 type Props = {
   /** Renders before the paw + wordmark (e.g. back button). */
@@ -30,9 +42,7 @@ export function BrandedAppHeader({
   style,
 }: Props) {
   const { colors } = useTheme();
-  const language = useAuthStore((s) => s.language);
-  const isRTL = language === "he";
-  const row = rowDirectionForAppLayout(isRTL);
+  const brandRow = brandHeaderRowFlexDirection();
 
   const surfaceStyle = chromed
     ? { backgroundColor: colors.text }
@@ -62,8 +72,8 @@ export function BrandedAppHeader({
   return (
     <View
       style={[
+        BRAND_HEADER_LTR_CONTAINER,
         {
-          flexDirection: row,
           alignItems: "center",
           justifyContent: "space-between",
           paddingHorizontal: horizontalPadding,
@@ -77,7 +87,7 @@ export function BrandedAppHeader({
     >
       <View
         style={{
-          flexDirection: row,
+          flexDirection: brandRow,
           alignItems: "center",
           flex: 1,
           minWidth: 0,
@@ -87,7 +97,7 @@ export function BrandedAppHeader({
         {leading}
         <View
           style={{
-            flexDirection: row,
+            flexDirection: brandRow,
             alignItems: "center",
             gap: 12,
             minWidth: 0,

@@ -5,28 +5,36 @@ import {
   Modal,
   Pressable,
   ActivityIndicator,
-  Share,
 } from "react-native";
 import * as Clipboard from "expo-clipboard";
+import * as Print from "expo-print";
+import * as Sharing from "expo-sharing";
 import { Ionicons } from "@expo/vector-icons";
 import QRCode from "qrcode";
 import { SvgXml } from "react-native-svg";
-import { medicalApi } from "../api/client";
+import { medicalApi, triageApi } from "../api/client";
+import { useAuthStore } from "../store/authStore";
+import { generateHealthPassportHtml } from "../utils/HealthPassportPdf";
 import { useTranslation, rowDirectionForAppLayout } from "../i18n";
 import { useTheme } from "../theme/ThemeContext";
+import { getNormalizedApiError } from "../utils/apiUtils";
+import { showApiErrorToast } from "../services/apiErrorToast";
 import type { HealthPassportShareDto } from "../types/api";
+import type { PetDto } from "../types/api";
 
 interface Props {
+  pet: PetDto;
   petId: string;
   visible: boolean;
   onClose: () => void;
 }
 
-export function ShareHealthPassportModal({ petId, visible, onClose }: Props) {
+export function ShareHealthPassportModal({ pet, petId, visible, onClose }: Props) {
   const { t, isRTL } = useTranslation();
   const { colors } = useTheme();
   const [data, setData] = useState<HealthPassportShareDto | null>(null);
   const [loading, setLoading] = useState(false);
+  const [sharingPdf, setSharingPdf] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [qrSvg, setQrSvg] = useState<string | null>(null);
@@ -37,6 +45,7 @@ export function ShareHealthPassportModal({ petId, visible, onClose }: Props) {
       setError(null);
       setCopied(false);
       setQrSvg(null);
+      setSharingPdf(false);
       return;
     }
     setLoading(true);
@@ -60,7 +69,33 @@ export function ShareHealthPassportModal({ petId, visible, onClose }: Props) {
 
   const handleShare = async () => {
     if (!data) return;
-    await Share.share({ message: data.url, url: data.url });
+    setSharingPdf(true);
+    try {
+      const user = useAuthStore.getState().user;
+      const lang = useAuthStore.getState().language;
+      const [vaccineStatuses, weightHistory, medicalRecords, triageHistory] = await Promise.all([
+        medicalApi.getVaccineStatus(pet.id),
+        medicalApi.getWeightHistory(pet.id),
+        medicalApi.getMedicalRecords(pet.id),
+        triageApi.getHistory(pet.id, { backgroundRequest: true }).catch(() => []),
+      ]);
+      const html = generateHealthPassportHtml({
+        pet,
+        ownerName: user?.name ?? "",
+        ownerEmail: user?.email,
+        vaccineStatuses,
+        weightHistory,
+        medicalRecords,
+        triageHistory,
+        language: lang,
+      });
+      const { uri } = await Print.printToFileAsync({ html });
+      await Sharing.shareAsync(uri, { UTI: ".pdf", mimeType: "application/pdf" });
+    } catch (e: unknown) {
+      showApiErrorToast(getNormalizedApiError(e), { title: t("errorTitle") });
+    } finally {
+      setSharingPdf(false);
+    }
   };
 
   return (
@@ -169,6 +204,7 @@ export function ShareHealthPassportModal({ petId, visible, onClose }: Props) {
 
                 <Pressable
                   onPress={handleShare}
+                  disabled={sharingPdf}
                   style={{
                     flex: 1,
                     flexDirection: "row",
@@ -178,9 +214,14 @@ export function ShareHealthPassportModal({ petId, visible, onClose }: Props) {
                     paddingVertical: 14,
                     borderRadius: 14,
                     backgroundColor: colors.primary,
+                    opacity: sharingPdf ? 0.7 : 1,
                   }}
                 >
-                  <Ionicons name="share-outline" size={18} color="#fff" />
+                  {sharingPdf ? (
+                    <ActivityIndicator size="small" color="#fff" />
+                  ) : (
+                    <Ionicons name="share-outline" size={18} color="#fff" />
+                  )}
                   <Text style={{ fontWeight: "600", color: "#fff", fontSize: 14 }}>
                     {t("share")}
                   </Text>

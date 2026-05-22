@@ -39,9 +39,15 @@ import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context"
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect, useIsFocused, useNavigation, useRoute } from "@react-navigation/native";
 import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
+import { useBottomSafeInset } from "../../hooks/useBottomSafeInset";
+import { resolveTabBarOccupiedHeight } from "../../navigation/tabBarLayout";
 import * as Location from "expo-location";
 import { LinearGradient } from "expo-linear-gradient";
-import { BRAND_HEADER_HORIZONTAL_PAD } from "../../components/BrandedAppHeader";
+import {
+  BRAND_HEADER_HORIZONTAL_PAD,
+  BRAND_HEADER_LTR_CONTAINER,
+  brandHeaderRowFlexDirection,
+} from "../../components/BrandedAppHeader";
 import { ScreenLoadingCenter } from "../../components/shared/ScreenLoadingCenter";
 
 /** Tight crop of `petcare-logo-transparent.png` (Explore header only). */
@@ -53,10 +59,11 @@ import { showApiErrorToast } from "../../services/apiErrorToast";
 import { useAuthStore } from "../../store/authStore";
 import { usePetsStore } from "../../store/petsStore";
 import { useFavoritesStore } from "../../store/favoritesStore";
+import { useDogParkStore } from "../../store/dogParkStore";
 import { useTheme } from "../../theme/ThemeContext";
 import { DatePickerField } from "../../components/DatePickerField";
 import { TimePickerField } from "../../components/TimePickerField";
-import { mapApi, communityApi, palsApi } from "../../api/client";
+import { mapApi, communityApi, palsApi, usersApi } from "../../api/client";
 import {
   ProviderType,
   PetSpecies,
@@ -77,7 +84,6 @@ import {
 import { mapDiag } from "./exploreMapDiag";
 import {
   EXPLORE_MAP_INITIAL_REGION,
-  EXPLORE_MAP_PADDING,
   EXPLORE_USER_MARKER_ANCHOR,
   isValidMapRegion,
   viewportPinsSearchParamsFromRegion,
@@ -234,29 +240,21 @@ export function ExploreScreen() {
   const { height: windowHeight } = useWindowDimensions();
   const isFocused = useIsFocused();
   const tabBarHeight = useBottomTabBarHeight();
-  /** Must match Android tab bar in `AppNavigator` (content + top padding + nav inset). */
-  const ANDROID_TAB_BAR_CONTENT = 60;
-  const ANDROID_TAB_BAR_PADDING_TOP = 8;
-  const androidTabBarFloor =
-    Platform.OS === "android"
-      ? ANDROID_TAB_BAR_CONTENT + ANDROID_TAB_BAR_PADDING_TOP + insets.bottom
-      : 0;
-  const defaultTabBarFloor = Platform.OS === "android" ? androidTabBarFloor : 68;
-  /**
-   * When the map layer is taller than `windowHeight - tabBar`, it steals touches on Android.
-   * `useBottomTabBarHeight()` is usually correct; `Math.max` guards under-measurement vs. the map.
-   */
-  const resolvedTabBarH =
-    tabBarHeight > 0.5
-      ? Platform.OS === "android"
-        ? Math.max(tabBarHeight, androidTabBarFloor)
-        : tabBarHeight
-      : defaultTabBarFloor;
+  const bottomSafeInset = useBottomSafeInset();
+  const resolvedTabBarH = useMemo(
+    () =>
+      resolveTabBarOccupiedHeight({
+        tabBarHeightFromHook: tabBarHeight,
+        bottomSafeInset,
+      }),
+    [tabBarHeight, bottomSafeInset],
+  );
 
   const isLoggedIn = useAuthStore((s) => s.isLoggedIn);
   const hasPets = usePetsStore((s) => s.pets.length > 0);
   const pets = usePetsStore((s) => s.pets);
   const favoriteIds = useFavoritesStore((s) => s.ids);
+  const { lastCheckInExpiration, setCheckInExpiration } = useDogParkStore();
   const toggleFavorite = useFavoritesStore((s) => s.toggle);
 
   const [pins, setPins] = useState<MapPinDto[]>([]);
@@ -327,6 +325,7 @@ export function ExploreScreen() {
   const showDogParksOnlyRef = useRef(false);
   const [selectedDogPark, setSelectedDogPark] = useState<DogParkDto | null>(null);
   const [dogParkCheckInLoading, setDogParkCheckInLoading] = useState(false);
+  const [checkInSecondsLeft, setCheckInSecondsLeft] = useState(0);
   /** Live height of whichever bottom card is visible — drives FAB stack position (no hardcoded estimate). */
   const [measuredCardHeight, setMeasuredCardHeight] = useState(0);
 
@@ -617,6 +616,11 @@ export function ExploreScreen() {
             prevUserLngRef.current = longitude;
             setUserLat(latitude);
             setUserLng(longitude);
+
+            // Silently persist location to enable geofenced SOS notifications.
+            if (useAuthStore.getState().isLoggedIn) {
+              usersApi.updateLocation(latitude, longitude).catch(() => {});
+            }
 
             // Auto-center once on the first real fix.
             if (!hasAutocenteredRef.current) {
@@ -1230,12 +1234,28 @@ export function ExploreScreen() {
     if (Number.isFinite(h) && h > 0) setMeasuredCardHeight(h);
   }, []);
 
-  /** Inside artificial floor: FAB row sits above measured card + gap (user spec: 10 + card + 10). */
-  const OVERLAY_FLOOR_PAD = 10;
+  /**
+   * The screen's layout coordinate system ends at the top of the tab bar (React Navigation
+   * clips screen content above the tab bar). So bottom: 0 = tab bar top — no need to add
+   * resolvedTabBarH. We just need a small breathing gap.
+   */
+  const CARD_ABOVE_TAB_GAP = 8;
+
+  /**
+   * mapPadding.bottom leaves a blank strip on iOS (parent background shows through).
+   * Keep at 0 unless a bottom card is open — then nudge the camera up so the selected
+   * provider is not hidden behind the card.
+   */
+  const exploreMapPadding = useMemo(() => {
+    if (!hasBottomOverlay || measuredCardHeight <= 0) {
+      return { top: 0, right: 0, bottom: 0, left: 0 };
+    }
+    return { top: 0, right: 0, left: 0, bottom: measuredCardHeight + CARD_ABOVE_TAB_GAP };
+  }, [hasBottomOverlay, measuredCardHeight]);
   const fabRowBottom = useMemo(
     () =>
-      OVERLAY_FLOOR_PAD +
-      (hasBottomOverlay && measuredCardHeight > 0 ? measuredCardHeight + 10 : 0),
+      CARD_ABOVE_TAB_GAP +
+      (hasBottomOverlay && measuredCardHeight > 0 ? measuredCardHeight + CARD_ABOVE_TAB_GAP : 0),
     [hasBottomOverlay, measuredCardHeight],
   );
   const locationButtonBottom = fabRowBottom + 56;
@@ -1243,10 +1263,16 @@ export function ExploreScreen() {
   const openDogParkNavigation = useCallback((park: DogParkDto) => {
     const lat = park.latitude;
     const lng = park.longitude;
-    const waze = `https://waze.com/ul?ll=${lat},${lng}&navigate=yes`;
-    const gmaps = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`;
-    Linking.openURL(waze).catch(() => {
-      void Linking.openURL(gmaps);
+    const nativeUrl = Platform.select({
+      ios: `http://maps.apple.com/?daddr=${lat},${lng}`,
+      default: `google.navigation:q=${lat},${lng}`,
+    });
+    const webFallback = Platform.select({
+      ios: `https://maps.apple.com/?daddr=${lat},${lng}`,
+      default: `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`,
+    });
+    Linking.openURL(nativeUrl).catch(() => {
+      void Linking.openURL(webFallback);
     });
   }, []);
 
@@ -1275,7 +1301,7 @@ export function ExploreScreen() {
             latitude: park.latitude,
             longitude: park.longitude,
             petId: primaryPet?.id,
-            durationMinutes: 75,
+            durationMinutes: 15,
           });
           communityOk = true;
         } catch {
@@ -1289,7 +1315,7 @@ export function ExploreScreen() {
             latitude: park.latitude,
             longitude: park.longitude,
             city: cityHintFromParkAddress(park.address),
-            durationMinutes: 60,
+            durationMinutes: 15,
             petIds: petIdsForBeacon,
             species: "DOG",
           });
@@ -1299,6 +1325,7 @@ export function ExploreScreen() {
         }
 
         if (beaconOk || communityOk) {
+          await setCheckInExpiration(Date.now() + 15 * 60 * 1000);
           showGlobalAlertCompat(
             t("dogParkCheckInSuccessTitle"),
             t("dogParkCheckInSuccessMessage"),
@@ -1318,8 +1345,33 @@ export function ExploreScreen() {
         setDogParkCheckInLoading(false);
       }
     },
-    [hasPets, isLoggedIn, navigation, pets, t],
+    [hasPets, isLoggedIn, navigation, pets, setCheckInExpiration, t],
   );
+
+  /* ─── Check-in anti-spam countdown ─── */
+  useEffect(() => {
+    const tick = () => {
+      if (!lastCheckInExpiration) {
+        setCheckInSecondsLeft(0);
+        return;
+      }
+      const remaining = Math.ceil((lastCheckInExpiration - Date.now()) / 1000);
+      if (remaining <= 0) {
+        void setCheckInExpiration(null);
+        setCheckInSecondsLeft(0);
+      } else {
+        setCheckInSecondsLeft(remaining);
+      }
+    };
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, [lastCheckInExpiration, setCheckInExpiration]);
+
+  const isCheckInCoolingDown = checkInSecondsLeft > 0;
+  const checkInButtonLabel = isCheckInCoolingDown
+    ? `פעיל (${String(Math.floor(checkInSecondsLeft / 60)).padStart(2, "0")}:${String(checkInSecondsLeft % 60).padStart(2, "0")})`
+    : t("dogParkCheckInButton");
 
   /* ═════════════════════ RENDER ═════════════════════ */
 
@@ -1337,7 +1389,7 @@ export function ExploreScreen() {
           toolbarEnabled={false}
           pitchEnabled={false}
           moveOnMarkerPress={false}
-          mapPadding={EXPLORE_MAP_PADDING}
+          mapPadding={exploreMapPadding}
           onRegionChangeComplete={handleRegionChange}
           onPress={handleMapBackgroundPress}
           {...(Platform.OS === "android" && { mapType: "standard" })}
@@ -1439,13 +1491,13 @@ export function ExploreScreen() {
       <SafeAreaView
         edges={["top"]}
         style={[
-          { zIndex: 10, marginTop: -8 },
+          { zIndex: 10, marginTop: Platform.OS === "android" ? 0 : -8 },
           Platform.OS === "android" && { elevation: 22 },
         ]}
       >
         <View
           style={{
-            flexDirection: "row",
+            ...BRAND_HEADER_LTR_CONTAINER,
             alignItems: "center",
             justifyContent: "space-between",
             paddingHorizontal: BRAND_HEADER_HORIZONTAL_PAD,
@@ -1461,7 +1513,7 @@ export function ExploreScreen() {
         >
           <View
             style={{
-              flexDirection: "row",
+              flexDirection: brandHeaderRowFlexDirection(),
               alignItems: "center",
               flexShrink: 1,
               minWidth: 0,
@@ -1687,14 +1739,7 @@ export function ExploreScreen() {
       )}
 
       <View
-        style={{
-          position: "absolute",
-          top: 0,
-          left: 0,
-          right: 0,
-          height: Math.max(0, windowHeight - resolvedTabBarH),
-          zIndex: 16,
-        }}
+        style={[StyleSheet.absoluteFillObject, { zIndex: 16 }]}
         pointerEvents="box-none"
       >
       {/* My Location button */}
@@ -1891,7 +1936,7 @@ export function ExploreScreen() {
           className="absolute left-0 right-0"
           onLayout={onBottomCardLayout}
           style={{
-            bottom: OVERLAY_FLOOR_PAD,
+            bottom: CARD_ABOVE_TAB_GAP,
             zIndex: 20,
             paddingHorizontal: BRAND_HEADER_HORIZONTAL_PAD,
           }}
@@ -2019,7 +2064,7 @@ export function ExploreScreen() {
           className="absolute left-0 right-0"
           onLayout={onBottomCardLayout}
           style={{
-            bottom: OVERLAY_FLOOR_PAD,
+            bottom: CARD_ABOVE_TAB_GAP,
             zIndex: 20,
             paddingHorizontal: BRAND_HEADER_HORIZONTAL_PAD,
           }}
@@ -2091,7 +2136,7 @@ export function ExploreScreen() {
           className="absolute left-0 right-0"
           onLayout={onBottomCardLayout}
           style={{
-            bottom: OVERLAY_FLOOR_PAD,
+            bottom: CARD_ABOVE_TAB_GAP,
             zIndex: 20,
             paddingHorizontal: BRAND_HEADER_HORIZONTAL_PAD,
           }}
@@ -2175,7 +2220,7 @@ export function ExploreScreen() {
               </Pressable>
               <Pressable
                 onPress={() => void handleDogParkCheckIn(selectedDogPark)}
-                disabled={dogParkCheckInLoading}
+                disabled={dogParkCheckInLoading || isCheckInCoolingDown}
                 style={{
                   flex: 1,
                   paddingVertical: 12,
@@ -2184,14 +2229,14 @@ export function ExploreScreen() {
                   alignItems: "center",
                   justifyContent: "center",
                   minHeight: 46,
-                  opacity: dogParkCheckInLoading ? 0.65 : 1,
+                  opacity: dogParkCheckInLoading || isCheckInCoolingDown ? 0.5 : 1,
                 }}
               >
                 {dogParkCheckInLoading ? (
                   <ActivityIndicator color="#fff" />
                 ) : (
                   <Text style={{ fontSize: 14, fontWeight: "700", color: "#fff" }}>
-                    {t("dogParkCheckInButton")}
+                    {checkInButtonLabel}
                   </Text>
                 )}
               </Pressable>

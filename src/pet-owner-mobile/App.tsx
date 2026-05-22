@@ -1,5 +1,5 @@
 import "./global.css";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import { DevSettings, I18nManager, Keyboard, Platform, View, LogBox } from "react-native";
 import { NavigationContainer, DefaultTheme, DarkTheme } from "@react-navigation/native";
 import {
@@ -9,19 +9,45 @@ import {
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { ErrorBoundary } from "react-error-boundary";
 import * as Sentry from "@sentry/react-native";
-import { isSentryEnabled, navigationIntegration } from "./src/services/sentry";
+import { initSentry, isSentryEnabled, navigationIntegration } from "./src/services/sentry";
+
+// Must run before `Sentry.wrap(App)` below. Static imports are hoisted, so
+// placing this call here (before the export) ensures Sentry.init executes
+// prior to Sentry.wrap regardless of the import order in index.ts.
+initSentry();
 
 // react-native-maps on iOS triggers this warning when MapKit's native gesture
 // recognizer absorbs touches before RN Gesture Handler can count them.
-// It is harmless and has no user-visible effect.
-LogBox.ignoreLogs(["Ended a touch event which was not counted in"]);
+// expo-notifications remote-push warnings are expected in Expo Go (SDK 53+).
+LogBox.ignoreLogs([
+  "Ended a touch event which was not counted in",
+  "expo-notifications: Android Push notifications",
+  "`expo-notifications` functionality is not fully supported in Expo Go",
+]);
 import { StatusBar } from "expo-status-bar";
 import * as Notifications from "expo-notifications";
 import * as SecureStore from "expo-secure-store";
 import { AppNavigator, navigationRef } from "./src/navigation/AppNavigator";
+import {
+  getActiveTabRouteName,
+  rootNavigate,
+} from "./src/navigation/rootNavigation";
 import { useAuthStore } from "./src/store/authStore";
 import { useThemeStore } from "./src/store/themeStore";
+import { useDogParkStore } from "./src/store/dogParkStore";
 import { ThemeProvider, useTheme } from "./src/theme/ThemeContext";
+
+/** Brand tab-bar blue — paints behind transparent Android system bars before theme hydrates. */
+const ANDROID_EDGE_BG = "#001a5a";
+
+function RootShell({ children }: { children: ReactNode }) {
+  const { colors } = useTheme();
+  return (
+    <View style={{ flex: 1, backgroundColor: colors.tabBar }}>
+      {children}
+    </View>
+  );
+}
 import { ErrorFallback } from "./src/components/ErrorFallback";
 import { ImageSourcePickerHost } from "./src/components/ImageSourcePickerHost";
 import { GlobalModalProvider } from "./src/components/global-modal";
@@ -71,6 +97,17 @@ const UNAUTHENTICATED_SCREENS = new Set([
   "ForgotPasswordScreen",
 ]);
 
+function restoreScreenAfterReload(screenName: string, isLoggedIn: boolean): void {
+  if (UNAUTHENTICATED_SCREENS.has(screenName)) {
+    if (isLoggedIn) return;
+    rootNavigate(screenName);
+    return;
+  }
+
+  if (!isLoggedIn) return;
+  rootNavigate(screenName);
+}
+
 function AppInner() {
   const { colors, isDark } = useTheme();
 
@@ -112,12 +149,7 @@ function AppInner() {
             if (!screenName) return;
             await reloadStorage.remove();
             const isLoggedIn = useAuthStore.getState().isLoggedIn;
-            if (!isLoggedIn && !UNAUTHENTICATED_SCREENS.has(screenName)) return;
-            try {
-              navigationRef.navigate(screenName as never);
-            } catch {
-              // Screen may not exist in current auth tree; fail silently.
-            }
+            restoreScreenAfterReload(screenName, isLoggedIn);
           })();
         }}
         onStateChange={() => {
@@ -143,13 +175,15 @@ function App() {
   const language = useAuthStore((s) => s.language);
   const hydrateTheme = useThemeStore((s) => s.hydrate);
   const themeHydrated = useThemeStore((s) => s.hydrated);
+  const hydrateDogPark = useDogParkStore((s) => s.hydrate);
   const coldStartHandled = useRef(false);
   const coldStartNavPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     hydrateAuth();
     hydrateTheme();
-  }, [hydrateAuth, hydrateTheme]);
+    hydrateDogPark();
+  }, [hydrateAuth, hydrateTheme, hydrateDogPark]);
 
   useEffect(() => {
     if (!authHydrated || Platform.OS === "web") return;
@@ -159,9 +193,9 @@ function App() {
       I18nManager.forceRTL(shouldBeRTL);
       I18nManager.allowRTL(true);
       const doReload = async () => {
-        const currentRoute = navigationRef.getCurrentRoute();
-        if (currentRoute?.name) {
-          await reloadStorage.set(currentRoute.name);
+        const tabName = getActiveTabRouteName();
+        if (tabName) {
+          await reloadStorage.set(tabName);
         }
         if (!__DEV__) {
           const Updates = await import("expo-updates");
@@ -233,7 +267,14 @@ function App() {
   }, [authHydrated]);
 
   if (!authHydrated || !themeHydrated) {
-    return <View style={{ flex: 1, backgroundColor: "#fff" }} />;
+    return (
+      <View
+        style={{
+          flex: 1,
+          backgroundColor: Platform.OS === "android" ? ANDROID_EDGE_BG : "#fff",
+        }}
+      />
+    );
   }
 
   return (
@@ -247,12 +288,19 @@ function App() {
         }
       }}
     >
-      <GestureHandlerRootView style={{ flex: 1 }}>
+      <GestureHandlerRootView
+        style={{
+          flex: 1,
+          backgroundColor: Platform.OS === "android" ? ANDROID_EDGE_BG : undefined,
+        }}
+      >
         <SafeAreaProvider initialWindowMetrics={initialWindowMetrics}>
           <ThemeProvider>
-            <GlobalModalProvider>
-              <AppInner />
-            </GlobalModalProvider>
+            <RootShell>
+              <GlobalModalProvider>
+                <AppInner />
+              </GlobalModalProvider>
+            </RootShell>
           </ThemeProvider>
         </SafeAreaProvider>
       </GestureHandlerRootView>

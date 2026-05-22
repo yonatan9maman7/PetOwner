@@ -4,6 +4,7 @@ using System.Text;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using NetTopologySuite.Geometries;
 using PetOwner.Api.DTOs;
 using PetOwner.Api.Infrastructure;
 using PetOwner.Data;
@@ -77,6 +78,32 @@ public class UsersController : ControllerBase
         if (token is null) return NoContent();
 
         _db.UserPushTokens.Remove(token);
+        await _db.SaveChangesAsync();
+        return NoContent();
+    }
+
+    /// <summary>
+    /// Upsert the authenticated user's geographic location.
+    /// Called silently from the mobile app whenever a fresh GPS fix is available.
+    /// This populates the Locations table for owners so they receive geofenced SOS push notifications.
+    /// </summary>
+    [HttpPut("me/location")]
+    public async Task<IActionResult> UpdateLocation([FromBody] UpdateUserLocationDto dto)
+    {
+        if (dto.Latitude is < -90 or > 90 || dto.Longitude is < -180 or > 180)
+            return BadRequest(new { message = "Invalid coordinates." });
+
+        var userId = GetUserId();
+
+        var location = await _db.Locations.FirstOrDefaultAsync(l => l.UserId == userId);
+        if (location is null)
+        {
+            location = new Location { UserId = userId };
+            _db.Locations.Add(location);
+        }
+
+        location.GeoLocation = new Point(dto.Longitude, dto.Latitude) { SRID = 4326 };
+
         await _db.SaveChangesAsync();
         return NoContent();
     }

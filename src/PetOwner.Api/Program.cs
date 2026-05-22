@@ -169,7 +169,14 @@ builder.Services.AddHttpClient<IGrowPaymentService, GrowPaymentService>(client =
 });
 
 builder.Services.Configure<BlobStorageSettings>(builder.Configuration.GetSection(BlobStorageSettings.SectionName));
-builder.Services.AddScoped<IBlobService, BlobService>();
+
+var blobConnStr = builder.Configuration[$"{BlobStorageSettings.SectionName}:ConnectionString"];
+var useMockBlob = string.IsNullOrWhiteSpace(blobConnStr)
+    || blobConnStr.Equals("UseDevelopmentStorage=true", StringComparison.OrdinalIgnoreCase);
+if (useMockBlob)
+    builder.Services.AddScoped<IBlobService, MockBlobService>();
+else
+    builder.Services.AddScoped<IBlobService, BlobService>();
 
 builder.Services.AddHttpClient<IGeminiAiService, GeminiAiService>();
 

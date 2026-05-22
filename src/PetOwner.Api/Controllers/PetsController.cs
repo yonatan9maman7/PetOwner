@@ -188,11 +188,14 @@ public class PetsController : ControllerBase
 
         await _db.SaveChangesAsync();
 
-        await _notifications.BroadcastAsync(
-            "sos",
-            "NOTIFICATIONS.SOS_ALERT_TITLE",
-            "NOTIFICATIONS.SOS_ALERT",
-            sosPost.Id);
+        await _notifications.NotifyUsersNearLocationAsync(
+            request.LastSeenLat,
+            request.LastSeenLng,
+            radiusKm: 7,
+            type: "sos",
+            title: "NOTIFICATIONS.SOS_ALERT_TITLE",
+            message: "NOTIFICATIONS.SOS_ALERT",
+            relatedEntityId: sosPost.Id);
 
         return Ok(MapToDto(pet));
     }
@@ -212,6 +215,24 @@ public class PetsController : ControllerBase
             return BadRequest(new { message = "Pet is not currently reported as lost." });
 
         pet.IsLost = false;
+
+        // Update the linked SOS community post in a single transaction.
+        if (pet.CommunityPostId.HasValue)
+        {
+            var sosPost = await _db.Posts.FirstOrDefaultAsync(p => p.Id == pet.CommunityPostId.Value);
+            if (sosPost is not null && sosPost.SosResolvedAt is null)
+            {
+                const string foundPrefixEn = "✅ [FOUND] ";
+                const string foundPrefixHe = "✅ [נמצא] ";
+                var prefix = foundPrefixEn;
+                if (!sosPost.Content.StartsWith(foundPrefixEn, StringComparison.Ordinal)
+                    && !sosPost.Content.StartsWith(foundPrefixHe, StringComparison.Ordinal))
+                {
+                    sosPost.Content = prefix + sosPost.Content;
+                }
+                sosPost.SosResolvedAt = DateTime.UtcNow;
+            }
+        }
 
         await _db.SaveChangesAsync();
 

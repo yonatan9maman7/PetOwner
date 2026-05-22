@@ -167,7 +167,6 @@ const PostCard = memo(function PostCard({
             if (petId) {
               await markFound(petId);
             }
-            await postsApi.resolveSos(post.id);
             onSosResolved?.(post.id, new Date().toISOString());
           } catch {
             showGlobalAlertCompat(t("errorTitle"), t("profileSaveError"));

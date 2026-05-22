@@ -11,6 +11,8 @@ import {
   Animated,
   Easing,
   Image,
+  Alert,
+  Linking,
 } from "react-native";
 import { showGlobalAlertCompat } from "../../components/global-modal";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -228,14 +230,36 @@ export function RegisterScreen() {
         ],
       );
     } catch (err: unknown) {
-      const key = mapAuthApiErrorToTranslationKey(getNormalizedApiError(err));
-      setErrorMessage(t(key));
+      const normalized = getNormalizedApiError(err);
+      const code = normalized.code?.toUpperCase();
+      if (code === "EMAIL_ALREADY_REGISTERED" || code === "PHONE_ALREADY_REGISTERED") {
+        const isEmailDuplicate = code === "EMAIL_ALREADY_REGISTERED";
+        Alert.alert(
+          t("accountExistsTitle"),
+          isEmailDuplicate ? t("accountExistsEmailMsg") : t("accountExistsPhoneMsg"),
+          [
+            {
+              text: t("goToLogin"),
+              onPress: () =>
+                navigation.reset({ index: 0, routes: [{ name: "LoginScreen" }] }),
+            },
+            {
+              text: t("contactSupport"),
+              onPress: () =>
+                Linking.openURL(
+                  "mailto:support@petcare-app.com?subject=Registration%20Assistance",
+                ),
+            },
+            { text: t("cancelButton"), style: "cancel" },
+          ],
+        );
+      } else {
+        setErrorMessage(t(mapAuthApiErrorToTranslationKey(normalized)));
+      }
     } finally {
       setLoading(false);
     }
   };
-
-  const labelCls = `text-xs font-bold mb-2 px-1 ${alignCls} ${!isHebrew ? "uppercase tracking-widest" : ""}`;
 
   const canSubmit = useMemo(
     () =>
@@ -246,12 +270,6 @@ export function RegisterScreen() {
       confirmPassword.trim().length > 0 &&
       termsAccepted,
     [fullName, email, phone, password, confirmPassword, termsAccepted],
-  );
-
-  const requiredAfterLabel = (
-    <Text style={{ color: colors.danger }} accessibilityLabel="required">
-      {" *"}
-    </Text>
   );
 
   return (
@@ -327,7 +345,7 @@ export function RegisterScreen() {
           contentContainerStyle={{
             flexGrow: 1,
             paddingHorizontal: 28,
-            paddingTop: 8,
+            paddingTop: 28,
             paddingBottom: 120 + insets.bottom,
           }}
           keyboardShouldPersistTaps="handled"
@@ -366,10 +384,6 @@ export function RegisterScreen() {
 
           {/* ── Full Name ── */}
           <View className="mb-4">
-            <Text style={[rtlText, { color: colors.textSecondary }]} className={labelCls}>
-              {t("fullNameLabel")}
-              {requiredAfterLabel}
-            </Text>
             <View
               style={[
                 rtlRow,
@@ -397,7 +411,7 @@ export function RegisterScreen() {
                     padding: 0,
                   },
                 ]}
-                placeholder={t("fullNamePlaceholder")}
+                placeholder={t("fullNameLabel")}
                 placeholderTextColor={colors.textMuted}
                 value={fullName}
                 onChangeText={(v) => {
@@ -417,10 +431,6 @@ export function RegisterScreen() {
 
           {/* ── Email ── */}
           <View className="mb-4">
-            <Text style={[rtlText, { color: colors.textSecondary }]} className={labelCls}>
-              {t("emailLabel")}
-              {requiredAfterLabel}
-            </Text>
             <View
               style={[
                 rtlRow,
@@ -447,7 +457,7 @@ export function RegisterScreen() {
                     padding: 0,
                   },
                 ]}
-                placeholder={t("emailPlaceholder")}
+                placeholder={t("emailLabel")}
                 placeholderTextColor={colors.textMuted}
                 value={email}
                 onChangeText={(v) => {
@@ -455,7 +465,7 @@ export function RegisterScreen() {
                   setEmailError(null);
                   setEmail(v);
                 }}
-                keyboardType="email-address"
+                keyboardType={isHebrew ? "default" : "email-address"}
                 autoCapitalize="none"
                 autoComplete="email"
                 ref={emailRef}
@@ -469,10 +479,6 @@ export function RegisterScreen() {
 
           {/* ── Phone ── */}
           <View className="mb-4">
-            <Text style={[rtlText, { color: colors.textSecondary }]} className={labelCls}>
-              {t("phoneLabel")}
-              {requiredAfterLabel}
-            </Text>
             <View
               style={[
                 rtlRow,
@@ -499,7 +505,7 @@ export function RegisterScreen() {
                     padding: 0,
                   },
                 ]}
-                placeholder={t("phonePlaceholder")}
+                placeholder={t("phoneLabel")}
                 placeholderTextColor={colors.textMuted}
                 value={phone}
                 onChangeText={(v) => {
@@ -520,10 +526,6 @@ export function RegisterScreen() {
 
           {/* ── Password ── */}
           <View className="mb-5">
-            <Text style={[rtlText, { color: colors.textSecondary }]} className={labelCls}>
-              {t("passwordLabel")}
-              {requiredAfterLabel}
-            </Text>
             <View
               style={[
                 rtlRow,
@@ -555,7 +557,7 @@ export function RegisterScreen() {
                     padding: 0,
                   },
                 ]}
-                placeholder={t("passwordPlaceholder")}
+                placeholder={t("passwordLabel")}
                 placeholderTextColor={colors.textMuted}
                 value={password}
                 onChangeText={(v) => {
@@ -585,10 +587,6 @@ export function RegisterScreen() {
 
           {/* ── Confirm Password ── */}
           <View className="mb-5">
-            <Text style={[rtlText, { color: colors.textSecondary }]} className={labelCls}>
-              {t("confirmPasswordLabel")}
-              {requiredAfterLabel}
-            </Text>
             <View
               style={[
                 rtlRow,
@@ -620,7 +618,7 @@ export function RegisterScreen() {
                     padding: 0,
                   },
                 ]}
-                placeholder={t("confirmPasswordPlaceholder")}
+                placeholder={t("confirmPasswordLabel")}
                 placeholderTextColor={colors.textMuted}
                 value={confirmPassword}
                 onChangeText={(v) => {

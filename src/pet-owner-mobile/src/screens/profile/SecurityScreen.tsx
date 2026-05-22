@@ -192,21 +192,49 @@ function BiometricCard() {
     setToggling(true);
     try {
       // Re-verify the password against the server before storing it.
-      await authApi.login({ email: user.email, password });
+      await authApi.login({ identifier: user.email, password });
       // Credentials valid — now prompt biometrics and persist.
-      await biometricService.enable(user.email, password, t("biometricEnablePrompt"));
+      await biometricService.enable(
+        user.email,
+        password,
+        {
+          promptMessage: t("biometricEnablePrompt"),
+          cancelLabel: t("cancel"),
+          fallbackLabel: t("biometricFallback"),
+        },
+        {
+          unavailable: t("biometricUnavailable"),
+          notEnrolled: t("biometricNotEnrolled"),
+          failed: t("biometricFailed"),
+        },
+      );
       setEnabled(true);
-    } catch (err: any) {
-      const status = err?.response?.status;
+    } catch (err: unknown) {
+      if (err instanceof biometricService.BiometricCancelledError) {
+        return;
+      }
+      const status =
+        typeof err === "object" &&
+        err !== null &&
+        "response" in err &&
+        (err as { response?: { status?: number } }).response?.status;
       if (status === 401) {
         showGlobalAlertCompat(t("errorTitle"), t("biometricPasswordWrong"));
-      } else if (err?.response) {
-        showGlobalAlertCompat(
-          t("errorTitle"),
-          err.response?.data?.message ?? t("loginError"),
-        );
+      } else if (
+        typeof err === "object" &&
+        err !== null &&
+        "response" in err &&
+        (err as { response?: unknown }).response
+      ) {
+        const message =
+          typeof err === "object" &&
+          err !== null &&
+          "response" in err &&
+          (err as { response?: { data?: { message?: string } } }).response?.data
+            ?.message;
+        showGlobalAlertCompat(t("errorTitle"), message ?? t("loginError"));
       }
-      // Biometric / SecureStore failures: biometricService.enable already showed "Biometric Error".
+      // Other biometric / SecureStore failures: biometricService.enable already showed an alert.
     } finally {
       setToggling(false);
     }

@@ -6,7 +6,7 @@ using Moq;
 using PetOwner.Api.Controllers;
 using PetOwner.Api.DTOs;
 using PetOwner.Api.Services;
-using PetOwner.Data;
+using PetOwner.Api.Tests.Infrastructure;
 using PetOwner.Data.Models;
 using Xunit;
 
@@ -17,7 +17,7 @@ public class TeletriageControllerTests
     [Fact]
     public async Task Assess_WhenSymptomsMissing_ReturnsBadRequest_DoesNotCallAi()
     {
-        await using var db = CreateInMemoryDb();
+        await using var db = TestDbFactory.Create();
         var ai = new Mock<IGeminiAiService>(MockBehavior.Strict);
         var sut = new TeletriageController(db, ai.Object);
         sut.ControllerContext = ControllerContextForUser(Guid.NewGuid());
@@ -37,7 +37,7 @@ public class TeletriageControllerTests
         var userId = Guid.NewGuid();
         var petId = Guid.NewGuid();
 
-        await using var db = CreateInMemoryDb();
+        await using var db = TestDbFactory.Create();
         db.Users.Add(new User
         {
             Id = userId,
@@ -86,14 +86,6 @@ public class TeletriageControllerTests
         Assert.Equal(petId, saved.PetId);
         Assert.Equal(userId, saved.UserId);
         Assert.Equal(expected.Assessment, saved.Assessment);
-    }
-
-    private static ApplicationDbContext CreateInMemoryDb()
-    {
-        var options = new DbContextOptionsBuilder<ApplicationDbContext>()
-            .UseInMemoryDatabase(databaseName: Guid.NewGuid().ToString())
-            .Options;
-        return new ApplicationDbContext(options);
     }
 
     private static ControllerContext ControllerContextForUser(Guid userId)
