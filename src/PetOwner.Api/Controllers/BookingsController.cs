@@ -273,9 +273,12 @@ public class BookingsController : ControllerBase
     }
 
     [HttpPut("{id:guid}/cancel")]
-    public async Task<IActionResult> Cancel(Guid id)
+    public async Task<IActionResult> Cancel(Guid id, [FromBody] CancelBookingRequest request)
     {
         var userId = GetUserId();
+
+        if (string.IsNullOrWhiteSpace(request.Reason))
+            return BadRequest(new { message = "A cancellation reason is required." });
 
         var booking = await _db.Bookings.FindAsync(id);
         if (booking is null)
@@ -294,6 +297,7 @@ public class BookingsController : ControllerBase
         booking.CancelledByRole = booking.ProviderProfileId == userId
             ? BookingActorRole.Provider
             : BookingActorRole.Owner;
+        booking.CancellationReason = request.Reason.Trim()[..Math.Min(request.Reason.Trim().Length, 500)];
 
         // Cancellation is also a "response" from the provider's perspective for response-time stats.
         if (booking.CancelledByRole == BookingActorRole.Provider && booking.RespondedAt is null)
@@ -315,7 +319,8 @@ public class BookingsController : ControllerBase
             b.PaymentStatus.ToString(), b.PaymentUrl,
             b.CreatedAt, b.Notes,
             providerPhone, ownerPhone,
-            b.Review is not null
+            b.Review is not null,
+            b.CancellationReason
         );
     }
 

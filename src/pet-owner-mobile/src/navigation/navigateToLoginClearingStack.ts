@@ -1,16 +1,42 @@
 import { DeviceEventEmitter } from "react-native";
 import type { NavigationProp, ParamListBase } from "@react-navigation/native";
 import { StackActions } from "@react-navigation/native";
+import { useAuthStore } from "../store/authStore";
 import { navigationRef } from "./navigationRef";
-import { rootNavigate } from "./rootNavigation";
+import { rootNavigate, whenNavigationReady } from "./rootNavigation";
 
 /** ExploreScreen listens to clear map overlays before switching to the Login tab. */
 export const EXPLORE_CLEAR_BEFORE_LOGIN_EVENT = "petowner/explore/clearBeforeLogin";
+
+const LOGIN_TAB_PARAMS = { screen: "LoginScreen" } as const;
 
 function stackRouteCount(nav: NavigationProp<ParamListBase>): number {
   const state = nav.getState();
   if (!state?.routes?.length) return 0;
   return state.routes.length;
+}
+
+/** Walk up to the tab navigator that owns the guest "Login" tab. */
+function navigateViaParentChain(navigation: NavigationProp<ParamListBase>): boolean {
+  let nav: NavigationProp<ParamListBase> | undefined = navigation;
+  while (nav) {
+    const routeNames = nav.getState()?.routeNames;
+    if (routeNames?.includes("Login")) {
+      if (stackRouteCount(nav) > 1) {
+        nav.dispatch(StackActions.popToTop());
+      }
+      nav.navigate("Login" as never, LOGIN_TAB_PARAMS as never);
+      return true;
+    }
+    nav = nav.getParent() as NavigationProp<ParamListBase> | undefined;
+  }
+  return false;
+}
+
+function goToLoginTab(): boolean {
+  if (!navigationRef.isReady()) return false;
+  if (useAuthStore.getState().isLoggedIn) return false;
+  return rootNavigate("Login", LOGIN_TAB_PARAMS);
 }
 
 /**
@@ -21,17 +47,19 @@ function stackRouteCount(nav: NavigationProp<ParamListBase>): number {
 export function navigateToLoginClearingStack(navigation: NavigationProp<ParamListBase>): void {
   DeviceEventEmitter.emit(EXPLORE_CLEAR_BEFORE_LOGIN_EVENT);
 
-  if (navigationRef.isReady()) {
-    rootNavigate("Login");
-    return;
-  }
+  if (useAuthStore.getState().isLoggedIn) return;
 
-  try {
-    if (stackRouteCount(navigation) > 1) {
-      navigation.dispatch(StackActions.popToTop());
+  if (goToLoginTab()) return;
+
+  whenNavigationReady(() => {
+    if (goToLoginTab()) return;
+    try {
+      if (stackRouteCount(navigation) > 1) {
+        navigation.dispatch(StackActions.popToTop());
+      }
+    } catch {
+      // Nested stack may not support popToTop yet.
     }
-    navigation.navigate("Login" as never);
-  } catch {
-    // Tab navigator may still be mounting; root ref path handles the common case.
-  }
+    navigateViaParentChain(navigation);
+  });
 }

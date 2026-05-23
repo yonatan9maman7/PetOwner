@@ -39,6 +39,7 @@ public class ProvidersController : ControllerBase
         ServiceType.PetSitting,
         ServiceType.Insurance,
         ServiceType.PetStore,
+        ServiceType.Veterinary,
     };
 
     private static readonly TimeZoneInfo ProviderLocalTimeZone = ResolveProviderLocalTimeZone();

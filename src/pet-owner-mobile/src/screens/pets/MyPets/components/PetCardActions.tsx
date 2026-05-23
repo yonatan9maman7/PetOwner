@@ -3,7 +3,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useTranslation, rowDirectionForAppLayout } from "../../../../i18n";
 import type { PetDto } from "../../../../types/api";
 import { usePetsStore } from "../../../../store/petsStore";
-import { showGlobalAlertCompat } from "../../../../components/global-modal";
+import { showGlobalAlertCompat, showMarkFoundConfirmAlert } from "../../../../components/global-modal";
 
 interface PetCardActionsProps {
   pet: PetDto;
@@ -71,19 +71,13 @@ export function PetCardActions({
       {pet.isLost && (
         <Pressable
           onPress={() => {
-            showGlobalAlertCompat(t("markFoundBtn"), t("markFound") + "?", [
-              { text: t("cancel"), style: "cancel" },
-              {
-                text: t("markFoundBtn"),
-                onPress: async () => {
-                  try {
-                    await usePetsStore.getState().markFound(pet.id);
-                  } catch {
-                    showGlobalAlertCompat(t("errorTitle"));
-                  }
-                },
-              },
-            ]);
+            showMarkFoundConfirmAlert(t, async () => {
+              try {
+                await usePetsStore.getState().markFound(pet.id);
+              } catch {
+                showGlobalAlertCompat(t("errorTitle"));
+              }
+            });
           }}
           style={{
             flexDirection: rowDirectionForAppLayout(isRTL),

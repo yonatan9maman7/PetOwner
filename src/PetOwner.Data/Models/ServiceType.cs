@@ -10,5 +10,6 @@ public enum ServiceType
     Insurance,
     PetStore,
     HouseSitting,
-    DoggyDayCare
+    DoggyDayCare,
+    Veterinary
 }

@@ -1,6 +1,13 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
-import { Modal, Pressable, Text, View } from "react-native";
+import {
+  BackHandler,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useTranslation } from "../../i18n";
 import { useAuthStore } from "../../store/authStore";
 import { useTheme } from "../../theme/ThemeContext";
 import { registerGlobalModalApi } from "./modalService";
@@ -12,12 +19,13 @@ interface QueueItem extends ShowModalOptions {
 
 const GlobalModalContext = createContext<GlobalModalApi | null>(null);
 
-/** Defer `onPress` until after hide so RN `Modal` + navigation/auth updates don't race (e.g. logout). */
+/** Defer `onPress` until after hide so overlay + navigation/auth updates don't race (e.g. logout). */
 const MODAL_CLOSE_ACTION_DELAY_MS = 300;
 
 export function GlobalModalProvider({ children }: { children: React.ReactNode }) {
   const insets = useSafeAreaInsets();
   const language = useAuthStore((s) => s.language);
+  const { rtlText, rtlRow } = useTranslation();
   const defaultOkLabel = language === "he" ? "אישור" : "OK";
   const defaultCancelLabel = language === "he" ? "ביטול" : "Cancel";
   const { colors, isDark } = useTheme();
@@ -95,8 +103,6 @@ export function GlobalModalProvider({ children }: { children: React.ReactNode })
         role: options?.destructive ? "destructive" : "primary",
         onPress: onConfirm,
       };
-      // Always cancel first, then confirm — the modal card uses `direction: rtl` when language is Hebrew
-      // so the row mirrors (destructive/confirm on the leading reading edge, cancel on the trailing edge).
       const buttons = [cancelBtn, confirmBtn];
       showModal({
         title,
@@ -148,126 +154,197 @@ export function GlobalModalProvider({ children }: { children: React.ReactNode })
     return () => registerGlobalModalApi(null);
   }, [api]);
 
-  /** Match chosen app language — `Modal` subtree may not follow `I18nManager` the same as the rest of the tree. */
-  const isModalRTL = language === "he";
+  useEffect(() => {
+    if (!activeModal) return;
+    const sub = BackHandler.addEventListener("hardwareBackPress", () => {
+      if (activeModal.dismissible) {
+        hideModal();
+      }
+      return true;
+    });
+    return () => sub.remove();
+  }, [activeModal, hideModal]);
+
   const isVerticalButtons = (activeModal?.buttons?.length ?? 0) > 2;
 
   return (
     <GlobalModalContext.Provider value={api}>
-      {children}
-      <Modal
-        transparent
-        visible={Boolean(activeModal)}
-        animationType="fade"
-        statusBarTranslucent
-        onRequestClose={() => {
-          if (activeModal?.dismissible) {
-            hideModal();
-          }
-        }}
-      >
-        <View className="flex-1 items-center justify-center bg-black/60" style={{ paddingTop: insets.top + 16, paddingBottom: insets.bottom + 16, paddingHorizontal: 16 }}>
+      <>
+        {children}
+        {activeModal ? (
           <View
-            className="w-[86%] rounded-2xl p-6"
-            style={{
-              maxWidth: 420,
-              backgroundColor: colors.surface,
-              shadowColor: colors.shadow,
-              shadowOffset: { width: 0, height: 10 },
-              shadowOpacity: isDark ? 0.45 : 0.18,
-              shadowRadius: 20,
-              elevation: 12,
-              direction: isModalRTL ? "rtl" : "ltr",
-            }}
+            pointerEvents="box-none"
+            style={[StyleSheet.absoluteFillObject, styles.overlayHost]}
           >
-            {activeModal?.title ? (
-              <Text
-                className="mb-3 text-xl font-bold"
-                style={{
-                  color: colors.text,
-                  textAlign: isModalRTL ? "right" : "left",
-                  writingDirection: isModalRTL ? "rtl" : "ltr",
-                }}
-              >
-                {activeModal.title}
-              </Text>
-            ) : null}
-
-            {activeModal?.message ? (
-              <Text
-                className="mb-6 text-base"
-                style={{
-                  color: colors.textSecondary,
-                  textAlign: isModalRTL ? "right" : "left",
-                  writingDirection: isModalRTL ? "rtl" : "ltr",
-                }}
-              >
-                {activeModal.message}
-              </Text>
-            ) : (
-              <View className="mb-6" />
-            )}
-
-            <View
-              className={isVerticalButtons ? "gap-2" : "gap-3"}
-              style={{ flexDirection: isVerticalButtons ? "column" : "row" }}
+            <Pressable
+              style={[
+                StyleSheet.absoluteFillObject,
+                styles.backdrop,
+                {
+                  paddingTop: insets.top + 16,
+                  paddingBottom: insets.bottom + 16,
+                  paddingHorizontal: 16,
+                },
+              ]}
+              onPress={() => {
+                if (activeModal.dismissible) hideModal();
+              }}
             >
-              {(activeModal?.buttons ?? []).map((button, index) => {
-                const role = button.role ?? "primary";
-                const isPrimary = role === "primary";
-                const isDestructive = role === "destructive";
-                const isSecondary = role === "secondary" || role === "cancel";
-
-                const destructiveAsFilled = isDestructive && !isVerticalButtons;
-                const bg = isPrimary
-                  ? colors.brand
-                  : isDestructive
-                    ? destructiveAsFilled
-                      ? colors.danger
-                      : colors.dangerLight
-                    : isSecondary
-                      ? colors.surfaceSecondary
-                      : colors.primaryLight;
-                const fg = isPrimary || destructiveAsFilled
-                  ? colors.primaryText
-                  : isDestructive
-                    ? colors.danger
-                    : colors.text;
-
-                return (
-                  <Pressable
-                    key={`${activeModal?.id}-${index}-${button.text}`}
-                    className="items-center justify-center rounded-xl px-4 py-3"
-                    style={{
-                      flex: isVerticalButtons ? undefined : 1,
-                      backgroundColor: bg,
-                      borderWidth: isSecondary ? 1 : 0,
-                      borderColor: isSecondary ? colors.border : "transparent",
-                    }}
-                    onPress={() => {
-                      void handlePressButton(button);
-                    }}
+              <Pressable
+                style={[
+                  styles.card,
+                  {
+                    maxWidth: 420,
+                    backgroundColor: colors.surface,
+                    shadowColor: colors.shadow,
+                    shadowOpacity: isDark ? 0.45 : 0.18,
+                  },
+                ]}
+                onPress={(e) => e.stopPropagation()}
+              >
+                {activeModal.title ? (
+                  <Text
+                    style={[
+                      styles.title,
+                      rtlText,
+                      { color: colors.text },
+                    ]}
                   >
-                    <Text
-                      className="text-base font-semibold"
-                      style={{
-                        color: fg,
-                        textAlign: "center",
-                        writingDirection: isModalRTL ? "rtl" : "ltr",
-                      }}
-                    >
-                      {button.text}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </View>
+                    {activeModal.title}
+                  </Text>
+                ) : null}
+
+                {activeModal.message ? (
+                  <Text
+                    style={[
+                      styles.message,
+                      rtlText,
+                      { color: colors.textSecondary },
+                    ]}
+                  >
+                    {activeModal.message}
+                  </Text>
+                ) : (
+                  <View style={styles.messageSpacer} />
+                )}
+
+                <View
+                  style={[
+                    isVerticalButtons ? styles.buttonCol : styles.buttonRow,
+                    !isVerticalButtons ? rtlRow : null,
+                  ]}
+                >
+                  {(activeModal.buttons ?? []).map((button, index) => {
+                    const role = button.role ?? "primary";
+                    const isPrimary = role === "primary";
+                    const isDestructive = role === "destructive";
+                    const isSecondary = role === "secondary" || role === "cancel";
+
+                    const destructiveAsFilled = isDestructive && !isVerticalButtons;
+                    const bg = isPrimary
+                      ? colors.brand
+                      : isDestructive
+                        ? destructiveAsFilled
+                          ? colors.danger
+                          : colors.dangerLight
+                        : isSecondary
+                          ? colors.surfaceSecondary
+                          : colors.primaryLight;
+                    const fg = isPrimary || destructiveAsFilled
+                      ? colors.primaryText
+                      : isDestructive
+                        ? colors.danger
+                        : colors.text;
+
+                    return (
+                      <Pressable
+                        key={`${activeModal.id}-${index}-${button.text}`}
+                        style={[
+                          styles.button,
+                          {
+                            flex: isVerticalButtons ? undefined : 1,
+                            backgroundColor: bg,
+                            borderWidth: isSecondary ? 1 : 0,
+                            borderColor: isSecondary ? colors.border : "transparent",
+                          },
+                        ]}
+                        onPress={() => {
+                          void handlePressButton(button);
+                        }}
+                      >
+                        <Text
+                          style={[
+                            styles.buttonLabel,
+                            rtlText,
+                            { color: fg, textAlign: "center" },
+                          ]}
+                        >
+                          {button.text}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              </Pressable>
+            </Pressable>
           </View>
-        </View>
-      </Modal>
+        ) : null}
+      </>
     </GlobalModalContext.Provider>
   );
 }
+
+const styles = StyleSheet.create({
+  overlayHost: {
+    zIndex: 100000,
+    elevation: 100000,
+  },
+  backdrop: {
+    backgroundColor: "rgba(0,0,0,0.6)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  card: {
+    width: "86%",
+    borderRadius: 16,
+    padding: 24,
+    shadowOffset: { width: 0, height: 10 },
+    shadowRadius: 20,
+    elevation: 12,
+  },
+  title: {
+    width: "100%",
+    marginBottom: 12,
+    fontSize: 20,
+    fontWeight: "700",
+  },
+  message: {
+    width: "100%",
+    marginBottom: 24,
+    fontSize: 16,
+  },
+  messageSpacer: {
+    marginBottom: 24,
+  },
+  buttonRow: {
+    gap: 12,
+  },
+  buttonCol: {
+    flexDirection: "column",
+    gap: 8,
+  },
+  button: {
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  buttonLabel: {
+    fontSize: 16,
+    fontWeight: "600",
+  },
+});
 
 export function useGlobalModal() {
   const ctx = useContext(GlobalModalContext);

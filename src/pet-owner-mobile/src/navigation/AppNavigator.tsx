@@ -1,12 +1,11 @@
-import { useEffect, useRef } from "react";
-import { View, Text, Platform } from "react-native";
-import { PlatformPressable } from "@react-navigation/elements";
+import { useEffect, useRef, useState, useMemo } from "react";
+import { View, Text, Pressable, StyleSheet, Animated, Dimensions } from "react-native";
 import {
-  createBottomTabNavigator,
-  BottomTabBar,
-  type BottomTabBarButtonProps,
-  type BottomTabBarProps,
-} from "@react-navigation/bottom-tabs";
+  createMaterialTopTabNavigator,
+  type MaterialTopTabBarProps,
+} from "@react-navigation/material-top-tabs";
+import { BlurView } from "expo-blur";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { getFocusedRouteNameFromRoute } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
@@ -16,7 +15,6 @@ import { useChatStore } from "../store/chatStore";
 import { useTranslation } from "../i18n";
 import { useTheme } from "../theme/ThemeContext";
 import { GlobalSosFab } from "../components/GlobalSosFab";
-import { tabBarRowHeight } from "./tabBarLayout";
 import { NotificationToast } from "../components/NotificationToast";
 import { DiscoverScreen } from "../screens/explore/DiscoverScreen";
 import { ExploreScreen } from "../screens/explore/ExploreScreen";
@@ -64,7 +62,7 @@ import { MyStatsScreen } from "../screens/profile/MyStatsScreen";
 import { PaymentCheckoutScreen } from "../screens/profile/PaymentCheckoutScreen";
 import { FavoritesScreen } from "../screens/profile/FavoritesScreen";
 import { navigationRef } from "./navigationRef";
-import { whenNavigationReady } from "./rootNavigation";
+import { rootNavigate, whenNavigationReady } from "./rootNavigation";
 
 export { navigationRef };
 
@@ -111,56 +109,227 @@ function shouldHideTabBar(route: any): boolean {
   return routeName != null && HIDDEN_TAB_SCREENS.has(routeName);
 }
 
-/**
- * Thin wrapper: provides navigation context for GlobalSosFab (useNavigationState),
- * but does NOT override BottomTabBar's internal layout — tabBarStyle in screenOptions
- * controls all sizing/colors.
- */
-function TabBarWithSos(props: BottomTabBarProps) {
+const TAB_BAR_HIDDEN = { display: "none" as const };
+
+// ─── Glassmorphism tab bar ────────────────────────────────────────────────────
+
+const GLASS_PILL_H_MARGIN = 6;
+// Seed the layout with an accurate initial estimate so the pill renders correctly
+// on the very first frame before the onLayout measurement fires.
+// The bar has marginHorizontal: 16 on each side → subtract 32 from screen width.
+const INITIAL_CONTAINER_WIDTH = Dimensions.get("window").width - 32;
+
+function GlassTabBar({ state, descriptors, navigation, position }: MaterialTopTabBarProps) {
+  const insets = useSafeAreaInsets();
+  const { colors, isDark } = useTheme();
+
+  // Exact inner width of the icon row, updated after the first layout pass.
+  const [containerWidth, setContainerWidth] = useState(INITIAL_CONTAINER_WIDTH);
+
+  const numTabs = state.routes.length;
+  const tabW = containerWidth / numTabs; // Each tab item width — equal because flex:1
+  const pillW = Math.max(0, tabW - GLASS_PILL_H_MARGIN * 2);
+
+  // Map the pager's continuous Animated position value → pill translateX.
+  //
+  // • On swipe: position updates 60 fps, in lock-step with the user's finger.
+  // • On tap:   the pager animates the transition; position follows, so the pill
+  //             glides smoothly without any extra spring logic here.
+  //
+  // The Animated driver runs on the UI thread — zero JS-thread lag.
+  const translateX = useMemo(
+    () =>
+      position.interpolate({
+        inputRange: state.routes.map((_, i) => i),
+        outputRange: state.routes.map((_, i) => i * tabW + GLASS_PILL_H_MARGIN),
+        extrapolate: "clamp",
+      }),
+    // position is a stable reference that never changes for the life of this navigator.
+    // tabW / numTabs only change when key= forces a full remount.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [position, tabW, numTabs],
+  );
+
+  const focusedRoute = state.routes[state.index];
+  const focusedTabBarStyle = (descriptors[focusedRoute.key].options as any).tabBarStyle;
+  if (focusedTabBarStyle?.display === "none") return null;
+
+  const overlayColor = isDark ? "rgba(26,34,54,0.90)" : "rgba(0,26,90,0.85)";
+
+  return (
+    <View
+      style={[
+        glassStyles.barContainer,
+        {
+          shadowColor: colors.shadow,
+          paddingBottom: Math.max(insets.bottom, 8),
+        },
+      ]}
+    >
+      {/* Blur layer — frosted-glass texture */}
+      <BlurView intensity={70} tint="dark" style={StyleSheet.absoluteFill} />
+      {/* Brand-colour tint + opaque fallback for Android / no-blur devices */}
+      <View
+        style={[
+          StyleSheet.absoluteFill,
+          { backgroundColor: overlayColor, borderRadius: 28 },
+        ]}
+      />
+
+      {/* Icon row — also the measurement surface for the interpolation */}
+      <View
+        style={glassStyles.contentRow}
+        onLayout={({ nativeEvent: { layout } }) => setContainerWidth(layout.width)}
+      >
+        {/* Pill — driven by the pager's Animated position: finger-synced on swipe,
+            smoothly animated on tap, zero JS-thread involvement. */}
+        <Animated.View
+          style={[
+            glassStyles.pill,
+            { width: pillW, transform: [{ translateX }] },
+          ]}
+        />
+
+        {state.routes.map((route, index) => {
+          // Cast so we can read bottom-tab-style extras (tabBarBadge, tabBarButtonTestID)
+          // that are not in MaterialTopTabNavigationOptions but work fine at runtime.
+          const options = descriptors[route.key].options as any;
+          const isFocused = state.index === index;
+          const color = isFocused ? colors.tabBarActive : colors.tabBarInactive;
+          const label =
+            typeof options.tabBarLabel === "function"
+              ? options.tabBarLabel({
+                  focused: isFocused,
+                  color,
+                  children: route.name,
+                  position: "below-icon",
+                })
+              : (options.tabBarLabel ?? options.title ?? route.name);
+          const badge = options.tabBarBadge;
+
+          const onPress = () => {
+            const event = navigation.emit({
+              type: "tabPress",
+              target: route.key,
+              canPreventDefault: true,
+            });
+            if (!isFocused && !event.defaultPrevented) {
+              navigation.navigate(route.name, route.params as any);
+            }
+          };
+
+          const onLongPress = () => {
+            navigation.emit({ type: "tabLongPress", target: route.key });
+          };
+
+          return (
+            <Pressable
+              key={route.key}
+              accessibilityRole="button"
+              accessibilityState={isFocused ? { selected: true } : {}}
+              accessibilityLabel={options.tabBarAccessibilityLabel}
+              testID={options.tabBarButtonTestID ?? options.tabBarTestID}
+              onPress={onPress}
+              onLongPress={onLongPress}
+              style={glassStyles.tabItem}
+            >
+              <View style={glassStyles.iconContainer}>
+                {options.tabBarIcon?.({ focused: isFocused, color, size: 24 })}
+                {badge != null && (
+                  <View style={[glassStyles.badge, { backgroundColor: colors.danger }]}>
+                    <Text style={glassStyles.badgeText}>
+                      {typeof badge === "number" && badge > 99 ? "99+" : badge}
+                    </Text>
+                  </View>
+                )}
+              </View>
+              <Text style={[glassStyles.label, { color }]} numberOfLines={1}>
+                {label as string}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
+    </View>
+  );
+}
+
+const glassStyles = StyleSheet.create({
+  barContainer: {
+    marginHorizontal: 16,
+    marginBottom: 6,
+    paddingTop: 8,      // intentional breathing room above the icon row
+    borderRadius: 28,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.15)",
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.35,
+    shadowRadius: 20,
+    elevation: 20,
+  },
+  contentRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    // No hardcoded height — wraps naturally to tabItem content + paddingVertical.
+  },
+  pill: {
+    position: "absolute",
+    // top + bottom instead of a fixed height: the pill auto-sizes to the row
+    // height minus 6 px on each edge, giving it a slender, tightly-fitted look.
+    top: 6,
+    bottom: 6,
+    left: 0,
+    borderRadius: 18,
+    backgroundColor: "rgba(255,255,255,0.18)",
+  },
+  tabItem: {
+    flex: 1,
+    alignItems: "center",
+    paddingVertical: 7,   // content-height driver: icon(24) + gap(2) + label(~12) + 7+7 = ~52 px
+    // No hardcoded height. justifyContent not needed — paddingVertical centres naturally.
+    gap: 2,
+  },
+  iconContainer: {
+    width: 28,
+    height: 28,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  label: {
+    fontSize: 10,
+    fontWeight: "700",
+    letterSpacing: 0.2,
+  },
+  badge: {
+    position: "absolute",
+    top: -4,
+    right: -10,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 4,
+  },
+  badgeText: {
+    color: "#fff",
+    fontSize: 10,
+    fontWeight: "700",
+    lineHeight: 18,
+  },
+});
+
+function TabBarWithSos(props: MaterialTopTabBarProps) {
   return (
     <>
-      <BottomTabBar {...props} />
+      <GlassTabBar {...props} />
       <GlobalSosFab />
     </>
   );
 }
 
-function useTabBarStyle() {
-  const { colors } = useTheme();
-  const height = tabBarRowHeight();
-  const isAndroid = Platform.OS === "android";
-  return {
-    backgroundColor: colors.tabBar,
-    borderTopColor: colors.border,
-    borderTopWidth: 1,
-    paddingTop: isAndroid ? 8 : 6,
-    // iOS: let React Navigation manage height + safe-area padding naturally.
-    // Android: fix height and strip bottom padding (safe area handled by system nav bar).
-    ...(isAndroid && {
-      height,
-      paddingBottom: 0,
-      elevation: 48,
-    }),
-  };
-}
-
-/**
- * Tab press targets centered on icon+label.
- * Do NOT extend hitSlop into the wrapper's paddingBottom (system nav zone) — that
- * shifted Android taps ~48px below the visible icons.
- */
-function LooseTabBarButton({ style, ...rest }: BottomTabBarButtonProps) {
-  return (
-    <PlatformPressable
-      {...rest}
-      style={[style, { flex: 1, justifyContent: "center", alignItems: "center" }]}
-    />
-  );
-}
-
-const TAB_BAR_HIDDEN = { display: "none" as const };
-
-const Tab = createBottomTabNavigator();
+const Tab = createMaterialTopTabNavigator();
 const AuthStack = createNativeStackNavigator();
 const CompleteProfileStack = createNativeStackNavigator();
 const ExploreStack = createNativeStackNavigator();
@@ -332,15 +501,30 @@ function useNavigateToExploreAfterLogin(isLoggedIn: boolean, requiresPhone: bool
   }, [isLoggedIn, requiresPhone]);
 }
 
+/** After logout the Login tab replaces Messages/Profile; switch once the tree is ready. */
+function useNavigateToLoginAfterLogout(isLoggedIn: boolean, requiresPhone: boolean): void {
+  const wasLoggedInRef = useRef(isLoggedIn);
+
+  useEffect(() => {
+    const justLoggedOut = wasLoggedInRef.current && !isLoggedIn && !requiresPhone;
+    wasLoggedInRef.current = isLoggedIn;
+
+    if (!justLoggedOut) return;
+
+    return whenNavigationReady(() => {
+      rootNavigate("Login", { screen: "LoginScreen" });
+    });
+  }, [isLoggedIn, requiresPhone]);
+}
+
 export function AppNavigator() {
   const isLoggedIn = useAuthStore((s) => s.isLoggedIn);
   const requiresPhone = useAuthStore((s) => s.requiresPhone);
   const unreadCount = useNotificationStore((s) => s.unreadCount);
   const { t } = useTranslation();
-  const { colors } = useTheme();
-  const tabBarStyle = useTabBarStyle();
 
   useNavigateToExploreAfterLogin(isLoggedIn, requiresPhone);
+  useNavigateToLoginAfterLogout(isLoggedIn, requiresPhone);
 
   // Social login users must complete phone before accessing any tab
   if (isLoggedIn && requiresPhone) {
@@ -363,32 +547,16 @@ export function AppNavigator() {
     <>
     <NotificationToast />
     <Tab.Navigator
+      key={isLoggedIn ? "authenticated" : "guest"}
       tabBar={(tabProps) => <TabBarWithSos {...tabProps} />}
+      tabBarPosition="bottom"
       screenOptions={{
-        headerShown: false,
-        /** Inactive tabs skip re-renders while off-screen (saves CPU when switching tabs). */
-        freezeOnBlur: true,
-        /** Mount tab stacks on first visit (default in v7; explicit for clarity). */
+        /** Lazy-mount tabs on first visit to avoid rendering off-screen stacks. */
         lazy: true,
-        tabBarShowLabel: true,
-        tabBarActiveTintColor: colors.tabBarActive,
-        tabBarInactiveTintColor: colors.tabBarInactive,
-        tabBarLabelStyle: {
-          fontSize: 10,
-          fontWeight: "700",
-          marginTop: Platform.OS === "android" ? 2 : -2,
-        },
-        tabBarIconStyle: {
-          marginBottom: Platform.OS === "android" ? 0 : -2,
-        },
-        tabBarItemStyle: {
-          justifyContent: "center",
-          alignItems: "center",
-          paddingTop: 0,
-          paddingBottom: 0,
-        },
-        tabBarButton: (btnProps) => <LooseTabBarButton {...btnProps} />,
-        tabBarStyle,
+        /** Allow horizontal swipe to switch tabs.
+         *  NOTE: The Explore tab opts out below because its MapView uses the same
+         *  gesture axis and would conflict with full-screen horizontal pans. */
+        swipeEnabled: true,
       }}
     >
       <Tab.Screen
@@ -404,7 +572,10 @@ export function AppNavigator() {
               color={color}
             />
           ),
-          tabBarStyle: shouldHideTabBar(route) ? TAB_BAR_HIDDEN : tabBarStyle,
+          tabBarStyle: shouldHideTabBar(route) ? TAB_BAR_HIDDEN : undefined,
+          // Disable swipe on Explore — the MapView handles horizontal pans natively
+          // and would fight with the pager view for the same gesture axis.
+          swipeEnabled: false,
         })}
       />
       <Tab.Screen
@@ -420,7 +591,7 @@ export function AppNavigator() {
               color={color}
             />
           ),
-          tabBarStyle: shouldHideTabBar(route) ? TAB_BAR_HIDDEN : tabBarStyle,
+          tabBarStyle: shouldHideTabBar(route) ? TAB_BAR_HIDDEN : undefined,
         })}
       />
       <Tab.Screen
@@ -436,7 +607,7 @@ export function AppNavigator() {
               color={color}
             />
           ),
-          tabBarStyle: shouldHideTabBar(route) ? TAB_BAR_HIDDEN : tabBarStyle,
+          tabBarStyle: shouldHideTabBar(route) ? TAB_BAR_HIDDEN : undefined,
         })}
       />
 
@@ -451,7 +622,7 @@ export function AppNavigator() {
               tabBarIcon: ({ focused, color }) => (
                 <MessagesTabIcon focused={focused} color={color} />
               ),
-              tabBarStyle: shouldHideTabBar(route) ? TAB_BAR_HIDDEN : tabBarStyle,
+              tabBarStyle: shouldHideTabBar(route) ? TAB_BAR_HIDDEN : undefined,
             })}
           />
           <Tab.Screen
@@ -468,25 +639,18 @@ export function AppNavigator() {
             options={({ route }) => ({
               tabBarButtonTestID: "tab-profile",
               tabBarLabel: t("tabProfile"),
-              tabBarIcon: ({ focused, color }) => (
+              tabBarIcon: ({ focused, color }: { focused: boolean; color: string }) => (
                 <Ionicons
                   name={focused ? "person" : "person-outline"}
                   size={24}
                   color={color}
                 />
               ),
+              // tabBarBadge in material-top-tabs expects () => ReactNode; we pass a
+              // plain number because our custom GlassTabBar reads it via (options as any).
               tabBarBadge: unreadCount > 0 ? unreadCount : undefined,
-              tabBarBadgeStyle: {
-                backgroundColor: colors.danger,
-                fontSize: 10,
-                fontWeight: "700" as const,
-                minWidth: 18,
-                height: 18,
-                borderRadius: 9,
-                lineHeight: 18,
-              },
-              tabBarStyle: shouldHideTabBar(route) ? TAB_BAR_HIDDEN : tabBarStyle,
-            })}
+              tabBarStyle: shouldHideTabBar(route) ? TAB_BAR_HIDDEN : undefined,
+            } as any)}
           />
         </>
       ) : (

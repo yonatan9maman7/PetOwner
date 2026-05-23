@@ -16,8 +16,9 @@ import {
   type KeyboardAvoidingViewProps,
   Share,
   InteractionManager,
+  I18nManager,
 } from "react-native";
-import { showGlobalAlertCompat } from "../../components/global-modal";
+import { showGlobalAlertCompat, showMarkFoundConfirmAlert } from "../../components/global-modal";
 import { SafeAreaProvider, SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { FormFieldLabel } from "../../components/FormFieldLabel";
 import { useBottomSafeInset } from "../../hooks/useBottomSafeInset";
@@ -146,36 +147,30 @@ const PostCard = memo(function PostCard({
 
   const handleOwnerMarkFoundFromSos = () => {
     if (sosResolving) return;
-    showGlobalAlertCompat(t("sosMarkFoundCloseReport"), `${t("markFound")}?`, [
-      { text: t("cancel"), style: "cancel" },
-      {
-        text: t("markFoundBtn"),
-        onPress: async () => {
-          setSosResolving(true);
-          try {
-            celebrateMarkFoundBurst?.();
-            await new Promise<void>((resolve) =>
-              setTimeout(resolve, MARK_FOUND_SOS_CELEBRATION_DELAY_MS),
-            );
-            await fetchPets().catch(() => {});
-            const petId =
-              post.relatedPetId ??
-              usePetsStore
-                .getState()
-                .pets.find((p) => p.communityPostId === post.id)?.id ??
-              null;
-            if (petId) {
-              await markFound(petId);
-            }
-            onSosResolved?.(post.id, new Date().toISOString());
-          } catch {
-            showGlobalAlertCompat(t("errorTitle"), t("profileSaveError"));
-          } finally {
-            setSosResolving(false);
-          }
-        },
-      },
-    ]);
+    showMarkFoundConfirmAlert(t, async () => {
+      setSosResolving(true);
+      try {
+        celebrateMarkFoundBurst?.();
+        await new Promise<void>((resolve) =>
+          setTimeout(resolve, MARK_FOUND_SOS_CELEBRATION_DELAY_MS),
+        );
+        await fetchPets().catch(() => {});
+        const petId =
+          post.relatedPetId ??
+          usePetsStore
+            .getState()
+            .pets.find((p) => p.communityPostId === post.id)?.id ??
+          null;
+        if (petId) {
+          await markFound(petId);
+        }
+        onSosResolved?.(post.id, new Date().toISOString());
+      } catch {
+        showGlobalAlertCompat(t("errorTitle"), t("profileSaveError"));
+      } finally {
+        setSosResolving(false);
+      }
+    });
   };
 
   return (
@@ -541,9 +536,6 @@ export function CommunityScreen() {
   const [checkingInPark, setCheckingInPark] = useState<DogPark | null>(null);
   const [selectedPark, setSelectedPark] = useState<DogPark | null>(null);
   const [parkCheckins, setParkCheckins] = useState<Record<string, boolean>>({});
-  const [dogProfilePet, setDogProfilePet] = useState<PetDto | null>(null);
-  const [invitedPetIds, setInvitedPetIds] = useState<Set<string>>(() => new Set());
-  const [followedPetIds, setFollowedPetIds] = useState<Set<string>>(() => new Set());
   const [answerPost, setAnswerPost] = useState<PostDto | null>(null);
   const [playdateCommentsOpenFor, setPlaydateCommentsOpenFor] = useState<PlaydateEventDto | null>(null);
   const [playdateCommentText, setPlaydateCommentText] = useState("");
@@ -565,6 +557,32 @@ export function CommunityScreen() {
   const selectedPet = pets.find((p) => p.id === selectedPetId) ?? pets[0] ?? null;
   const appRowDirection = rowDirectionForAppLayout(isRTL);
   const bottomContentPadding = 16 + insets.bottom;
+
+  const categoryTabsScrollRef = useRef<ScrollView>(null);
+  const categoryTabsLayoutRef = useRef({ contentWidth: 0, viewportWidth: 0 });
+
+  /** Keep the first tab (Feed) visible at the reading-direction start in horizontal RTL lists. */
+  const alignCategoryTabsToStart = useCallback(() => {
+    const scroll = categoryTabsScrollRef.current;
+    if (!scroll) return;
+    const { contentWidth, viewportWidth } = categoryTabsLayoutRef.current;
+    if (contentWidth <= viewportWidth) return;
+
+    if (!isRTL) {
+      scroll.scrollTo({ x: 0, animated: false });
+      return;
+    }
+
+    if (I18nManager.isRTL) {
+      scroll.scrollToEnd({ animated: false });
+    } else {
+      scroll.scrollTo({ x: contentWidth - viewportWidth, animated: false });
+    }
+  }, [isRTL]);
+
+  useEffect(() => {
+    alignCategoryTabsToStart();
+  }, [alignCategoryTabsToStart]);
 
   const loadDashboard = useCallback(async () => {
     if (!focusedRef.current) return;
@@ -1566,21 +1584,6 @@ export function CommunityScreen() {
     }
   };
 
-  const handleInvitePet = (pet: PetDto) => {
-    setInvitedPetIds((prev) => new Set(prev).add(pet.id));
-    showGlobalAlertCompat(copy("invite"), copy("inviteOpened"));
-  };
-
-  const handleFollowPet = (pet: PetDto) => {
-    setFollowedPetIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(pet.id)) next.delete(pet.id);
-      else next.add(pet.id);
-      return next;
-    });
-    showGlobalAlertCompat(copy("following"), copy("followingDesc"));
-  };
-
   const renderFeedItem = useCallback(
     ({ item }: ListRenderItemInfo<PostDto>) => (
       <PostCard
@@ -1687,6 +1690,7 @@ export function CommunityScreen() {
           </Pressable>
         </View>
         <ScrollView
+          ref={categoryTabsScrollRef}
           horizontal
           showsHorizontalScrollIndicator={false}
           style={[styles.categoryTabsScroll, { flexGrow: 0, flexShrink: 0 }]}
@@ -1694,6 +1698,14 @@ export function CommunityScreen() {
             styles.topTabsContent,
             { flexDirection: appRowDirection },
           ]}
+          onLayout={(event) => {
+            categoryTabsLayoutRef.current.viewportWidth = event.nativeEvent.layout.width;
+            alignCategoryTabsToStart();
+          }}
+          onContentSizeChange={(width) => {
+            categoryTabsLayoutRef.current.contentWidth = width;
+            alignCategoryTabsToStart();
+          }}
         >
           {(["feed", "playdates", "parks", "groups", "qa", "events", "lostSos"] as MainTab[]).map((tab) => {
             const active = mainTab === tab;
@@ -1837,6 +1849,7 @@ export function CommunityScreen() {
       colors,
       styles,
       posts.length,
+      alignCategoryTabsToStart,
     ],
   );
 
@@ -1874,42 +1887,10 @@ export function CommunityScreen() {
             </Pressable>
           </View>
         </View>
-        {pets.length > 0 && (
-          <View style={styles.card}>
-            <Text style={[styles.sectionCardTitle, rtlText]}>{copy("myDogs")}</Text>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={[styles.dogProfileRail, { flexDirection: appRowDirection }]}
-            >
-              {pets.map((pet) => (
-                <Pressable key={pet.id} onPress={() => setDogProfilePet(pet)} style={styles.dogProfileCard}>
-                  <View style={styles.dogProfileAvatar}>
-                    {pet.imageUrl ? (
-                      <Image source={{ uri: pet.imageUrl }} style={StyleSheet.absoluteFill} />
-                    ) : (
-                      <Ionicons name="paw" size={22} color={colors.textInverse} />
-                    )}
-                  </View>
-                  <Text style={[styles.dogProfileName, rtlText]} numberOfLines={2}>{pet.name}</Text>
-                  <Text style={[styles.dogProfileSub, rtlText]} numberOfLines={2}>
-                    {pet.breed ? formatBreedForDisplay(pet.breed, t) : copy("dog")} · {pet.age}
-                  </Text>
-                </Pressable>
-              ))}
-            </ScrollView>
-          </View>
-        )}
-        {pets.length === 0 && (
-          <View style={styles.card}>
-            <Text style={[styles.sectionCardTitle, rtlText]}>{copy("myDogs")}</Text>
-            <Text style={[styles.emptyInline, rtlText]}>{copy("noPets")}</Text>
-          </View>
-        )}
       </>
     ),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [search, feedError, appRowDirection, styles, colors, rtlText, rtlRow, rtlInput, copy, pets, t],
+    [search, feedError, appRowDirection, styles, colors, rtlText, rtlRow, rtlInput, copy],
   );
 
   /** Stable FlatList footer renderer — only recomputed when pagination state changes. */
@@ -2260,56 +2241,6 @@ export function CommunityScreen() {
                 </Pressable>
                 <Pressable onPress={() => handleParkCheckIn(selectedPark)} style={styles.smallOutlineBtn}>
                   <Text style={styles.smallOutlineText}>{copy("checkIn")}</Text>
-                </Pressable>
-              </View>
-            </Pressable>
-          </View>
-        </Modal>
-      )}
-
-      {dogProfilePet && (
-        <Modal
-          visible
-          transparent
-          animationType="slide"
-          onRequestClose={() => setDogProfilePet(null)}
-        >
-          <View style={styles.modalRoot}>
-          <Pressable style={styles.modalBackdropFill} onPress={() => setDogProfilePet(null)} />
-            <Pressable style={styles.detailSheet} onPress={(e) => e.stopPropagation()}>
-              <View style={styles.handle} />
-              <View style={styles.largeDogAvatar}>
-                {dogProfilePet.imageUrl ? (
-                  <Image source={{ uri: dogProfilePet.imageUrl }} style={StyleSheet.absoluteFill} />
-                ) : (
-                  <Ionicons name="paw" size={34} color={colors.textInverse} />
-                )}
-              </View>
-              <Text style={[styles.modalTitle, { textAlign: "center" }]}>{dogProfilePet.name}</Text>
-              <Text style={[styles.sectionCardSub, { textAlign: "center" }]}>
-                {dogProfilePet.breed ? formatBreedForDisplay(dogProfilePet.breed, t) : copy("dog")} · {dogProfilePet.age}
-              </Text>
-              <View style={[styles.metaWrap, { justifyContent: "center" }]}>
-                <Text style={styles.metaPill}>{copy("localDogProfile")}</Text>
-                <Text style={styles.metaPill}>{copy("energyLevel")}: {energyLabel("Medium", isRTL)}</Text>
-                <Text style={styles.metaPill}>{copy("parks")}</Text>
-              </View>
-              <View style={[styles.actionBar, { justifyContent: "center" }]}>
-                <Pressable
-                  onPress={() => handleInvitePet(dogProfilePet)}
-                  style={invitedPetIds.has(dogProfilePet.id) ? styles.smallOutlineBtn : styles.primarySmallBtn}
-                >
-                  <Text style={invitedPetIds.has(dogProfilePet.id) ? styles.smallOutlineText : styles.primarySmallText}>
-                    {invitedPetIds.has(dogProfilePet.id) ? copy("invited") : copy("invite")}
-                  </Text>
-                </Pressable>
-                <Pressable
-                  onPress={() => handleFollowPet(dogProfilePet)}
-                  style={followedPetIds.has(dogProfilePet.id) ? styles.primarySmallBtn : styles.smallOutlineBtn}
-                >
-                  <Text style={followedPetIds.has(dogProfilePet.id) ? styles.primarySmallText : styles.smallOutlineText}>
-                    {followedPetIds.has(dogProfilePet.id) ? copy("followed") : copy("follow")}
-                  </Text>
                 </Pressable>
               </View>
             </Pressable>

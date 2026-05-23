@@ -38,9 +38,8 @@ import Reanimated, {
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect, useIsFocused, useNavigation, useRoute } from "@react-navigation/native";
-import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 import { useBottomSafeInset } from "../../hooks/useBottomSafeInset";
-import { resolveTabBarOccupiedHeight } from "../../navigation/tabBarLayout";
+import { resolveTabBarOccupiedHeight, tabBarRowHeight } from "../../navigation/tabBarLayout";
 import * as Location from "expo-location";
 import { LinearGradient } from "expo-linear-gradient";
 import {
@@ -239,15 +238,16 @@ export function ExploreScreen() {
   const insets = useSafeAreaInsets();
   const { height: windowHeight } = useWindowDimensions();
   const isFocused = useIsFocused();
-  const tabBarHeight = useBottomTabBarHeight();
   const bottomSafeInset = useBottomSafeInset();
+  // tabBarRowHeight() returns the glass bar's content height (68 px).
+  // resolveTabBarOccupiedHeight adds the bottom safe-area inset on top of that.
   const resolvedTabBarH = useMemo(
     () =>
       resolveTabBarOccupiedHeight({
-        tabBarHeightFromHook: tabBarHeight,
+        tabBarHeightFromHook: tabBarRowHeight(),
         bottomSafeInset,
       }),
-    [tabBarHeight, bottomSafeInset],
+    [bottomSafeInset],
   );
 
   const isLoggedIn = useAuthStore((s) => s.isLoggedIn);

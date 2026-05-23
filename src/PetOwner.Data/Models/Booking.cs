@@ -32,6 +32,13 @@ public class Booking
     /// <summary>Who cancelled this booking (Owner vs Provider). Null when not cancelled.</summary>
     public BookingActorRole? CancelledByRole { get; set; }
 
+    /// <summary>
+    /// Free-text or predefined-reason description supplied by the cancelling party.
+    /// Collected at cancel/decline time in the mobile app.
+    /// Max 500 characters.
+    /// </summary>
+    public string? CancellationReason { get; set; }
+
     public User Owner { get; set; } = null!;
     public ProviderProfile ProviderProfile { get; set; } = null!;
     public Review? Review { get; set; }

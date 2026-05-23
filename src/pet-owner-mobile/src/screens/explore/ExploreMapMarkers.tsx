@@ -1,13 +1,19 @@
-import React, { memo, useCallback, useState } from "react";
+import React, { memo, useCallback, useState, type ReactNode } from "react";
 import { View, Image, StyleSheet, Text, Platform } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { MarkerWrapper } from "../../components/MapViewWrapper";
 import type { MapPinDto } from "../../types/api";
 
+/** Toggle to preview cluster-style Ionicons paws instead of PNG assets. */
+const PREVIEW_IONICON_PAW_MARKERS = false;
+
 const PAW_PROVIDER_IMAGE = require("../../../assets/map-marker-provider.png");
 const PAW_SELECTED_IMAGE = require("../../../assets/map-marker-provider-selected.png");
 
 const IS_ANDROID = Platform.OS === "android";
+
+const BRAND_PRIMARY = "#001a5a";
+const PAW_ICON_COLOR = "#1a1a2e";
 
 /* ── Constants ──────────────────────────────────────────────────────────── */
 
@@ -16,8 +22,8 @@ export const OFFSCREEN_COORDINATE = { latitude: -90, longitude: 0 } as const;
 const ANCHOR_PIN_TIP = { x: 0.5, y: 1 } as const;
 const ANCHOR_CENTER = { x: 0.5, y: 0.5 } as const;
 
-const PAW_SIZE = 110;
-const PAW_SELECTED_SIZE = 114;
+const PAW_SIZE = 45;
+const PAW_SELECTED_SIZE = 45;
 
 const MARKER_Z = 1;
 const SELECTED_Z = 1000;
@@ -26,15 +32,20 @@ const CLUSTER_OUTER = 52;
 const CLUSTER_INNER = 40;
 const CLUSTER_ICON = 20;
 
-/* ── Image preload flags (iOS only) ─────────────────────────────────────────
+const IONICON_PAW_OUTER = PAW_SIZE;
+const IONICON_PAW_INNER = 36;
+const IONICON_PAW_ICON = 22;
+const IONICON_SELECTED_OUTER = PAW_SELECTED_SIZE;
+const IONICON_SELECTED_INNER = 38;
+const IONICON_SELECTED_ICON = 24;
+
+/* ── Image preload (iOS red-pin avoidance) ──────────────────────────────────
  *
- * iOS MapKit: Once any marker loads the paw PNG, subsequent markers can start
- * with tracksViewChanges=false immediately, avoiding the red-balloon fallback.
+ * iOS: After the first paw onLoad, later markers start with imageLoaded=true
+ * so tracksViewChanges stays false (avoids MapKit red-balloon flash).
  *
- * Android Google Maps: Each marker must independently wait for its OWN onLoad
- * to fire before freezing (tracksViewChanges=false). Google Maps snapshots the
- * bitmap on mount — if the Image hasn't rendered in this specific marker's view
- * tree yet, the snapshot is empty and the marker is invisible.
+ * Android: Each marker still waits for its own onLoad before freezing the
+ * snapshot (tracksViewChanges=false); empty snapshot if frozen too early.
  *
  * ────────────────────────────────────────────────────────────────────────── */
 
@@ -126,7 +137,116 @@ const S = StyleSheet.create({
     fontWeight: "800",
     color: "#ffffff",
   },
+  ioniconPawOuter: {
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  ioniconPawInner: {
+    backgroundColor: "#ffffff",
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 2,
+    borderColor: "#e2e2e2",
+    ...Platform.select({ android: { elevation: 2 }, default: {} }),
+  },
+  ioniconPawInnerSelected: {
+    backgroundColor: "#ffffff",
+    borderColor: BRAND_PRIMARY,
+    borderWidth: 3,
+    ...Platform.select({ android: { elevation: 4 }, default: {} }),
+  },
+  ioniconPawRing: {
+    position: "absolute",
+    borderColor: BRAND_PRIMARY,
+    borderWidth: 2,
+    backgroundColor: "transparent",
+  },
 });
+
+function IoniconPawMarkerContent({
+  selected,
+  size,
+}: {
+  selected: boolean;
+  size: number;
+}) {
+  const outer = selected ? IONICON_SELECTED_OUTER : IONICON_PAW_OUTER;
+  const inner = selected ? IONICON_SELECTED_INNER : IONICON_PAW_INNER;
+  const icon = selected ? IONICON_SELECTED_ICON : IONICON_PAW_ICON;
+
+  return (
+    <View
+      style={[S.ioniconPawOuter, { width: outer, height: outer }]}
+      collapsable={false}
+    >
+      {selected ? (
+        <View
+          style={[
+            S.ioniconPawRing,
+            {
+              width: size,
+              height: size,
+              borderRadius: size / 2,
+            },
+          ]}
+          collapsable={false}
+        />
+      ) : null}
+      <View
+        style={[
+          S.ioniconPawInner,
+          selected && S.ioniconPawInnerSelected,
+          {
+            width: inner,
+            height: inner,
+            borderRadius: inner / 2,
+          },
+        ]}
+        collapsable={false}
+      >
+        <Ionicons
+          name="paw"
+          size={icon}
+          color={selected ? BRAND_PRIMARY : PAW_ICON_COLOR}
+        />
+      </View>
+    </View>
+  );
+}
+
+function PawMarkerBody({
+  selected,
+  imageLoaded,
+  onImageLoad,
+}: {
+  selected: boolean;
+  imageLoaded: boolean;
+  onImageLoad: () => void;
+}): ReactNode {
+  if (PREVIEW_IONICON_PAW_MARKERS) {
+    return (
+      <IoniconPawMarkerContent
+        selected={selected}
+        size={selected ? IONICON_SELECTED_OUTER : IONICON_PAW_OUTER}
+      />
+    );
+  }
+
+  const rootStyle = selected ? S.selectedRoot : S.markerRoot;
+  const imageStyle = selected ? S.selectedImage : S.markerImage;
+  const source = selected ? PAW_SELECTED_IMAGE : PAW_PROVIDER_IMAGE;
+
+  return (
+    <View style={rootStyle} collapsable={false}>
+      <Image
+        source={source}
+        style={imageStyle}
+        resizeMode="contain"
+        onLoad={onImageLoad}
+      />
+    </View>
+  );
+}
 
 /* ── PooledMarker ───────────────────────────────────────────────────────────
  *
@@ -205,41 +325,24 @@ const PooledMarker = memo(function PooledMarker({
   const isVisible = slot.kind === "single";
   const coordinate = isVisible ? slot.coordinate : OFFSCREEN_COORDINATE;
 
-  if (IS_ANDROID) {
-    // Android: use the native `image` prop — Google Maps renders
-    // BitmapDescriptor directly without needing a View snapshot.
-    // Requires properly-sized @1x/@2x/@3x density variants.
-    return (
-      <MarkerWrapper
-        identifier={`pool-${index}`}
-        coordinate={coordinate}
-        anchor={ANCHOR_PIN_TIP}
-        image={PAW_PROVIDER_IMAGE}
-        tracksViewChanges={false}
-        onPress={isVisible ? handlePress : undefined}
-        zIndex={MARKER_Z}
-      />
-    );
-  }
+  const tracksViewChanges = PREVIEW_IONICON_PAW_MARKERS
+    ? false
+    : !imageLoaded;
 
-  // iOS: use <Image> child to avoid the red-balloon pin flash.
   return (
     <MarkerWrapper
       identifier={`pool-${index}`}
       coordinate={coordinate}
-      anchor={ANCHOR_PIN_TIP}
-      tracksViewChanges={isVisible ? !imageLoaded : false}
+      anchor={PREVIEW_IONICON_PAW_MARKERS ? ANCHOR_CENTER : ANCHOR_PIN_TIP}
+      tracksViewChanges={tracksViewChanges}
       onPress={isVisible ? handlePress : undefined}
       zIndex={MARKER_Z}
     >
-      <View style={S.markerRoot} collapsable={false}>
-        <Image
-          source={PAW_PROVIDER_IMAGE}
-          style={S.markerImage}
-          resizeMode="contain"
-          onLoad={handleImageLoad}
-        />
-      </View>
+      <PawMarkerBody
+        selected={false}
+        imageLoaded={imageLoaded}
+        onImageLoad={handleImageLoad}
+      />
     </MarkerWrapper>
   );
 });
@@ -288,35 +391,23 @@ export const ExploreSelectedMarkerOverlay = memo(
       ? { latitude: Number(latitude), longitude: Number(longitude) }
       : OFFSCREEN_COORDINATE;
 
-    if (IS_ANDROID) {
-      return (
-        <MarkerWrapper
-          identifier="selected-overlay"
-          coordinate={coordinate}
-          anchor={ANCHOR_PIN_TIP}
-          image={PAW_SELECTED_IMAGE}
-          tracksViewChanges={false}
-          zIndex={SELECTED_Z}
-        />
-      );
-    }
+    const tracksViewChanges = PREVIEW_IONICON_PAW_MARKERS
+      ? false
+      : !imageLoaded;
 
     return (
       <MarkerWrapper
         identifier="selected-overlay"
         coordinate={coordinate}
-        anchor={ANCHOR_PIN_TIP}
-        tracksViewChanges={!imageLoaded}
+        anchor={PREVIEW_IONICON_PAW_MARKERS ? ANCHOR_CENTER : ANCHOR_PIN_TIP}
+        tracksViewChanges={tracksViewChanges}
         zIndex={SELECTED_Z}
       >
-        <View style={S.selectedRoot} collapsable={false}>
-          <Image
-            source={PAW_SELECTED_IMAGE}
-            style={S.selectedImage}
-            resizeMode="contain"
-            onLoad={handleImageLoad}
-          />
-        </View>
+        <PawMarkerBody
+          selected
+          imageLoaded={imageLoaded}
+          onImageLoad={handleImageLoad}
+        />
       </MarkerWrapper>
     );
   },

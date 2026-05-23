@@ -89,6 +89,13 @@ export function rootNavigate(name: string, params?: object): boolean {
     }
 
     if (ROOT_TAB_NAMES.has(name)) {
+      if (name === "Login") {
+        dispatchNavigate("Login", {
+          screen: "LoginScreen",
+          ...params,
+        });
+        return true;
+      }
       dispatchNavigate(name, params);
       return true;
     }

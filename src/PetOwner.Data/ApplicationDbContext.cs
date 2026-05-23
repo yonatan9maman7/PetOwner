@@ -982,6 +982,9 @@ public class ApplicationDbContext : DbContext
                 .HasConversion<string>()
                 .HasMaxLength(20);
 
+            entity.Property(b => b.CancellationReason)
+                .HasMaxLength(500);
+
             entity.HasIndex(b => new { b.OwnerId, b.Status });
             entity.HasIndex(b => new { b.ProviderProfileId, b.Status });
 

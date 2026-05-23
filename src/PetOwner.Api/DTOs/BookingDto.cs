@@ -11,6 +11,13 @@ public record CreateBookingRequest(
     string? Notes = null
 );
 
+/// <summary>Body sent when an owner or provider cancels/declines a booking.</summary>
+/// <param name="Reason">
+/// Required non-empty reason. This may be a predefined label (sent verbatim from the mobile predefined list)
+/// or free text when the user selects "Other".
+/// </param>
+public record CancelBookingRequest(string Reason);
+
 public record BookingDto(
     Guid Id,
     Guid OwnerId,
@@ -32,5 +39,6 @@ public record BookingDto(
     string? Notes,
     string? ProviderPhone,
     string? OwnerPhone,
-    bool HasReview
+    bool HasReview,
+    string? CancellationReason
 );

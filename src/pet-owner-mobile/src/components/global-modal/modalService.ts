@@ -46,3 +46,20 @@ export function hideGlobalModal() {
   if (!modalApi) return warnNotReady("hideGlobalModal");
   modalApi.hideModal();
 }
+
+/** Shared "pet found — close lost report?" confirm dialog (Community + My Pets). */
+export function showMarkFoundConfirmAlert(
+  t: (key: "sosMarkFoundCloseReport" | "markFoundConfirm" | "cancel" | "markFoundBtn") => string,
+  onConfirm?: () => void | Promise<void>,
+) {
+  showGlobalConfirm(
+    t("sosMarkFoundCloseReport"),
+    t("markFoundConfirm"),
+    onConfirm,
+    undefined,
+    {
+      confirmText: t("markFoundBtn"),
+      cancelText: t("cancel"),
+    },
+  );
+}

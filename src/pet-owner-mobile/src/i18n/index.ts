@@ -173,6 +173,28 @@ const he = {
   cancelBooking: "ביטול הזמנה",
   cancelBookingConfirm: "האם אתה בטוח שברצונך לבטל הזמנה זו?",
   bookingCancelled: "ההזמנה בוטלה",
+  cancelReasonTitle: "סיבת הביטול",
+  cancelReasonSubtitle: "אנא בחר סיבה לביטול ההזמנה",
+  declineReasonTitle: "סיבת הדחייה",
+  declineReasonSubtitle: "אנא בחר סיבה לדחיית ההזמנה",
+  cancelReasonOther: "אחר",
+  cancelReasonOtherPlaceholder: "ספר לנו יותר...",
+  cancelReasonOtherLabel: "פרט את הסיבה",
+  cancelReasonRequired: "יש לבחור סיבה או לרשום הסבר",
+  cancelConfirmBtn: "אשר ביטול",
+  declineConfirmBtn: "אשר דחייה",
+  cancelReasonOwner1: "שינוי תכניות",
+  cancelReasonOwner2: "מצאתי ספק אחר",
+  cancelReasonOwner3: "בעיה עם החיה",
+  cancelReasonOwner4: "הזמנתי בטעות",
+  cancelReasonOwner5: "בעיית מחיר",
+  cancelReasonOwner6: "חוסר זמינות",
+  cancelReasonProvider1: "לא פנוי בתאריכים אלה",
+  cancelReasonProvider2: "מחוץ לאזור השירות שלי",
+  cancelReasonProvider3: "החיה לא מתאימה לשירותים שלי",
+  cancelReasonProvider4: "עימות לוח זמנים",
+  cancelReasonProvider5: "חירום / עניין אישי",
+  cancelReasonProvider6: "בעיית בריאות של החיה",
   incomingRequests: "בקשות נכנסות",
   confirmBookingAction: "אשר הזמנה",
   declineBooking: "דחה הזמנה",
@@ -451,6 +473,7 @@ const he = {
   lostLabel: "אבד/ה",
   reportLost: "דיווח על אובדן",
   markFound: "סימון כנמצא",
+  markFoundConfirm: "סימון כנמצא\u200F?",
   lastSeenLocation: "מיקום אחרון",
   lastSeenLocationPlaceholder: "היכן נראה לאחרונה?",
   contactPhoneLabel: "טלפון ליצירת קשר",
@@ -479,7 +502,7 @@ const he = {
   tapMapToMark: "הקש/י על המפה לסמן את המיקום האחרון",
   reportLostMapBtn: "דיווח על חיית מחמד אבודה",
   markFoundBtn: "סמן כנמצא",
-  sosMarkFoundCloseReport: "החיה נמצאה! סגור דיווח",
+  sosMarkFoundCloseReport: "החיה נמצאה\u200F! סגור דיווח",
   petLostActiveBanner:
     "חיית המחמד מסומנת כאבודה. סמנו כנמצא כדי לסגור את הדיווח ולעדכן את הקהילה.",
 
@@ -1563,6 +1586,28 @@ const en: Record<keyof typeof he, string> = {
   cancelBooking: "Cancel Booking",
   cancelBookingConfirm: "Are you sure you want to cancel this booking?",
   bookingCancelled: "Booking cancelled",
+  cancelReasonTitle: "Reason for Cancellation",
+  cancelReasonSubtitle: "Please select a reason for cancelling this booking",
+  declineReasonTitle: "Reason for Declining",
+  declineReasonSubtitle: "Please select a reason for declining this booking",
+  cancelReasonOther: "Other",
+  cancelReasonOtherPlaceholder: "Tell us more...",
+  cancelReasonOtherLabel: "Describe your reason",
+  cancelReasonRequired: "Please select a reason or describe your situation",
+  cancelConfirmBtn: "Confirm Cancellation",
+  declineConfirmBtn: "Confirm Decline",
+  cancelReasonOwner1: "Change of plans",
+  cancelReasonOwner2: "Found another provider",
+  cancelReasonOwner3: "Issue with my pet",
+  cancelReasonOwner4: "Booked by mistake",
+  cancelReasonOwner5: "Price concern",
+  cancelReasonOwner6: "Unavailable on those dates",
+  cancelReasonProvider1: "Not available on those dates",
+  cancelReasonProvider2: "Outside my service area",
+  cancelReasonProvider3: "Pet doesn't match my services",
+  cancelReasonProvider4: "Schedule conflict",
+  cancelReasonProvider5: "Emergency / personal matter",
+  cancelReasonProvider6: "Pet health concern",
   incomingRequests: "Incoming Requests",
   confirmBookingAction: "Confirm",
   declineBooking: "Decline",
@@ -1844,6 +1889,7 @@ const en: Record<keyof typeof he, string> = {
   lostLabel: "Lost",
   reportLost: "Report Lost",
   markFound: "Mark as Found",
+  markFoundConfirm: "Mark as Found?",
   lastSeenLocation: "Last Seen Location",
   lastSeenLocationPlaceholder: "Where was it last seen?",
   contactPhoneLabel: "Contact Phone",
@@ -2832,6 +2878,12 @@ export function resolveNotificationApiText(
   const key = NOTIFICATION_API_I18N_MAP[s];
   if (key) return translations[language][key];
   return s;
+}
+
+/** Wrap copy for RN `Modal` subtrees where `writingDirection` alone may not apply. */
+export function bidiWrapRtl(text: string, isRTL: boolean): string {
+  if (!isRTL || !text) return text;
+  return `\u202B${text}\u202C`;
 }
 
 /**

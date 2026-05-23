@@ -12,6 +12,7 @@ const SERVICE_TYPE_BY_ORDINAL: Record<number, ServiceType> = {
   6: ServiceType.PetStore,
   7: ServiceType.HouseSitting,
   8: ServiceType.DoggyDayCare,
+  9: ServiceType.Veterinary,
 };
 
 /** English display names for matching API strings in `resolveServiceType` only */
@@ -25,6 +26,7 @@ const SERVICE_TYPE_DISPLAY_NAMES: Record<ServiceType, string> = {
   [ServiceType.PetStore]: "Pet Store",
   [ServiceType.HouseSitting]: "House Sitting",
   [ServiceType.DoggyDayCare]: "Doggy Day Care",
+  [ServiceType.Veterinary]: "Veterinary",
 };
 
 const SERVICE_TYPE_TO_TRANSLATION_KEY: Record<ServiceType, TranslationKey> = {
@@ -37,6 +39,7 @@ const SERVICE_TYPE_TO_TRANSLATION_KEY: Record<ServiceType, TranslationKey> = {
   [ServiceType.PetStore]: "servicePetStore",
   [ServiceType.HouseSitting]: "serviceHouseSitting",
   [ServiceType.DoggyDayCare]: "serviceDoggyDayCare",
+  [ServiceType.Veterinary]: "chipVet",
 };
 
 const PRICING_UNIT_NUM_TO_KEY: Record<number, TranslationKey> = {

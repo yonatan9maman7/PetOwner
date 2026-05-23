@@ -18,6 +18,9 @@ export const SERVICE_I18N_MAP: Record<string, TranslationKey> = {
   "doggy day care": "serviceDoggyDayCare",
   grooming: "serviceGrooming",
   "pet grooming": "serviceGrooming",
+  veterinary: "chipVet",
+  vet: "chipVet",
+  "vet clinic": "chipVet",
 };
 
 export function translateServiceLabel(

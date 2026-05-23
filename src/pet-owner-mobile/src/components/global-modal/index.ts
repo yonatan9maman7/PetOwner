@@ -4,6 +4,7 @@ export {
   showGlobalConfirm,
   showGlobalModal,
   hideGlobalModal,
+  showMarkFoundConfirmAlert,
 } from "./modalService";
 export { showGlobalAlertCompat } from "./alertCompat";
 export type {

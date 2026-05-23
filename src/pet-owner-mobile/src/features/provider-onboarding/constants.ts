@@ -22,7 +22,7 @@ export interface ServiceDef {
  * Numeric ids must stay in sync with the C# `ServiceType` enum
  * (PetOwner.Data/Models/ServiceType.cs). Order = enum index.
  *   0 DogWalking, 1 PetSitting, 2 Boarding, 3 DropInVisit, 4 Training,
- *   5 Insurance, 6 PetStore, 7 HouseSitting, 8 DoggyDayCare
+ *   5 Insurance, 6 PetStore, 7 HouseSitting, 8 DoggyDayCare, 9 Veterinary
  */
 export const SERVICES: ServiceDef[] = [
   { serviceType: 0, serviceTypeName: ServiceType.DogWalking, pricingUnit: 0, nameKey: "serviceDogWalking", unitKey: "perHour", icon: "footsteps", bgColor: "rgba(15,47,127,0.08)", iconColor: NAVY },
@@ -34,6 +34,7 @@ export const SERVICES: ServiceDef[] = [
   { serviceType: 6, serviceTypeName: ServiceType.PetStore, pricingUnit: 4, nameKey: "servicePetStore", unitKey: "perPackage", icon: "storefront", bgColor: "rgba(15,47,127,0.06)", iconColor: NAVY },
   { serviceType: 7, serviceTypeName: ServiceType.HouseSitting, pricingUnit: 0, nameKey: "serviceHouseSitting", unitKey: "perHour", icon: "key", bgColor: "rgba(211,232,215,0.25)", iconColor: "#506356" },
   { serviceType: 8, serviceTypeName: ServiceType.DoggyDayCare, pricingUnit: 0, nameKey: "serviceDoggyDayCare", unitKey: "perHour", icon: "sunny", bgColor: "rgba(233,226,209,0.25)", iconColor: "#242116" },
+  { serviceType: 9, serviceTypeName: ServiceType.Veterinary, pricingUnit: 2, nameKey: "chipVet", unitKey: "perVisit", icon: "medkit", bgColor: "rgba(211,232,215,0.3)", iconColor: "#506356" },
 ];
 
 /** Individual sitters: dog care + training + visits — not business catalog services. */
@@ -51,6 +52,7 @@ const BUSINESS_ALLOWED_SERVICE_TYPES = new Set<ServiceType>([
   ServiceType.PetSitting,
   ServiceType.Insurance,
   ServiceType.PetStore,
+  ServiceType.Veterinary,
 ]);
 
 /**

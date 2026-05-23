@@ -21,7 +21,6 @@ import { AuthPlaceholder } from "../../../components/AuthPlaceholder";
 import { BrandedAppHeader } from "../../../components/BrandedAppHeader";
 import { useTheme } from "../../../theme/ThemeContext";
 import type { PetDto } from "../../../types/api";
-import { ListSkeleton } from "../../../components/shared/ListSkeleton";
 import { ScreenLoadingCenter } from "../../../components/shared/ScreenLoadingCenter";
 import { ListEmptyState } from "../../../components/shared/ListEmptyState";
 import { InlineError } from "../../../components/shared/InlineError";
@@ -39,7 +38,7 @@ import { HealthHubList } from "./components/HealthHubList";
 import { prefetchActivePetSummary, useActivePetSummary } from "./hooks/useActivePetSummary";
 import type { Section } from "./types";
 import { useDeferredMount } from "../../../hooks/useDeferredMount";
-import { showGlobalAlertCompat } from "../../../components/global-modal";
+import { showGlobalAlertCompat, showMarkFoundConfirmAlert } from "../../../components/global-modal";
 import {
   CelebrationConfettiBurst,
   type CelebrationConfettiBurstRef,
@@ -167,26 +166,20 @@ export function MyPetsScreen() {
 
   const handleMarkFoundFromBanner = useCallback(
     (pet: PetDto) => {
-      showGlobalAlertCompat(t("markFoundBtn"), `${t("markFound")}?`, [
-        { text: t("cancel"), style: "cancel" },
-        {
-          text: t("markFoundBtn"),
-          onPress: async () => {
-            setMarkFoundBusy(true);
-            try {
-              markFoundConfettiRef.current?.burst();
-              await new Promise<void>((resolve) =>
-                setTimeout(resolve, MARK_FOUND_SOS_CELEBRATION_DELAY_MS),
-              );
-              await usePetsStore.getState().markFound(pet.id);
-            } catch {
-              showGlobalAlertCompat(t("errorTitle"), t("profileSaveError"));
-            } finally {
-              setMarkFoundBusy(false);
-            }
-          },
-        },
-      ]);
+      showMarkFoundConfirmAlert(t, async () => {
+        setMarkFoundBusy(true);
+        try {
+          markFoundConfettiRef.current?.burst();
+          await new Promise<void>((resolve) =>
+            setTimeout(resolve, MARK_FOUND_SOS_CELEBRATION_DELAY_MS),
+          );
+          await usePetsStore.getState().markFound(pet.id);
+        } catch {
+          showGlobalAlertCompat(t("errorTitle"), t("profileSaveError"));
+        } finally {
+          setMarkFoundBusy(false);
+        }
+      });
     },
     [t],
   );
@@ -351,7 +344,7 @@ export function MyPetsScreen() {
 
           {/* Everything below is deferred to committedPetIndex — no blocking on the UI thread */}
           {isSwitching ? (
-            <ListSkeleton count={4} style={{ marginTop: 14, marginHorizontal: 20 }} />
+            <ScreenLoadingCenter fill={false} spinnerSize={60} style={{ paddingVertical: 48 }} />
           ) : (
             <>
               {activePet?.isLost ? (

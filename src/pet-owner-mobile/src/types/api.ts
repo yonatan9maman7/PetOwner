@@ -306,6 +306,7 @@ export enum ServiceType {
   PetStore = 'PetStore',
   HouseSitting = 'HouseSitting',
   DoggyDayCare = 'DoggyDayCare',
+  Veterinary = 'Veterinary',
 }
 
 export enum PricingUnit {
@@ -1013,6 +1014,8 @@ export interface BookingDto {
   providerPhone?: string;
   ownerPhone?: string;
   hasReview: boolean;
+  /** Free-text or predefined reason provided when the booking was cancelled or declined. */
+  cancellationReason?: string;
 }
 
 export interface FavoriteProviderDto {

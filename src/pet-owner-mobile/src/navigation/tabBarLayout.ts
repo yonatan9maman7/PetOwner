@@ -1,14 +1,14 @@
 import { Platform } from "react-native";
 import { initialWindowMetrics } from "react-native-safe-area-context";
 
-/** Must stay in sync with `useTabBarStyle` + `TabBarWithSos` in AppNavigator. */
+/** Must stay in sync with GLASS_BAR_CONTENT_HEIGHT in AppNavigator. */
 
-/** Icon + label area height (no padding). */
-export const TAB_BAR_CONTENT_HEIGHT_ANDROID = 580;
-export const TAB_BAR_CONTENT_HEIGHT_IOS = 40;
-/** Padding ABOVE icons so content sits in the upper portion of the row. */
-export const TAB_BAR_PADDING_TOP_ANDROID = 15;
-export const TAB_BAR_PADDING_TOP_IOS = 45;
+/** Icon + label area height — unified across platforms for the glass bar. */
+export const TAB_BAR_CONTENT_HEIGHT_ANDROID = 68;
+export const TAB_BAR_CONTENT_HEIGHT_IOS = 68;
+/** No separate top-padding hack needed; the glass bar is self-contained. */
+export const TAB_BAR_PADDING_TOP_ANDROID = 0;
+export const TAB_BAR_PADDING_TOP_IOS = 0;
 
 export function getTabBarBottomInset(insets: { bottom: number }): number {
   if (Platform.OS === "android") {

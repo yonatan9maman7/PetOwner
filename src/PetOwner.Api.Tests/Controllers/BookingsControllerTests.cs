@@ -281,7 +281,7 @@ public class BookingsControllerTests
     }
 
     [Fact]
-    public async Task Cancel_WhenOwnerCancelsPending_SetsCancelled()
+    public async Task Cancel_WhenOwnerCancelsPending_SetsCancelledWithReason()
     {
         // Arrange
         var ownerId = Guid.NewGuid();
@@ -292,13 +292,32 @@ public class BookingsControllerTests
         var sut = CreateSut(db, ownerId);
 
         // Act
-        var result = await sut.Cancel(bookingId);
+        var result = await sut.Cancel(bookingId, new CancelBookingRequest("Changed my plans"));
 
         // Assert
         Assert.IsType<NoContentResult>(result);
         var booking = await db.Bookings.FindAsync(bookingId);
         Assert.Equal(BookingStatus.Cancelled, booking!.Status);
         Assert.Equal(BookingActorRole.Owner, booking.CancelledByRole);
+        Assert.Equal("Changed my plans", booking.CancellationReason);
+    }
+
+    [Fact]
+    public async Task Cancel_WhenReasonBlank_ReturnsBadRequest()
+    {
+        // Arrange
+        var ownerId = Guid.NewGuid();
+        var providerId = Guid.NewGuid();
+        var bookingId = Guid.NewGuid();
+        await using var db = TestDbFactory.Create();
+        await SeedBookingGraphAsync(db, bookingId, ownerId, providerId);
+        var sut = CreateSut(db, ownerId);
+
+        // Act
+        var result = await sut.Cancel(bookingId, new CancelBookingRequest("   "));
+
+        // Assert
+        Assert.IsType<BadRequestObjectResult>(result);
     }
 
     [Fact]
@@ -313,7 +332,7 @@ public class BookingsControllerTests
         var sut = CreateSut(db, ownerId);
 
         // Act
-        var result = await sut.Cancel(bookingId);
+        var result = await sut.Cancel(bookingId, new CancelBookingRequest("Test reason"));
 
         // Assert
         Assert.IsType<BadRequestObjectResult>(result);
@@ -331,7 +350,7 @@ public class BookingsControllerTests
         var sut = CreateSut(db, ownerId);
 
         // Act
-        var result = await sut.Cancel(bookingId);
+        var result = await sut.Cancel(bookingId, new CancelBookingRequest("Test reason"));
 
         // Assert
         Assert.IsType<BadRequestObjectResult>(result);

@@ -18,6 +18,8 @@ import { useBookingsStore } from "../../store/bookingsStore";
 import { bookingsApi } from "../../api/client";
 import { ScreenLoadingCenter } from "../../components/shared/ScreenLoadingCenter";
 import type { BookingDto } from "../../types/api";
+import CancelBookingSheet from "./CancelBookingSheet";
+import type { CancelBookingMode } from "./CancelBookingSheet";
 
 const STATUS_COLORS: Record<string, { bg: string; text: string }> = {
   Pending: { bg: "#fef9c3", text: "#92400e" },
@@ -84,6 +86,12 @@ export function MyBookingsScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState<Tab>(initialTab);
 
+  // Cancel / decline sheet state
+  const [cancelSheet, setCancelSheet] = useState<{
+    booking: BookingDto;
+    mode: CancelBookingMode;
+  } | null>(null);
+
   const fetchBookings = useCallback(
     async (silent = false) => {
       await fetchMine({ silent });
@@ -123,22 +131,7 @@ export function MyBookingsScreen() {
   const bookings = activeTab === "incoming" ? incoming : outgoing;
 
   const handleCancel = (booking: BookingDto) => {
-    showGlobalAlertCompat(t("cancelBooking"), t("cancelBookingConfirm"), [
-      { text: t("backStep"), style: "cancel" },
-      {
-        text: t("cancelBooking"),
-        style: "destructive",
-        onPress: async () => {
-          try {
-            await bookingsApi.cancel(booking.id);
-            showGlobalAlertCompat(t("bookingCancelled"));
-            fetchBookings(true);
-          } catch {
-            /* error toast from global API interceptor */
-          }
-        },
-      },
-    ]);
+    setCancelSheet({ booking, mode: "owner" });
   };
 
   const handleConfirm = (booking: BookingDto) => {
@@ -160,23 +153,23 @@ export function MyBookingsScreen() {
   };
 
   const handleDecline = (booking: BookingDto) => {
-    showGlobalAlertCompat(t("declineBooking"), t("declineBookingConfirm"), [
-      { text: t("backStep"), style: "cancel" },
-      {
-        text: t("declineBooking"),
-        style: "destructive",
-        onPress: async () => {
-          try {
-            await bookingsApi.cancel(booking.id);
-            showGlobalAlertCompat(t("bookingDeclined"));
-            fetchBookings(true);
-          } catch {
-            /* error toast from global API interceptor */
-          }
-        },
-      },
-    ]);
+    setCancelSheet({ booking, mode: "provider" });
   };
+
+  const handleSheetConfirm = useCallback(
+    async (reason: string) => {
+      if (!cancelSheet) return;
+      await bookingsApi.cancel(cancelSheet.booking.id, reason);
+      setCancelSheet(null);
+      const successKey =
+        cancelSheet.mode === "owner" ? "bookingCancelled" : "bookingDeclined";
+      showGlobalAlertCompat(t(successKey));
+      fetchBookings(true);
+    },
+    [cancelSheet, t, fetchBookings],
+  );
+
+  const handleSheetDismiss = useCallback(() => setCancelSheet(null), []);
 
   const handleMarkComplete = (booking: BookingDto) => {
     showGlobalAlertCompat(t("markCompleted"), undefined, [
@@ -737,6 +730,13 @@ export function MyBookingsScreen() {
           }
         />
       )}
+
+      <CancelBookingSheet
+        visible={cancelSheet !== null}
+        mode={cancelSheet?.mode ?? "owner"}
+        onConfirm={handleSheetConfirm}
+        onDismiss={handleSheetDismiss}
+      />
     </SafeAreaView>
   );
 }
