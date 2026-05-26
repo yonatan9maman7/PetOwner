@@ -1,17 +1,10 @@
-    import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { View, Text, Pressable, StyleSheet, ActivityIndicator, InteractionManager } from "react-native";
-    import {
-      createBottomTabNavigator,
-      type BottomTabBarProps,
-    } from "@react-navigation/bottom-tabs";
-    import Animated, {
-      useSharedValue,
-      useAnimatedStyle,
-      withTiming,
-      Easing,
-    } from "react-native-reanimated";
-    import { BlurView } from "expo-blur";
-    import { useSafeAreaInsets } from "react-native-safe-area-context";
+import {
+  createBottomTabNavigator,
+  type BottomTabBarProps,
+} from "@react-navigation/bottom-tabs";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
     import { createNativeStackNavigator } from "@react-navigation/native-stack";
     import { getFocusedRouteNameFromRoute } from "@react-navigation/native";
     import { Ionicons } from "@expo/vector-icons";
@@ -117,277 +110,147 @@ import { View, Text, Pressable, StyleSheet, ActivityIndicator, InteractionManage
 
     const TAB_BAR_HIDDEN = { display: "none" as const };
 
-    // ─── Glassmorphism tab bar ────────────────────────────────────────────────────
+// ─── Solid bottom tab bar ─────────────────────────────────────────────────────
 
-    /**
-    * Set to true temporarily to paint each layer a vivid colour so you can
-    * see exactly what area each view occupies on screen (Android debug aid).
-    * Flip back to false before committing.
-    */
-    const DEBUG_TAB_BAR = false;
+function SolidTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
+  const insets = useSafeAreaInsets();
+  const { colors, isDark } = useTheme();
 
-    const GLASS_PILL_H_MARGIN = 6;
+  const focusedRoute = state.routes[state.index];
+  const focusedTabBarStyle = (descriptors[focusedRoute.key].options as any).tabBarStyle;
+  if (focusedTabBarStyle?.display === "none") return null;
 
-    // Apple-style "ease" curve: fast departure, smooth deceleration into place.
-    // withTiming at 250 ms gives a silky glide with zero bounce — no wobble possible.
-    const PILL_TIMING = {
-      duration: 250,
-      easing: Easing.bezier(0.25, 0.1, 0.25, 1),
-    };
+  const barBg = isDark ? "#0A1229" : "#0D1B42";
 
-    function GlassTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
-      const insets = useSafeAreaInsets();
-      const { colors, isDark } = useTheme();
+  return (
+    <View
+      style={[
+        solidStyles.barContainer,
+        {
+          backgroundColor: barBg,
+          paddingBottom: Math.max(insets.bottom, 12),
+          shadowColor: colors.shadow,
+        },
+      ]}
+    >
+      {state.routes.map((route, index) => {
+        const { options } = descriptors[route.key];
+        const isFocused = state.index === index;
+        const color = isFocused ? colors.tabBarActive : colors.tabBarInactive;
+        const label =
+          typeof options.tabBarLabel === "function"
+            ? options.tabBarLabel({
+                focused: isFocused,
+                color,
+                children: route.name,
+                position: "below-icon",
+              })
+            : (options.tabBarLabel ?? options.title ?? route.name);
+        const badge = options.tabBarBadge;
 
-      // Exact physical position + width of each tab button, populated by onLayout.
-      // Using physical coordinates (not computed from container width) makes this
-      // intrinsically RTL-safe: onLayout always returns the real pixel x position.
-      const tabLayouts = useRef<Record<number, { x: number; width: number }>>({});
-      const hasInitialized = useRef(false);
-      // Set to true in onPress so the subsequent useEffect doesn't double-fire.
-      const pressDidAnimateRef = useRef(false);
+        const onPress = () => {
+          const event = navigation.emit({
+            type: "tabPress",
+            target: route.key,
+            canPreventDefault: true,
+          });
+          if (!isFocused && !event.defaultPrevented) {
+            navigation.navigate(route.name, route.params as any);
+          }
+        };
 
-      // Reanimated shared values that drive the floating pill.
-      const pillX = useSharedValue(0);
-      const pillWidth = useSharedValue(0);
+        const onLongPress = () => {
+          navigation.emit({ type: "tabLongPress", target: route.key });
+        };
 
-      const pillStyle = useAnimatedStyle(() => ({
-        transform: [{ translateX: pillX.value }],
-        width: pillWidth.value,
-      }));
-
-      // ① Safety-net: keep the pill in sync after programmatic navigation
-      //    (deep links, back gestures, navigation.navigate() from code, etc.).
-      //    When the user taps a tab, onPress already fired the animation, so we
-      //    skip this to avoid restarting it mid-flight.
-      useEffect(() => {
-        if (pressDidAnimateRef.current) {
-          pressDidAnimateRef.current = false;
-          return;
-        }
-        const layout = tabLayouts.current[state.index];
-        if (!layout) return;
-        const targetX = layout.x + GLASS_PILL_H_MARGIN;
-        const targetW = layout.width - GLASS_PILL_H_MARGIN * 2;
-        if (!hasInitialized.current) {
-          // First active-tab layout: snap without animation so there's no slide-in on mount.
-          pillX.value = targetX;
-          pillWidth.value = targetW;
-          hasInitialized.current = true;
-        } else {
-          pillX.value = withTiming(targetX, PILL_TIMING);
-          pillWidth.value = withTiming(targetW, PILL_TIMING);
-        }
-      }, [state.index]);
-
-      const focusedRoute = state.routes[state.index];
-      const focusedTabBarStyle = (descriptors[focusedRoute.key].options as any).tabBarStyle;
-      if (focusedTabBarStyle?.display === "none") return null;
-
-      const overlayColor = isDark ? "rgba(26,34,54,0.90)" : "rgba(0,26,90,0.85)";
-
-      return (
-        <View
-          collapsable={false}
-          style={[
-            glassStyles.barContainer,
-            {
-              shadowColor: colors.shadow,
-              bottom: Math.max(insets.bottom, 16),
-            },
-          ]}
-        >
-          {/* Blur layer — purely visual, must never intercept touches */}
-          <BlurView
-            intensity={70}
-            tint="dark"
+        return (
+          <Pressable
+            key={route.key}
+            accessibilityRole="button"
+            accessibilityState={isFocused ? { selected: true } : {}}
+            accessibilityLabel={options.tabBarAccessibilityLabel}
+            testID={options.tabBarButtonTestID}
+            onPress={onPress}
+            onLongPress={onLongPress}
+            android_ripple={{ color: "rgba(255,255,255,0.1)", borderless: false }}
             style={[
-              StyleSheet.absoluteFill,
-              { borderRadius: 28 },
-              DEBUG_TAB_BAR && { backgroundColor: "rgba(255,0,0,0.35)" },
-            ]}
-            pointerEvents="none"
-          />
-          {/* Brand-colour tint + opaque fallback for Android / no-blur devices — purely visual */}
-          <View
-            style={[
-              StyleSheet.absoluteFill,
-              { backgroundColor: overlayColor, borderRadius: 28 },
-              DEBUG_TAB_BAR && { backgroundColor: "rgba(0,0,255,0.25)" },
-            ]}
-            pointerEvents="none"
-          />
-
-          {/* Icon row */}
-          <View
-            collapsable={false}
-            style={[
-              glassStyles.contentRow,
-              DEBUG_TAB_BAR && { backgroundColor: "rgba(0,255,0,0.25)" },
+              solidStyles.tabItem,
+              isFocused && solidStyles.tabItemActive,
             ]}
           >
-            {/* Pill — purely decorative, must never intercept touches */}
-            <Animated.View pointerEvents="none" style={[glassStyles.pill, pillStyle]} />
-
-            {state.routes.map((route, index) => {
-              const { options } = descriptors[route.key];
-              const isFocused = state.index === index;
-              const color = isFocused ? colors.tabBarActive : colors.tabBarInactive;
-              const label =
-                typeof options.tabBarLabel === "function"
-                  ? options.tabBarLabel({
-                      focused: isFocused,
-                      color,
-                      children: route.name,
-                      position: "below-icon",
-                    })
-                  : (options.tabBarLabel ?? options.title ?? route.name);
-              const badge = options.tabBarBadge;
-
-              // ② Pre-emptive animation on press: moves the pill BEFORE React Navigation
-              //    updates state.index, giving the same frame-zero response as a native control.
-              const onPress = () => {
-                if (!isFocused) {
-                  const layout = tabLayouts.current[index];
-                  if (layout) {
-                    pressDidAnimateRef.current = true;
-                    pillX.value = withTiming(layout.x + GLASS_PILL_H_MARGIN, PILL_TIMING);
-                    pillWidth.value = withTiming(
-                      layout.width - GLASS_PILL_H_MARGIN * 2,
-                      PILL_TIMING,
-                    );
-                  }
-                }
-                const event = navigation.emit({
-                  type: "tabPress",
-                  target: route.key,
-                  canPreventDefault: true,
-                });
-                if (!isFocused && !event.defaultPrevented) {
-                  navigation.navigate(route.name, route.params as any);
-                }
-              };
-
-              const onLongPress = () => {
-                navigation.emit({ type: "tabLongPress", target: route.key });
-              };
-
-              // ③ onLayout gives the physical pixel position of each tab button.
-              //    This is intrinsically RTL-correct: x is always the real left edge.
-              const onLayout = ({
-                nativeEvent: { layout },
-              }: {
-                nativeEvent: { layout: { x: number; width: number } };
-              }) => {
-                tabLayouts.current[index] = { x: layout.x, width: layout.width };
-                // Snap the pill to the initially-active tab as soon as its layout arrives.
-                if (index === state.index && !hasInitialized.current) {
-                  pillX.value = layout.x + GLASS_PILL_H_MARGIN;
-                  pillWidth.value = layout.width - GLASS_PILL_H_MARGIN * 2;
-                  hasInitialized.current = true;
-                }
-              };
-
-              return (
-                <Pressable
-                  key={route.key}
-                  accessibilityRole="button"
-                  accessibilityState={isFocused ? { selected: true } : {}}
-                  accessibilityLabel={options.tabBarAccessibilityLabel}
-                  testID={options.tabBarButtonTestID}
-                  onPress={onPress}
-                  onLongPress={onLongPress}
-                  onLayout={onLayout}
-                  style={[
-                    glassStyles.tabItem,
-                    DEBUG_TAB_BAR && { backgroundColor: `rgba(${index * 60},200,${255 - index * 60},0.4)` },
-                  ]}
-                >
-                  <View style={glassStyles.iconContainer}>
-                    {options.tabBarIcon?.({ focused: isFocused, color, size: 24 })}
-                    {badge != null && (
-                      <View style={[glassStyles.badge, { backgroundColor: colors.danger }]}>
-                        <Text style={glassStyles.badgeText}>
-                          {typeof badge === "number" && badge > 99 ? "99+" : badge}
-                        </Text>
-                      </View>
-                    )}
-                  </View>
-                  <Text style={[glassStyles.label, { color }]} numberOfLines={1}>
-                    {label as string}
+            <View style={solidStyles.iconContainer} pointerEvents="none">
+              {options.tabBarIcon?.({ focused: isFocused, color, size: 24 })}
+              {badge != null && (
+                <View style={[solidStyles.badge, { backgroundColor: colors.danger }]}>
+                  <Text style={solidStyles.badgeText}>
+                    {typeof badge === "number" && badge > 99 ? "99+" : badge}
                   </Text>
-                </Pressable>
-              );
-            })}
-          </View>
-        </View>
-      );
-    }
+                </View>
+              )}
+            </View>
+            <Text style={[solidStyles.label, { color }]} numberOfLines={1}>
+              {label as string}
+            </Text>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
 
-    const glassStyles = StyleSheet.create({
-      barContainer: {
-        marginHorizontal: 16,
-        marginBottom: 6,
-        borderRadius: 28,
-    overflow: "hidden",
-        borderWidth: 1,
-        borderColor: "rgba(255,255,255,0.15)",
-        shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.35,
-        shadowRadius: 20,
-        elevation: 20,
-      },
-      contentRow: {
-        flexDirection: "row",
-        height: 64,
-      },
-      pill: {
-        position: "absolute",
-        // top + bottom instead of a fixed height: the pill auto-sizes to the row
-        // height minus 6 px on each edge, giving it a slender, tightly-fitted look.
-        top: 6,
-        bottom: 6,
-        left: 0,
-        borderRadius: 18,
-        backgroundColor: "rgba(255,255,255,0.18)",
-      },
-      tabItem: {
+const solidStyles = StyleSheet.create({
+  barContainer: {
+    flexDirection: "row",
+    paddingHorizontal: 8,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 16,
+  },
+  tabItem: {
     flex: 1,
-    height: "100%",
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "rgba(255, 255, 255, 0.01)",
-    gap: 2,
+    paddingTop: 18,
+    paddingBottom: 10,
+    borderRadius: 16,
+    backgroundColor: "rgba(255,255,255,0.01)",
+    gap: 4,
   },
-      iconContainer: {
-        width: 28,
-        height: 28,
-        alignItems: "center",
-        justifyContent: "center",
-      },
-      label: {
-        fontSize: 10,
-        fontWeight: "700",
-        letterSpacing: 0.2,
-      },
-      badge: {
-        position: "absolute",
-        top: -4,
-        right: -10,
-        minWidth: 18,
-        height: 18,
-        borderRadius: 9,
-        alignItems: "center",
-        justifyContent: "center",
-        paddingHorizontal: 4,
-      },
-      badgeText: {
-        color: "#fff",
-        fontSize: 10,
-        fontWeight: "700",
-        lineHeight: 18,
-      },
-    });
+  tabItemActive: {
+    backgroundColor: "rgba(255,255,255,0.15)",
+  },
+  iconContainer: {
+    width: 28,
+    height: 28,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  label: {
+    fontSize: 10,
+    fontWeight: "700",
+    letterSpacing: 0.2,
+  },
+  badge: {
+    position: "absolute",
+    top: -4,
+    right: -10,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 4,
+  },
+  badgeText: {
+    color: "#fff",
+    fontSize: 10,
+    fontWeight: "700",
+    lineHeight: 18,
+  },
+});
 
 
     const Tab = createBottomTabNavigator();
@@ -666,7 +529,7 @@ import { View, Text, Pressable, StyleSheet, ActivityIndicator, InteractionManage
         <NotificationToast />
         <Tab.Navigator
           key={isLoggedIn ? "authenticated" : "guest"}
-          tabBar={(tabProps) => <GlassTabBar {...tabProps} />}
+          tabBar={(tabProps) => <SolidTabBar {...tabProps} />}
           screenOptions={{
             headerShown: false,
             freezeOnBlur: true,
