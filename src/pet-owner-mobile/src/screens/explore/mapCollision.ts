@@ -17,9 +17,9 @@ function isFiniteCoord(lat: unknown, lng: unknown): boolean {
 }
 
 function bucketPrecisionForDelta(latitudeDelta: number): number {
-  if (latitudeDelta > 2) return 1;
-  if (latitudeDelta > 0.5) return 2;
-  if (latitudeDelta > 0.1) return 3;
+  if (latitudeDelta > 0.5) return 1;
+  if (latitudeDelta > 0.08) return 2;
+  if (latitudeDelta > 0.015) return 3;
   return 4;
 }
 
@@ -29,10 +29,10 @@ function bucketPrecisionForDelta(latitudeDelta: number): number {
  *
  * | latitudeDelta | precision | bucket size |
  * |---------------|-----------|-------------|
- * | > 2           | 1         | ~11 km      |
- * | > 0.5         | 2         | ~1.1 km     |
- * | > 0.1         | 3         | ~110 m      |
- * | <= 0.1        | 4 (default)| ~11 m      |
+ * | > 0.5         | 1         | ~11 km      |
+ * | > 0.08        | 2         | ~1.1 km     |
+ * | > 0.015       | 3         | ~110 m      |
+ * | <= 0.015      | 4 (default)| ~11 m      |
  *
  * When `latitudeDelta` is omitted the function defaults to precision 4
  * (same-address only), preserving the previous behaviour.

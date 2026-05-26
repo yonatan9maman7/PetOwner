@@ -1,6 +1,6 @@
 import { DeviceEventEmitter } from "react-native";
 import type { NavigationProp, ParamListBase } from "@react-navigation/native";
-import { StackActions } from "@react-navigation/native";
+import { CommonActions, StackActions } from "@react-navigation/native";
 import { useAuthStore } from "../store/authStore";
 import { navigationRef } from "./navigationRef";
 import { rootNavigate, whenNavigationReady } from "./rootNavigation";
@@ -25,7 +25,7 @@ function navigateViaParentChain(navigation: NavigationProp<ParamListBase>): bool
       if (stackRouteCount(nav) > 1) {
         nav.dispatch(StackActions.popToTop());
       }
-      nav.navigate("Login" as never, LOGIN_TAB_PARAMS as never);
+      nav.dispatch(CommonActions.navigate({ name: "Login", params: LOGIN_TAB_PARAMS }));
       return true;
     }
     nav = nav.getParent() as NavigationProp<ParamListBase> | undefined;

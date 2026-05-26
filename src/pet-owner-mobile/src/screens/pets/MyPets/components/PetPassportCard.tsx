@@ -6,7 +6,6 @@ import { LinearGradient } from "expo-linear-gradient";
 import { BlurView } from "expo-blur";
 import { useTranslation, rowDirectionForAppLayout, type TranslationKey } from "../../../../i18n";
 import { useTheme } from "../../../../theme/ThemeContext";
-import { usePetsStore } from "../../../../store/petsStore";
 import type { PetDto } from "../../../../types/api";
 import { getSpeciesEmoji } from "../constants";
 import { ALLERGY_LABEL_I18N, formatBreedForDisplay } from "../../addPetHelpers";
@@ -43,32 +42,14 @@ function PetPassportCardInner({
   const CARD_W = screenWidth - 40;
 
   const handleMore = () => {
-    showGlobalAlertCompat(
-      pet.name,
-      undefined,
-      [
-        ...(pet.isLost
-          ? [
-              {
-                text: t("markFoundBtn"),
-                onPress: async () => {
-                  try {
-                    await usePetsStore.getState().markFound(pet.id);
-                  } catch {
-                    showGlobalAlertCompat(t("errorTitle"));
-                  }
-                },
-              },
-            ]
-          : []),
-        {
-          text: t("deletePet"),
-          style: "destructive" as const,
-          onPress: onDelete,
-        },
-        { text: t("softDeleteCancel"), style: "cancel" as const },
-      ],
-    );
+    showGlobalAlertCompat(pet.name, undefined, [
+      {
+        text: t("deletePet"),
+        style: "destructive" as const,
+        onPress: onDelete,
+      },
+      { text: t("softDeleteCancel"), style: "cancel" as const },
+    ]);
   };
 
   const chipRow = [

@@ -213,7 +213,6 @@ export function MessagesScreen() {
       ) : (
         <FlashList
           data={sorted}
-          estimatedItemSize={88}
           keyExtractor={(item) => item.conversationId}
           renderItem={renderItem}
           ListEmptyComponent={renderEmpty}

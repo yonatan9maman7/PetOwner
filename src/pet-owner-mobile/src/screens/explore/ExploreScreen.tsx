@@ -167,9 +167,8 @@ function getServiceIcon(name: string, isActive: boolean) {
 }
 
 /**
- * Google Maps on Android can stop receiving gestures after `I18nManager.forceRTL`
- * (language toggle → reload). Keep the map subtree in native LTR; Explore chrome
- * still uses `rowDirectionForAppLayout` / `rtlInput` for RTL UI.
+ * Keep the map subtree physically LTR; Explore chrome still uses
+ * `rowDirectionForAppLayout` / `rtlInput` for RTL UI.
  */
 function AndroidMapRtlIsolation({ children }: PropsWithChildren) {
   if (Platform.OS !== "android") return <>{children}</>;
@@ -380,8 +379,9 @@ export function ExploreScreen() {
       clusterPinsTotal,
     });
 
+    const MAX_MARKER_POOL_SIZE = 200;
     if (items.length > poolHighWaterRef.current) {
-      poolHighWaterRef.current = items.length;
+      poolHighWaterRef.current = Math.min(items.length, MAX_MARKER_POOL_SIZE);
     }
     const poolSize = poolHighWaterRef.current;
 
@@ -961,7 +961,7 @@ export function ExploreScreen() {
       }
       const prev = mapLatDeltaRef.current;
       const next = region.latitudeDelta;
-      if (Math.abs(next - prev) / Math.max(prev, 1e-9) > 0.15) {
+      if (Math.abs(next - prev) / Math.max(prev, 1e-9) > 0.05) {
         mapLatDeltaRef.current = next;
         setMapLatDelta(next);
       }
@@ -1240,17 +1240,24 @@ export function ExploreScreen() {
    * resolvedTabBarH. We just need a small breathing gap.
    */
   const CARD_ABOVE_TAB_GAP = 8;
+  const ANDROID_TAB_BAR_MAP_PADDING = 80;
 
   /**
    * mapPadding.bottom leaves a blank strip on iOS (parent background shows through).
-   * Keep at 0 unless a bottom card is open — then nudge the camera up so the selected
-   * provider is not hidden behind the card.
+   * On Android, keep the bottom tab-bar area reserved so Google Maps does not
+   * capture touches that visually belong to the tab bar.
    */
   const exploreMapPadding = useMemo(() => {
+    const tabBarPadding = Platform.OS === "android" ? ANDROID_TAB_BAR_MAP_PADDING : 0;
     if (!hasBottomOverlay || measuredCardHeight <= 0) {
-      return { top: 0, right: 0, bottom: 0, left: 0 };
+      return { top: 0, right: 0, bottom: tabBarPadding, left: 0 };
     }
-    return { top: 0, right: 0, left: 0, bottom: measuredCardHeight + CARD_ABOVE_TAB_GAP };
+    return {
+      top: 0,
+      right: 0,
+      left: 0,
+      bottom: tabBarPadding + measuredCardHeight + CARD_ABOVE_TAB_GAP,
+    };
   }, [hasBottomOverlay, measuredCardHeight]);
   const fabRowBottom = useMemo(
     () =>

@@ -21,7 +21,7 @@ import Animated, {
   FadeOut,
   FadeIn,
 } from "react-native-reanimated";
-import { useTranslation, type TranslationKey } from "../../i18n";
+import { useTranslation, rowDirectionForAppLayout, type TranslationKey } from "../../i18n";
 import { useTheme, type ThemeColors } from "../../theme/ThemeContext";
 import { mapApi } from "../../api/client";
 import { getNormalizedApiError } from "../../utils/apiUtils";
@@ -345,6 +345,28 @@ export function DiscoverScreen() {
     setSelectedCategory(id);
   }, []);
 
+  const categoryChipsScrollRef = useRef<ScrollView>(null);
+  const categoryChipsLayoutRef = useRef({ contentWidth: 0, viewportWidth: 0 });
+
+  /** Keep the first chip (All) visible at the reading-direction start in horizontal RTL lists. */
+  const alignCategoryChipsToStart = useCallback(() => {
+    const scroll = categoryChipsScrollRef.current;
+    if (!scroll) return;
+    const { contentWidth, viewportWidth } = categoryChipsLayoutRef.current;
+    if (contentWidth <= viewportWidth) return;
+
+    if (!isRTL) {
+      scroll.scrollTo({ x: 0, animated: false });
+      return;
+    }
+
+    scroll.scrollTo({ x: contentWidth - viewportWidth, animated: false });
+  }, [isRTL]);
+
+  useEffect(() => {
+    alignCategoryChipsToStart();
+  }, [alignCategoryChipsToStart]);
+
   const onCancelSearch = useCallback(() => {
     setSearchQuery("");
     setIsSearchFocused(false);
@@ -576,12 +598,22 @@ export function DiscoverScreen() {
           </Text>
         )}
         <ScrollView
+          ref={categoryChipsScrollRef}
           horizontal
           showsHorizontalScrollIndicator={false}
+          style={{ direction: "ltr" }}
           contentContainerStyle={[
             c.chipList,
-            isRTL && { flexDirection: "row-reverse" },
+            { flexDirection: rowDirectionForAppLayout(isRTL) },
           ]}
+          onLayout={(event) => {
+            categoryChipsLayoutRef.current.viewportWidth = event.nativeEvent.layout.width;
+            alignCategoryChipsToStart();
+          }}
+          onContentSizeChange={(width) => {
+            categoryChipsLayoutRef.current.contentWidth = width;
+            alignCategoryChipsToStart();
+          }}
         >
           {chips.map((item) => {
             const isActive = item.id === selectedCategory;

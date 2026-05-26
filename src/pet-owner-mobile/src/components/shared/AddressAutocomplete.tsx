@@ -107,7 +107,7 @@ export interface AddressAutocompleteProps {
 
 const DEBOUNCE_MS = 250;
 
-/** Logical row direction — does not rely on `I18nManager` (Modal subtrees often stay LTR). */
+/** Logical row direction — follows the in-app language even inside Modal subtrees. */
 function layoutDirection(isRTL: boolean | undefined | null): "ltr" | "rtl" {
   return isRTL ? "rtl" : "ltr";
 }
@@ -324,7 +324,7 @@ export function AddressAutocomplete({
         </Text>
       ) : null}
 
-      {/* Input row — explicit `direction` so RTL works inside Modal (no I18nManager mirroring). */}
+      {/* Input row — explicit `direction` so RTL works inside Modal. */}
       <View
         style={{
           flexDirection: "row",

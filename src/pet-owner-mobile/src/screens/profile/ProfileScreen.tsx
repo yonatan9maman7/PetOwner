@@ -127,10 +127,13 @@ function ProviderCTALoadingSlot() {
     <View
       accessibilityRole="progressbar"
       accessibilityLabel="Loading"
-      className="py-5 px-8 rounded-xl mb-4 flex-row items-center justify-center"
+      className="mb-4 flex-row items-center justify-center"
       style={{
         backgroundColor: colors.cardHighlight,
-        minHeight: 72,
+        paddingVertical: 16,
+        paddingHorizontal: 32,
+        borderRadius: 100,
+        minHeight: 56,
       }}
     >
       <PawLoadingSpinner size={40} />
@@ -142,13 +145,11 @@ function NavyButton({
   label,
   icon,
   onPress,
-  isRTL,
   disabled,
 }: {
   label: string;
   icon: keyof typeof Ionicons.glyphMap;
   onPress: () => void;
-  isRTL: boolean;
   disabled?: boolean;
 }) {
   const { colors } = useTheme();
@@ -156,9 +157,13 @@ function NavyButton({
   return (
     <TouchableOpacity
       activeOpacity={0.9}
-      className="py-5 px-8 rounded-xl mb-4 flex-row items-center justify-between"
+      className="mb-4 flex-row items-center justify-center"
       style={{
         backgroundColor: disabled ? colors.textMuted : colors.text,
+        paddingVertical: 16,
+        paddingHorizontal: 32,
+        borderRadius: 100,
+        gap: 10,
         shadowColor: colors.text,
         shadowOffset: { width: 0, height: 8 },
         shadowOpacity: disabled ? 0.1 : 0.25,
@@ -171,17 +176,10 @@ function NavyButton({
       accessibilityState={{ disabled }}
       accessibilityLabel={label}
     >
-      <View className="flex-row items-center gap-3">
-        <Ionicons name={icon} size={24} color={colors.textInverse} />
-        <Text className="font-bold text-base" style={{ color: colors.textInverse }}>{label}</Text>
-      </View>
-      {!disabled && (
-        <Ionicons
-          name={isRTL ? "arrow-back" : "arrow-forward"}
-          size={22}
-          color={colors.textInverse}
-        />
-      )}
+      <Ionicons name={icon} size={24} color={colors.textInverse} />
+      <Text className="font-bold text-base" style={{ color: colors.textInverse }}>
+        {label}
+      </Text>
     </TouchableOpacity>
   );
 }
@@ -377,7 +375,6 @@ export function ProfileScreen() {
             label={t("switchToProvider")}
             icon="paw"
             onPress={() => navigation.navigate("ProviderDashboard")}
-            isRTL={isRTL}
           />
         )}
 
@@ -386,7 +383,6 @@ export function ProfileScreen() {
             label={t("providerPendingEditCta")}
             icon="create-outline"
             onPress={() => navigation.navigate("ProviderEdit")}
-            isRTL={isRTL}
           />
         )}
 
@@ -395,7 +391,6 @@ export function ProfileScreen() {
             label={t("notifAccountSuspendedTitle")}
             icon="ban-outline"
             onPress={() => {}}
-            isRTL={isRTL}
             disabled
           />
         )}
@@ -405,7 +400,6 @@ export function ProfileScreen() {
             label={t("providerAccessEnded")}
             icon="alert-circle-outline"
             onPress={() => {}}
-            isRTL={isRTL}
             disabled
           />
         )}
@@ -415,7 +409,6 @@ export function ProfileScreen() {
             label={t("becomeProvider")}
             icon="paw"
             onPress={() => navigation.navigate("ProviderOnboarding")}
-            isRTL={isRTL}
           />
         )}
 
@@ -424,7 +417,6 @@ export function ProfileScreen() {
             label={t("adminDashboard")}
             icon="shield-checkmark-outline"
             onPress={() => navigation.navigate("AdminDashboard")}
-            isRTL={isRTL}
           />
         )}
 
@@ -478,14 +470,15 @@ export function ProfileScreen() {
             flexDirection: rowDirectionForAppLayout(isRTL),
             alignItems: "center",
             justifyContent: "center",
-            gap: 8,
+            gap: 10,
             marginTop: 8,
             paddingVertical: 16,
-            borderRadius: 14,
+            paddingHorizontal: 32,
+            borderRadius: 100,
             backgroundColor: colors.danger,
           }}
         >
-          <Ionicons name="log-out-outline" size={20} color="#fff" />
+          <Ionicons name="log-out-outline" size={24} color="#fff" />
           <Text style={{ fontSize: 16, fontWeight: "700", color: "#ffffff" }}>
             {t("logoutButton")}
           </Text>

@@ -14,6 +14,7 @@ jest.mock("../store/authStore", () => ({
   useAuthStore: {
     getState: jest.fn(() => ({
       user: { id: "reviewer-1", name: "Sam Owner" },
+      language: "en",
     })),
   },
 }));
@@ -30,6 +31,7 @@ describe("reviewsStore", () => {
     jest.clearAllMocks();
     jest.mocked(useAuthStore.getState).mockReturnValue({
       user: { id: "reviewer-1", name: "Sam Owner" },
+      language: "en",
     } as ReturnType<typeof useAuthStore.getState>);
   });
 

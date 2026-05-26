@@ -226,12 +226,13 @@ function BiometricCard() {
         "response" in err &&
         (err as { response?: unknown }).response
       ) {
-        const message =
+        const rawMessage =
           typeof err === "object" &&
           err !== null &&
           "response" in err &&
           (err as { response?: { data?: { message?: string } } }).response?.data
             ?.message;
+        const message = typeof rawMessage === "string" ? rawMessage : undefined;
         showGlobalAlertCompat(t("errorTitle"), message ?? t("loginError"));
       }
       // Other biometric / SecureStore failures: biometricService.enable already showed an alert.

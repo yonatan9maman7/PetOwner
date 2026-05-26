@@ -1,5 +1,6 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
+  DeviceEventEmitter,
   View,
   Text,
   Pressable,
@@ -9,18 +10,16 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useBottomSafeInset } from "../hooks/useBottomSafeInset";
-import {
-  useNavigation,
-  useNavigationState,
-  getFocusedRouteNameFromRoute,
-} from "@react-navigation/native";
+import { getFocusedRouteNameFromRoute } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuthStore } from "../store/authStore";
 import { useMyPetsUiStore } from "../store/myPetsUiStore";
 import { usePetsStore } from "../store/petsStore";
 import { useTranslation } from "../i18n";
 import { useTheme } from "../theme/ThemeContext";
-import { navigateToLoginClearingStack } from "../navigation/navigateToLoginClearingStack";
+import { rootNavigate } from "../navigation/rootNavigation";
+import { navigationRef } from "../navigation/navigationRef";
+import { EXPLORE_CLEAR_BEFORE_LOGIN_EVENT } from "../navigation/navigateToLoginClearingStack";
 
 /** Sits just above the tab bar. */
 const TAB_BAR_OFFSET = 72;
@@ -34,26 +33,38 @@ const MY_PETS_STACK_HIDE_SOS = new Set<string>([
   "ActivityLog",
 ]);
 
+function checkSosFabVisible(): boolean {
+  if (!navigationRef.isReady()) return false;
+  const state = navigationRef.getRootState();
+  if (!state?.routes?.length) return false;
+  const tabRoute = state.routes[state.index];
+  if (tabRoute.name !== "MyPets") return false;
+
+  const focused = getFocusedRouteNameFromRoute(tabRoute);
+  if (focused != null) return focused === "MyPetsMain";
+
+  const innerState = tabRoute.state;
+  if (!innerState?.routes?.length) return true;
+  const innerRoute = innerState.routes[innerState.index ?? 0];
+  if (!innerRoute?.name) return true;
+  if (MY_PETS_STACK_HIDE_SOS.has(innerRoute.name)) return false;
+  return innerRoute.name === "MyPetsMain";
+}
+
 function useSosFabVisible(): boolean {
-  return useNavigationState((state) => {
-    if (!state?.routes?.length) return false;
-    const tabRoute = state.routes[state.index];
-    if (tabRoute.name !== "MyPets") return false;
+  const [visible, setVisible] = useState(false);
 
-    const focused = getFocusedRouteNameFromRoute(tabRoute);
-    if (focused != null) return focused === "MyPetsMain";
+  useEffect(() => {
+    setVisible(checkSosFabVisible());
+    return navigationRef.addListener("state", () => {
+      setVisible(checkSosFabVisible());
+    });
+  }, []);
 
-    const innerState = tabRoute.state;
-    if (!innerState?.routes?.length) return true;
-    const innerRoute = innerState.routes[innerState.index ?? 0];
-    if (!innerRoute?.name) return true;
-    if (MY_PETS_STACK_HIDE_SOS.has(innerRoute.name)) return false;
-    return innerRoute.name === "MyPetsMain";
-  });
+  return visible;
 }
 
 export function GlobalSosFab() {
-  const navigation = useNavigation<any>();
   const insets = useSafeAreaInsets();
   const bottomInset = useBottomSafeInset();
   const { width } = useWindowDimensions();
@@ -76,27 +87,28 @@ export function GlobalSosFab() {
     (then: () => void) => {
       if (!isLoggedIn) {
         setMenuOpen(false);
-        navigateToLoginClearingStack(navigation);
+        DeviceEventEmitter.emit(EXPLORE_CLEAR_BEFORE_LOGIN_EVENT);
+        rootNavigate("Login", { screen: "LoginScreen" });
         return;
       }
       then();
     },
-    [isLoggedIn, navigation],
+    [isLoggedIn],
   );
 
   const onReportLost = useCallback(() => {
     setMenuOpen(false);
     requireAuth(() => {
-      navigation.navigate("MyPets", { screen: "ReportLost" });
+      rootNavigate("ReportLost");
     });
-  }, [navigation, requireAuth]);
+  }, [requireAuth]);
 
   const onEmergencyVet = useCallback(() => {
     setMenuOpen(false);
     requireAuth(() => {
-      navigation.navigate("MyPets", { screen: "EmergencyVets" });
+      rootNavigate("EmergencyVets");
     });
-  }, [navigation, requireAuth]);
+  }, [requireAuth]);
 
   const styles = useMemo(() => createStyles(colors), [colors]);
 

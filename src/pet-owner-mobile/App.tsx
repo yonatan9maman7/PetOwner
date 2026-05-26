@@ -1,6 +1,6 @@
 import "./global.css";
 import { useEffect, useRef, type ReactNode } from "react";
-import { DevSettings, I18nManager, Keyboard, Platform, View, LogBox } from "react-native";
+import { Keyboard, Platform, View, LogBox } from "react-native";
 import { NavigationContainer, DefaultTheme, DarkTheme } from "@react-navigation/native";
 import {
   initialWindowMetrics,
@@ -26,12 +26,7 @@ LogBox.ignoreLogs([
 ]);
 import { StatusBar } from "expo-status-bar";
 import * as Notifications from "expo-notifications";
-import * as SecureStore from "expo-secure-store";
 import { AppNavigator, navigationRef } from "./src/navigation/AppNavigator";
-import {
-  getActiveTabRouteName,
-  rootNavigate,
-} from "./src/navigation/rootNavigation";
 import { useAuthStore } from "./src/store/authStore";
 import { useThemeStore } from "./src/store/themeStore";
 import { useDogParkStore } from "./src/store/dogParkStore";
@@ -39,6 +34,9 @@ import { ThemeProvider, useTheme } from "./src/theme/ThemeContext";
 
 /** Brand tab-bar blue — paints behind transparent Android system bars before theme hydrates. */
 const ANDROID_EDGE_BG = "#001a5a";
+const APP_LAYOUT_ROOT = {
+  direction: "ltr" as const,
+};
 
 function RootShell({ children }: { children: ReactNode }) {
   const { colors } = useTheme();
@@ -51,6 +49,7 @@ function RootShell({ children }: { children: ReactNode }) {
 import { ErrorFallback } from "./src/components/ErrorFallback";
 import { ImageSourcePickerHost } from "./src/components/ImageSourcePickerHost";
 import { GlobalModalProvider } from "./src/components/global-modal";
+import { MarkerBitmapPrerender } from "./src/screens/explore/markerBitmapCache";
 import { attachNotificationListeners, type TapPayload } from "./src/services/pushService";
 import { routeForNotification } from "./src/services/notificationRouter";
 import Toast from "react-native-toast-message";
@@ -66,46 +65,6 @@ if (Platform.OS !== "web") {
       shouldSetBadge: true,
     }),
   });
-}
-
-const RELOAD_SCREEN_KEY = "LAST_ACTIVE_SCREEN_BEFORE_RELOAD";
-
-const reloadStorage = {
-  async get(): Promise<string | null> {
-    if (Platform.OS === "web") return localStorage.getItem(RELOAD_SCREEN_KEY);
-    return SecureStore.getItemAsync(RELOAD_SCREEN_KEY);
-  },
-  async set(value: string): Promise<void> {
-    if (Platform.OS === "web") {
-      localStorage.setItem(RELOAD_SCREEN_KEY, value);
-      return;
-    }
-    await SecureStore.setItemAsync(RELOAD_SCREEN_KEY, value);
-  },
-  async remove(): Promise<void> {
-    if (Platform.OS === "web") {
-      localStorage.removeItem(RELOAD_SCREEN_KEY);
-      return;
-    }
-    await SecureStore.deleteItemAsync(RELOAD_SCREEN_KEY);
-  },
-};
-
-const UNAUTHENTICATED_SCREENS = new Set([
-  "LoginScreen",
-  "RegisterScreen",
-  "ForgotPasswordScreen",
-]);
-
-function restoreScreenAfterReload(screenName: string, isLoggedIn: boolean): void {
-  if (UNAUTHENTICATED_SCREENS.has(screenName)) {
-    if (isLoggedIn) return;
-    rootNavigate(screenName);
-    return;
-  }
-
-  if (!isLoggedIn) return;
-  rootNavigate(screenName);
 }
 
 function AppInner() {
@@ -144,13 +103,6 @@ function AppInner() {
           if (isSentryEnabled()) {
             navigationIntegration.registerNavigationContainer(navigationRef);
           }
-          (async () => {
-            const screenName = await reloadStorage.get();
-            if (!screenName) return;
-            await reloadStorage.remove();
-            const isLoggedIn = useAuthStore.getState().isLoggedIn;
-            restoreScreenAfterReload(screenName, isLoggedIn);
-          })();
         }}
         onStateChange={() => {
           if (Platform.OS !== "web") {
@@ -172,7 +124,6 @@ function AppInner() {
 function App() {
   const hydrateAuth = useAuthStore((s) => s.hydrate);
   const authHydrated = useAuthStore((s) => s.hydrated);
-  const language = useAuthStore((s) => s.language);
   const hydrateTheme = useThemeStore((s) => s.hydrate);
   const themeHydrated = useThemeStore((s) => s.hydrated);
   const hydrateDogPark = useDogParkStore((s) => s.hydrate);
@@ -184,31 +135,6 @@ function App() {
     hydrateTheme();
     hydrateDogPark();
   }, [hydrateAuth, hydrateTheme, hydrateDogPark]);
-
-  useEffect(() => {
-    if (!authHydrated || Platform.OS === "web") return;
-
-    const shouldBeRTL = language === "he";
-    if (I18nManager.isRTL !== shouldBeRTL) {
-      I18nManager.forceRTL(shouldBeRTL);
-      I18nManager.allowRTL(true);
-      const doReload = async () => {
-        const tabName = getActiveTabRouteName();
-        if (tabName) {
-          await reloadStorage.set(tabName);
-        }
-        if (!__DEV__) {
-          const Updates = await import("expo-updates");
-          Updates.reloadAsync().catch(() => {});
-        } else if (Platform.OS === "android") {
-          // `forceRTL` on Android is only fully applied after restart; in dev a reload syncs
-          // `I18nManager.isRTL` with the in-app language (without this, LTR/RTL can appear inverted).
-          DevSettings.reload();
-        }
-      };
-      doReload();
-    }
-  }, [authHydrated, language]);
 
   // Attach notification tap listener and handle cold-start tap once after hydration.
   useEffect(() => {
@@ -271,6 +197,7 @@ function App() {
       <View
         style={{
           flex: 1,
+          ...APP_LAYOUT_ROOT,
           backgroundColor: Platform.OS === "android" ? ANDROID_EDGE_BG : "#fff",
         }}
       />
@@ -291,14 +218,17 @@ function App() {
       <GestureHandlerRootView
         style={{
           flex: 1,
+          ...APP_LAYOUT_ROOT,
           backgroundColor: Platform.OS === "android" ? ANDROID_EDGE_BG : undefined,
         }}
       >
-        <SafeAreaProvider initialWindowMetrics={initialWindowMetrics}>
+        <SafeAreaProvider initialMetrics={initialWindowMetrics}>
           <ThemeProvider>
             <RootShell>
               <GlobalModalProvider>
-                <AppInner />
+                <MarkerBitmapPrerender>
+                  <AppInner />
+                </MarkerBitmapPrerender>
               </GlobalModalProvider>
             </RootShell>
           </ThemeProvider>

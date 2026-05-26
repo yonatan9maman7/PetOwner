@@ -1,9 +1,8 @@
 import React from "react";
 import renderer, { act } from "react-test-renderer";
-import { Platform, Pressable, Text } from "react-native";
+import { Pressable } from "react-native";
 import type { MapPinDto } from "../types/api";
 import { ProviderType } from "../types/api";
-import { mapDiag } from "../screens/explore/exploreMapDiag";
 import {
   ExploreMapMarkers,
   ExploreSelectedMarkerOverlay,
@@ -11,13 +10,10 @@ import {
   type MarkerPoolSlot,
 } from "../screens/explore/ExploreMapMarkers";
 
-jest.mock("@expo/vector-icons", () => ({
-  Ionicons: () => null,
-}));
-
-jest.mock("../screens/explore/exploreMapDiag", () => ({
-  mapDiag: jest.fn(),
-}));
+let mockProviderUri: string | null = "file://provider.png";
+let mockSelectedUri: string | null = "file://selected.png";
+let mockClusterUris = new Map<number, string>();
+const mockGetClusterUri = jest.fn((count: number) => mockClusterUris.get(count) ?? null);
 
 jest.mock("../components/MapViewWrapper", () => {
   const React = require("react");
@@ -48,13 +44,13 @@ jest.mock("../components/MapViewWrapper", () => {
   };
 });
 
-const mapDiagMock = mapDiag as jest.MockedFunction<typeof mapDiag>;
-
-const originalPlatformOs = Platform.OS;
-
-function setPlatform(os: "ios" | "android") {
-  Object.defineProperty(Platform, "OS", { value: os, writable: true, configurable: true });
-}
+jest.mock("../screens/explore/markerBitmapCache", () => ({
+  useMarkerBitmapUris: () => ({
+    providerUri: mockProviderUri,
+    selectedUri: mockSelectedUri,
+    getClusterUri: mockGetClusterUri,
+  }),
+}));
 
 function renderComponent(element: React.ReactElement) {
   let tree!: renderer.ReactTestRenderer;
@@ -75,6 +71,7 @@ function makePin(overrides: Partial<MapPinDto> = {}): MapPinDto {
     reviewCount: 0,
     acceptsOffHoursRequests: false,
     providerType: ProviderType.Individual,
+    isEmergencyService: false,
     ...overrides,
   };
 }
@@ -126,7 +123,7 @@ function getMarker(tree: renderer.ReactTestRenderer, id: string) {
 function parseMarkerLabel(node: renderer.ReactTestInstance) {
   return JSON.parse(node.props.accessibilityLabel as string) as {
     coordinate: { latitude: number; longitude: number };
-    image?: number;
+    image?: { uri: string };
     zIndex?: number;
     tracksViewChanges?: boolean;
   };
@@ -134,18 +131,10 @@ function parseMarkerLabel(node: renderer.ReactTestInstance) {
 
 describe("ExploreMapMarkers", () => {
   beforeEach(() => {
-    setPlatform("android");
+    mockProviderUri = "file://provider.png";
+    mockSelectedUri = "file://selected.png";
+    mockClusterUris = new Map([[2, "file://cluster-2.png"]]);
     jest.clearAllMocks();
-    jest.useFakeTimers();
-  });
-
-  afterEach(() => {
-    act(() => {
-      jest.runOnlyPendingTimers();
-    });
-    jest.clearAllTimers();
-    jest.useRealTimers();
-    setPlatform(originalPlatformOs as "ios" | "android");
   });
 
   it("exports OFFSCREEN_COORDINATE", () => {
@@ -153,7 +142,7 @@ describe("ExploreMapMarkers", () => {
   });
 
   describe("ExploreMapMarkers container", () => {
-    it("renders one marker per pool slot and reports active count to mapDiag", () => {
+    it("renders one bitmap marker per pool slot when bitmap URIs are ready", () => {
       const pool: MarkerPoolSlot[] = [
         singleSlot(),
         clusterSlot(),
@@ -162,7 +151,7 @@ describe("ExploreMapMarkers", () => {
       const onPressProviderId = jest.fn();
       const onPressClusterPins = jest.fn();
 
-      renderComponent(
+      const tree = renderComponent(
         <ExploreMapMarkers
           pool={pool}
           onPressProviderId={onPressProviderId}
@@ -170,9 +159,25 @@ describe("ExploreMapMarkers", () => {
         />,
       );
 
-      expect(mapDiagMock).toHaveBeenCalledWith("markers.render", {
-        poolSize: 3,
-        active: 2,
+      const single = parseMarkerLabel(getMarker(tree, "pool-0"));
+      const cluster = parseMarkerLabel(getMarker(tree, "pool-1"));
+      const offscreen = parseMarkerLabel(getMarker(tree, "pool-2"));
+
+      expect(single).toMatchObject({
+        coordinate: { latitude: 32.1, longitude: 34.8 },
+        image: { uri: "file://provider.png" },
+        zIndex: 1,
+        tracksViewChanges: false,
+      });
+      expect(cluster).toMatchObject({
+        coordinate: { latitude: 32.2, longitude: 34.9 },
+        image: { uri: "file://cluster-2.png" },
+        zIndex: 1,
+        tracksViewChanges: false,
+      });
+      expect(offscreen).toMatchObject({
+        coordinate: OFFSCREEN_COORDINATE,
+        image: { uri: "file://provider.png" },
       });
     });
 
@@ -233,17 +238,43 @@ describe("ExploreMapMarkers", () => {
         />,
       );
 
-      act(() => {
-        getMarker(tree, "pool-0").props.onPress();
-      });
+      expect(getMarker(tree, "pool-0").props.onPress).toBeUndefined();
 
       expect(onPressProviderId).not.toHaveBeenCalled();
       expect(onPressClusterPins).not.toHaveBeenCalled();
     });
+
+    it("does not render provider/offscreen markers until the provider bitmap is ready", () => {
+      mockProviderUri = null;
+      const tree = renderComponent(
+        <ExploreMapMarkers
+          pool={[singleSlot(), offscreenSlot()]}
+          onPressProviderId={jest.fn()}
+          onPressClusterPins={jest.fn()}
+        />,
+      );
+
+      expect(tree.root.findAllByType(Pressable)).toHaveLength(0);
+    });
   });
 
-  describe("cluster badge", () => {
-    it("shows the count when count is 99 or less", () => {
+  describe("cluster bitmap behavior", () => {
+    it("uses the cached cluster bitmap for the requested count", () => {
+      const tree = renderComponent(
+        <ExploreMapMarkers
+          pool={[clusterSlot({ clusterCount: 2 })]}
+          onPressProviderId={jest.fn()}
+          onPressClusterPins={jest.fn()}
+        />,
+      );
+
+      const label = parseMarkerLabel(getMarker(tree, "pool-0"));
+      expect(mockGetClusterUri).toHaveBeenCalledWith(2);
+      expect(label.image).toEqual({ uri: "file://cluster-2.png" });
+      expect(label.tracksViewChanges).toBe(false);
+    });
+
+    it("falls back to the provider bitmap while a new cluster count is pending", () => {
       const tree = renderComponent(
         <ExploreMapMarkers
           pool={[clusterSlot({ clusterCount: 42 })]}
@@ -252,102 +283,29 @@ describe("ExploreMapMarkers", () => {
         />,
       );
 
-      const badge = tree.root
-        .findAllByType(Text)
-        .find((n) => n.props.children === 42);
-      expect(badge).toBeDefined();
-    });
-
-    it('shows "99+" when count exceeds 99', () => {
-      const tree = renderComponent(
-        <ExploreMapMarkers
-          pool={[clusterSlot({ clusterCount: 150 })]}
-          onPressProviderId={jest.fn()}
-          onPressClusterPins={jest.fn()}
-        />,
-      );
-
-      const badge = tree.root
-        .findAllByType(Text)
-        .find((n) => n.props.children === "99+");
-      expect(badge).toBeDefined();
-    });
-  });
-
-  describe("Android tracksViewChanges", () => {
-    beforeEach(() => setPlatform("android"));
-
-    it("keeps tracksViewChanges false on a single paw marker", () => {
-      const tree = renderComponent(
-        <ExploreMapMarkers
-          pool={[singleSlot()]}
-          onPressProviderId={jest.fn()}
-          onPressClusterPins={jest.fn()}
-        />,
-      );
-
-      expect(getMarker(tree, "pool-0").props.accessibilityState?.expanded).toBe(
-        false,
-      );
-
-      act(() => {
-        jest.advanceTimersByTime(2000);
-      });
-
-      expect(getMarker(tree, "pool-0").props.accessibilityState?.expanded).toBe(
-        false,
-      );
-    });
-
-    it("disables tracksViewChanges on cluster layout before the timeout", () => {
-      const tree = renderComponent(
-        <ExploreMapMarkers
-          pool={[clusterSlot()]}
-          onPressProviderId={jest.fn()}
-          onPressClusterPins={jest.fn()}
-        />,
-      );
-
-      expect(getMarker(tree, "pool-0").props.accessibilityState?.expanded).toBe(
-        true,
-      );
-
-      const layoutHost = tree.root.findAll(
-        (node) => typeof node.props.onLayout === "function",
-      )[0];
-
-      act(() => {
-        layoutHost.props.onLayout();
-        jest.advanceTimersByTime(350);
-      });
-
-      expect(getMarker(tree, "pool-0").props.accessibilityState?.expanded).toBe(
-        false,
-      );
-    });
-  });
-
-  describe("iOS PawMarker", () => {
-    beforeEach(() => setPlatform("ios"));
-
-    it("passes native image to MarkerWrapper with tracksViewChanges false", () => {
-      const tree = renderComponent(
-        <ExploreMapMarkers
-          pool={[singleSlot()]}
-          onPressProviderId={jest.fn()}
-          onPressClusterPins={jest.fn()}
-        />,
-      );
-
       const label = parseMarkerLabel(getMarker(tree, "pool-0"));
-      expect(label.image).toBeDefined();
-      expect(label.tracksViewChanges).toBe(false);
+      expect(mockGetClusterUri).toHaveBeenCalledWith(42);
+      expect(label.image).toEqual({ uri: "file://provider.png" });
+    });
+
+    it("does not render a cluster when neither cluster nor provider bitmap is ready", () => {
+      mockProviderUri = null;
+      mockClusterUris = new Map();
+      const tree = renderComponent(
+        <ExploreMapMarkers
+          pool={[clusterSlot({ clusterCount: 42 })]}
+          onPressProviderId={jest.fn()}
+          onPressClusterPins={jest.fn()}
+        />,
+      );
+
+      expect(tree.root.findAllByType(Pressable)).toHaveLength(0);
     });
   });
 
   describe("ExploreSelectedMarkerOverlay", () => {
-    it("uses OFFSCREEN_COORDINATE and deactivates when props are incomplete", () => {
-      renderComponent(
+    it("uses OFFSCREEN_COORDINATE when props are incomplete", () => {
+      const tree = renderComponent(
         <ExploreSelectedMarkerOverlay
           providerId={null}
           latitude={null}
@@ -355,10 +313,16 @@ describe("ExploreMapMarkers", () => {
         />,
       );
 
-      expect(mapDiagMock).toHaveBeenCalledWith("overlay.deactivate");
+      const label = parseMarkerLabel(getMarker(tree, "selected-overlay"));
+      expect(label).toMatchObject({
+        coordinate: OFFSCREEN_COORDINATE,
+        image: { uri: "file://selected.png" },
+        zIndex: 1000,
+        tracksViewChanges: false,
+      });
     });
 
-    it("positions at provider coordinates and activates when props are complete", () => {
+    it("positions at provider coordinates when props are complete", () => {
       const tree = renderComponent(
         <ExploreSelectedMarkerOverlay
           providerId="sel-1"
@@ -367,18 +331,12 @@ describe("ExploreMapMarkers", () => {
         />,
       );
 
-      expect(mapDiagMock).toHaveBeenCalledWith("overlay.activate", {
-        providerId: "sel-1",
-      });
-
       const label = parseMarkerLabel(getMarker(tree, "selected-overlay"));
       expect(label.coordinate).toEqual({ latitude: 32.5, longitude: 34.2 });
       expect(label.zIndex).toBe(1000);
     });
 
     it("keeps tracksViewChanges false when providerId changes while active", () => {
-      setPlatform("android");
-
       const tree = renderComponent(
         <ExploreSelectedMarkerOverlay
           providerId="sel-1"
@@ -404,6 +362,19 @@ describe("ExploreMapMarkers", () => {
       expect(
         getMarker(tree, "selected-overlay").props.accessibilityState?.expanded,
       ).toBe(false);
+    });
+
+    it("does not render until the selected bitmap is ready", () => {
+      mockSelectedUri = null;
+      const tree = renderComponent(
+        <ExploreSelectedMarkerOverlay
+          providerId="sel-1"
+          latitude={32.5}
+          longitude={34.2}
+        />,
+      );
+
+      expect(tree.root.findAllByType(Pressable)).toHaveLength(0);
     });
   });
 });

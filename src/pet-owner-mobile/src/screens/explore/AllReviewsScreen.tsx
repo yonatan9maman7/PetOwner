@@ -271,7 +271,6 @@ export function AllReviewsScreen() {
       <FlashList<ReviewDto>
         className="flex-1"
         data={loading && reviews.length === 0 ? [] : sortedReviews}
-        estimatedItemSize={150}
         keyExtractor={(r) => r.id}
         renderItem={renderItem}
         ListHeaderComponent={ListHeader}

@@ -8,6 +8,10 @@ enableScreens(true);
 import { registerRootComponent } from "expo";
 import App from "./App";
 
-I18nManager.allowRTL(true);
+// App language controls layout direction in JS; keep native mirroring disabled
+// so Android/iOS system language cannot fight the in-app language setting.
+I18nManager.allowRTL(false);
+I18nManager.forceRTL(false);
+I18nManager.swapLeftAndRightInRTL(false);
 
 registerRootComponent(App);

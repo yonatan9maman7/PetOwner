@@ -1,16 +1,16 @@
 import type { ReactNode } from "react";
-import { View, Text, Platform, I18nManager, type StyleProp, type ViewStyle } from "react-native";
+import { View, Text, type StyleProp, type ViewStyle } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../theme/ThemeContext";
 
 export const BRAND_HEADER_HORIZONTAL_PAD = 28;
 
 /**
- * Brand header rows must not flip with app RTL on Android — counter native flex mirroring.
+ * Brand header rows stay physically LTR; app language drives surrounding layout.
  * Parent containers should also set `direction: "ltr"` (see `BRAND_HEADER_LTR_CONTAINER`).
  */
 export function brandHeaderRowFlexDirection(): "row" | "row-reverse" {
-  return Platform.OS === "android" && I18nManager.isRTL ? "row-reverse" : "row";
+  return "row";
 }
 
 /** Locks the whole header strip to physical LTR (logo stays on the default/left edge). */

@@ -54,7 +54,6 @@ export function NearbyPalsList() {
   return (
       <FlashList
         data={pals}
-        estimatedItemSize={150}
         keyExtractor={(item) => item.userId}
         contentContainerStyle={{ paddingBottom: 120 }}
       refreshControl={

@@ -61,7 +61,6 @@ export function LiveBeaconsList() {
     <View style={{ flex: 1 }}>
       <FlashList
         data={beacons}
-        estimatedItemSize={180}
         keyExtractor={(item) => item.id}
         contentContainerStyle={{ paddingBottom: 140 }}
         refreshControl={

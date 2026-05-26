@@ -312,7 +312,6 @@ export function ActivityLogScreen() {
       <FlashList<ActivityDto>
         className="flex-1"
         data={items}
-        estimatedItemSize={72}
         keyExtractor={(a) => a.id}
         extraData={{ isRTL, colors }}
         ListHeaderComponent={ListHeader}

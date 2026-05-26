@@ -16,7 +16,6 @@ import {
   type KeyboardAvoidingViewProps,
   Share,
   InteractionManager,
-  I18nManager,
 } from "react-native";
 import { showGlobalAlertCompat, showMarkFoundConfirmAlert } from "../../components/global-modal";
 import { SafeAreaProvider, SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
@@ -524,7 +523,7 @@ export function CommunityScreen() {
 
   const openPlaydateModal = useCallback(() => {
     resetPlaydateForm();
-    openPlaydateModal();
+    setPlaydateModalOpen(true);
   }, [resetPlaydateForm]);
 
   const [beacons, setBeacons] = useState<LiveBeaconDto[]>([]);
@@ -573,11 +572,7 @@ export function CommunityScreen() {
       return;
     }
 
-    if (I18nManager.isRTL) {
-      scroll.scrollToEnd({ animated: false });
-    } else {
-      scroll.scrollTo({ x: contentWidth - viewportWidth, animated: false });
-    }
+    scroll.scrollTo({ x: contentWidth - viewportWidth, animated: false });
   }, [isRTL]);
 
   useEffect(() => {
@@ -1693,7 +1688,7 @@ export function CommunityScreen() {
           ref={categoryTabsScrollRef}
           horizontal
           showsHorizontalScrollIndicator={false}
-          style={[styles.categoryTabsScroll, { flexGrow: 0, flexShrink: 0 }]}
+          style={[styles.categoryTabsScroll, { direction: "ltr", flexGrow: 0, flexShrink: 0 }]}
           contentContainerStyle={[
             styles.topTabsContent,
             { flexDirection: appRowDirection },

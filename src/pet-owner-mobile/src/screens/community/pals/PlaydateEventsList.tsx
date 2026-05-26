@@ -40,7 +40,6 @@ export function PlaydateEventsList() {
     <View style={{ flex: 1 }}>
       <FlashList
         data={events}
-        estimatedItemSize={140}
         keyExtractor={(item) => item.id}
         contentContainerStyle={{ paddingBottom: 140 }}
         refreshControl={

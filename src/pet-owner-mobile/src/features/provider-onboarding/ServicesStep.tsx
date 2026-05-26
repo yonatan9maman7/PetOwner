@@ -39,6 +39,8 @@ function serviceInfoDescriptionKey(serviceTypeName: ServiceType): TranslationKey
       return "serviceInfoInsurance";
     case ServiceType.PetStore:
       return "serviceInfoPetStore";
+    case ServiceType.Veterinary:
+      return "serviceInfoVeterinary";
     case ServiceType.HouseSitting:
       return "serviceInfoHouseSitting";
     case ServiceType.DoggyDayCare:

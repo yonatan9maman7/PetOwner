@@ -1,56 +1,46 @@
-import React, { memo, useCallback, useState, type ReactNode } from "react";
-import { View, Image, StyleSheet, Text, Platform } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+/**
+ * Explore map markers — production-grade bitmap-based rendering.
+ *
+ * Architecture (used by Wolt / Uber / Mapbox-style production map apps):
+ *
+ *  1. The React marker visuals (paw + circle + selection / cluster badge)
+ *     live in `markerPinViews.tsx`. They are NEVER mounted as `<Marker>`
+ *     children at runtime.
+ *
+ *  2. `MarkerBitmapPrerender` (mounted in `App.tsx`) renders these views once
+ *     off-screen, captures each to a PNG via `react-native-view-shot`, and
+ *     exposes the resulting file URIs through React context.
+ *
+ *  3. `<Marker image={{ uri }} />` draws those bitmaps directly via
+ *     MKAnnotationView (iOS) / BitmapDescriptor (Android). There is no
+ *     React-view snapshot at runtime, so:
+ *      • No pink default-pin fallback on iOS when slots transition.
+ *      • No empty-bitmap snapshots on Android during zoom.
+ *      • `tracksViewChanges` can stay `false` permanently — perfect perf.
+ *
+ *  4. Pool invariant kept: slots are mounted for the lifetime of the pool;
+ *     offscreen slots park at `OFFSCREEN_COORDINATE`. The only thing changing
+ *     between zoom levels is the `image` URI handed to a slot — a cheap
+ *     native bitmap swap.
+ *
+ * Cluster bitmaps are cached per count value (each count = different badge).
+ * If a brand-new count appears before its bitmap is ready, the marker briefly
+ * uses the provider bitmap as a fallback — still no pink pin.
+ */
+
+import React, { memo, useCallback } from "react";
 import { MarkerWrapper } from "../../components/MapViewWrapper";
 import type { MapPinDto } from "../../types/api";
-
-/** Toggle to preview cluster-style Ionicons paws instead of PNG assets. */
-const PREVIEW_IONICON_PAW_MARKERS = false;
-
-const PAW_PROVIDER_IMAGE = require("../../../assets/map-marker-provider.png");
-const PAW_SELECTED_IMAGE = require("../../../assets/map-marker-provider-selected.png");
-
-const IS_ANDROID = Platform.OS === "android";
-
-const BRAND_PRIMARY = "#001a5a";
-const PAW_ICON_COLOR = "#1a1a2e";
+import { useMarkerBitmapUris } from "./markerBitmapCache";
 
 /* ── Constants ──────────────────────────────────────────────────────────── */
 
 export const OFFSCREEN_COORDINATE = { latitude: -90, longitude: 0 } as const;
 
-const ANCHOR_PIN_TIP = { x: 0.5, y: 1 } as const;
 const ANCHOR_CENTER = { x: 0.5, y: 0.5 } as const;
-
-const PAW_SIZE = 45;
-const PAW_SELECTED_SIZE = 45;
 
 const MARKER_Z = 1;
 const SELECTED_Z = 1000;
-
-const CLUSTER_OUTER = 52;
-const CLUSTER_INNER = 40;
-const CLUSTER_ICON = 20;
-
-const IONICON_PAW_OUTER = PAW_SIZE;
-const IONICON_PAW_INNER = 36;
-const IONICON_PAW_ICON = 22;
-const IONICON_SELECTED_OUTER = PAW_SELECTED_SIZE;
-const IONICON_SELECTED_INNER = 38;
-const IONICON_SELECTED_ICON = 24;
-
-/* ── Image preload (iOS red-pin avoidance) ──────────────────────────────────
- *
- * iOS: After the first paw onLoad, later markers start with imageLoaded=true
- * so tracksViewChanges stays false (avoids MapKit red-balloon flash).
- *
- * Android: Each marker still waits for its own onLoad before freezing the
- * snapshot (tracksViewChanges=false); empty snapshot if frozen too early.
- *
- * ────────────────────────────────────────────────────────────────────────── */
-
-let pawPreloaded = false;
-let selectedPreloaded = false;
 
 /* ── Types ──────────────────────────────────────────────────────────────── */
 
@@ -78,191 +68,7 @@ export type ExploreSelectedMarkerOverlayProps = {
   longitude: number | null;
 };
 
-/* ── Styles ─────────────────────────────────────────────────────────────── */
-
-const S = StyleSheet.create({
-  markerRoot: {
-    width: PAW_SIZE,
-    height: PAW_SIZE,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  markerImage: {
-    width: PAW_SIZE,
-    height: PAW_SIZE,
-  },
-  selectedRoot: {
-    width: PAW_SELECTED_SIZE,
-    height: PAW_SELECTED_SIZE,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  selectedImage: {
-    width: PAW_SELECTED_SIZE,
-    height: PAW_SELECTED_SIZE,
-  },
-  clusterOuter: {
-    width: CLUSTER_OUTER,
-    height: CLUSTER_OUTER,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  clusterInner: {
-    width: CLUSTER_INNER,
-    height: CLUSTER_INNER,
-    borderRadius: CLUSTER_INNER / 2,
-    backgroundColor: "#ffffff",
-    justifyContent: "center",
-    alignItems: "center",
-    borderWidth: 2,
-    borderColor: "#e2e2e2",
-    ...Platform.select({ android: { elevation: 0 }, default: {} }),
-  },
-  badge: {
-    position: "absolute",
-    top: 2,
-    right: 2,
-    minWidth: 18,
-    height: 18,
-    borderRadius: 9,
-    paddingHorizontal: 4,
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 1.5,
-    borderColor: "#ffffff",
-    backgroundColor: "#ef4444",
-  },
-  badgeText: {
-    fontSize: 10,
-    fontWeight: "800",
-    color: "#ffffff",
-  },
-  ioniconPawOuter: {
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  ioniconPawInner: {
-    backgroundColor: "#ffffff",
-    justifyContent: "center",
-    alignItems: "center",
-    borderWidth: 2,
-    borderColor: "#e2e2e2",
-    ...Platform.select({ android: { elevation: 2 }, default: {} }),
-  },
-  ioniconPawInnerSelected: {
-    backgroundColor: "#ffffff",
-    borderColor: BRAND_PRIMARY,
-    borderWidth: 3,
-    ...Platform.select({ android: { elevation: 4 }, default: {} }),
-  },
-  ioniconPawRing: {
-    position: "absolute",
-    borderColor: BRAND_PRIMARY,
-    borderWidth: 2,
-    backgroundColor: "transparent",
-  },
-});
-
-function IoniconPawMarkerContent({
-  selected,
-  size,
-}: {
-  selected: boolean;
-  size: number;
-}) {
-  const outer = selected ? IONICON_SELECTED_OUTER : IONICON_PAW_OUTER;
-  const inner = selected ? IONICON_SELECTED_INNER : IONICON_PAW_INNER;
-  const icon = selected ? IONICON_SELECTED_ICON : IONICON_PAW_ICON;
-
-  return (
-    <View
-      style={[S.ioniconPawOuter, { width: outer, height: outer }]}
-      collapsable={false}
-    >
-      {selected ? (
-        <View
-          style={[
-            S.ioniconPawRing,
-            {
-              width: size,
-              height: size,
-              borderRadius: size / 2,
-            },
-          ]}
-          collapsable={false}
-        />
-      ) : null}
-      <View
-        style={[
-          S.ioniconPawInner,
-          selected && S.ioniconPawInnerSelected,
-          {
-            width: inner,
-            height: inner,
-            borderRadius: inner / 2,
-          },
-        ]}
-        collapsable={false}
-      >
-        <Ionicons
-          name="paw"
-          size={icon}
-          color={selected ? BRAND_PRIMARY : PAW_ICON_COLOR}
-        />
-      </View>
-    </View>
-  );
-}
-
-function PawMarkerBody({
-  selected,
-  imageLoaded,
-  onImageLoad,
-}: {
-  selected: boolean;
-  imageLoaded: boolean;
-  onImageLoad: () => void;
-}): ReactNode {
-  if (PREVIEW_IONICON_PAW_MARKERS) {
-    return (
-      <IoniconPawMarkerContent
-        selected={selected}
-        size={selected ? IONICON_SELECTED_OUTER : IONICON_PAW_OUTER}
-      />
-    );
-  }
-
-  const rootStyle = selected ? S.selectedRoot : S.markerRoot;
-  const imageStyle = selected ? S.selectedImage : S.markerImage;
-  const source = selected ? PAW_SELECTED_IMAGE : PAW_PROVIDER_IMAGE;
-
-  return (
-    <View style={rootStyle} collapsable={false}>
-      <Image
-        source={source}
-        style={imageStyle}
-        resizeMode="contain"
-        onLoad={onImageLoad}
-      />
-    </View>
-  );
-}
-
-/* ── PooledMarker ───────────────────────────────────────────────────────────
- *
- * POOL INVARIANT: This component must never unmount. Returning null for
- * offscreen slots causes native Marker nodes to be added/removed from the
- * MapView, which triggers crashes in Google Maps (Android) when many markers
- * change state simultaneously during a zoom. Every slot stays mounted;
- * only its coordinate and content change.
- *
- * RED-PIN FIX: The paw Image is rendered in BOTH "single" AND "offscreen"
- * states. While a slot is offscreen the image pre-warms (onLoad fires,
- * pawPreloaded=true). When the slot becomes "single" the image is already
- * in the system image cache, so tracksViewChanges is false immediately and
- * iOS MapKit never falls back to its default red-balloon pin.
- *
- * ────────────────────────────────────────────────────────────────────────── */
+/* ── PooledMarker ───────────────────────────────────────────────────────── */
 
 type PooledMarkerProps = {
   slot: MarkerPoolSlot;
@@ -280,13 +86,7 @@ const PooledMarker = memo(function PooledMarker({
   onPressProviderId,
   onPressClusterPins,
 }: PooledMarkerProps) {
-  // Android: never trust the preload flag — each marker must wait for its own onLoad.
-  const [imageLoaded, setImageLoaded] = useState(IS_ANDROID ? false : pawPreloaded);
-
-  const handleImageLoad = useCallback(() => {
-    if (!IS_ANDROID) pawPreloaded = true;
-    setImageLoaded(true);
-  }, []);
+  const { providerUri, getClusterUri } = useMarkerBitmapUris();
 
   const handlePress = useCallback(() => {
     if (slot.kind === "single" && slot.providerId) {
@@ -296,8 +96,11 @@ const PooledMarker = memo(function PooledMarker({
     }
   }, [slot, onPressProviderId, onPressClusterPins]);
 
-  // ── Cluster ────────────────────────────────────────────────────────────
+  // ── Cluster ─────────────────────────────────────────────────────────────
   if (slot.kind === "cluster") {
+    const clusterUri = getClusterUri(slot.clusterCount);
+    const imageUri = clusterUri ?? providerUri;
+    if (!imageUri) return null;
     return (
       <MarkerWrapper
         identifier={`pool-${index}`}
@@ -306,44 +109,27 @@ const PooledMarker = memo(function PooledMarker({
         tracksViewChanges={false}
         onPress={handlePress}
         zIndex={MARKER_Z}
-      >
-        <View style={S.clusterOuter} collapsable={false}>
-          <View style={S.clusterInner} collapsable={false}>
-            <Ionicons name="paw" size={CLUSTER_ICON} color="#1a1a2e" />
-          </View>
-          <View style={S.badge} collapsable={false}>
-            <Text style={S.badgeText}>
-              {slot.clusterCount > 99 ? "99+" : slot.clusterCount}
-            </Text>
-          </View>
-        </View>
-      </MarkerWrapper>
+        image={{ uri: imageUri }}
+      />
     );
   }
 
-  // ── Single or offscreen ──────────────────────────────────────────────
+  // ── Single / offscreen ─────────────────────────────────────────────────
   const isVisible = slot.kind === "single";
   const coordinate = isVisible ? slot.coordinate : OFFSCREEN_COORDINATE;
 
-  const tracksViewChanges = PREVIEW_IONICON_PAW_MARKERS
-    ? false
-    : !imageLoaded;
+  if (!providerUri) return null;
 
   return (
     <MarkerWrapper
       identifier={`pool-${index}`}
       coordinate={coordinate}
-      anchor={PREVIEW_IONICON_PAW_MARKERS ? ANCHOR_CENTER : ANCHOR_PIN_TIP}
-      tracksViewChanges={tracksViewChanges}
+      anchor={ANCHOR_CENTER}
+      tracksViewChanges={false}
       onPress={isVisible ? handlePress : undefined}
       zIndex={MARKER_Z}
-    >
-      <PawMarkerBody
-        selected={false}
-        imageLoaded={imageLoaded}
-        onImageLoad={handleImageLoad}
-      />
-    </MarkerWrapper>
+      image={{ uri: providerUri }}
+    />
   );
 });
 
@@ -377,12 +163,7 @@ export const ExploreSelectedMarkerOverlay = memo(
     latitude,
     longitude,
   }: ExploreSelectedMarkerOverlayProps) {
-    const [imageLoaded, setImageLoaded] = useState(IS_ANDROID ? false : selectedPreloaded);
-
-    const handleImageLoad = useCallback(() => {
-      if (!IS_ANDROID) selectedPreloaded = true;
-      setImageLoaded(true);
-    }, []);
+    const { selectedUri } = useMarkerBitmapUris();
 
     const isActive =
       providerId != null && latitude != null && longitude != null;
@@ -391,24 +172,17 @@ export const ExploreSelectedMarkerOverlay = memo(
       ? { latitude: Number(latitude), longitude: Number(longitude) }
       : OFFSCREEN_COORDINATE;
 
-    const tracksViewChanges = PREVIEW_IONICON_PAW_MARKERS
-      ? false
-      : !imageLoaded;
+    if (!selectedUri) return null;
 
     return (
       <MarkerWrapper
         identifier="selected-overlay"
         coordinate={coordinate}
-        anchor={PREVIEW_IONICON_PAW_MARKERS ? ANCHOR_CENTER : ANCHOR_PIN_TIP}
-        tracksViewChanges={tracksViewChanges}
+        anchor={ANCHOR_CENTER}
+        tracksViewChanges={false}
         zIndex={SELECTED_Z}
-      >
-        <PawMarkerBody
-          selected
-          imageLoaded={imageLoaded}
-          onImageLoad={handleImageLoad}
-        />
-      </MarkerWrapper>
+        image={{ uri: selectedUri }}
+      />
     );
   },
 );

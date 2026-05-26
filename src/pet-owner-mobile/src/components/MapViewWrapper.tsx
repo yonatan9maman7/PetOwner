@@ -4,6 +4,7 @@ import MapView, { Marker, Circle } from "react-native-maps";
 
 export const MapViewWrapper = React.forwardRef<MapView, any>(
   ({ style, fallbackLabel, children, onMapReady, onError, ...rest }, ref) => {
+    void onError;
     try {
       return (
         <MapView
@@ -15,11 +16,6 @@ export const MapViewWrapper = React.forwardRef<MapView, any>(
             // eslint-disable-next-line no-console
             console.log("Map ready");
             onMapReady?.(e);
-          }}
-          onError={(e) => {
-            // eslint-disable-next-line no-console
-            console.log("Map error:", e);
-            onError?.(e);
           }}
         >
           {children}

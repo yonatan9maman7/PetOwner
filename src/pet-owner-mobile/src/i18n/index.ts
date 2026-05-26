@@ -1,5 +1,4 @@
 import { useCallback } from "react";
-import { I18nManager, Platform } from "react-native";
 import { useAuthStore } from "../store/authStore";
 import communityHe from "../screens/community/i18n/he.json";
 import communityEn from "../screens/community/i18n/en.json";
@@ -572,6 +571,8 @@ const he = {
   serviceInfoInsurance:
     "הצעה לתוכניות ביטוח לחיות מחמד או מוצרי כיסוי נלווים.",
   serviceInfoPetStore: "מכירת מוצרים לחיות מחמד, אספקה או חבילות.",
+  serviceInfoVeterinary:
+    "מתן שירותי וטרינריה, בדיקות או טיפול רפואי לחיות מחמד.",
   serviceInfoTraining:
     "מפגשים מובנים המתמקדים בצייתנות, מיומנות או התנהגות.",
   serviceInfoHouseSitting:
@@ -1989,6 +1990,8 @@ const en: Record<keyof typeof he, string> = {
     "Offering pet insurance plans or related coverage products.",
   serviceInfoPetStore:
     "Selling pet products, supplies, or bundled packages.",
+  serviceInfoVeterinary:
+    "Providing veterinary services, checkups, or medical care for pets.",
   serviceInfoTraining:
     "Structured sessions focused on obedience, skills, or behavior.",
   serviceInfoHouseSitting:
@@ -2886,34 +2889,16 @@ export function bidiWrapRtl(text: string, isRTL: boolean): string {
   return `\u202B${text}\u202C`;
 }
 
-/**
- * When `I18nManager.isRTL` is true the OS (both iOS and Android) applies native
- * flex mirroring to all flex containers. A plain `appWantsRTL ? "row-reverse" : "row"`
- * would therefore double-mirror on those devices.  We counter-flip so the visual
- * result is always correct regardless of the system RTL setting.
- */
 export function rowDirectionForAppLayout(
   appWantsRTL: boolean | undefined | null,
 ): "row" | "row-reverse" {
-  const rtl = appWantsRTL === true;
-  if (I18nManager.isRTL) {
-    return rtl ? "row" : "row-reverse";
-  }
-  return rtl ? "row-reverse" : "row";
+  return appWantsRTL === true ? "row-reverse" : "row";
 }
 
-/**
- * Physical `textAlign` for labels / TextInputs when the OS has RTL active.
- * Mirrors the counter-flip logic in `rowDirectionForAppLayout`.
- */
 export function textAlignForAppLayout(
   appWantsRTL: boolean | undefined | null,
 ): "left" | "right" {
-  const rtl = appWantsRTL === true;
-  if (I18nManager.isRTL) {
-    return rtl ? "left" : "right";
-  }
-  return rtl ? "right" : "left";
+  return appWantsRTL === true ? "right" : "left";
 }
 
 export function useTranslation() {
@@ -2930,13 +2915,9 @@ export function useTranslation() {
     language,
     isHebrew,
     isRTL: isHebrew,
-    /** `alignSelf` for secondary actions (e.g. forgot password): EN left, HE right, correct physical edge when native RTL matches app. */
+    /** `alignSelf` for secondary actions (e.g. forgot password): EN left, HE right. */
     trailingFormLinkAlign: {
-      alignSelf: (isHebrew
-        ? (I18nManager.isRTL ? "flex-start" : "flex-end")
-        : I18nManager.isRTL
-          ? "flex-end"
-          : "flex-start") as "flex-start" | "flex-end",
+      alignSelf: (isHebrew ? "flex-end" : "flex-start") as "flex-start" | "flex-end",
     },
     /** Apply to Text with explicit start-aligned text (labels, headings). */
     rtlText: {
