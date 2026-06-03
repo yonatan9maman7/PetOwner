@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { View, Text, Pressable, StyleSheet, ActivityIndicator, InteractionManager } from "react-native";
+import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, InteractionManager } from "react-native";
 import {
   createBottomTabNavigator,
   type BottomTabBarProps,
@@ -128,95 +128,101 @@ function SolidTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
         solidStyles.barContainer,
         {
           backgroundColor: barBg,
-          paddingBottom: Math.max(insets.bottom, 12),
+          paddingBottom: Math.max(insets.bottom, 0),
           shadowColor: colors.shadow,
         },
       ]}
     >
-      {state.routes.map((route, index) => {
-        const { options } = descriptors[route.key];
-        const isFocused = state.index === index;
-        const color = isFocused ? colors.tabBarActive : colors.tabBarInactive;
-        const label =
-          typeof options.tabBarLabel === "function"
-            ? options.tabBarLabel({
-                focused: isFocused,
-                color,
-                children: route.name,
-                position: "below-icon",
-              })
-            : (options.tabBarLabel ?? options.title ?? route.name);
-        const badge = options.tabBarBadge;
+      <View style={solidStyles.contentRow}>
+        {state.routes.map((route, index) => {
+          const { options } = descriptors[route.key];
+          const isFocused = state.index === index;
+          const color = isFocused ? colors.tabBarActive : colors.tabBarInactive;
+          const label =
+            typeof options.tabBarLabel === "function"
+              ? options.tabBarLabel({
+                  focused: isFocused,
+                  color,
+                  children: route.name,
+                  position: "below-icon",
+                })
+              : (options.tabBarLabel ?? options.title ?? route.name);
+          const badge = options.tabBarBadge;
 
-        const onPress = () => {
-          const event = navigation.emit({
-            type: "tabPress",
-            target: route.key,
-            canPreventDefault: true,
-          });
-          if (!isFocused && !event.defaultPrevented) {
-            navigation.navigate(route.name, route.params as any);
-          }
-        };
+          const onPress = () => {
+            const event = navigation.emit({
+              type: "tabPress",
+              target: route.key,
+              canPreventDefault: true,
+            });
+            if (!isFocused && !event.defaultPrevented) {
+              navigation.navigate(route.name, route.params as any);
+            }
+          };
 
-        const onLongPress = () => {
-          navigation.emit({ type: "tabLongPress", target: route.key });
-        };
+          const onLongPress = () => {
+            navigation.emit({ type: "tabLongPress", target: route.key });
+          };
 
-        return (
-          <Pressable
-            key={route.key}
-            accessibilityRole="button"
-            accessibilityState={isFocused ? { selected: true } : {}}
-            accessibilityLabel={options.tabBarAccessibilityLabel}
-            testID={options.tabBarButtonTestID}
-            onPress={onPress}
-            onLongPress={onLongPress}
-            android_ripple={{ color: "rgba(255,255,255,0.1)", borderless: false }}
-            style={[
-              solidStyles.tabItem,
-              isFocused && solidStyles.tabItemActive,
-            ]}
-          >
-            <View style={solidStyles.iconContainer} pointerEvents="none">
-              {options.tabBarIcon?.({ focused: isFocused, color, size: 24 })}
-              {badge != null && (
-                <View style={[solidStyles.badge, { backgroundColor: colors.danger }]}>
-                  <Text style={solidStyles.badgeText}>
-                    {typeof badge === "number" && badge > 99 ? "99+" : badge}
-                  </Text>
-                </View>
-              )}
-            </View>
-            <Text style={[solidStyles.label, { color }]} numberOfLines={1}>
-              {label as string}
-            </Text>
-          </Pressable>
-        );
-      })}
+          return (
+            <TouchableOpacity
+              key={route.key}
+              activeOpacity={0.7}
+              accessibilityRole="button"
+              accessibilityState={isFocused ? { selected: true } : {}}
+              accessibilityLabel={options.tabBarAccessibilityLabel}
+              testID={options.tabBarButtonTestID}
+              onPress={onPress}
+              onLongPress={onLongPress}
+              style={[
+                solidStyles.tabItem,
+                isFocused && solidStyles.tabItemActive,
+              ]}
+            >
+              <View style={solidStyles.iconContainer}>
+                {options.tabBarIcon?.({ focused: isFocused, color, size: 24 })}
+                {badge != null && (
+                  <View style={[solidStyles.badge, { backgroundColor: colors.danger }]}>
+                    <Text style={solidStyles.badgeText}>
+                      {typeof badge === "number" && badge > 99 ? "99+" : badge}
+                    </Text>
+                  </View>
+                )}
+              </View>
+              <Text style={[solidStyles.label, { color }]} numberOfLines={1}>
+                {label as string}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
     </View>
   );
 }
 
 const solidStyles = StyleSheet.create({
   barContainer: {
-    flexDirection: "row",
-    paddingHorizontal: 8,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     shadowOffset: { width: 0, height: -4 },
     shadowOpacity: 0.15,
     shadowRadius: 12,
-    elevation: 16,
+    elevation: 24,
+    zIndex: 9999,
+  },
+  contentRow: {
+    flexDirection: "row",
+    height: 70,
+    paddingHorizontal: 8,
+    alignItems: "center",
   },
   tabItem: {
     flex: 1,
+    height: 56,
     alignItems: "center",
     justifyContent: "center",
-    paddingTop: 18,
-    paddingBottom: 10,
     borderRadius: 16,
-    backgroundColor: "rgba(255,255,255,0.01)",
+    backgroundColor: "rgba(255, 255, 255, 0.01)",
     gap: 4,
   },
   tabItemActive: {

@@ -20,19 +20,22 @@ public class BookingsController : ControllerBase
     private readonly IPricingService _pricing;
     private readonly INotificationService _notifications;
     private readonly IAchievementService _achievements;
+    private readonly ILogger<BookingsController> _logger;
 
     public BookingsController(
         ApplicationDbContext db,
         IGrowPaymentService growPayment,
         IPricingService pricing,
         INotificationService notifications,
-        IAchievementService achievements)
+        IAchievementService achievements,
+        ILogger<BookingsController> logger)
     {
         _db = db;
         _growPayment = growPayment;
         _pricing = pricing;
         _notifications = notifications;
         _achievements = achievements;
+        _logger = logger;
     }
 
     [HttpPost]
@@ -121,10 +124,11 @@ public class BookingsController : ControllerBase
             Service = request.ServiceType,
             StartDate = bookingStart,
             EndDate = bookingEnd,
+            BasePrice = breakdown.BasePrice,
+            ClientFee = breakdown.ClientFee,
             TotalPrice = breakdown.TotalAmountToPay,
+            ProviderFee = breakdown.ProviderFee,
             ProviderNetAmount = breakdown.ProviderNetAmount,
-            GrossAmount = breakdown.GrossAmount,
-            ServiceFee = breakdown.ServiceFee,
             Status = BookingStatus.Pending,
             PaymentStatus = PaymentStatus.Pending,
             CreatedAt = DateTime.UtcNow,
@@ -259,14 +263,46 @@ public class BookingsController : ControllerBase
         if (booking.Status != BookingStatus.Confirmed)
             return BadRequest(new { message = "Only confirmed bookings can be marked complete." });
 
+        // Auth-and-Capture: funds must be authorized before we can capture (charge) them.
+        if (booking.PaymentStatus != PaymentStatus.Authorized)
+            return BadRequest(new
+            {
+                message = "Payment must be authorized (funds on hold) before the booking can be completed.",
+                code = "PAYMENT_NOT_AUTHORIZED"
+            });
+
+        if (string.IsNullOrEmpty(booking.TransactionId))
+        {
+            _logger.LogError("Booking {BookingId} is Authorized but has no TransactionId — cannot capture.", id);
+            return StatusCode(500, new { message = "Transaction ID is missing. Contact support." });
+        }
+
+        // Capture the held funds from the owner's card.
+        var captured = await _growPayment.CapturePaymentAsync(booking.TransactionId, booking.TotalPrice);
+        if (!captured)
+        {
+            _logger.LogError(
+                "Grow capture failed for booking {BookingId} (txn {Txn})", id, booking.TransactionId);
+            return StatusCode(502, new
+            {
+                message = "Payment capture failed. Please try again or contact support.",
+                code = "CAPTURE_FAILED"
+            });
+        }
+
         booking.Status = BookingStatus.Completed;
+        booking.PaymentStatus = PaymentStatus.Paid;
         await _db.SaveChangesAsync();
+
+        // Achievements fire here (after real money movement), not in the webhook.
+        await _achievements.EvaluateOwnerAsync(booking.OwnerId);
+        await _achievements.EvaluateProviderAsync(booking.ProviderProfileId);
 
         await _notifications.CreateAsync(
             booking.OwnerId,
             "BookingCompleted",
             "Booking Completed",
-            $"Your booking with {booking.ProviderProfile.User.Name} was marked complete.",
+            $"Your booking with {booking.ProviderProfile.User.Name} is complete. Payment has been charged.",
             booking.Id);
 
         return NoContent();
@@ -287,11 +323,37 @@ public class BookingsController : ControllerBase
         if (booking.OwnerId != userId && booking.ProviderProfileId != userId)
             return Forbid();
 
+        // Once fully captured (paid + completed) the booking cannot be cancelled here.
         if (booking.PaymentStatus == PaymentStatus.Paid)
-            return BadRequest(new { message = "Cannot cancel a booking after payment has been completed." });
+            return BadRequest(new { message = "Cannot cancel a booking after the payment has been captured." });
 
         if (booking.Status == BookingStatus.Cancelled)
             return BadRequest(new { message = "Booking is already cancelled." });
+
+        if (booking.Status == BookingStatus.Completed)
+            return BadRequest(new { message = "Cannot cancel a completed booking." });
+
+        // If funds are on hold (Authorized) we must void the authorization so the owner isn't charged.
+        if (booking.PaymentStatus == PaymentStatus.Authorized
+            && !string.IsNullOrEmpty(booking.TransactionId))
+        {
+            var voided = await _growPayment.VoidPaymentAsync(booking.TransactionId);
+            if (voided)
+            {
+                booking.PaymentStatus = PaymentStatus.Voided;
+                _logger.LogInformation(
+                    "Authorization voided for cancelled booking {BookingId} (txn {Txn})",
+                    id, booking.TransactionId);
+            }
+            else
+            {
+                // Mark as Failed so ops can investigate; still allow booking cancellation.
+                booking.PaymentStatus = PaymentStatus.Failed;
+                _logger.LogError(
+                    "Grow void FAILED for booking {BookingId} (txn {Txn}) — manual refund may be required.",
+                    id, booking.TransactionId);
+            }
+        }
 
         booking.Status = BookingStatus.Cancelled;
         booking.CancelledByRole = booking.ProviderProfileId == userId
@@ -299,7 +361,7 @@ public class BookingsController : ControllerBase
             : BookingActorRole.Owner;
         booking.CancellationReason = request.Reason.Trim()[..Math.Min(request.Reason.Trim().Length, 500)];
 
-        // Cancellation is also a "response" from the provider's perspective for response-time stats.
+        // Cancellation counts as a response from the provider for response-time stats.
         if (booking.CancelledByRole == BookingActorRole.Provider && booking.RespondedAt is null)
             booking.RespondedAt = DateTime.UtcNow;
 
@@ -315,7 +377,8 @@ public class BookingsController : ControllerBase
             b.Id, b.OwnerId, b.ProviderProfileId,
             providerName, ownerName,
             b.Service.ToString(), b.StartDate, b.EndDate,
-            b.TotalPrice, b.ProviderNetAmount, b.GrossAmount, b.ServiceFee, unit, b.Status.ToString(),
+            b.BasePrice, b.ClientFee, b.TotalPrice, b.ProviderFee, b.ProviderNetAmount,
+            unit, b.Status.ToString(),
             b.PaymentStatus.ToString(), b.PaymentUrl,
             b.CreatedAt, b.Notes,
             providerPhone, ownerPhone,

@@ -9,19 +9,19 @@ using PetOwner.Data.Models;
 namespace PetOwner.Api.Services;
 
 /// <summary>
-/// Grow (Meshulam) Light-Server integration.
+/// Grow (Meshulam) Light-Server integration — Auth-and-Capture flow.
 ///
-/// Creates a payment page via POST createPaymentProcess and returns the hosted checkout URL.
-/// Docs: https://grow-il.readme.io/reference/post_api-light-server-1-0-createpaymentprocess
+/// Payment page creation (createPaymentProcess):
+///   chargeType 1 = immediate charge (J4).
+///   chargeType 2 = authorization only (J5 / hold); capture later.
 ///
-/// Request fields used (JSON body):
-///   pageCode, userId, apiKey, sum, description,
-///   successUrl, cancelUrl, notifyUrl,
-///   pageField[fullName], pageField[phone], pageField[email],
-///   cField1 = BookingId  (returned verbatim in the server-to-server callback)
+/// Capture (commitTransaction):
+///   POST {base}/commitTransaction  { userId, apiKey, transactionCode, sum }
 ///
-/// Response shape (on success):
-///   { "status": 1, "err": "", "data": { "url": "https://..." } }
+/// Void (cancelTransaction):
+///   POST {base}/cancelTransaction  { userId, apiKey, transactionCode }
+///
+/// Docs: https://grow-il.readme.io/reference
 /// </summary>
 public class GrowPaymentService : IGrowPaymentService
 {
@@ -42,6 +42,8 @@ public class GrowPaymentService : IGrowPaymentService
         _logger = logger;
     }
 
+    // ─── Create authorization/charge page ────────────────────────────────────
+
     public async Task<string> GeneratePaymentLinkAsync(Booking booking)
     {
         if (!IsGrowConfigured())
@@ -60,18 +62,18 @@ public class GrowPaymentService : IGrowPaymentService
 
         var payload = new Dictionary<string, object?>
         {
-            ["pageCode"] = _settings.PageCode,
-            ["userId"] = _settings.UserId,
-            ["apiKey"] = _settings.ApiKey,
-            ["chargeType"] = 1,
-            ["sum"] = booking.TotalPrice.ToString("0.00", CultureInfo.InvariantCulture),
-            ["description"] = SanitizeDescription($"{_settings.DescriptionPrefix} {booking.Service}"),
-            ["successUrl"] = _settings.SuccessUrl,
-            ["cancelUrl"] = _settings.CancelUrl,
+            ["pageCode"]           = _settings.PageCode,
+            ["userId"]             = _settings.UserId,
+            ["apiKey"]             = _settings.ApiKey,
+            ["chargeType"]         = _settings.ChargeType,
+            ["sum"]                = booking.TotalPrice.ToString("0.00", CultureInfo.InvariantCulture),
+            ["description"]        = SanitizeDescription($"{_settings.DescriptionPrefix} {booking.Service}"),
+            ["successUrl"]         = _settings.SuccessUrl,
+            ["cancelUrl"]          = _settings.CancelUrl,
             ["pageField[fullName]"] = BuildFullName(owner.Name),
-            ["pageField[phone]"] = owner.Phone ?? string.Empty,
-            ["cField1"] = booking.Id.ToString(),
-            ["cField2"] = booking.ProviderProfileId.ToString(),
+            ["pageField[phone]"]   = owner.Phone ?? string.Empty,
+            ["cField1"]            = booking.Id.ToString(),
+            ["cField2"]            = booking.ProviderProfileId.ToString(),
         };
 
         if (!string.IsNullOrWhiteSpace(owner.Email))
@@ -108,15 +110,133 @@ public class GrowPaymentService : IGrowPaymentService
         if (parsed.Status != 1 || string.IsNullOrWhiteSpace(parsed.Url))
         {
             _logger.LogWarning(
-                "Grow API rejected createPaymentProcess for booking {BookingId}: status={Status} err={Err} body={Body}",
-                booking.Id, parsed.Status, parsed.Err, Truncate(body, 500));
+                "Grow API rejected createPaymentProcess for booking {BookingId}: status={Status} err={Err}",
+                booking.Id, parsed.Status, parsed.Err);
             throw new InvalidOperationException(
                 $"Grow rejected payment creation (status={parsed.Status}, err={parsed.Err ?? "n/a"}).");
         }
 
+        var chargeLabel = _settings.ChargeType == 2 ? "authorization (J5)" : "immediate charge";
         _logger.LogInformation(
-            "Grow checkout URL created for booking {BookingId} (sum={Sum})", booking.Id, booking.TotalPrice);
+            "Grow checkout URL created ({ChargeType}) for booking {BookingId} (sum={Sum})",
+            chargeLabel, booking.Id, booking.TotalPrice);
+
         return parsed.Url!;
+    }
+
+    // ─── Capture ─────────────────────────────────────────────────────────────
+
+    public async Task<bool> CapturePaymentAsync(string transactionId, decimal amount)
+    {
+        if (!IsGrowConfigured())
+        {
+            _logger.LogWarning(
+                "Grow not configured — mock capture approved for transaction {TransactionId}", transactionId);
+            return true;
+        }
+
+        var endpoint = BuildEndpoint("commitTransaction");
+        var payload = new Dictionary<string, object?>
+        {
+            ["userId"]          = _settings.UserId,
+            ["apiKey"]          = _settings.ApiKey,
+            ["transactionCode"] = transactionId,
+            ["sum"]             = amount.ToString("0.00", CultureInfo.InvariantCulture),
+        };
+
+        return await PostTransactionActionAsync(endpoint, payload, "capture", transactionId);
+    }
+
+    // ─── Void ─────────────────────────────────────────────────────────────────
+
+    public async Task<bool> VoidPaymentAsync(string transactionId)
+    {
+        if (!IsGrowConfigured())
+        {
+            _logger.LogWarning(
+                "Grow not configured — mock void approved for transaction {TransactionId}", transactionId);
+            return true;
+        }
+
+        var endpoint = BuildEndpoint("cancelTransaction");
+        var payload = new Dictionary<string, object?>
+        {
+            ["userId"]          = _settings.UserId,
+            ["apiKey"]          = _settings.ApiKey,
+            ["transactionCode"] = transactionId,
+        };
+
+        return await PostTransactionActionAsync(endpoint, payload, "void", transactionId);
+    }
+
+    // ─── Shared helpers ───────────────────────────────────────────────────────
+
+    private async Task<bool> PostTransactionActionAsync(
+        string endpoint,
+        Dictionary<string, object?> payload,
+        string actionName,
+        string transactionId)
+    {
+        var json = JsonSerializer.Serialize(payload);
+        using var content = new StringContent(json, Encoding.UTF8, "application/json");
+
+        HttpResponseMessage response;
+        try
+        {
+            response = await _httpClient.PostAsync(endpoint, content).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex,
+                "Grow {Action} HTTP call failed for transaction {TransactionId}", actionName, transactionId);
+            return false;
+        }
+
+        var body = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+
+        if (!response.IsSuccessStatusCode)
+        {
+            _logger.LogWarning(
+                "Grow {Action} returned HTTP {StatusCode} for transaction {TransactionId}: {Body}",
+                actionName, (int)response.StatusCode, transactionId, Truncate(body, 500));
+            return false;
+        }
+
+        var parsed = ParseResponse(body);
+        if (parsed.Status != 1)
+        {
+            _logger.LogWarning(
+                "Grow {Action} rejected for transaction {TransactionId}: status={Status} err={Err}",
+                actionName, transactionId, parsed.Status, parsed.Err);
+            return false;
+        }
+
+        _logger.LogInformation(
+            "Grow {Action} succeeded for transaction {TransactionId}", actionName, transactionId);
+        return true;
+    }
+
+    /// <summary>
+    /// Derives a sibling endpoint URL from <c>Grow:ApiUrl</c> by replacing the last path segment.
+    /// e.g. "…/createPaymentProcess" → "…/commitTransaction".
+    /// </summary>
+    private string BuildEndpoint(string action)
+    {
+        try
+        {
+            var uri = new Uri(_settings.ApiUrl.Trim());
+            var segments = uri.Segments;
+            var basePath = string.Concat(segments.Take(segments.Length - 1));
+            return $"{uri.Scheme}://{uri.Host}{basePath}{action}";
+        }
+        catch
+        {
+            // Fallback: replace the last path component by string manipulation.
+            var lastSlash = _settings.ApiUrl.LastIndexOf('/');
+            return lastSlash >= 0
+                ? _settings.ApiUrl[..(lastSlash + 1)] + action
+                : _settings.ApiUrl + "/" + action;
+        }
     }
 
     private bool IsGrowConfigured() =>
@@ -129,21 +249,18 @@ public class GrowPaymentService : IGrowPaymentService
     {
         if (string.IsNullOrWhiteSpace(_settings.CallbackUrl))
             _logger.LogWarning(
-                "Grow:CallbackUrl is empty — notifyUrl will not be sent to Grow; payment status will rely on client polling only.");
+                "Grow:CallbackUrl is empty — notifyUrl will not be sent; payment status relies on client polling only.");
     }
 
     private string BuildFullName(string? raw)
     {
         var name = (raw ?? string.Empty).Trim();
-        if (string.IsNullOrEmpty(name))
-            name = "PetOwner User";
-        // Grow requires the full name to contain at least two name parts.
+        if (string.IsNullOrEmpty(name)) name = "PetOwner User";
         return name.Contains(' ') ? name : $"{name} {_settings.FullNameFallbackSurname}";
     }
 
     private static string SanitizeDescription(string value)
     {
-        // Grow forbids special characters in description/successUrl/cField*.
         var sb = new StringBuilder(value.Length);
         foreach (var ch in value)
         {
@@ -162,19 +279,15 @@ public class GrowPaymentService : IGrowPaymentService
             var root = doc.RootElement;
 
             var status = root.TryGetProperty("status", out var s) && s.ValueKind == JsonValueKind.Number
-                ? s.GetInt32()
-                : 0;
+                ? s.GetInt32() : 0;
 
             var err = root.TryGetProperty("err", out var e) && e.ValueKind == JsonValueKind.String
-                ? e.GetString()
-                : null;
+                ? e.GetString() : null;
 
             string? url = null;
             if (root.TryGetProperty("data", out var data) && data.ValueKind == JsonValueKind.Object)
-            {
                 if (data.TryGetProperty("url", out var u) && u.ValueKind == JsonValueKind.String)
                     url = u.GetString();
-            }
 
             return (status, err, url);
         }

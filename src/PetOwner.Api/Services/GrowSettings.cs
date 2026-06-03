@@ -54,6 +54,14 @@ public class GrowSettings
     /// </summary>
     public string CallbackUrl { get; set; } = string.Empty;
 
+    /// <summary>
+    /// Grow charge type sent in createPaymentProcess as the "chargeType" field.
+    /// 1 = immediate charge (J4).
+    /// 2 = authorization only / J5 (hold funds, capture later via CapturePaymentAsync).
+    /// Defaults to 2 (Auth-and-Capture) to match the marketplace flow.
+    /// </summary>
+    public int ChargeType { get; set; } = 2;
+
     /// <summary>Optional: override the "description" prefix shown on Grow's invoice/transaction details.</summary>
     public string DescriptionPrefix { get; set; } = "PetOwner booking";
 

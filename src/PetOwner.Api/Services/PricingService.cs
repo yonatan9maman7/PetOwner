@@ -3,53 +3,56 @@ using PetOwner.Data.Models;
 namespace PetOwner.Api.Services;
 
 /// <summary>
-/// Server-side pricing: provider net (stored rate), 10% platform commission via gross = net/0.9,
-/// 4% customer service fee on gross. Total charged = gross + fee.
+/// Split-fee marketplace model (Airbnb-style).
+///
+/// ProviderServiceRate.Rate = the provider's advertised base price per billing unit.
+///
+///   BasePrice       = Rate × durationUnits × pets
+///   ClientFee       = BasePrice × 0.10   (added on top — paid by customer)
+///   TotalAmountToPay= BasePrice + ClientFee
+///   ProviderFee     = BasePrice × 0.04   (deducted from base — platform commission)
+///   ProviderNetAmount = BasePrice - ProviderFee
 /// </summary>
 public record PricingBreakdown(
-    decimal ProviderNetAmount,
-    decimal GrossAmount,
-    decimal ServiceFee,
-    decimal TotalAmountToPay);
+    decimal BasePrice,
+    decimal ClientFee,
+    decimal TotalAmountToPay,
+    decimal ProviderFee,
+    decimal ProviderNetAmount);
 
 public interface IPricingService
 {
     /// <summary>
-    /// <paramref name="rate"/>.Rate is interpreted as the provider's desired net per billing unit.
+    /// Calculates the full booking breakdown.
+    /// <paramref name="rate"/>.Rate is the provider's base price per billing unit.
     /// </summary>
     PricingBreakdown Calculate(ProviderServiceRate rate, DateTime start, DateTime end, int petCount);
 }
 
 public class PricingService : IPricingService
 {
-    /// <summary>Provider receives 90% of gross; platform keeps 10% → gross = net / 0.9.</summary>
-    private const decimal ProviderNetFractionOfGross = 0.9m;
+    /// <summary>10 % of base charged to the customer on top of the base price.</summary>
+    private const decimal ClientFeeRate = 0.10m;
 
-    private const decimal CustomerFeeRate = 0.04m;
+    /// <summary>4 % of base deducted from the provider's payout (platform commission).</summary>
+    private const decimal ProviderFeeRate = 0.04m;
 
     public PricingBreakdown Calculate(ProviderServiceRate rate, DateTime start, DateTime end, int petCount)
     {
         var pets = Math.Max(1, petCount);
         var durationUnits = ComputeDurationUnits(rate, start, end);
 
-        var netRate = rate.Rate;
-        if (netRate < 0)
-            netRate = 0;
+        var unitRate = rate.Rate < 0 ? 0m : rate.Rate;
 
-        var grossRate = netRate / ProviderNetFractionOfGross;
+        var basePrice   = Math.Round(unitRate * durationUnits * pets, 2, MidpointRounding.AwayFromZero);
+        var clientFee   = Math.Round(basePrice * ClientFeeRate,  2, MidpointRounding.AwayFromZero);
+        var total       = Math.Round(basePrice + clientFee,       2, MidpointRounding.AwayFromZero);
+        var providerFee = Math.Round(basePrice * ProviderFeeRate, 2, MidpointRounding.AwayFromZero);
+        var providerNet = Math.Round(basePrice - providerFee,     2, MidpointRounding.AwayFromZero);
 
-        var providerNet = Math.Round(netRate * durationUnits * pets, 2, MidpointRounding.AwayFromZero);
-        var gross = Math.Round(grossRate * durationUnits * pets, 2, MidpointRounding.AwayFromZero);
-        var fee = Math.Round(gross * CustomerFeeRate, 2, MidpointRounding.AwayFromZero);
-        var total = Math.Round(gross + fee, 2, MidpointRounding.AwayFromZero);
-
-        return new PricingBreakdown(providerNet, gross, fee, total);
+        return new PricingBreakdown(basePrice, clientFee, total, providerFee, providerNet);
     }
 
-    /// <summary>
-    /// Billing unit count (nights, hours, visits, etc.) without rate — mirrors legacy
-    /// <c>BookingsController.CalculateTotalPrice</c> divisor logic.
-    /// </summary>
     private static decimal ComputeDurationUnits(ProviderServiceRate rate, DateTime start, DateTime end)
     {
         return rate.Unit switch

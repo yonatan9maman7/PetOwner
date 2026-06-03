@@ -6,10 +6,13 @@ import {
   Pressable,
   ActivityIndicator,
   RefreshControl,
+  StyleSheet,
+  Modal,
 } from "react-native";
-import { showGlobalAlertCompat } from "../../components/global-modal";
+import { showGlobalAlertCompat, showGlobalConfirm, showGlobalAlert } from "../../components/global-modal";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
+import * as Haptics from "expo-haptics";
 import { useNavigation, useRoute, useFocusEffect } from "@react-navigation/native";
 import { useTranslation, rowDirectionForAppLayout } from "../../i18n";
 import { useTheme } from "../../theme/ThemeContext";
@@ -21,12 +24,14 @@ import type { BookingDto } from "../../types/api";
 import CancelBookingSheet from "./CancelBookingSheet";
 import type { CancelBookingMode } from "./CancelBookingSheet";
 
-const STATUS_COLORS: Record<string, { bg: string; text: string }> = {
-  Pending: { bg: "#fef9c3", text: "#92400e" },
-  Confirmed: { bg: "#dcfce7", text: "#16a34a" },
-  Completed: { bg: "#dbeafe", text: "#1d4ed8" },
-  Cancelled: { bg: "#fee2e2", text: "#dc2626" },
-  Paid: { bg: "#d1fae5", text: "#065f46" },
+const STATUS_COLORS: Record<string, { bg: string; text: string; dot?: string }> = {
+  Pending:    { bg: "#fef9c3", text: "#92400e",  dot: "#f59e0b" },
+  Confirmed:  { bg: "#dcfce7", text: "#16a34a",  dot: "#22c55e" },
+  Completed:  { bg: "#dbeafe", text: "#1d4ed8",  dot: "#3b82f6" },
+  Cancelled:  { bg: "#f3f4f6", text: "#6b7280",  dot: "#9ca3af" },
+  Authorized: { bg: "#fff7ed", text: "#c2410c",  dot: "#f97316" }, // amber-orange — funds on hold
+  Paid:       { bg: "#dcfce7", text: "#065f46",  dot: "#22c55e" }, // satisfying green
+  Voided:     { bg: "#f3f4f6", text: "#6b7280",  dot: "#9ca3af" },
 };
 
 type Tab = "outgoing" | "incoming";
@@ -92,6 +97,16 @@ export function MyBookingsScreen() {
     mode: CancelBookingMode;
   } | null>(null);
 
+  // Per-booking action loading states
+  const [completingId, setCompletingId] = useState<string | null>(null);
+  const [cancellingId, setCancellingId] = useState<string | null>(null);
+
+  // Full-screen overlay while an async payment action runs (capture / void)
+  const [actionOverlay, setActionOverlay] = useState<{
+    message: string;
+    icon: "checkmark-circle" | "close-circle" | "card";
+  } | null>(null);
+
   const fetchBookings = useCallback(
     async (silent = false) => {
       await fetchMine({ silent });
@@ -130,80 +145,145 @@ export function MyBookingsScreen() {
 
   const bookings = activeTab === "incoming" ? incoming : outgoing;
 
-  const handleCancel = (booking: BookingDto) => {
-    setCancelSheet({ booking, mode: "owner" });
-  };
+  const handleCancel = useCallback((booking: BookingDto) => {
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    const isAuthorized = booking.paymentStatus === "Authorized";
+    if (isAuthorized) {
+      // Extra friction: warn that the credit hold will be released before opening sheet.
+      showGlobalConfirm(
+        t("cancelAuthorizedTitle"),
+        t("cancelAuthorizedMessage"),
+        () => setCancelSheet({ booking, mode: "owner" }),
+        undefined,
+        { confirmText: t("proceedCancelBtn"), cancelText: t("backStep"), destructive: true },
+      );
+    } else {
+      setCancelSheet({ booking, mode: "owner" });
+    }
+  }, [t]);
 
-  const handleConfirm = (booking: BookingDto) => {
-    showGlobalAlertCompat(t("confirmBookingAction"), undefined, [
-      { text: t("backStep"), style: "cancel" },
-      {
-        text: t("confirmBookingAction"),
-        onPress: async () => {
-          try {
-            await bookingsApi.confirm(booking.id);
-            showGlobalAlertCompat(t("bookingConfirmed"));
-            fetchBookings(true);
-          } catch {
-            /* error toast from global API interceptor */
-          }
-        },
+  const handleConfirm = useCallback((booking: BookingDto) => {
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    showGlobalConfirm(
+      t("confirmBookingAction"),
+      undefined,
+      async () => {
+        try {
+          await bookingsApi.confirm(booking.id);
+          void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          showGlobalAlert(t("bookingConfirmed"));
+          fetchBookings(true);
+        } catch {
+          /* error toast from global API interceptor */
+        }
       },
-    ]);
-  };
+      undefined,
+      { confirmText: t("confirmBookingAction"), cancelText: t("backStep") },
+    );
+  }, [t, fetchBookings]);
 
-  const handleDecline = (booking: BookingDto) => {
+  const handleDecline = useCallback((booking: BookingDto) => {
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setCancelSheet({ booking, mode: "provider" });
-  };
+  }, []);
 
   const handleSheetConfirm = useCallback(
     async (reason: string) => {
       if (!cancelSheet) return;
-      await bookingsApi.cancel(cancelSheet.booking.id, reason);
+      const snap = cancelSheet;
+      const isAuthorized = snap.booking.paymentStatus === "Authorized";
+
+      // Dismiss sheet first so the overlay renders on top cleanly.
       setCancelSheet(null);
-      const successKey =
-        cancelSheet.mode === "owner" ? "bookingCancelled" : "bookingDeclined";
-      showGlobalAlertCompat(t(successKey));
-      fetchBookings(true);
+      setCancellingId(snap.booking.id);
+      setActionOverlay({
+        message: isAuthorized ? t("cancellingAuthorizedOverlay") : t("cancelBooking") + "...",
+        icon: "close-circle",
+      });
+      try {
+        await bookingsApi.cancel(snap.booking.id, reason);
+        void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        const successKey = snap.mode === "owner" ? "bookingCancelled" : "bookingDeclined";
+        showGlobalAlertCompat(t(successKey));
+        fetchBookings(true);
+      } catch {
+        /* error toast from global API interceptor */
+      } finally {
+        setCancellingId(null);
+        setActionOverlay(null);
+      }
     },
     [cancelSheet, t, fetchBookings],
   );
 
   const handleSheetDismiss = useCallback(() => setCancelSheet(null), []);
 
-  const handleMarkComplete = (booking: BookingDto) => {
-    showGlobalAlertCompat(t("markCompleted"), undefined, [
-      { text: t("backStep"), style: "cancel" },
-      {
-        text: t("markCompleted"),
-        onPress: async () => {
-          try {
-            await bookingsApi.complete(booking.id);
-            fetchBookings(true);
-          } catch {
-            /* error toast from global API interceptor */
-          }
-        },
+  const handleMarkComplete = useCallback((booking: BookingDto) => {
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    showGlobalConfirm(
+      t("markCompleted"),
+      t("markCompletedConfirm"),
+      async () => {
+        setCompletingId(booking.id);
+        setActionOverlay({ message: t("completingBookingOverlay"), icon: "card" });
+        try {
+          await bookingsApi.complete(booking.id);
+          void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          // Celebration modal: show captured amount to the provider.
+          showGlobalAlert(
+            t("captureSuccessTitle"),
+            t("captureSuccessMessage").replace("{amount}", booking.totalPrice.toFixed(2)),
+          );
+          fetchBookings(true);
+        } catch {
+          /* error toast from global API interceptor */
+        } finally {
+          setCompletingId(null);
+          setActionOverlay(null);
+        }
       },
-    ]);
-  };
+      undefined,
+      { confirmText: t("markCompleted"), cancelText: t("backStep") },
+    );
+  }, [t, fetchBookings]);
 
   const renderOutgoingCard = ({ item }: { item: BookingDto }) => {
-    const isPaid = item.paymentStatus === "Paid";
+    const isAuthorized = item.paymentStatus === "Authorized";
+    const isPaid       = item.paymentStatus === "Paid";
+    const isVoided     = item.paymentStatus === "Voided";
+
+    // Status chip: prioritise payment state over booking state for visibility.
     const sc = isPaid
       ? STATUS_COLORS.Paid
+      : isAuthorized
+      ? STATUS_COLORS.Authorized
+      : isVoided
+      ? STATUS_COLORS.Voided
       : STATUS_COLORS[item.status] ?? STATUS_COLORS.Pending;
+
+    const statusChipText = isPaid
+      ? t("statusPaid")
+      : isAuthorized
+      ? t("statusAuthorized")
+      : isVoided
+      ? t("statusVoided")
+      : t(statusKey(item.status));
+
+    // Owner can cancel until funds are captured (Paid = captured; Authorized = voidable on server).
     const canCancel =
       item.status !== "Completed" &&
       item.status !== "Cancelled" &&
-      item.paymentStatus !== "Paid" &&
-      (item.status === "Pending" || item.status === "Confirmed");
-    const canLeaveReview =
-      !item.hasReview && item.status === "Completed";
+      item.paymentStatus !== "Paid";
+
+    const canLeaveReview = !item.hasReview && item.status === "Completed";
+
+    // Only show Pay button when not yet authorized (payment hasn't been initiated by owner).
     const canPay =
       item.status === "Confirmed" &&
       !!item.paymentUrl &&
-      item.paymentStatus !== "Paid";
+      item.paymentStatus === "Pending";
+
+    const isCancelling = cancellingId === item.id;
 
     return (
       <View
@@ -243,12 +323,19 @@ export function MyBookingsScreen() {
             style={{
               backgroundColor: sc.bg,
               paddingHorizontal: 10,
-              paddingVertical: 4,
-              borderRadius: 12,
+              paddingVertical: 5,
+              borderRadius: 20,
+              flexDirection: "row",
+              alignItems: "center",
+              gap: 5,
             }}
           >
-            <Text style={{ fontSize: 12, fontWeight: "700", color: sc.text }}>
-              {isPaid ? t("statusPaid") : t(statusKey(item.status))}
+            <View style={{
+              width: 7, height: 7, borderRadius: 4,
+              backgroundColor: sc.dot ?? sc.text,
+            }} />
+            <Text style={{ fontSize: 11, fontWeight: "700", color: sc.text }}>
+              {statusChipText}
             </Text>
           </View>
         </View>
@@ -311,15 +398,23 @@ export function MyBookingsScreen() {
           </Text>
           {canCancel && (
             <Pressable
-              onPress={() => handleCancel(item)}
+              onPress={() => !isCancelling && handleCancel(item)}
+              disabled={isCancelling}
               style={{
                 paddingHorizontal: 14,
                 paddingVertical: 8,
                 borderRadius: 10,
                 borderWidth: 1,
                 borderColor: "#dc2626",
+                opacity: isCancelling ? 0.6 : 1,
+                flexDirection: "row",
+                alignItems: "center",
+                gap: 6,
               }}
             >
+              {isCancelling && (
+                <ActivityIndicator size="small" color="#dc2626" />
+              )}
               <Text
                 style={{ fontSize: 13, fontWeight: "600", color: "#dc2626" }}
               >
@@ -385,12 +480,17 @@ export function MyBookingsScreen() {
   };
 
   const renderIncomingCard = ({ item }: { item: BookingDto }) => {
-    const sc = STATUS_COLORS[item.status] ?? STATUS_COLORS.Pending;
+    // Use Authorized payment color on the chip when funds are on hold.
+    const isAuthorized = item.paymentStatus === "Authorized";
+    const sc = isAuthorized
+      ? STATUS_COLORS.Authorized
+      : STATUS_COLORS[item.status] ?? STATUS_COLORS.Pending;
     const isPending = item.status === "Pending";
-    const canMarkComplete =
-      item.status !== "Completed" &&
-      item.status !== "Cancelled" &&
-      (item.status === "Confirmed" || item.paymentStatus === "Paid");
+
+    // Provider can only complete once the owner has authorized (held) the funds.
+    const canMarkComplete = item.paymentStatus === "Authorized";
+    const isCompleting = completingId === item.id;
+    const isCancellingIncoming = cancellingId === item.id;
 
     return (
       <View
@@ -440,12 +540,19 @@ export function MyBookingsScreen() {
             style={{
               backgroundColor: sc.bg,
               paddingHorizontal: 10,
-              paddingVertical: 4,
-              borderRadius: 12,
+              paddingVertical: 5,
+              borderRadius: 20,
+              flexDirection: "row",
+              alignItems: "center",
+              gap: 5,
             }}
           >
-            <Text style={{ fontSize: 12, fontWeight: "700", color: sc.text }}>
-              {t(statusKey(item.status))}
+            <View style={{
+              width: 7, height: 7, borderRadius: 4,
+              backgroundColor: sc.dot ?? sc.text,
+            }} />
+            <Text style={{ fontSize: 11, fontWeight: "700", color: sc.text }}>
+              {isAuthorized ? t("statusAuthorized") : t(statusKey(item.status))}
             </Text>
           </View>
         </View>
@@ -546,15 +653,23 @@ export function MyBookingsScreen() {
                 </Text>
               </Pressable>
               <Pressable
-                onPress={() => handleDecline(item)}
+                onPress={() => !isCancellingIncoming && handleDecline(item)}
+                disabled={isCancellingIncoming}
                 style={{
                   paddingHorizontal: 14,
                   paddingVertical: 8,
                   borderRadius: 10,
                   borderWidth: 1,
                   borderColor: "#dc2626",
+                  opacity: isCancellingIncoming ? 0.6 : 1,
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: 6,
                 }}
               >
+                {isCancellingIncoming && (
+                  <ActivityIndicator size="small" color="#dc2626" />
+                )}
                 <Text
                   style={{ fontSize: 13, fontWeight: "600", color: "#dc2626" }}
                 >
@@ -567,15 +682,26 @@ export function MyBookingsScreen() {
 
         {canMarkComplete ? (
           <Pressable
-            onPress={() => handleMarkComplete(item)}
+            onPress={() => !isCompleting && handleMarkComplete(item)}
+            disabled={isCompleting}
             className="mt-3 py-3 rounded-xl items-center"
-            style={{ backgroundColor: colors.primary }}
+            style={{
+              backgroundColor: colors.primary,
+              opacity: isCompleting ? 0.7 : 1,
+              flexDirection: "row",
+              justifyContent: "center",
+              gap: 8,
+            }}
           >
-            <Text
-              style={{ fontSize: 14, fontWeight: "700", color: colors.primaryText }}
-            >
-              {t("markCompleted")}
-            </Text>
+            {isCompleting ? (
+              <ActivityIndicator color={colors.primaryText} />
+            ) : (
+              <Text
+                style={{ fontSize: 14, fontWeight: "700", color: colors.primaryText }}
+              >
+                {t("markCompleted")}
+              </Text>
+            )}
           </Pressable>
         ) : null}
 
@@ -737,9 +863,82 @@ export function MyBookingsScreen() {
         onConfirm={handleSheetConfirm}
         onDismiss={handleSheetDismiss}
       />
+
+      <ActionOverlay overlay={actionOverlay} colors={colors} />
     </SafeAreaView>
   );
 }
+
+// ─── Action Overlay ───────────────────────────────────────────────────────────
+
+type OverlayIconName = "checkmark-circle" | "close-circle" | "card";
+
+function ActionOverlay({
+  overlay,
+  colors,
+}: {
+  overlay: { message: string; icon: OverlayIconName } | null;
+  colors: ReturnType<typeof import("../../theme/ThemeContext").useTheme>["colors"];
+}) {
+  if (!overlay) return null;
+
+  const iconColor =
+    overlay.icon === "checkmark-circle"
+      ? "#22c55e"
+      : overlay.icon === "close-circle"
+      ? "#ef4444"
+      : colors.primary;
+
+  return (
+    <Modal transparent animationType="fade" visible statusBarTranslucent>
+      <View style={overlayStyles.backdrop}>
+        <View style={[overlayStyles.card, { backgroundColor: colors.surface }]}>
+          <Ionicons name={overlay.icon} size={52} color={iconColor} />
+          <ActivityIndicator
+            size="large"
+            color={colors.primary}
+            style={{ marginTop: 20 }}
+          />
+          <Text style={[overlayStyles.message, { color: colors.text }]}>
+            {overlay.message}
+          </Text>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+const overlayStyles = StyleSheet.create({
+  backdrop: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.55)",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 32,
+  },
+  card: {
+    width: "100%",
+    maxWidth: 320,
+    borderRadius: 20,
+    paddingVertical: 36,
+    paddingHorizontal: 28,
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.18,
+    shadowRadius: 24,
+    elevation: 12,
+  },
+  message: {
+    marginTop: 16,
+    fontSize: 16,
+    fontWeight: "600",
+    textAlign: "center",
+    lineHeight: 24,
+  },
+});
+
+// ─── Tab Pill ────────────────────────────────────────────────────────────────
 
 function TabPill({
   label,

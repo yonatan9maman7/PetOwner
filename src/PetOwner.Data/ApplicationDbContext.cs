@@ -939,17 +939,22 @@ public class ApplicationDbContext : DbContext
                 .HasColumnType("decimal(18,2)")
                 .IsRequired();
 
+            entity.Property(b => b.BasePrice)
+                .HasColumnType("decimal(18,2)")
+                .IsRequired()
+                .HasDefaultValue(0m);
+
+            entity.Property(b => b.ClientFee)
+                .HasColumnType("decimal(18,2)")
+                .IsRequired()
+                .HasDefaultValue(0m);
+
+            entity.Property(b => b.ProviderFee)
+                .HasColumnType("decimal(18,2)")
+                .IsRequired()
+                .HasDefaultValue(0m);
+
             entity.Property(b => b.ProviderNetAmount)
-                .HasColumnType("decimal(18,2)")
-                .IsRequired()
-                .HasDefaultValue(0m);
-
-            entity.Property(b => b.GrossAmount)
-                .HasColumnType("decimal(18,2)")
-                .IsRequired()
-                .HasDefaultValue(0m);
-
-            entity.Property(b => b.ServiceFee)
                 .HasColumnType("decimal(18,2)")
                 .IsRequired()
                 .HasDefaultValue(0m);

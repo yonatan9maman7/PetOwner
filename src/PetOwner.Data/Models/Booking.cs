@@ -8,16 +8,20 @@ public class Booking
     public ServiceType Service { get; set; }
     public DateTime StartDate { get; set; }
     public DateTime EndDate { get; set; }
+    /// <summary>Provider's advertised base price for this booking (rate × units × pets).</summary>
+    public decimal BasePrice { get; set; }
+
+    /// <summary>10 % fee added on top of <see cref="BasePrice"/> — paid by the customer.</summary>
+    public decimal ClientFee { get; set; }
+
+    /// <summary>Total charged to the customer: <see cref="BasePrice"/> + <see cref="ClientFee"/>.</summary>
     public decimal TotalPrice { get; set; }
 
-    /// <summary>Provider net for this booking (sum over pets × duration at net rate).</summary>
+    /// <summary>4 % of <see cref="BasePrice"/> deducted from the provider's payout (platform commission).</summary>
+    public decimal ProviderFee { get; set; }
+
+    /// <summary>What the provider actually earns: <see cref="BasePrice"/> − <see cref="ProviderFee"/>.</summary>
     public decimal ProviderNetAmount { get; set; }
-
-    /// <summary>Customer-facing subtotal before 4% service fee (gross after 10% platform commission on net).</summary>
-    public decimal GrossAmount { get; set; }
-
-    /// <summary>4% customer service fee on <see cref="GrossAmount"/>.</summary>
-    public decimal ServiceFee { get; set; }
 
     public BookingStatus Status { get; set; } = BookingStatus.Pending;
     public PaymentStatus PaymentStatus { get; set; } = PaymentStatus.Pending;

@@ -85,14 +85,15 @@ export function PaymentCheckoutScreen() {
     void loadBookingDetail();
   }, [loadBookingDetail]);
 
-  const pollUntilPaid = useCallback(async () => {
+  const pollUntilAuthorized = useCallback(async () => {
     const deadline = Date.now() + POLL_TIMEOUT_MS;
     while (!pollCancelledRef.current && mountedRef.current && Date.now() < deadline) {
       try {
         const b = await bookingsApi.getById(bookingId);
         if (mountedRef.current) {
           setBookingDetail(b);
-          if (b.paymentStatus === "Paid") {
+          // Authorization confirmed — funds are on hold. Navigate back to bookings list.
+          if (b.paymentStatus === "Authorized" || b.paymentStatus === "Paid") {
             navigation.goBack();
             return;
           }
@@ -113,8 +114,8 @@ export function PaymentCheckoutScreen() {
     if (handledRedirectRef.current) return;
     handledRedirectRef.current = true;
     setPostPayPhase("processing");
-    void pollUntilPaid();
-  }, [pollUntilPaid]);
+    void pollUntilAuthorized();
+  }, [pollUntilAuthorized]);
 
   const onRefreshStatusPress = useCallback(async () => {
     setRefreshBusy(true);
@@ -122,7 +123,7 @@ export function PaymentCheckoutScreen() {
       const b = await bookingsApi.getById(bookingId);
       if (!mountedRef.current) return;
       setBookingDetail(b);
-      if (b.paymentStatus === "Paid") {
+      if (b.paymentStatus === "Authorized" || b.paymentStatus === "Paid") {
         navigation.goBack();
         return;
       }
@@ -192,7 +193,7 @@ export function PaymentCheckoutScreen() {
 
   const showItemized =
     bookingDetail &&
-    (bookingDetail.grossAmount > 0 || bookingDetail.serviceFee > 0 || bookingDetail.totalPrice > 0);
+    (bookingDetail.basePrice > 0 || bookingDetail.clientFee > 0 || bookingDetail.totalPrice > 0);
 
   const breakdownCard = showItemized ? (
     <View
@@ -215,7 +216,7 @@ export function PaymentCheckoutScreen() {
       <Text style={[rtlText, { fontSize: 13, fontWeight: "700", color: colors.text, marginBottom: 10 }]}>
         {t("paymentSummaryTitle")}
       </Text>
-      {bookingDetail!.grossAmount > 0 || bookingDetail!.serviceFee > 0 ? (
+      {bookingDetail!.basePrice > 0 || bookingDetail!.clientFee > 0 ? (
         <>
           <View
             style={{
@@ -228,7 +229,7 @@ export function PaymentCheckoutScreen() {
               {t("bookingBreakdownBase")}
             </Text>
             <Text style={{ fontSize: 14, fontWeight: "700", color: colors.text }}>
-              ₪{bookingDetail!.grossAmount.toFixed(2)}
+              ₪{bookingDetail!.basePrice.toFixed(2)}
             </Text>
           </View>
           <View
@@ -242,7 +243,7 @@ export function PaymentCheckoutScreen() {
               {t("bookingBreakdownFee")}
             </Text>
             <Text style={{ fontSize: 14, fontWeight: "700", color: colors.text }}>
-              ₪{bookingDetail!.serviceFee.toFixed(2)}
+              ₪{bookingDetail!.clientFee.toFixed(2)}
             </Text>
           </View>
         </>
@@ -252,8 +253,8 @@ export function PaymentCheckoutScreen() {
           flexDirection: rowDirectionForAppLayout(isRTL),
           justifyContent: "space-between",
           alignItems: "center",
-          paddingTop: bookingDetail!.grossAmount > 0 || bookingDetail!.serviceFee > 0 ? 10 : 0,
-          borderTopWidth: bookingDetail!.grossAmount > 0 || bookingDetail!.serviceFee > 0 ? 1 : 0,
+          paddingTop: bookingDetail!.basePrice > 0 || bookingDetail!.clientFee > 0 ? 10 : 0,
+          borderTopWidth: bookingDetail!.basePrice > 0 || bookingDetail!.clientFee > 0 ? 1 : 0,
           borderTopColor: colors.borderLight,
         }}
       >
@@ -264,6 +265,16 @@ export function PaymentCheckoutScreen() {
           ₪{bookingDetail!.totalPrice.toFixed(2)}
         </Text>
       </View>
+
+      {/* Disclaimer */}
+      <Text style={[rtlText, {
+        fontSize: 11,
+        color: colors.textMuted,
+        marginTop: 10,
+        lineHeight: 17,
+      }]}>
+        {t("serviceFeeDisclaimer")}
+      </Text>
     </View>
   ) : null;
 

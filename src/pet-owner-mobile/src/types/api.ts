@@ -965,17 +965,21 @@ export interface HealthPassportShareDto {
 }
 
 /**
- * Canonical booking price components for UI and payment gateway (e.g. Grow) splits.
- * `BookingDto` uses API field names (`grossAmount`, `serviceFee`, `totalPrice`, `providerNetAmount`).
+ * Canonical booking price breakdown (split-fee model).
+ * Provider's rate = basePrice.
+ *   clientFee       = basePrice × 10 %  (added on top; paid by customer)
+ *   finalTotal      = basePrice + clientFee
+ *   providerFee     = basePrice × 4 %   (deducted from provider payout)
+ *   providerNetAmount = basePrice - providerFee
  */
 export interface BookingPricingBreakdown {
-  /** Sticker / base service price (= `BookingDto.grossAmount`; providerNetAmount / 0.9). */
+  /** Provider's advertised base price. */
   basePrice: number;
-  /** Platform cut from base (10%); maps to provider-side deduction. */
+  /** 4 % platform fee deducted from provider; shown to provider only. */
   providerPlatformFee: number;
-  /** Customer processing fee (4% of base); maps to `BookingDto.serviceFee`. */
+  /** 10 % customer service fee added on top of basePrice. */
   customerServiceFee: number;
-  /** Amount charged to customer; maps to `BookingDto.totalPrice`. */
+  /** Total charged to customer (basePrice + customerServiceFee). */
   finalTotal: number;
 }
 
@@ -997,17 +1001,28 @@ export interface BookingDto {
   service: string;
   startDate: string;
   endDate: string;
-  /** Final total charged to customer (`grossAmount` + `serviceFee`). */
+  /** Final total charged to customer (basePrice + clientFee). */
   totalPrice: number;
-  /** Net earnings for provider after 10% platform fee (`grossAmount` × 0.90; server-computed). */
+  /** Provider net earnings after deducting providerFee (= basePrice − providerFee). */
   providerNetAmount: number;
-  /** Base price of the service (provider sticker price; = providerNetAmount / 0.9). */
-  grossAmount: number;
-  /** 4% customer service fee on top of `grossAmount`. */
-  serviceFee: number;
+  /** Provider's advertised base price for this booking (rate × units × pets). */
+  basePrice: number;
+  /** 10 % customer service fee on top of basePrice. */
+  clientFee: number;
+  /** 4 % platform commission deducted from provider payout. */
+  providerFee: number;
   pricingUnit: string;
-  status: string;
-  paymentStatus: string;
+  status: "Pending" | "Confirmed" | "Completed" | "Cancelled" | string;
+  /**
+   * Lifecycle:
+   *   Pending     → payment not yet initiated
+   *   Authorized  → funds on hold (J5); awaiting capture on booking completion
+   *   Paid        → funds captured (booking complete)
+   *   Failed      → authorization or capture rejected
+   *   Voided      → authorization released (booking cancelled before capture)
+   *   Refunded    → captured funds returned
+   */
+  paymentStatus: "Pending" | "Authorized" | "Paid" | "Failed" | "Voided" | "Refunded" | string;
   paymentUrl?: string;
   createdAt: string;
   notes?: string;

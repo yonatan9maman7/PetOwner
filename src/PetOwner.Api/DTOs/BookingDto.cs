@@ -27,10 +27,14 @@ public record BookingDto(
     string Service,
     DateTime StartDate,
     DateTime EndDate,
+    /// <see cref="PetOwner.Data.Models.Booking.BasePrice"/>
+    decimal BasePrice,
+    /// <see cref="PetOwner.Data.Models.Booking.ClientFee"/> — 10 % customer fee
+    decimal ClientFee,
     decimal TotalPrice,
+    /// <see cref="PetOwner.Data.Models.Booking.ProviderFee"/> — 4 % platform commission
+    decimal ProviderFee,
     decimal ProviderNetAmount,
-    decimal GrossAmount,
-    decimal ServiceFee,
     string PricingUnit,
     string Status,
     string PaymentStatus,

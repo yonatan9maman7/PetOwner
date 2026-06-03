@@ -34,18 +34,18 @@ public class WebhooksController : ControllerBase
     private readonly ApplicationDbContext _db;
     private readonly GrowSettings _growSettings;
     private readonly ILogger<WebhooksController> _logger;
-    private readonly IAchievementService _achievements;
+    private readonly INotificationService _notifications;
 
     public WebhooksController(
         ApplicationDbContext db,
         IOptions<GrowSettings> growSettings,
         ILogger<WebhooksController> logger,
-        IAchievementService achievements)
+        INotificationService notifications)
     {
         _db = db;
         _growSettings = growSettings.Value;
         _logger = logger;
-        _achievements = achievements;
+        _notifications = notifications;
     }
 
     [HttpPost("grow")]
@@ -88,12 +88,12 @@ public class WebhooksController : ControllerBase
             return Ok(new { message = "Booking not found; ignored." });
         }
 
-        // Idempotency: terminal Paid state — return 200 OK without DB updates (duplicate or conflicting txn codes).
-        if (booking.PaymentStatus == PaymentStatus.Paid)
+        // Idempotency: already in a terminal/authorized state — safe to ack without re-processing.
+        if (booking.PaymentStatus is PaymentStatus.Authorized or PaymentStatus.Paid)
         {
             _logger.LogInformation(
-                "Grow webhook: booking {BookingId} already Paid (stored txn={Stored}, incoming txn={Incoming}); treating as duplicate.",
-                bookingId, booking.TransactionId, transactionCode);
+                "Grow webhook: booking {BookingId} already in {Status} (stored txn={Stored}, incoming txn={Incoming}); treating as duplicate.",
+                bookingId, booking.PaymentStatus, booking.TransactionId, transactionCode);
             return Ok(new { message = "Already processed." });
         }
 
@@ -113,16 +113,18 @@ public class WebhooksController : ControllerBase
 
         if (isSuccess)
         {
-            booking.PaymentStatus = PaymentStatus.Paid;
+            // Funds are now on hold (J5 authorization). They will be captured when the provider
+            // marks the booking Complete. Do NOT set Paid here — that happens after capture.
+            booking.PaymentStatus = PaymentStatus.Authorized;
             _logger.LogInformation(
-                "Booking {BookingId} marked Paid via Grow webhook (txn {Txn}, sum {Sum})",
+                "Booking {BookingId} authorization confirmed via Grow webhook (txn {Txn}, sum {Sum})",
                 bookingId, transactionCode, paymentSumRaw);
         }
         else
         {
             booking.PaymentStatus = PaymentStatus.Failed;
             _logger.LogWarning(
-                "Booking {BookingId} payment failed via Grow webhook (txn {Txn}, status {Status})",
+                "Booking {BookingId} payment authorization failed via Grow webhook (txn {Txn}, status {Status})",
                 bookingId, transactionCode, statusRaw);
         }
 
@@ -137,10 +139,15 @@ public class WebhooksController : ControllerBase
             return StatusCode(500, new { message = "Failed to persist webhook." });
         }
 
-        if (booking.PaymentStatus == PaymentStatus.Paid)
+        if (booking.PaymentStatus == PaymentStatus.Authorized)
         {
-            await _achievements.EvaluateOwnerAsync(booking.OwnerId);
-            await _achievements.EvaluateProviderAsync(booking.ProviderProfileId);
+            // Notify owner that their funds are held and the service is confirmed.
+            await _notifications.CreateAsync(
+                booking.OwnerId,
+                "PaymentAuthorized",
+                "Payment Authorized",
+                "Your payment hold is confirmed. Funds will be charged once the service is complete.",
+                booking.Id);
         }
 
         return Ok(new { message = "Webhook processed." });

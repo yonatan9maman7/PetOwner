@@ -1078,7 +1078,7 @@ export function BookingScreen() {
           ) : null}
         </View>
 
-        {/* Price estimate (server: same base from provider net + 4% customer fee) */}
+        {/* Price breakdown (split-fee: basePrice + 10% clientFee) */}
         {estimatedPricing !== null && (
           <View
             className="rounded-2xl p-5 mb-5"
@@ -1095,6 +1095,7 @@ export function BookingScreen() {
               {t("estimatedPrice")}
             </Text>
             <View style={{ gap: 8 }}>
+              {/* Base price row */}
               <View
                 style={{
                   flexDirection: rowDirectionForAppLayout(isRTL),
@@ -1109,6 +1110,8 @@ export function BookingScreen() {
                   ₪{estimatedPricing.basePrice.toFixed(2)}
                 </Text>
               </View>
+
+              {/* Client fee row (10%) */}
               <View
                 style={{
                   flexDirection: rowDirectionForAppLayout(isRTL),
@@ -1123,6 +1126,8 @@ export function BookingScreen() {
                   ₪{estimatedPricing.customerServiceFee.toFixed(2)}
                 </Text>
               </View>
+
+              {/* Total row */}
               <View
                 style={{
                   marginTop: 4,
@@ -1142,6 +1147,16 @@ export function BookingScreen() {
                 </Text>
               </View>
             </View>
+
+            {/* Disclaimer — prevents sticker shock on the service fee */}
+            <Text style={[rtlText, {
+              fontSize: 12,
+              color: colors.textMuted,
+              marginTop: 10,
+              lineHeight: 18,
+            }]}>
+              {t("serviceFeeDisclaimer")}
+            </Text>
           </View>
         )}
 

@@ -22,6 +22,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
+import * as Haptics from "expo-haptics";
 import { useTranslation } from "../../i18n";
 import { useTheme } from "../../theme/ThemeContext";
 
@@ -85,6 +86,7 @@ export default function CancelBookingSheet({ visible, mode, onConfirm, onDismiss
 
   const handleSelect = useCallback(
     (key: TransKey | "other") => {
+      void Haptics.selectionAsync();
       setSelectedKey(key);
       setShowError(false);
     },
@@ -93,13 +95,14 @@ export default function CancelBookingSheet({ visible, mode, onConfirm, onDismiss
 
   const handleConfirm = useCallback(async () => {
     if (!isValid) {
+      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
       setShowError(true);
       return;
     }
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setLoading(true);
     try {
       await onConfirm(resolvedReason);
-      // Reset state after successful confirm
       setSelectedKey(null);
       setOtherText("");
       setShowError(false);

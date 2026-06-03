@@ -238,4 +238,4 @@ function App() {
   );
 }
 
-export default Sentry.wrap(App);
+export default isSentryEnabled() ? Sentry.wrap(App) : App;

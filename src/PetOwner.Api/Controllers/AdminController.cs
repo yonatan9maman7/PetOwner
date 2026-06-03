@@ -20,7 +20,7 @@ public class AdminController : ControllerBase
     private readonly ILogger<AdminController> _logger;
     private readonly IHostEnvironment _hostEnvironment;
     // private readonly IEmailService _emailService;
-    private const decimal PlatformFeePercent = 0.10m;
+    // PlatformFeePercent removed — revenue is now computed from stored ClientFee + ProviderFee on each Booking.
 
     public AdminController(
         ApplicationDbContext db,
@@ -52,10 +52,10 @@ public class AdminController : ControllerBase
         var pendingProviders = await _db.ProviderProfiles
             .CountAsync(p => p.Status == ProviderStatus.Pending);
 
-        var revenueBookings = await _db.Bookings
-            .Where(b => b.Status == BookingStatus.Completed ||
-                        b.PaymentStatus == PaymentStatus.Paid)
-            .SumAsync(b => b.TotalPrice);
+        // Platform revenue = ClientFee (paid by customer) + ProviderFee (deducted from provider payout).
+        var platformRevenue = await _db.Bookings
+            .Where(b => b.PaymentStatus == PaymentStatus.Paid)
+            .SumAsync(b => b.ClientFee + b.ProviderFee);
 
         var unreadInquiries = await _db.ContactInquiries
             .CountAsync(c => c.ReadAt == null);
@@ -68,7 +68,7 @@ public class AdminController : ControllerBase
             TotalBookings = totalBookings,
             ActiveSOSReports = activeSOSReports,
             PendingProviders = pendingProviders,
-            TotalPlatformRevenue = revenueBookings * PlatformFeePercent,
+            TotalPlatformRevenue = platformRevenue,
             UnreadContactInquiries = unreadInquiries
         });
     }

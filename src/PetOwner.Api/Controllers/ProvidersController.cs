@@ -649,24 +649,26 @@ public class ProvidersController : ControllerBase
         if (!hasProfile)
             return NotFound(new { message = "Provider profile not found." });
 
-        var payments = await _db.Payments
+        var paidBookings = await _db.Bookings
             .AsNoTracking()
-            .Where(p => p.ServiceRequest.ProviderId == userId)
+            .Where(b => b.ProviderProfileId == userId && b.PaymentStatus == Data.Models.PaymentStatus.Paid)
             .ToListAsync();
 
-        var captured = payments.Where(p => p.Status == "Captured").ToList();
-        var pending = payments.Where(p => p.Status == "Authorized").ToList();
+        var authorizedBookings = await _db.Bookings
+            .AsNoTracking()
+            .Where(b => b.ProviderProfileId == userId && b.PaymentStatus == Data.Models.PaymentStatus.Authorized)
+            .ToListAsync();
 
-        var totalEarned = captured.Sum(p => p.Amount);
-        var platformFees = captured.Sum(p => p.PlatformFee);
-        var pendingAmount = pending.Sum(p => p.Amount - p.PlatformFee);
+        var totalEarned = paidBookings.Sum(b => b.ProviderNetAmount);
+        var platformFees = paidBookings.Sum(b => b.ProviderFee);
+        var pendingAmount = authorizedBookings.Sum(b => b.ProviderNetAmount);
 
         return Ok(new EarningsSummaryDto(
             totalEarned,
             platformFees,
-            totalEarned - platformFees,
-            captured.Count,
-            pending.Count,
+            totalEarned,           // ProviderNetAmount already excludes ProviderFee
+            paidBookings.Count,
+            authorizedBookings.Count,
             pendingAmount));
     }
 
@@ -676,22 +678,26 @@ public class ProvidersController : ControllerBase
     {
         var userId = GetUserId();
 
-        var transactions = await _db.Payments
+        var transactions = await _db.Bookings
             .AsNoTracking()
-            .Where(p => p.ServiceRequest.ProviderId == userId)
-            .OrderByDescending(p => p.CreatedAt)
-            .Select(p => new EarningsTransactionDto(
-                p.Id,
-                p.ServiceRequestId,
-                p.ServiceRequest.PetOwner.Name,
-                p.ServiceRequest.Pet != null ? p.ServiceRequest.Pet.Name : null,
-                p.Amount,
-                p.PlatformFee,
-                p.Amount - p.PlatformFee,
-                p.Status,
-                p.CreatedAt,
-                p.CapturedAt))
+            .Include(b => b.Owner)
+            .Include(b => b.BookingPets).ThenInclude(bp => bp.Pet)
+            .Where(b => b.ProviderProfileId == userId
+                && (b.PaymentStatus == Data.Models.PaymentStatus.Paid
+                    || b.PaymentStatus == Data.Models.PaymentStatus.Authorized))
+            .OrderByDescending(b => b.CreatedAt)
             .Take(50)
+            .Select(b => new EarningsTransactionDto(
+                b.Id,
+                b.Id,
+                b.Owner.Name,
+                b.BookingPets.Select(bp => bp.Pet.Name).FirstOrDefault(),
+                b.BasePrice,
+                b.ProviderFee,
+                b.ProviderNetAmount,
+                b.PaymentStatus.ToString(),
+                b.CreatedAt,
+                b.PaymentStatus == Data.Models.PaymentStatus.Paid ? (DateTime?)b.CreatedAt : null))
             .ToListAsync();
 
         return Ok(transactions);
