@@ -207,6 +207,12 @@ export const getStyles = (colors: any) =>
       paddingVertical: 2,
       borderRadius: 8,
     },
+    parkCheckinBadge: {
+      backgroundColor: "#15803d",
+      paddingHorizontal: 6,
+      paddingVertical: 2,
+      borderRadius: 8,
+    },
     foundPetClaimBtn: {
       marginTop: 12,
       flexDirection: "row",

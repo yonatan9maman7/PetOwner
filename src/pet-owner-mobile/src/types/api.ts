@@ -711,6 +711,7 @@ export interface StartParkCheckInDto {
   longitude: number;
   petId?: string | null;
   durationMinutes?: number;
+  imageUrl?: string;
 }
 
 export interface GroupJoinResponse {

@@ -24,6 +24,7 @@ import { useBottomSafeInset } from "../../hooks/useBottomSafeInset";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect, useNavigation, useRoute } from "@react-navigation/native";
 import * as Location from "expo-location";
+import * as ImagePicker from "expo-image-picker";
 import { useAuthStore } from "../../store/authStore";
 import { usePetsStore } from "../../store/petsStore";
 import { useTranslation, rowDirectionForAppLayout } from "../../i18n";
@@ -221,6 +222,7 @@ const PostCard = memo(function PostCard({
                 styles.kindBadge,
                 kind === "Lost & Found" && styles.sosBadge,
                 kind === "Found Pet" && styles.foundPetBadge,
+                kind === "Park Check-in" && styles.parkCheckinBadge,
               ]}
             >
               <Text style={styles.kindBadgeText}>{postKindLabel(kind, isRTL)}</Text>
@@ -1467,8 +1469,27 @@ export function CommunityScreen() {
   };
 
   const handleParkCheckIn = async (park: DogPark) => {
+    // Offer optional photo before locking the card button
+    const imageUri = await pickImageWithSource({
+      title: "צ'ק-אין לגינה",
+      message: "תרצו לצרף תמונה לקהילה?",
+      labels: { camera: "צלם תמונה", gallery: "בחר מגלריה", cancel: "דלג" },
+      pickerOptions: {
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        quality: 0.8,
+        allowsEditing: true,
+        aspect: [4, 3] as [number, number],
+      },
+    });
+
     setCheckingInPark(park);
     try {
+      let imageUrl: string | undefined;
+      if (imageUri) {
+        const up = await filesApi.uploadImage(imageUri, "posts");
+        imageUrl = up.url;
+      }
+
       let communityOk = false;
       try {
         await communityApi.startParkCheckIn({
@@ -1478,6 +1499,7 @@ export function CommunityScreen() {
           longitude: park.longitude,
           petId: selectedPet?.id,
           durationMinutes: 75,
+          imageUrl,
         });
         communityOk = true;
       } catch {

@@ -62,7 +62,9 @@ import { useDogParkStore } from "../../store/dogParkStore";
 import { useTheme } from "../../theme/ThemeContext";
 import { DatePickerField } from "../../components/DatePickerField";
 import { TimePickerField } from "../../components/TimePickerField";
-import { mapApi, communityApi, palsApi, usersApi } from "../../api/client";
+import { mapApi, communityApi, palsApi, usersApi, filesApi } from "../../api/client";
+import { pickImageWithSource } from "../../utils/imagePicker";
+import * as ImagePicker from "expo-image-picker";
 import {
   ProviderType,
   PetSpecies,
@@ -1321,8 +1323,28 @@ export function ExploreScreen() {
         navigation.getParent()?.navigate("MyPets");
         return;
       }
+
+      // Offer optional photo before locking the button
+      const imageUri = await pickImageWithSource({
+        title: "צ'ק-אין לגינה",
+        message: "תרצו לצרף תמונה לקהילה?",
+        labels: { camera: "צלם תמונה", gallery: "בחר מגלריה", cancel: "דלג" },
+        pickerOptions: {
+          mediaTypes: ImagePicker.MediaTypeOptions.Images,
+          quality: 0.8,
+          allowsEditing: true,
+          aspect: [4, 3] as [number, number],
+        },
+      });
+
       setDogParkCheckInLoading(true);
       try {
+        let imageUrl: string | undefined;
+        if (imageUri) {
+          const up = await filesApi.uploadImage(imageUri, "posts");
+          imageUrl = up.url;
+        }
+
         const dogPets = pets.filter((p) => p.species === PetSpecies.Dog);
         const petIdsForBeacon =
           dogPets.length > 0 ? dogPets.map((p) => p.id) : pets.map((p) => p.id);
@@ -1336,7 +1358,8 @@ export function ExploreScreen() {
             latitude: park.latitude,
             longitude: park.longitude,
             petId: primaryPet?.id,
-            durationMinutes: 15,
+            durationMinutes: 60,
+            imageUrl,
           });
           communityOk = true;
         } catch {
@@ -1350,7 +1373,7 @@ export function ExploreScreen() {
             latitude: park.latitude,
             longitude: park.longitude,
             city: cityHintFromParkAddress(park.address),
-            durationMinutes: 15,
+            durationMinutes: 60,
             petIds: petIdsForBeacon,
             species: "DOG",
           });
@@ -1360,7 +1383,7 @@ export function ExploreScreen() {
         }
 
         if (beaconOk || communityOk) {
-          await setCheckInExpiration(Date.now() + 15 * 60 * 1000);
+          await setCheckInExpiration(Date.now() + 60 * 60 * 1000);
           showGlobalAlertCompat(
             t("dogParkCheckInSuccessTitle"),
             t("dogParkCheckInSuccessMessage"),

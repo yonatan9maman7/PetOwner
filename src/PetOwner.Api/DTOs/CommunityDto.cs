@@ -34,7 +34,8 @@ public record StartParkCheckInDto(
     double Latitude,
     double Longitude,
     Guid? PetId,
-    int DurationMinutes = 75);
+    int DurationMinutes = 75,
+    string? ImageUrl = null);
 
 public record UserCommunityPrefsDto(
     bool ShowExactLocation,

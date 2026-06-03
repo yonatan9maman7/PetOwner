@@ -34,7 +34,8 @@ export type PostKind =
   | "Warning"
   | "Lost & Found"
   | "Found Pet"
-  | "Event";
+  | "Event"
+  | "Park Check-in";
 
 export type Visibility = "Public" | "Nearby only" | "Friends only" | "Group only";
 export type DogSizeSuitability = "Small" | "Medium" | "Large" | "All";
@@ -492,6 +493,9 @@ export function categoryToKind(category?: string): PostKind {
       return "Event";
     case "warning":
       return "Warning";
+    case "park_checkin":
+    case "park check-in":
+      return "Park Check-in";
     default:
       return "Cute moment";
   }
@@ -508,6 +512,7 @@ export function postKindLabel(kind: PostKind, isRTL: boolean): string {
       case "Lost & Found": return EN.postKindLostFound;
       case "Found Pet": return "Found!";
       case "Event": return EN.postKindEvent;
+      case "Park Check-in": return "🌳 Park Check-in";
     }
   }
   switch (kind) {
@@ -519,6 +524,7 @@ export function postKindLabel(kind: PostKind, isRTL: boolean): string {
     case "Lost & Found": return "אבדות ומציאות";
     case "Found Pet": return "נמצאה!";
     case "Event": return "אירוע";
+    case "Park Check-in": return "🌳 צ'ק-אין בגינה";
   }
 }
 

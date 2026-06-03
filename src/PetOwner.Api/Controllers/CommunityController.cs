@@ -176,7 +176,7 @@ public class CommunityController : ControllerBase
     public async Task<IActionResult> StartParkCheckIn([FromBody] StartParkCheckInDto dto)
     {
         var userId = GetUserId();
-        var mins = Math.Clamp(dto.DurationMinutes, 60, 90);
+        var mins = Math.Clamp(dto.DurationMinutes, 15, 90);
         var now = DateTime.UtcNow;
         var existing = await _db.DogParkCheckIns
             .Where(c => c.UserId == userId && c.ExpiresAt >= now)
@@ -195,8 +195,23 @@ public class CommunityController : ControllerBase
             StartedAt = now,
             ExpiresAt = now.AddMinutes(mins)
         });
+
+        var communityPost = new Post
+        {
+            Id = Guid.NewGuid(),
+            UserId = userId,
+            Content = $"הגענו לגינת {dto.PlaceName.Trim()}! מי בא לשחק? 🌳🐕",
+            ImageUrl = dto.ImageUrl?.Trim(),
+            Latitude = dto.Latitude,
+            Longitude = dto.Longitude,
+            Category = "park_checkin",
+            RelatedPetId = dto.PetId,
+            CreatedAt = now,
+        };
+        _db.Posts.Add(communityPost);
+
         await _db.SaveChangesAsync();
-        return Ok(new { ok = true, expiresAt = now.AddMinutes(mins) });
+        return Ok(new { ok = true, expiresAt = now.AddMinutes(mins), postId = communityPost.Id });
     }
 
     [HttpDelete("park-check-ins/me")]
