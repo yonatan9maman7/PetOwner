@@ -473,6 +473,9 @@
     "FOUND_PET_BADGE": "נמצאה!",
     "FOUND_PET_CLAIM": "מדובר בחיה שלי!",
     "FOUND_PET_CLAIM_HINT": "שלח/י הודעה למוצא/ת החיה",
+    "SOS_CLOSE_REPORT": "סגור דיווח (החיה נמצאה)",
+    "SOS_FINDER_CTA": "במידה ומצאת את החיה, לחץ כאן!",
+    "SOS_RESOLVED_BADGE": "✅ החיה נמצאה!",
     "CHAT_SELF_ERROR": "לא ניתן לשלוח הודעה לעצמך"
   },
   "WIZARD": {

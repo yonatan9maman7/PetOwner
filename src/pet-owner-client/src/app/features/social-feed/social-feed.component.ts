@@ -9,6 +9,7 @@ import { FileUploadService } from '../../services/file-upload.service';
 import { ToastService } from '../../services/toast.service';
 import { MapService, UserMiniProfile } from '../../services/map.service';
 import { CommunityService, CommunityGroup } from '../../services/community.service';
+import { PetService } from '../../services/pet.service';
 import { isFoundPetCategory } from '../../utils/sos-post-content';
 
 @Component({
@@ -229,6 +230,44 @@ import { isFoundPetCategory } from '../../utils/sos-post-content';
                 <!-- Post Content -->
                 <div class="px-5 pb-3">
                   <p class="text-sm text-slate-700 whitespace-pre-wrap leading-relaxed" dir="auto">{{ post.content }}</p>
+
+                  <!-- SOS lost_and_found CTAs -->
+                  @if (post.category === 'lost_and_found') {
+                    @if (post.sosResolvedAt) {
+                      <div class="mt-4 flex items-center justify-center gap-2 rounded-xl bg-green-100 text-green-800 text-sm font-semibold py-3 px-4">
+                        {{ 'COMMUNITY.SOS_RESOLVED_BADGE' | translate }}
+                      </div>
+                    } @else if (post.userId === currentUserId()) {
+                      <button
+                        type="button"
+                        (click)="markSosFound(post)"
+                        [disabled]="sosSubmitting() || !post.relatedPetId"
+                        class="mt-4 w-full flex items-center justify-center gap-2 rounded-xl border border-red-400 text-red-500
+                               hover:bg-red-50 text-sm font-medium py-3 px-4 transition-colors disabled:opacity-50"
+                        [attr.aria-label]="'COMMUNITY.SOS_CLOSE_REPORT' | translate"
+                      >
+                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                          <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+                        </svg>
+                        {{ 'COMMUNITY.SOS_CLOSE_REPORT' | translate }}
+                      </button>
+                    } @else {
+                      <button
+                        type="button"
+                        (click)="openChatWithUser(post.userId, post.userName, $event)"
+                        class="mt-4 w-full flex items-center justify-center gap-2 rounded-xl bg-orange-500 hover:bg-orange-600
+                               text-white text-sm font-bold py-3 px-4 shadow-sm transition-colors"
+                        [attr.aria-label]="'COMMUNITY.SOS_FINDER_CTA' | translate"
+                      >
+                        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                          <path stroke-linecap="round" stroke-linejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                        </svg>
+                        {{ 'COMMUNITY.SOS_FINDER_CTA' | translate }}
+                      </button>
+                    }
+                  }
+
+                  <!-- found_pet CTA -->
                   @if (isFoundPetCategory(post.category) && post.userId !== currentUserId()) {
                     <button
                       type="button"
@@ -522,6 +561,7 @@ import { isFoundPetCategory } from '../../utils/sos-post-content';
 export class SocialFeedComponent implements OnInit, AfterViewInit {
   private readonly postService = inject(PostService);
   private readonly communityService = inject(CommunityService);
+  private readonly petService = inject(PetService);
   private readonly auth = inject(AuthService);
   private readonly fileUpload = inject(FileUploadService);
   private readonly toast = inject(ToastService);
@@ -561,6 +601,7 @@ export class SocialFeedComponent implements OnInit, AfterViewInit {
   posts = signal<Post[]>([]);
   feedLoading = signal(true);
   posting = signal(false);
+  sosSubmitting = signal(false);
   newPostContent = signal('');
   uploadedImageUrl = signal<string | null>(null);
   uploading = signal(false);
@@ -920,6 +961,23 @@ export class SocialFeedComponent implements OnInit, AfterViewInit {
       return;
     }
     this.openMiniProfile(post.userId, event);
+  }
+
+  markSosFound(post: Post): void {
+    if (!post.relatedPetId || this.sosSubmitting()) return;
+    this.sosSubmitting.set(true);
+    this.petService.markFound(post.relatedPetId).subscribe({
+      next: () => {
+        this.posts.update(list =>
+          list.map(p => p.id === post.id ? { ...p, sosResolvedAt: new Date().toISOString() } : p)
+        );
+        this.sosSubmitting.set(false);
+      },
+      error: () => {
+        this.toast.error(this.translate.instant('ERRORS.GENERAL'));
+        this.sosSubmitting.set(false);
+      },
+    });
   }
 
   openChatWithUser(userId: string, userName: string, event: Event): void {

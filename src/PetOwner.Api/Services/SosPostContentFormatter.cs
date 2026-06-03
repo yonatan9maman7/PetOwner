@@ -40,10 +40,10 @@ public static class SosPostContentFormatter
         if (IsHebrew(preferredLanguage))
         {
             return
-                $"🆘 SOS: {petName} אבד/ה!\n\n📍 נראה לאחרונה: {location}\n📞 יצירת קשר: {phone}{desc}\n\nעזרו לנו למצוא את {petName}! אם ראיתם את החיה, צרו קשר עם הבעלים מיד.";
+                $"🚨 SOS: הכלב/ה {petName} אבד/ה!\n\n📍 נראה/תה לאחרונה: {location}\n📞 איש קשר: {phone}{desc}";
         }
 
         return
-            $"🆘 SOS: {petName} is lost!\n\n📍 Last seen: {location}\n📞 Contact: {phone}{desc}\n\nPlease help us find {petName}! If you see this pet, contact the owner immediately.";
+            $"🚨 SOS: {petName} is lost!\n\n📍 Last seen: {location}\n📞 Contact: {phone}{desc}";
     }
 }

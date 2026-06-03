@@ -16,6 +16,8 @@ export interface Post {
   authorIsApprovedProvider: boolean;
   communityGroupId: string | null;
   category: string | null;
+  relatedPetId: string | null;
+  sosResolvedAt: string | null;
 }
 
 export interface PostComment {

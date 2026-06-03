@@ -68,13 +68,10 @@ public class PetsController : ControllerBase
             ImageUrl = request.ImageUrl,
         };
 
-        _db.Pets.Add(pet);
-
         if (request.Weight > 0)
         {
-            _db.Activities.Add(new Activity
+            pet.Activities.Add(new Activity
             {
-                PetId = pet.Id,
                 UserId = userId,
                 Type = "Weight",
                 Value = (decimal)request.Weight,
@@ -82,6 +79,7 @@ public class PetsController : ControllerBase
             });
         }
 
+        _db.Pets.Add(pet);
         await _db.SaveChangesAsync();
 
         return CreatedAtAction(nameof(GetMyPets), MapToDto(pet));
@@ -188,7 +186,6 @@ public class PetsController : ControllerBase
             .FirstOrDefaultAsync();
 
         var postImage = !string.IsNullOrEmpty(request.ImageUrl) ? request.ImageUrl : pet.ImageUrl;
-        var imageSection = !string.IsNullOrEmpty(postImage) ? $"\n🖼️ Photo: {postImage}" : "";
         var baseContent = !string.IsNullOrWhiteSpace(request.Content)
             ? request.Content.Trim()
             : SosPostContentFormatter.BuildLostPetContent(
@@ -201,7 +198,7 @@ public class PetsController : ControllerBase
         {
             Id = Guid.NewGuid(),
             UserId = userId,
-            Content = baseContent + imageSection,
+            Content = baseContent,
             ImageUrl = postImage,
             Latitude = request.LastSeenLat,
             Longitude = request.LastSeenLng,

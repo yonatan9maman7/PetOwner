@@ -474,6 +474,9 @@
     "FOUND_PET_BADGE": "Found!",
     "FOUND_PET_CLAIM": "This is my pet!",
     "FOUND_PET_CLAIM_HINT": "Message the person who found them",
+    "SOS_CLOSE_REPORT": "Close Report (Pet Found)",
+    "SOS_FINDER_CTA": "If you found the pet, click here!",
+    "SOS_RESOLVED_BADGE": "✅ Pet Found!",
     "CHAT_SELF_ERROR": "You cannot message yourself"
   },
   "WIZARD": {
