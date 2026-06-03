@@ -19,7 +19,7 @@ import { useTranslation, rowDirectionForAppLayout } from "../../i18n";
 import { useTheme } from "../../theme/ThemeContext";
 import { bookingsApi } from "../../api/client";
 import type { BookingDto } from "../../types/api";
-import { InlineError } from "../../components/shared/InlineError";
+import { formatFixedMoney } from "../../utils/pricingDisplay";
 
 /** Must match Grow / backend redirect URLs (intercepted in WebView, not loaded as real pages). */
 const SUCCESS_PREFIX = "https://petowner.app/payment/success";
@@ -229,7 +229,7 @@ export function PaymentCheckoutScreen() {
               {t("bookingBreakdownBase")}
             </Text>
             <Text style={{ fontSize: 14, fontWeight: "700", color: colors.text }}>
-              ₪{bookingDetail!.basePrice.toFixed(2)}
+              ₪{formatFixedMoney(bookingDetail!.basePrice)}
             </Text>
           </View>
           <View
@@ -243,7 +243,7 @@ export function PaymentCheckoutScreen() {
               {t("bookingBreakdownFee")}
             </Text>
             <Text style={{ fontSize: 14, fontWeight: "700", color: colors.text }}>
-              ₪{bookingDetail!.clientFee.toFixed(2)}
+              ₪{formatFixedMoney(bookingDetail!.clientFee)}
             </Text>
           </View>
         </>
@@ -262,7 +262,7 @@ export function PaymentCheckoutScreen() {
           {t("bookingBreakdownTotal")}
         </Text>
         <Text style={{ fontSize: 17, fontWeight: "800", color: colors.primary }}>
-          ₪{bookingDetail!.totalPrice.toFixed(2)}
+          ₪{formatFixedMoney(bookingDetail!.totalPrice)}
         </Text>
       </View>
 

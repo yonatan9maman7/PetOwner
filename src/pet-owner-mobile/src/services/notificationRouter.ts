@@ -104,6 +104,7 @@ export function routeForNotification(nav: Nav, payload: TapPayload): void {
       break;
 
     case "sos":
+    case "sos_found":
     case "sos_resolved":
       if (payload.relatedEntityId) {
         navigate("Community", {

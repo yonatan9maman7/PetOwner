@@ -7,7 +7,7 @@ import {
   ActivityIndicator,
   RefreshControl,
   StyleSheet,
-  Modal,
+  InteractionManager,
 } from "react-native";
 import { showGlobalAlertCompat, showGlobalConfirm, showGlobalAlert } from "../../components/global-modal";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -204,8 +204,12 @@ export function MyBookingsScreen() {
         await bookingsApi.cancel(snap.booking.id, reason);
         void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         const successKey = snap.mode === "owner" ? "bookingCancelled" : "bookingDeclined";
-        showGlobalAlertCompat(t(successKey));
-        fetchBookings(true);
+        setCancellingId(null);
+        setActionOverlay(null);
+        InteractionManager.runAfterInteractions(() => {
+          showGlobalAlertCompat(t(successKey));
+          fetchBookings(true);
+        });
       } catch {
         /* error toast from global API interceptor */
       } finally {
@@ -229,12 +233,15 @@ export function MyBookingsScreen() {
         try {
           await bookingsApi.complete(booking.id);
           void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-          // Celebration modal: show captured amount to the provider.
-          showGlobalAlert(
-            t("captureSuccessTitle"),
-            t("captureSuccessMessage").replace("{amount}", booking.totalPrice.toFixed(2)),
-          );
-          fetchBookings(true);
+          setCompletingId(null);
+          setActionOverlay(null);
+          InteractionManager.runAfterInteractions(() => {
+            showGlobalAlert(
+              t("captureSuccessTitle"),
+              t("captureSuccessMessage").replace("{amount}", booking.totalPrice.toFixed(2)),
+            );
+            fetchBookings(true);
+          });
         } catch {
           /* error toast from global API interceptor */
         } finally {
@@ -890,7 +897,10 @@ function ActionOverlay({
       : colors.primary;
 
   return (
-    <Modal transparent animationType="fade" visible statusBarTranslucent>
+    <View
+      pointerEvents="auto"
+      style={[StyleSheet.absoluteFillObject, overlayStyles.host]}
+    >
       <View style={overlayStyles.backdrop}>
         <View style={[overlayStyles.card, { backgroundColor: colors.surface }]}>
           <Ionicons name={overlay.icon} size={52} color={iconColor} />
@@ -904,11 +914,15 @@ function ActionOverlay({
           </Text>
         </View>
       </View>
-    </Modal>
+    </View>
   );
 }
 
 const overlayStyles = StyleSheet.create({
+  host: {
+    zIndex: 50,
+    elevation: 50,
+  },
   backdrop: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.55)",

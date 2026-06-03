@@ -116,6 +116,14 @@ export interface ReportLostRequest {
   imageUrl?: string;
 }
 
+export interface ReportFoundPetRequest {
+  imageUrl: string;
+  latitude: number;
+  longitude: number;
+  contactPhone: string;
+  description?: string;
+}
+
 export interface LostPetDto {
   id: string;
   name: string;

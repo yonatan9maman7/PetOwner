@@ -5,6 +5,7 @@ import {
   Pressable,
   ScrollView,
   Switch,
+  Image,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useFormContext } from "react-hook-form";
@@ -66,6 +67,8 @@ export function AvailabilityReviewStep() {
   const providerType = watch("providerType");
   const businessName = watch("businessName");
   const imageUrl = watch("imageUrl");
+  const imageUri = watch("imageUri");
+  const previewImageUri = imageUrl || imageUri || null;
   const specialOffers = watch("specialOffers");
 
   const isBusiness = providerType === 1;
@@ -342,7 +345,31 @@ export function AvailabilityReviewStep() {
         </Text>
 
         <SummaryRow label={t("onbProviderType")} value={isBusiness ? `${t("onbBusiness")} — ${businessName}` : t("onbIndividual")} isRTL={isRTL} />
-        {imageUrl ? <SummaryRow label={t("profilePicture")} value="✓" isRTL={isRTL} /> : null}
+        {previewImageUri ? (
+          <View
+            style={{
+              flexDirection: rowDirectionForAppLayout(isRTL),
+              alignItems: "center",
+              justifyContent: "space-between",
+              marginBottom: 8,
+              gap: 12,
+            }}
+          >
+            <Text style={{ fontSize: 13, fontWeight: "600", color: colors.textSecondary }}>
+              {t("profilePicture")}
+            </Text>
+            <Image
+              source={{ uri: previewImageUri }}
+              style={{
+                width: 56,
+                height: 56,
+                borderRadius: 12,
+                backgroundColor: colors.primaryLight,
+              }}
+              resizeMode="cover"
+            />
+          </View>
+        ) : null}
         <SummaryRow
           label={isBusiness ? t("bioTitleBusiness") : t("bioTitle")}
           value={bio.slice(0, 60) + (bio.length > 60 ? "…" : "")}

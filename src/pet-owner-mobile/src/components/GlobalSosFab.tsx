@@ -17,6 +17,7 @@ import { useMyPetsUiStore } from "../store/myPetsUiStore";
 import { usePetsStore } from "../store/petsStore";
 import { useTranslation } from "../i18n";
 import { useTheme } from "../theme/ThemeContext";
+import { showGlobalAlertCompat } from "./global-modal";
 import { rootNavigate } from "../navigation/rootNavigation";
 import { navigationRef } from "../navigation/navigationRef";
 import { EXPLORE_CLEAR_BEFORE_LOGIN_EVENT } from "../navigation/navigateToLoginClearingStack";
@@ -27,6 +28,7 @@ const TAB_BAR_OFFSET = 72;
 /** Pets stack screens where the global SOS FAB would duplicate the flow or cover inputs. */
 const MY_PETS_STACK_HIDE_SOS = new Set<string>([
   "ReportLost",
+  "ReportFound",
   "EmergencyVets",
   "AddPet",
   "Triage",
@@ -99,7 +101,18 @@ export function GlobalSosFab() {
   const onReportLost = useCallback(() => {
     setMenuOpen(false);
     requireAuth(() => {
+      if (!hasPets) {
+        showGlobalAlertCompat(t("errorTitle"), t("reportFoundNoPetsForLost"));
+        return;
+      }
       rootNavigate("ReportLost");
+    });
+  }, [requireAuth, hasPets, t]);
+
+  const onReportFound = useCallback(() => {
+    setMenuOpen(false);
+    requireAuth(() => {
+      rootNavigate("ReportFound");
     });
   }, [requireAuth]);
 
@@ -112,7 +125,7 @@ export function GlobalSosFab() {
 
   const styles = useMemo(() => createStyles(colors), [colors]);
 
-  if (!visible || !isLoggedIn || !hasPets) return null;
+  if (!visible || !isLoggedIn) return null;
 
   return (
     <>
@@ -264,6 +277,53 @@ export function GlobalSosFab() {
               </View>
             </Pressable>
 
+            {/* Found Pet */}
+            <Pressable
+              onPress={onReportFound}
+              style={({ pressed }) => [
+                styles.optionBtn,
+                styles.optionFoundBorder,
+                { backgroundColor: pressed ? "#d1fae5" : "#ecfdf5" },
+              ]}
+            >
+              <View
+                style={[
+                  styles.optionRow,
+                  isRTL && styles.optionRowRTL,
+                ]}
+              >
+                <View
+                  style={[styles.optionIcon, { backgroundColor: "#10b981" }]}
+                >
+                  <Ionicons name="search" size={24} color="#fff" />
+                </View>
+                <View style={styles.optionTextWrap}>
+                  <Text
+                    style={[
+                      styles.optionTitle,
+                      { color: "#065f46", textAlign: isRTL ? "right" : "left" },
+                    ]}
+                  >
+                    {t("sosOptionFoundPet")}
+                  </Text>
+                  <Text
+                    style={[
+                      styles.optionDesc,
+                      { color: "#047857", textAlign: isRTL ? "right" : "left" },
+                    ]}
+                    numberOfLines={2}
+                  >
+                    {t("sosOptionFoundPetDesc")}
+                  </Text>
+                </View>
+                <Ionicons
+                  name={isRTL ? "chevron-back" : "chevron-forward"}
+                  size={20}
+                  color="#059669"
+                />
+              </View>
+            </Pressable>
+
             {/* Cancel */}
             <Pressable
               onPress={() => setMenuOpen(false)}
@@ -369,6 +429,9 @@ function createStyles(colors: ReturnType<typeof useTheme>["colors"]) {
     },
     optionEmergencyBorder: {
       borderColor: "#fecaca",
+    },
+    optionFoundBorder: {
+      borderColor: "#a7f3d0",
     },
     optionRow: {
       flexDirection: "row",

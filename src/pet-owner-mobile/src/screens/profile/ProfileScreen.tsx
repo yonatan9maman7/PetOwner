@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   Platform,
   InteractionManager,
+  Image,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -192,6 +193,29 @@ type ProviderCTAState =
   | "suspended"
   | "inactive";
 
+function ProfileAvatar({
+  uri,
+  colors,
+}: {
+  uri: string | null;
+  colors: ReturnType<typeof useTheme>["colors"];
+}) {
+  const [failed, setFailed] = useState(false);
+
+  if (!uri || failed) {
+    return <Ionicons name="person" size={56} color={colors.primary} />;
+  }
+
+  return (
+    <Image
+      source={{ uri }}
+      style={{ width: "100%", height: "100%" }}
+      resizeMode="cover"
+      onError={() => setFailed(true)}
+    />
+  );
+}
+
 export function ProfileScreen() {
   const isDeferredReady = useDeferredMount();
   const navigation = useNavigation<any>();
@@ -218,6 +242,7 @@ export function ProfileScreen() {
   const userId = user?.id;
 
   const [pendingIncomingBookings, setPendingIncomingBookings] = useState(0);
+  const [profileImageUrl, setProfileImageUrl] = useState<string | null>(null);
 
   const [providerCTA, setProviderCTA] = useState<ProviderCTAState>("loading");
 
@@ -231,6 +256,7 @@ export function ProfileScreen() {
           .getMe()
           .then((profile) => {
             if (cancelled) return;
+            setProfileImageUrl(profile.profileImageUrl ?? null);
             const st = readProviderStatusRaw(profile);
             const suspended = isProfileSuspended(profile);
             if (st === "banned" || st === "revoked") {
@@ -248,12 +274,14 @@ export function ProfileScreen() {
           .catch((err: unknown) => {
             if (cancelled) return;
             if (axios.isAxiosError(err) && err.response?.status === 404) {
+              setProfileImageUrl(null);
               setProviderCTA("none");
               return;
             }
             if (axios.isAxiosError(err) && err.response?.status === 401) {
               return;
             }
+            setProfileImageUrl(null);
             setProviderCTA("none");
           });
       });
@@ -332,7 +360,7 @@ export function ProfileScreen() {
                 elevation: 8,
               }}
             >
-              <Ionicons name="person" size={56} color={colors.primary} />
+              <ProfileAvatar key={profileImageUrl ?? "placeholder"} uri={profileImageUrl} colors={colors} />
             </View>
             <View
               className="absolute -bottom-2 -right-2 p-1.5 rounded-full border-2"

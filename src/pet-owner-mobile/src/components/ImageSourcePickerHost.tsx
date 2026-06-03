@@ -19,7 +19,7 @@ import {
   subscribeImageSourceSheet,
 } from "../utils/imagePicker";
 import { useTheme } from "../theme/ThemeContext";
-import { useTranslation, rowDirectionForAppLayout } from "../i18n";
+import { useTranslation } from "../i18n";
 
 /**
  * Renders the image source bottom sheet on Android and web. iOS uses ActionSheetIOS inside
@@ -27,10 +27,9 @@ import { useTranslation, rowDirectionForAppLayout } from "../i18n";
  */
 export function ImageSourcePickerHost() {
   const { colors } = useTheme();
-  const { isRTL } = useTranslation();
+  const { isRTL, rtlText } = useTranslation();
   const insets = useSafeAreaInsets();
-  const rowDir = rowDirectionForAppLayout(isRTL);
-  const textAlign = isRTL ? "right" : "left";
+  const sheetDirection = isRTL ? "rtl" : "ltr";
 
   const snap = useSyncExternalStore(
     subscribeImageSourceSheet,
@@ -94,26 +93,33 @@ export function ImageSourcePickerHost() {
     >
       <Pressable style={[styles.backdrop, { backgroundColor: colors.overlay }]} onPress={onBackdrop}>
         <Pressable
-          style={[styles.sheet, { backgroundColor: colors.surface, paddingBottom: Math.max(insets.bottom, 16) }]}
+          style={[
+            styles.sheet,
+            {
+              backgroundColor: colors.surface,
+              paddingBottom: Math.max(insets.bottom, 16),
+              direction: sheetDirection,
+            },
+          ]}
           onPress={(e) => e.stopPropagation()}
         >
           <View style={[styles.handle, { backgroundColor: colors.border }]} />
 
-          <Text style={[styles.title, { color: colors.text, textAlign }]}>{title}</Text>
-          <Text style={[styles.subtitle, { color: colors.textSecondary, textAlign }]}>{message}</Text>
+          <Text style={[styles.title, rtlText, { color: colors.text }]}>{title}</Text>
+          <Text style={[styles.subtitle, rtlText, { color: colors.textSecondary }]}>{message}</Text>
 
           <Pressable
             onPress={onCamera}
             style={({ pressed }) => [
               styles.optionRow,
-              { flexDirection: rowDir, backgroundColor: pressed ? colors.surfaceSecondary : "transparent" },
+              { backgroundColor: pressed ? colors.surfaceSecondary : "transparent" },
             ]}
             android_ripple={{ color: colors.surfaceSecondary }}
           >
             <View style={[styles.iconWrap, { backgroundColor: colors.primaryLight }]}>
               <Ionicons name="camera-outline" size={22} color={colors.primary} />
             </View>
-            <Text style={[styles.optionLabel, { color: colors.text, textAlign }]}>{labels.camera}</Text>
+            <Text style={[styles.optionLabel, rtlText, { color: colors.text }]}>{labels.camera}</Text>
           </Pressable>
 
           <View style={[styles.divider, { backgroundColor: colors.borderLight }]} />
@@ -122,14 +128,14 @@ export function ImageSourcePickerHost() {
             onPress={onGallery}
             style={({ pressed }) => [
               styles.optionRow,
-              { flexDirection: rowDir, backgroundColor: pressed ? colors.surfaceSecondary : "transparent" },
+              { backgroundColor: pressed ? colors.surfaceSecondary : "transparent" },
             ]}
             android_ripple={{ color: colors.surfaceSecondary }}
           >
             <View style={[styles.iconWrap, { backgroundColor: colors.primaryLight }]}>
               <Ionicons name="images-outline" size={22} color={colors.primary} />
             </View>
-            <Text style={[styles.optionLabel, { color: colors.text, textAlign }]}>{labels.gallery}</Text>
+            <Text style={[styles.optionLabel, rtlText, { color: colors.text }]}>{labels.gallery}</Text>
           </Pressable>
 
           {allowRemove ? (
@@ -139,14 +145,14 @@ export function ImageSourcePickerHost() {
                 onPress={onRemovePhoto}
                 style={({ pressed }) => [
                   styles.optionRow,
-                  { flexDirection: rowDir, backgroundColor: pressed ? colors.surfaceSecondary : "transparent" },
+                  { backgroundColor: pressed ? colors.surfaceSecondary : "transparent" },
                 ]}
                 android_ripple={{ color: colors.surfaceSecondary }}
               >
                 <View style={[styles.iconWrap, { backgroundColor: colors.dangerLight }]}>
                   <Ionicons name="trash-outline" size={22} color={colors.danger} />
                 </View>
-                <Text style={[styles.optionLabel, { color: colors.danger, textAlign }]}>
+                <Text style={[styles.optionLabel, rtlText, { color: colors.danger }]}>
                   {removeLabelFor(pending.options)}
                 </Text>
               </Pressable>
@@ -200,7 +206,9 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   optionRow: {
+    flexDirection: "row",
     alignItems: "center",
+    alignSelf: "stretch",
     gap: 14,
     paddingVertical: 14,
     paddingHorizontal: 4,
@@ -233,5 +241,6 @@ const styles = StyleSheet.create({
   cancelLabel: {
     fontSize: 16,
     fontWeight: "600",
+    textAlign: "center",
   },
 });

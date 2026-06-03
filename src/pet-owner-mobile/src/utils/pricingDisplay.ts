@@ -16,6 +16,12 @@ export function roundMoney(n: number): number {
   return Math.round(n * 100) / 100;
 }
 
+/** Safe currency display — avoids crashing when API fields are missing. */
+export function formatFixedMoney(value: unknown, digits = 2): string {
+  const n = Number(value);
+  return Number.isFinite(n) ? n.toFixed(digits) : (0).toFixed(digits);
+}
+
 export interface ProviderPricingBreakdown {
   basePrice: number;
   providerFee: number;

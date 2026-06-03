@@ -34,6 +34,7 @@ import type {
   CreatePetRequest,
   UpdatePetRequest,
   ReportLostRequest,
+  ReportFoundPetRequest,
   LostPetDto,
   ChatConversationDto,
   ChatMessageDto,
@@ -453,6 +454,8 @@ export const postsApi = {
     apiClient.get<PostDto>(`/posts/${id}`).then((r) => r.data),
   create: (data: CreatePostDto) =>
     apiClient.post<PostDto>("/posts", data).then((r) => r.data),
+  reportFoundPet: (data: ReportFoundPetRequest) =>
+    apiClient.post<PostDto>("/posts/report-found", data).then((r) => r.data),
   deletePost: (id: string) => apiClient.delete(`/posts/${id}`),
   toggleLike: (id: string) =>
     apiClient

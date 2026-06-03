@@ -27,7 +27,7 @@ import { useKeyboardAvoidingState } from "../../hooks/useKeyboardAvoidingState";
 import { getNormalizedApiError } from "../../utils/apiUtils";
 import { mapAuthApiErrorToTranslationKey } from "../../utils/authErrorI18n";
 import { isValidEmailFormat } from "../../utils/emailValidation";
-import { isValidPhoneFormat } from "../../utils/phoneValidation";
+import { isIsraeliMobileValid } from "../../features/provider-onboarding/phoneUtils";
 
 const AUTH_PETCARE_HERO_LOGO = require("../../../assets/petcare-logo-transparent.png");
 
@@ -179,8 +179,8 @@ export function RegisterScreen() {
     if (!phone.trim()) {
       setPhoneError(t("fieldRequiredShort"));
       valid = false;
-    } else if (!isValidPhoneFormat(phone)) {
-      setPhoneError(t("invalid_phone") || "Please enter a valid phone number");
+    } else if (!isIsraeliMobileValid(phone)) {
+      setPhoneError(t("registerPhoneInvalidFormat"));
       valid = false;
     }
     if (!password.trim()) {
@@ -253,6 +253,8 @@ export function RegisterScreen() {
             { text: t("cancelButton"), style: "cancel" },
           ],
         );
+      } else if (code === "INVALID_PHONE") {
+        setPhoneError(t("registerPhoneInvalidFormat"));
       } else {
         setErrorMessage(t(mapAuthApiErrorToTranslationKey(normalized)));
       }
@@ -505,7 +507,7 @@ export function RegisterScreen() {
                     padding: 0,
                   },
                 ]}
-                placeholder={t("phoneLabel")}
+                placeholder={t("phonePlaceholder")}
                 placeholderTextColor={colors.textMuted}
                 value={phone}
                 onChangeText={(v) => {

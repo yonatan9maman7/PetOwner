@@ -187,7 +187,13 @@ const PostCard = memo(function PostCard({
                 <Text style={styles.providerBadgeText}>{copy("provider")}</Text>
               </View>
             )}
-            <View style={[styles.kindBadge, kind === "Lost & Found" && styles.sosBadge]}>
+            <View
+              style={[
+                styles.kindBadge,
+                kind === "Lost & Found" && styles.sosBadge,
+                kind === "Found Pet" && styles.foundPetBadge,
+              ]}
+            >
               <Text style={styles.kindBadgeText}>{postKindLabel(kind, isRTL)}</Text>
             </View>
           </View>
@@ -930,7 +936,7 @@ export function CommunityScreen() {
     () =>
       posts.filter((p) => {
         const c = (p.category ?? "").toLowerCase();
-        return c.includes("sos") || c.includes("lost");
+        return c.includes("sos") || c.includes("lost") || c.includes("found");
       }),
     [posts],
   );

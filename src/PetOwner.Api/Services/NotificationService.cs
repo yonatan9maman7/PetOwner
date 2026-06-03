@@ -14,6 +14,8 @@ public class NotificationService : INotificationService
         ["NOTIFICATIONS.SOS_ALERT"] = ("חיית מחמד באזור שלך נעדרת. לחצו לצפייה ולעזרה.", "A pet near you is missing. Tap to view and help."),
         ["NOTIFICATIONS.SOS_RESOLVED_TITLE"] = ("✅ SOS טופל", "✅ SOS Resolved"),
         ["NOTIFICATIONS.SOS_RESOLVED"] = ("חדשות טובות! חיית המחמד נמצאה בשלום!", "Great news! The pet has been found safe!"),
+        ["NOTIFICATIONS.FOUND_PET_TITLE"] = ("🐾 חיה נמצאה באזורך", "🐾 Pet Found Nearby"),
+        ["NOTIFICATIONS.FOUND_PET"] = ("מישהו דיווח על חיה שנמצאה באזור שלך. לחצו לצפייה ולעזור.", "Someone reported a found pet near you. Tap to view and help."),
         ["NOTIFICATIONS.PROVIDER_APPROVED_TITLE"] = ("🎉 בקשת ספק אושרה", "🎉 Provider Approved"),
         ["NOTIFICATIONS.PROVIDER_APPROVED"] = ("הפרופיל שלך אושר כספק. אפשר להתחיל לקבל הזמנות.", "Your provider profile has been approved. You can now start receiving bookings."),
         ["NOTIFICATIONS.ACCOUNT_SUSPENDED_TITLE"] = ("⚠️ החשבון הושעה", "⚠️ Account Suspended"),
@@ -262,7 +264,7 @@ public class NotificationService : INotificationService
                 => prefs.Bookings,
 
             "GROUP_POST" or "POST_COMMENT" or "POST_LIKE" or "SOS_ALERT"
-                or "sos" or "sos_resolved"
+                or "sos" or "sos_resolved" or "sos_found"
                 => prefs.Community,
 
             "TRIAGE_RESULT" or "VACCINE_DUE"

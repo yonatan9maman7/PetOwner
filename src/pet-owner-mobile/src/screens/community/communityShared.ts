@@ -33,6 +33,7 @@ export type PostKind =
   | "Playdate"
   | "Warning"
   | "Lost & Found"
+  | "Found Pet"
   | "Event";
 
 export type Visibility = "Public" | "Nearby only" | "Friends only" | "Group only";
@@ -484,6 +485,8 @@ export function categoryToKind(category?: string): PostKind {
     case "lost_and_found":
     case "lost & found":
       return "Lost & Found";
+    case "found_pet":
+      return "Found Pet";
     case "event":
     case "events":
       return "Event";
@@ -503,6 +506,7 @@ export function postKindLabel(kind: PostKind, isRTL: boolean): string {
       case "Playdate": return EN.postKindPlaydate;
       case "Warning": return EN.postKindWarning;
       case "Lost & Found": return EN.postKindLostFound;
+      case "Found Pet": return "Found!";
       case "Event": return EN.postKindEvent;
     }
   }
@@ -513,6 +517,7 @@ export function postKindLabel(kind: PostKind, isRTL: boolean): string {
     case "Playdate": return "מפגש";
     case "Warning": return "אזהרה";
     case "Lost & Found": return "אבדות ומציאות";
+    case "Found Pet": return "נמצאה!";
     case "Event": return "אירוע";
   }
 }
@@ -582,8 +587,10 @@ export function activityLabel(activity: DogPark["activity"], isRTL: boolean): st
 
 /** Active SOS-style lost post: Lost & Found category, not yet resolved on the server. */
 export function isActiveSosLostPost(post: PostDto, kind: PostKind): boolean {
+  if (kind === "Found Pet") return false;
   if (kind !== "Lost & Found" || post.sosResolvedAt) return false;
   const cat = (post.category ?? "").toLowerCase();
+  if (cat === "found_pet" || cat.includes("found_pet")) return false;
   if (cat.includes("sos") || cat.includes("lost")) return true;
   return post.content.includes("🆘") || /SOS:/i.test(post.content);
 }
@@ -597,7 +604,8 @@ export function filterMatchesPost(filter: FeedFilter, post: PostDto, meta?: Post
   }
   if (filter === "Questions") return kind === "Question";
   if (filter === "Recommendations") return kind === "Recommendation";
-  if (filter === "Lost & Found") return kind === "Lost & Found";
+  if (filter === "Lost & Found")
+    return kind === "Lost & Found" || kind === "Found Pet";
   if (filter === "Playdates") return kind === "Playdate";
   if (filter === "Events") return kind === "Event";
   return true;

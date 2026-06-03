@@ -1,3 +1,5 @@
+using System.ComponentModel.DataAnnotations;
+
 namespace PetOwner.Api.DTOs;
 
 public record CreatePostDto(
@@ -60,4 +62,12 @@ public record CommentDto(
     int LikeCount,
     bool LikedByMe,
     IReadOnlyList<CommentDto> Replies
+);
+
+public record ReportFoundPetDto(
+    [Required] string ImageUrl,
+    double Latitude,
+    double Longitude,
+    [Required] string ContactPhone,
+    string? Description = null
 );

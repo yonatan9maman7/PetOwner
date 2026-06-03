@@ -172,11 +172,12 @@ function FloatingRatingBadge({
   rating?: number;
   style?: ViewStyle;
 }) {
-  if (rating == null) return null;
+  const n = Number(rating);
+  if (!Number.isFinite(n)) return null;
   return (
     <View style={[c.floatingRating, style]}>
       <Ionicons name="star" size={13} color="#F59E0B" />
-      <Text style={c.floatingRatingText}>{rating.toFixed(1)}</Text>
+      <Text style={c.floatingRatingText}>{n.toFixed(1)}</Text>
     </View>
   );
 }

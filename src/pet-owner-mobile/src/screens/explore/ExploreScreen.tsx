@@ -215,12 +215,18 @@ function AvatarImage({ uri }: { uri?: string | null }) {
   }
 
   return (
-    <Image
-      source={{ uri }}
-      className="w-20 h-20 rounded-lg"
+    <View
+      className="w-20 h-20 rounded-lg overflow-hidden"
       style={{ backgroundColor: colors.primaryLight }}
-      onError={() => setFailed(true)}
-    />
+    >
+      <Image
+        key={uri}
+        source={{ uri }}
+        style={{ width: 80, height: 80 }}
+        resizeMode="cover"
+        onError={() => setFailed(true)}
+      />
+    </View>
   );
 }
 
@@ -283,6 +289,8 @@ export function ExploreScreen() {
   const suppressViewportFetchAfterMarkerMsRef = useRef(0);
   /** Avoid map/pin state updates while this screen is not focused (prevents native crashes from updates off-screen). */
   const exploreScreenFocusedRef = useRef(true);
+  /** After the first blur, silently refresh pins on refocus so avatar URLs stay current. */
+  const exploreHasBeenBlurredRef = useRef(false);
   /**
    * Aborts any in-flight `GET /map/pins` call when a new one is issued. Without this, rapid panning
    * stacks HTTP responses in memory (they can't be GC'd until axios resolves them), which pressures
@@ -440,6 +448,15 @@ export function ExploreScreen() {
     ? formatMapPinRating(selectedPin.averageRating)
     : null;
 
+  useEffect(() => {
+    if (!selectedPin) return;
+    const fresh = pins.find((p) => p.providerId === selectedPin.providerId);
+    if (!fresh) return;
+    if (fresh.profileImageUrl !== selectedPin.profileImageUrl) {
+      setSelectedPin(fresh);
+    }
+  }, [pins, selectedPin]);
+
   const activeFilterCount = useMemo(() => {
     let count = 0;
     if (activeServices.size > 0) count += activeServices.size;
@@ -458,6 +475,7 @@ export function ExploreScreen() {
       mapDiag("screen.focus");
       return () => {
         exploreScreenFocusedRef.current = false;
+        exploreHasBeenBlurredRef.current = true;
         mapDiag("screen.blur");
       };
     }, []),
@@ -724,7 +742,8 @@ export function ExploreScreen() {
           if (
             a.providerId !== b.providerId ||
             a.latitude !== b.latitude ||
-            a.longitude !== b.longitude
+            a.longitude !== b.longitude ||
+            a.profileImageUrl !== b.profileImageUrl
           ) {
             identical = false;
             break;
@@ -823,6 +842,15 @@ export function ExploreScreen() {
   /* Always-fresh ref so debounced / native callbacks never go stale */
   const loadPinsRef = useRef(loadPins);
   loadPinsRef.current = loadPins;
+
+  useFocusEffect(
+    useCallback(() => {
+      if (exploreHasBeenBlurredRef.current && pinsRef.current.length > 0) {
+        loadPinsRef.current({ silent: true });
+      }
+      return undefined;
+    }, []),
+  );
 
   /* ─── Initial load ─── */
   useEffect(() => {

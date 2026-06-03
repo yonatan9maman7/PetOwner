@@ -32,7 +32,7 @@ import { TimeSlotSelector } from "../../components/shared/TimeSlotSelector";
 import { ScreenLoadingCenter } from "../../components/shared/ScreenLoadingCenter";
 import { StackBackHeader } from "../../components/StackBackHeader";
 import { usePetsStore } from "../../store/petsStore";
-import { customerBreakdownFromProviderNet } from "../../utils/pricingDisplay";
+import { customerBreakdownFromProviderNet, formatFixedMoney } from "../../utils/pricingDisplay";
 import Toast from "react-native-toast-message";
 
 const PET_SPECIES_TO_KEY: Partial<Record<PetSpecies, TranslationKey>> = {
@@ -1107,7 +1107,7 @@ export function BookingScreen() {
                   {t("bookingBreakdownBase")}
                 </Text>
                 <Text style={{ fontSize: 15, fontWeight: "700", color: colors.text }}>
-                  ₪{estimatedPricing.basePrice.toFixed(2)}
+                  ₪{formatFixedMoney(estimatedPricing.basePrice)}
                 </Text>
               </View>
 
@@ -1123,7 +1123,7 @@ export function BookingScreen() {
                   {t("bookingBreakdownFee")}
                 </Text>
                 <Text style={{ fontSize: 15, fontWeight: "700", color: colors.text }}>
-                  ₪{estimatedPricing.customerServiceFee.toFixed(2)}
+                  ₪{formatFixedMoney(estimatedPricing.customerServiceFee)}
                 </Text>
               </View>
 
@@ -1143,7 +1143,7 @@ export function BookingScreen() {
                   {t("bookingBreakdownTotal")}
                 </Text>
                 <Text style={{ fontSize: 18, fontWeight: "800", color: colors.primary }}>
-                  ₪{estimatedPricing.finalTotal.toFixed(2)}
+                  ₪{formatFixedMoney(estimatedPricing.finalTotal)}
                 </Text>
               </View>
             </View>
@@ -1256,7 +1256,7 @@ export function BookingScreen() {
               <Ionicons name="checkmark-circle" size={20} color={colors.textInverse} />
               <Text style={{ color: colors.textInverse, fontSize: 16, fontWeight: "700" }}>
                 {t("confirmBooking")}
-                {estimatedPricing !== null ? ` — ₪${estimatedPricing.finalTotal.toFixed(2)}` : ""}
+                {estimatedPricing !== null ? ` — ₪${formatFixedMoney(estimatedPricing.finalTotal)}` : ""}
               </Text>
             </>
           )}

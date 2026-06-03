@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { View, Text, Pressable, ActivityIndicator, KeyboardAvoidingView } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -67,6 +67,21 @@ export function ProviderOnboardingScreen() {
     defaultValues: buildDefaultValues(),
     mode: "onSubmit",
   });
+
+  useEffect(() => {
+    let active = true;
+    providerApi
+      .getMe()
+      .then((profile) => {
+        if (!active || !profile.profileImageUrl) return;
+        methods.setValue("imageUrl", profile.profileImageUrl);
+        methods.setValue("imageUri", profile.profileImageUrl);
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, [methods]);
 
   const providerType = methods.watch("providerType");
   const steps = providerType === 1 ? BUSINESS_STEPS : INDIVIDUAL_STEPS;

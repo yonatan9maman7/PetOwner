@@ -1,9 +1,9 @@
+import { isIsraeliMobileValid } from "../features/provider-onboarding/phoneUtils";
+
 /**
- * Client-side phone check: optional leading '+', digits only, 9–15 digits total
- * (common range for national / international mobiles without strict E.164 parsing).
+ * Israeli mobile (05…, 10 digits). Accepts +972… input via normalization.
+ * Matches API PhoneValidator (0 + 05x + 7 digits).
  */
 export function isValidPhoneFormat(phone: string): boolean {
-  const trimmed = phone.trim();
-  if (!trimmed) return false;
-  return /^\+?[0-9]{9,15}$/.test(trimmed);
+  return isIsraeliMobileValid(phone);
 }

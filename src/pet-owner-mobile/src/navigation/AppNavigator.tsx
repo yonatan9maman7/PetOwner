@@ -44,6 +44,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
     import { TriageScreen } from "../screens/pets/TriageScreen";
     import { EmergencyVetsScreen } from "../screens/pets/EmergencyVetsScreen";
     import { ReportLostScreen } from "../screens/pets/ReportLostScreen";
+    import { ReportFoundScreen } from "../screens/pets/ReportFoundScreen";
     import { NotificationsScreen } from "../screens/profile/NotificationsScreen";
     import { AccountSettingsScreen } from "../screens/profile/AccountSettingsScreen";
     import { AccountEditScreen } from "../screens/profile/AccountEditScreen";
@@ -68,6 +69,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
     const HIDDEN_TAB_SCREENS = new Set([
       "AddPet",
       "ReportLost",
+      "ReportFound",
       "Triage",
       "ActivityLog",
       "EmergencyVets",
@@ -373,6 +375,7 @@ const solidStyles = StyleSheet.create({
           <PetsStack.Screen name="MyPetsMain" component={MyPetsScreen} />
           <PetsStack.Screen name="AddPet" component={AddPetScreen} />
           <PetsStack.Screen name="ReportLost" component={ReportLostScreen} />
+          <PetsStack.Screen name="ReportFound" component={ReportFoundScreen} />
           <PetsStack.Screen name="EmergencyVets" component={EmergencyVetsScreen} />
           <PetsStack.Screen name="ProviderProfile" component={ProviderProfileScreen} />
           <PetsStack.Screen name="Booking" component={BookingScreen} />

@@ -13,7 +13,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useFormContext } from "react-hook-form";
 import { useTranslation, rowDirectionForAppLayout } from "../../i18n";
 import { useTheme } from "../../theme/ThemeContext";
-import { filesApi, providerApi } from "../../api/client";
+import { providerApi } from "../../api/client";
 import { AddressMapModal } from "./AddressMapModal";
 import { FieldLabel } from "./FieldLabel";
 import type { OnboardingFormValues } from "./schemas";
@@ -32,6 +32,8 @@ export function IdentityStep() {
   const providerType = watch("providerType");
   const bio = watch("bio");
   const imageUri = watch("imageUri");
+  const imageUrl = watch("imageUrl");
+  const previewUri = imageUri || imageUrl || null;
   const phoneNumber = watch("phoneNumber");
   const whatsAppNumber = watch("whatsAppNumber");
   const websiteUrl = watch("websiteUrl");
@@ -66,11 +68,18 @@ export function IdentityStep() {
     setValue("imageUri", uri);
     setUploading(true);
     try {
-      const { url } = await filesApi.uploadImage(uri, "profiles");
+      const name = uri.split("/").pop() ?? "photo.jpg";
+      const match = /\.(\w+)$/.exec(name);
+      const type = match ? `image/${match[1]}` : "image/jpeg";
+      const form = new FormData();
+      form.append("file", { uri, name, type } as any);
+      const { url } = await providerApi.uploadImage(form);
       setValue("imageUrl", url);
+      setValue("imageUri", url);
     } catch {
       showGlobalAlertCompat(t("errorTitle"), t("onbImageUploadError"));
       setValue("imageUri", "");
+      setValue("imageUrl", "");
     } finally {
       setUploading(false);
     }
@@ -149,8 +158,8 @@ export function IdentityStep() {
         >
           {uploading ? (
             <ActivityIndicator color={colors.text} />
-          ) : imageUri ? (
-            <Image source={{ uri: imageUri }} style={{ width: 100, height: 100 }} />
+          ) : previewUri ? (
+            <Image source={{ uri: previewUri }} style={{ width: 100, height: 100 }} resizeMode="cover" />
           ) : (
             <Ionicons name="camera-outline" size={36} color={colors.text} />
           )}

@@ -5,18 +5,35 @@ import QRCode from "react-native-qrcode-svg";
 import type { ProviderPublicProfileDto } from "../../../types/api";
 import { publicProviderProfileUrl } from "../../../config/publicLinks";
 
-/**
- * Portrait card sized for sharp WhatsApp sharing at ~1080px logical width on @3x devices
- * (aspect ~1080:1400 matches prior server card).
- */
+/** Logical card size for @3x capture (~1080px wide when scaled). */
 const CARD_W = 360;
-const CARD_H = Math.round((CARD_W * 1400) / 1080);
 const OUTER_PAD = 12;
-const INNER_H = CARD_H - OUTER_PAD * 2;
-const HEADER_H = Math.round(INNER_H * 0.26);
 const AVATAR = 104;
 const AVATAR_HALF = AVATAR / 2;
-const QR_SIZE = 128;
+const QR_SIZE = 100;
+/** White border around modules — use plate padding, not quietZone (library clips quietZone). */
+const QR_PLATE_PAD = 14;
+const QR_PLATE_OUTER = QR_SIZE + QR_PLATE_PAD * 2 + 2;
+
+const HEADER_H = 132;
+const FOOTER_TOP_GAP = 10;
+const FOOTER_PAD_TOP = 10;
+const DOMAIN_LINE_H = 16;
+const FOOTER_BOTTOM_PAD = 18;
+/** QR plate + domain + spacing — reserved so nothing clips at the card bottom. */
+const FOOTER_BLOCK_H =
+  FOOTER_TOP_GAP +
+  FOOTER_PAD_TOP +
+  StyleSheet.hairlineWidth +
+  QR_PLATE_OUTER +
+  8 +
+  DOMAIN_LINE_H +
+  FOOTER_BOTTOM_PAD;
+
+const TOP_CONTENT_H = 250;
+const BODY_H = TOP_CONTENT_H + FOOTER_TOP_GAP + FOOTER_BLOCK_H;
+const INNER_H = HEADER_H + BODY_H;
+const CARD_H = INNER_H + OUTER_PAD * 2;
 
 const BRAND_NAVY = "#001A5A";
 const BRAND_NAVY_SOFT = "#0A3270";
@@ -47,7 +64,8 @@ export type ProviderShareCardCaptureViewProps = {
 };
 
 /**
- * Off-screen share card for `captureRef`. Uses SVG QR so ViewShot reliably captures pixels.
+ * Off-screen share card for `captureRef`. Uses explicit heights (not flex) so ViewShot
+ * never clips the QR footer.
  */
 export const ProviderShareCardCaptureView = forwardRef<View, ProviderShareCardCaptureViewProps>(
   function ProviderShareCardCaptureView(
@@ -106,67 +124,69 @@ export const ProviderShareCardCaptureView = forwardRef<View, ProviderShareCardCa
             colors={[BRAND_NAVY, BRAND_NAVY_SOFT]}
             start={{ x: 0.5, y: 0 }}
             end={{ x: 0.5, y: 1 }}
-            style={[styles.headerBand, { height: HEADER_H }]}
+            style={styles.headerBand}
           />
 
           <View style={styles.bodyBand}>
-            <View style={[styles.avatarRow, { marginTop: -AVATAR_HALF + 6 }]}>
-              <View collapsable={false} style={styles.avatarShadowPlate}>
-                <View style={styles.avatarRing}>
-                  {profile.profileImageUrl && !imgFailed ? (
-                    <Image
-                      source={{ uri: profile.profileImageUrl }}
-                      style={styles.avatarImage}
-                      resizeMode="cover"
-                      onLoad={() => setImgLoaded(true)}
-                      onError={() => {
-                        setImgFailed(true);
-                        setImgLoaded(true);
-                      }}
-                    />
-                  ) : (
-                    <View style={styles.avatarFallback}>
-                      <Text style={styles.avatarFallbackText}>{initials}</Text>
-                    </View>
-                  )}
+            <View style={styles.topContent}>
+              <View style={styles.avatarRow}>
+                <View collapsable={false} style={styles.avatarShadowPlate}>
+                  <View style={styles.avatarRing}>
+                    {profile.profileImageUrl && !imgFailed ? (
+                      <Image
+                        source={{ uri: profile.profileImageUrl }}
+                        style={styles.avatarImage}
+                        resizeMode="cover"
+                        onLoad={() => setImgLoaded(true)}
+                        onError={() => {
+                          setImgFailed(true);
+                          setImgLoaded(true);
+                        }}
+                      />
+                    ) : (
+                      <View style={styles.avatarFallback}>
+                        <Text style={styles.avatarFallbackText}>{initials}</Text>
+                      </View>
+                    )}
+                  </View>
                 </View>
+              </View>
+
+              <View style={styles.textBlock}>
+                <Text style={[styles.name, rtlText]} numberOfLines={2}>
+                  {displayName}
+                </Text>
+
+                {hasRating ? (
+                  <Text style={[styles.ratingLine, rtlText]} numberOfLines={2}>
+                    {ratingDisplay}
+                  </Text>
+                ) : (
+                  <View style={styles.newBadge}>
+                    <Text style={[styles.newBadgeText, rtlText]}>{newOnPetOwnerLabel}</Text>
+                  </View>
+                )}
+
+                {!!servicesLine && (
+                  <Text style={[styles.services, rtlText]} numberOfLines={2}>
+                    {servicesLine}
+                  </Text>
+                )}
               </View>
             </View>
 
-            <View style={styles.textBlock}>
-              <Text style={[styles.name, rtlText]} numberOfLines={2}>
-                {displayName}
-              </Text>
-
-              {hasRating ? (
-                <Text style={[styles.ratingLine, rtlText]} numberOfLines={2}>
-                  {ratingDisplay}
-                </Text>
-              ) : (
-                <View style={styles.newBadge}>
-                  <Text style={[styles.newBadgeText, rtlText]}>{newOnPetOwnerLabel}</Text>
-                </View>
-              )}
-
-              {!!servicesLine && (
-                <Text style={[styles.services, rtlText]} numberOfLines={2}>
-                  {servicesLine}
-                </Text>
-              )}
-            </View>
-
-            <View style={styles.footerSpacer} />
-
             <View style={styles.footer}>
               <View collapsable={false} style={styles.qrPlate}>
-                <QRCode
-                  value={publicUrl}
-                  size={QR_SIZE}
-                  color={BRAND_NAVY}
-                  backgroundColor="#FFFFFF"
-                  quietZone={6}
-                  ecl="Q"
-                />
+                <View style={styles.qrCanvas}>
+                  <QRCode
+                    value={publicUrl}
+                    size={QR_SIZE}
+                    color={BRAND_NAVY}
+                    backgroundColor="#FFFFFF"
+                    quietZone={0}
+                    ecl="Q"
+                  />
+                </View>
               </View>
               <Text style={[styles.domain, rtlText]}>petowner.app</Text>
             </View>
@@ -193,27 +213,33 @@ const styles = StyleSheet.create({
     height: CARD_H,
     backgroundColor: BRAND_NAVY,
     padding: OUTER_PAD,
-    borderRadius: 0,
   },
   cardFrame: {
-    flex: 1,
+    width: CARD_W - OUTER_PAD * 2,
+    height: INNER_H,
     borderRadius: 18,
-    overflow: "hidden",
     backgroundColor: "#FFFFFF",
   },
   headerBand: {
     width: "100%",
+    height: HEADER_H,
+    borderTopLeftRadius: 18,
+    borderTopRightRadius: 18,
   },
   bodyBand: {
-    flex: 1,
+    height: BODY_H,
     backgroundColor: "#FFFFFF",
+    borderBottomLeftRadius: 18,
+    borderBottomRightRadius: 18,
+  },
+  topContent: {
+    height: TOP_CONTENT_H,
     paddingHorizontal: 20,
-    paddingBottom: 16,
-    marginTop: 0,
   },
   avatarRow: {
     width: "100%",
     alignItems: "center",
+    marginTop: -AVATAR_HALF + 4,
     zIndex: 4,
   },
   avatarShadowPlate: {
@@ -253,32 +279,32 @@ const styles = StyleSheet.create({
   textBlock: {
     alignItems: "center",
     width: "100%",
-    marginTop: 10,
+    marginTop: 8,
     paddingHorizontal: 4,
   },
   name: {
     width: "100%",
     textAlign: "center",
-    fontSize: 26,
+    fontSize: 24,
     fontWeight: "800",
     color: INK_PRIMARY,
     letterSpacing: Platform.OS === "ios" ? -0.8 : -0.3,
-    lineHeight: 32,
+    lineHeight: 30,
   },
   ratingLine: {
-    marginTop: 10,
+    marginTop: 8,
     width: "100%",
     textAlign: "center",
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: "700",
     color: "#374151",
-    lineHeight: 22,
+    lineHeight: 20,
   },
   newBadge: {
-    marginTop: 12,
+    marginTop: 10,
     maxWidth: "100%",
-    paddingHorizontal: 16,
-    paddingVertical: 7,
+    paddingHorizontal: 14,
+    paddingVertical: 6,
     borderRadius: 20,
     backgroundColor: "#DBEAFE",
     borderWidth: 1,
@@ -287,44 +313,54 @@ const styles = StyleSheet.create({
   },
   newBadgeText: {
     textAlign: "center",
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: "800",
     color: "#1E3A8A",
     letterSpacing: 0.2,
-    lineHeight: 18,
+    lineHeight: 16,
   },
   services: {
-    marginTop: 14,
+    marginTop: 8,
     width: "100%",
     textAlign: "center",
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: "700",
     color: SERVICES_GRAY,
-    lineHeight: 20,
+    lineHeight: 18,
     letterSpacing: 0.15,
   },
-  footerSpacer: {
-    flex: 1,
-    minHeight: 8,
-  },
   footer: {
+    height: FOOTER_BLOCK_H,
+    paddingHorizontal: 20,
+    paddingTop: FOOTER_PAD_TOP,
+    paddingBottom: FOOTER_BOTTOM_PAD,
+    marginTop: FOOTER_TOP_GAP,
     alignItems: "center",
-    width: "100%",
-    paddingTop: 4,
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: "#E5E7EB",
   },
   qrPlate: {
-    padding: 10,
+    padding: QR_PLATE_PAD,
     backgroundColor: "#FFFFFF",
     borderRadius: 12,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: "#E5E7EB",
     alignItems: "center",
     justifyContent: "center",
+    alignSelf: "center",
+  },
+  /** Matches Svg width/height exactly — avoids RN layout clipping the matrix. */
+  qrCanvas: {
+    width: QR_SIZE,
+    height: QR_SIZE,
+    alignItems: "center",
+    justifyContent: "center",
+    overflow: "visible",
   },
   domain: {
-    marginTop: 10,
+    marginTop: 8,
+    height: DOMAIN_LINE_H,
+    lineHeight: DOMAIN_LINE_H,
     fontSize: 12,
     fontWeight: "700",
     color: "#64748B",

@@ -242,10 +242,10 @@ function ServiceRow({
         const raw = String(state.rate ?? "").trim();
         const basePrice = parseFloat(raw);
         if (!Number.isFinite(basePrice) || basePrice <= 0) return null;
-        const { platformFee, netEarnings } = providerBreakdownFromBasePrice(basePrice);
+        const { providerFee, netEarnings } = providerBreakdownFromBasePrice(basePrice);
         const hint = t("providerPriceEarningsHint")
           .replace("{{basePrice}}", basePrice.toFixed(2))
-          .replace("{{platformFee}}", platformFee.toFixed(2))
+          .replace("{{platformFee}}", providerFee.toFixed(2))
           .replace("{{netEarnings}}", netEarnings.toFixed(2));
         return (
           <Text

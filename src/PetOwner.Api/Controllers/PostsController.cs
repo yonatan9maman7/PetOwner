@@ -83,7 +83,7 @@ public class PostsController : ControllerBase
             static int SosRank(string? c)
             {
                 var x = (c ?? "").ToLowerInvariant();
-                if (x.Contains("sos") || x.Contains("lost")) return 3;
+                if (x.Contains("sos") || x.Contains("lost") || x.Contains("found")) return 3;
                 return 0;
             }
 
@@ -238,6 +238,79 @@ public class PostsController : ControllerBase
             .FirstAsync();
 
         return CreatedAtAction(nameof(GetFeed), null, created);
+    }
+
+    [HttpPost("report-found")]
+    public async Task<IActionResult> ReportFoundPet([FromBody] ReportFoundPetDto request)
+    {
+        var userId = GetUserId();
+
+        if (string.IsNullOrWhiteSpace(request.ImageUrl))
+            return BadRequest(new { message = "Image is required." });
+
+        if (string.IsNullOrWhiteSpace(request.ContactPhone))
+            return BadRequest(new { message = "Contact phone is required." });
+
+        var descriptionSection = !string.IsNullOrWhiteSpace(request.Description)
+            ? $"\n📝 {request.Description.Trim()}"
+            : string.Empty;
+        var content =
+            $"🐾 Found Pet!\n\n📞 Contact: {request.ContactPhone.Trim()}{descriptionSection}\n\nIf you recognize this pet, please contact the finder.";
+
+        var post = new Post
+        {
+            Id = Guid.NewGuid(),
+            UserId = userId,
+            Content = content,
+            ImageUrl = request.ImageUrl.Trim(),
+            Latitude = request.Latitude,
+            Longitude = request.Longitude,
+            Category = "found_pet",
+            ContactPhone = request.ContactPhone.Trim(),
+            RelatedPetId = null,
+            CreatedAt = DateTime.UtcNow,
+        };
+
+        _db.Posts.Add(post);
+        await _db.SaveChangesAsync();
+
+        await _notifications.NotifyUsersNearLocationAsync(
+            request.Latitude,
+            request.Longitude,
+            radiusKm: 7,
+            type: "sos_found",
+            title: "NOTIFICATIONS.FOUND_PET_TITLE",
+            message: "NOTIFICATIONS.FOUND_PET",
+            relatedEntityId: post.Id);
+
+        var created = await _db.Posts
+            .AsNoTracking()
+            .Where(p => p.Id == post.Id)
+            .Select(p => new PostDto(
+                p.Id,
+                p.UserId,
+                p.IsAnonymous ? "Anonymous" : p.User.Name,
+                p.Content,
+                p.ImageUrl,
+                p.LikeCount,
+                p.CommentCount,
+                p.HelpfulCount,
+                p.Likes.Any(l => l.UserId == userId),
+                p.HelpfulMarks.Any(h => h.UserId == userId),
+                p.SavedByUsers.Any(s => s.UserId == userId),
+                p.CreatedAt,
+                p.User.Role,
+                p.User.ProviderProfile != null && p.User.ProviderProfile.Status == ProviderStatus.Approved,
+                p.Category,
+                p.Title,
+                p.RelatedPetId,
+                p.RelatedPet != null ? p.RelatedPet.Name : null,
+                p.RelatedPet != null ? p.RelatedPet.ImageUrl : null,
+                p.SosResolvedAt,
+                p.IsAnonymous))
+            .FirstAsync();
+
+        return CreatedAtAction(nameof(GetById), new { id = post.Id }, created);
     }
 
     [HttpDelete("{id:guid}")]

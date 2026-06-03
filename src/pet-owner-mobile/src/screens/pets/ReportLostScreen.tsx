@@ -403,6 +403,7 @@ export function ReportLostScreen() {
                     disabled={disabled}
                     onPress={() => setSelectedId(pet.id)}
                     style={{
+                      alignItems: "center",
                       paddingHorizontal: 14,
                       paddingVertical: 10,
                       borderRadius: 16,
@@ -416,9 +417,28 @@ export function ReportLostScreen() {
                       opacity: disabled ? 0.6 : 1,
                     }}
                   >
-                    <Text style={{ fontSize: 18 }}>
-                      {getSpeciesEmoji(pet.species)}
-                    </Text>
+                    <View
+                      style={{
+                        width: 44,
+                        height: 44,
+                        borderRadius: 22,
+                        overflow: "hidden",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        backgroundColor: sel ? "rgba(255,255,255,0.2)" : colors.surfaceSecondary,
+                      }}
+                    >
+                      {pet.imageUrl ? (
+                        <Image
+                          source={{ uri: pet.imageUrl }}
+                          style={{ width: 44, height: 44 }}
+                        />
+                      ) : (
+                        <Text style={{ fontSize: 22 }}>
+                          {getSpeciesEmoji(pet.species)}
+                        </Text>
+                      )}
+                    </View>
                     <Text
                       style={{
                         marginTop: 4,

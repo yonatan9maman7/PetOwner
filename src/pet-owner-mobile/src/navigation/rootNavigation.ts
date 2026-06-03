@@ -34,6 +34,7 @@ const NESTED_SCREEN_TO_TAB: Record<string, string> = {
   MyPetsMain: "MyPets",
   AddPet: "MyPets",
   ReportLost: "MyPets",
+  ReportFound: "MyPets",
   EmergencyVets: "MyPets",
   Triage: "MyPets",
   ActivityLog: "MyPets",

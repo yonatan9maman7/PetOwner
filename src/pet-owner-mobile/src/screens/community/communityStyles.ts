@@ -201,6 +201,12 @@ export const getStyles = (colors: any) =>
       paddingVertical: 2,
       borderRadius: 8,
     },
+    foundPetBadge: {
+      backgroundColor: "#16a34a",
+      paddingHorizontal: 6,
+      paddingVertical: 2,
+      borderRadius: 8,
+    },
     kindBadge: {
       backgroundColor: colors.primaryLight,
       paddingHorizontal: 7,
