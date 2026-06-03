@@ -70,17 +70,40 @@ public class PetsController : ControllerBase
 
         if (request.Weight > 0)
         {
+            var weight = (decimal)request.Weight;
+            var recordedAt = DateTime.UtcNow.Date;
+
             pet.Activities.Add(new Activity
             {
                 UserId = userId,
                 Type = "Weight",
-                Value = (decimal)request.Weight,
-                Date = DateTime.UtcNow.Date,
+                Value = weight,
+                Date = recordedAt,
+            });
+
+            pet.WeightLogs.Add(new WeightLog
+            {
+                Weight = weight,
+                DateRecorded = recordedAt,
             });
         }
 
         _db.Pets.Add(pet);
         await _db.SaveChangesAsync();
+
+        if (request.Weight > 0)
+        {
+            var initialLog = pet.WeightLogs.First();
+            _db.MedicalRecords.Add(new MedicalRecord
+            {
+                PetId = pet.Id,
+                Type = "WeightLog",
+                Title = $"Weight: {initialLog.Weight} kg",
+                Date = initialLog.DateRecorded,
+                WeightLogId = initialLog.Id,
+            });
+            await _db.SaveChangesAsync();
+        }
 
         return CreatedAtAction(nameof(GetMyPets), MapToDto(pet));
     }
