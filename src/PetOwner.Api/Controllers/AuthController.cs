@@ -46,6 +46,10 @@ public class AuthController : ControllerBase
     [HttpPost("register")]
     public async Task<IActionResult> Register([FromBody] RegisterDto dto)
     {
+        var phone = dto.Phone.Trim();
+        if (!PhoneValidator.IsValidFormat(phone))
+            return BadRequest(new { message = "Invalid phone number format.", code = "INVALID_PHONE" });
+
         var emailNorm = NormalizeEmail(dto.Email);
         var emailExists = await _db.Users.AnyAsync(u => u.Email.ToLower() == emailNorm);
         if (emailExists)
@@ -55,7 +59,7 @@ public class AuthController : ControllerBase
                 code = "EMAIL_ALREADY_REGISTERED"
             });
 
-        var phoneExists = await _db.Users.AnyAsync(u => u.Phone == dto.Phone);
+        var phoneExists = await _db.Users.AnyAsync(u => u.Phone == phone);
         if (phoneExists)
             return Conflict(new
             {
@@ -67,9 +71,9 @@ public class AuthController : ControllerBase
         {
             Id = Guid.NewGuid(),
             Email = emailNorm,
-            Phone = dto.Phone,
+            Phone = phone,
             Name = dto.Name,
-            Role = dto.Role,
+            Role = "Owner",
             PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.Password),
             CreatedAt = DateTime.UtcNow
         };

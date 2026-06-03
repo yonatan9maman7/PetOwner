@@ -171,9 +171,16 @@ builder.Services.AddHttpClient<IGrowPaymentService, GrowPaymentService>(client =
 builder.Services.Configure<BlobStorageSettings>(builder.Configuration.GetSection(BlobStorageSettings.SectionName));
 
 var blobConnStr = builder.Configuration[$"{BlobStorageSettings.SectionName}:ConnectionString"];
-var useMockBlob = string.IsNullOrWhiteSpace(blobConnStr)
+var isInvalidBlobConnection = string.IsNullOrWhiteSpace(blobConnStr)
     || blobConnStr.Equals("UseDevelopmentStorage=true", StringComparison.OrdinalIgnoreCase);
-if (useMockBlob)
+
+if (!builder.Environment.IsDevelopment() && isInvalidBlobConnection)
+{
+    throw new InvalidOperationException(
+        "CRITICAL: Real Azure BlobStorage ConnectionString is required in Production/Deployed environments. Do not use Mock or Development storage.");
+}
+
+if (builder.Environment.IsDevelopment() && isInvalidBlobConnection)
     builder.Services.AddScoped<IBlobService, MockBlobService>();
 else
     builder.Services.AddScoped<IBlobService, BlobService>();

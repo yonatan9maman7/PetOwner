@@ -7,7 +7,6 @@ public record RegisterDto(
     [Required] string Phone,
     [Required] string Password,
     [Required] string Name,
-    string Role = "Owner",
     string LanguagePreference = "he"
 );
 
