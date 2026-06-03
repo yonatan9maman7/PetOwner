@@ -58,6 +58,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
     import { ProviderOnboardingScreen } from "../features/provider-onboarding/ProviderOnboardingScreen";
     import { BookingScreen } from "../screens/explore/BookingScreen";
     import { MyBookingsScreen } from "../screens/profile/MyBookingsScreen";
+    import { BookingPetCareScreen } from "../screens/profile/BookingPetCareScreen";
     import { MyStatsScreen } from "../screens/profile/MyStatsScreen";
     import { PaymentCheckoutScreen } from "../screens/profile/PaymentCheckoutScreen";
     import { FavoritesScreen } from "../screens/profile/FavoritesScreen";
@@ -98,6 +99,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
       "ProviderOnboarding",
       "Booking",
       "MyBookings",
+      "BookingPetCare",
       "MyStats",
       "Favorites",
       "AllReviews",
@@ -408,6 +410,7 @@ const solidStyles = StyleSheet.create({
           <ProfileStack.Screen name="ProviderProfile" component={ProviderProfileScreen} />
           <ProfileStack.Screen name="Booking" component={BookingScreen} />
           <ProfileStack.Screen name="MyBookings" component={MyBookingsScreen} />
+          <ProfileStack.Screen name="BookingPetCare" component={BookingPetCareScreen} />
           <ProfileStack.Screen name="MyStats" component={MyStatsScreen} />
           <ProfileStack.Screen name="Triage" component={TriageScreen} />
           <ProfileStack.Screen name="Notifications" component={NotificationsScreen} />

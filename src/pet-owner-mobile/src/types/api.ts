@@ -1041,6 +1041,31 @@ export interface BookingDto {
   hasReview: boolean;
   /** Free-text or predefined reason provided when the booking was cancelled or declined. */
   cancellationReason?: string;
+  /** Composed provider address (street, building, apartment, city) for calendar/maps. */
+  location?: string | null;
+}
+
+/**
+ * Read-only safety card for a pet inside a booking.
+ * Returned by GET /api/bookings/{id}/care-cards.
+ * Only the assigned provider (or owner) may fetch this.
+ */
+export interface PetCareCardDto {
+  id: string;
+  name: string;
+  species: PetSpecies;
+  breed?: string;
+  age: number;
+  weight?: number;
+  imageUrl?: string;
+  allergies?: string;
+  medicalConditions?: string;
+  medicalNotes?: string;
+  feedingSchedule?: string;
+  isNeutered: boolean;
+  microchipNumber?: string;
+  vetName?: string;
+  vetPhone?: string;
 }
 
 export interface FavoriteProviderDto {

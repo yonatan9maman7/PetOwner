@@ -44,5 +44,6 @@ public record BookingDto(
     string? ProviderPhone,
     string? OwnerPhone,
     bool HasReview,
-    string? CancellationReason
+    string? CancellationReason,
+    string? Location
 );

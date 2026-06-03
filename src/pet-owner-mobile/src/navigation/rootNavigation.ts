@@ -45,6 +45,7 @@ const NESTED_SCREEN_TO_TAB: Record<string, string> = {
   ProviderDashboard: "Profile",
   AdminDashboard: "Profile",
   MyBookings: "Profile",
+  BookingPetCare: "Profile",
   MyStats: "Profile",
   Notifications: "Profile",
   NotificationSettings: "Profile",

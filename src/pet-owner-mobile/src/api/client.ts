@@ -705,6 +705,8 @@ export const bookingsApi = {
     apiClient.put(`/bookings/${id}/complete`).then((r) => r.data),
   cancel: (id: string, reason: string) =>
     apiClient.put(`/bookings/${id}/cancel`, { reason }).then((r) => r.data),
+  getCareCards: (id: string) =>
+    apiClient.get<import("../types/api").PetCareCardDto[]>(`/bookings/${id}/care-cards`).then((r) => r.data),
 };
 
 /** Pet health: vaccinations, weight, vaccine status, and medical vault (`/pets/{id}/medical-records`). */

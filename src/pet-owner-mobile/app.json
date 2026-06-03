@@ -80,7 +80,14 @@
         }
       ],
       "expo-web-browser",
-      "expo-apple-authentication"
+      "expo-apple-authentication",
+      [
+        "expo-calendar",
+        {
+          "calendarPermission": "Allow PetOwner to add bookings to your calendar.",
+          "remindersPermission": "Allow PetOwner to add reminders for your bookings."
+        }
+      ]
     ],
     "owner": "mamanyon"
   }

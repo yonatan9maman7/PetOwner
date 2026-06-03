@@ -23,6 +23,7 @@ import { ScreenLoadingCenter } from "../../components/shared/ScreenLoadingCenter
 import type { BookingDto } from "../../types/api";
 import CancelBookingSheet from "./CancelBookingSheet";
 import type { CancelBookingMode } from "./CancelBookingSheet";
+import { addBookingToDeviceCalendar } from "../../utils/calendarUtils";
 
 const STATUS_COLORS: Record<string, { bg: string; text: string; dot?: string }> = {
   Pending:    { bg: "#fef9c3", text: "#92400e",  dot: "#f59e0b" },
@@ -66,6 +67,20 @@ function formatTime(iso: string) {
     hour: "2-digit",
     minute: "2-digit",
   });
+}
+
+function isFutureBooking(b: BookingDto): boolean {
+  return new Date(b.startDate) > new Date();
+}
+
+function canAddBookingToCalendar(b: BookingDto): boolean {
+  if (!isFutureBooking(b)) return false;
+  if (b.status === "Cancelled" || b.status === "Completed") return false;
+  return (
+    b.status === "Confirmed" ||
+    b.paymentStatus === "Authorized" ||
+    b.paymentStatus === "Paid"
+  );
 }
 
 export function MyBookingsScreen() {
@@ -290,6 +305,8 @@ export function MyBookingsScreen() {
       !!item.paymentUrl &&
       item.paymentStatus === "Pending";
 
+    const canAddToCalendar = canAddBookingToCalendar(item);
+
     const isCancelling = cancellingId === item.id;
 
     return (
@@ -431,6 +448,19 @@ export function MyBookingsScreen() {
           )}
         </View>
 
+        {canAddToCalendar ? (
+          <Pressable
+            onPress={() => void addBookingToDeviceCalendar(item, "owner")}
+            className="mt-3 py-3 rounded-xl items-center flex-row justify-center gap-2"
+            style={{ backgroundColor: colors.primaryLight }}
+          >
+            <Ionicons name="calendar-outline" size={16} color={colors.primary} />
+            <Text style={{ fontSize: 14, fontWeight: "600", color: colors.primary }}>
+              {t("addToCalendar")}
+            </Text>
+          </Pressable>
+        ) : null}
+
         {canPay && item.paymentUrl ? (
           <Pressable
             onPress={() =>
@@ -496,6 +526,7 @@ export function MyBookingsScreen() {
 
     // Provider can only complete once the owner has authorized (held) the funds.
     const canMarkComplete = item.paymentStatus === "Authorized";
+    const canAddToCalendar = canAddBookingToCalendar(item);
     const isCompleting = completingId === item.id;
     const isCancellingIncoming = cancellingId === item.id;
 
@@ -686,6 +717,36 @@ export function MyBookingsScreen() {
             </View>
           )}
         </View>
+
+        {canAddToCalendar ? (
+          <Pressable
+            onPress={() => void addBookingToDeviceCalendar(item, "provider")}
+            className="mt-3 py-3 rounded-xl items-center flex-row justify-center gap-2"
+            style={{ backgroundColor: colors.primaryLight }}
+          >
+            <Ionicons name="calendar-outline" size={16} color={colors.primary} />
+            <Text style={{ fontSize: 14, fontWeight: "600", color: colors.primary }}>
+              {t("addToCalendar")}
+            </Text>
+          </Pressable>
+        ) : null}
+
+        {(item.status === "Pending" || item.status === "Confirmed" || item.paymentStatus === "Authorized") && (
+          <Pressable
+            onPress={() => navigation.navigate("BookingPetCare", { bookingId: item.id })}
+            className="mt-2 py-3 rounded-xl items-center flex-row justify-center gap-2"
+            style={{
+              backgroundColor: "#fef2f2",
+              borderWidth: 1,
+              borderColor: "#fca5a5",
+            }}
+          >
+            <Ionicons name="heart-circle-outline" size={16} color="#dc2626" />
+            <Text style={{ fontSize: 14, fontWeight: "600", color: "#dc2626" }}>
+              {t("careCardButtonLabel")}
+            </Text>
+          </Pressable>
+        )}
 
         {canMarkComplete ? (
           <Pressable

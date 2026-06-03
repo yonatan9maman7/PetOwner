@@ -171,6 +171,16 @@ const he = {
   noBookings: "אין הזמנות עדיין",
   noBookingsSubtitle: "ההזמנות שלך יופיעו כאן",
   cancelBooking: "ביטול הזמנה",
+  addToCalendar: "הוסף ליומן",
+  calendarAddedTitle: "נוסף בהצלחה!",
+  calendarAddedDesc: "ההזמנה נוספה ליומן שלך.",
+  calendarPermissionDeniedTitle: "גישה ליומן נדחתה",
+  calendarPermissionDeniedDesc: "אנא אשר גישה ליומן בהגדרות המכשיר.",
+  calendarNoWritableCalendar: "לא נמצא יומן לכתיבה במכשיר.",
+  calendarWith: "עם",
+  calendarPhone: "טלפון",
+  calendarAddFailedTitle: "לא ניתן להוסיף ליומן",
+  calendarAddFailedDesc: "אירעה שגיאה. נסה שוב.",
   cancelBookingConfirm: "האם אתה בטוח שברצונך לבטל הזמנה זו?",
   bookingCancelled: "ההזמנה בוטלה",
   cancelReasonTitle: "סיבת הביטול",
@@ -1446,6 +1456,19 @@ const he = {
   achProvider100Paid: "100 הזמנות שהושלמו",
   achProvider10Reviews: "10 ביקורות התקבלו",
   achStarSitter: "Star Sitter",
+
+  // ── Provider: Pet Care Card screen ────────────────────────────────────────
+  careCardButtonLabel: "תיק רפואי",
+  careCardScreenTitle: "תיק טיפול",
+  careCardLoading: "טוען מידע רפואי...",
+  careCardEmpty: "לא נמצאו חיות לבקשה זו",
+  careCardReadOnlyNotice: "מסך לצפייה בלבד. המידע שייך לבעל החיה.",
+  careCardAllergiesSection: "רגישויות ומצבים רפואיים",
+  careCardNoAllergies: "אין רגישויות ידועות",
+  careCardMedicalSection: "הערות רפואיות ותזונה",
+  careCardVetSection: "רופא וטרינר לחירום",
+  careCardCallVet: "התקשר לווטרינר",
+  careCardYearsShort: "שנים",
 } as const;
 
 const en: Record<keyof typeof he, string> = {
@@ -1612,6 +1635,16 @@ const en: Record<keyof typeof he, string> = {
   noBookings: "No bookings yet",
   noBookingsSubtitle: "Your bookings will appear here",
   cancelBooking: "Cancel Booking",
+  addToCalendar: "Add to Calendar",
+  calendarAddedTitle: "Added!",
+  calendarAddedDesc: "The booking was added to your calendar.",
+  calendarPermissionDeniedTitle: "Calendar Access Denied",
+  calendarPermissionDeniedDesc: "Please allow calendar access in your device settings.",
+  calendarNoWritableCalendar: "No writable calendar found on this device.",
+  calendarWith: "with",
+  calendarPhone: "Phone",
+  calendarAddFailedTitle: "Could not add to calendar",
+  calendarAddFailedDesc: "Something went wrong. Please try again.",
   cancelBookingConfirm: "Are you sure you want to cancel this booking?",
   bookingCancelled: "Booking cancelled",
   cancelReasonTitle: "Reason for Cancellation",
@@ -2887,6 +2920,19 @@ const en: Record<keyof typeof he, string> = {
   achProvider100Paid: "100 bookings completed",
   achProvider10Reviews: "10 reviews received",
   achStarSitter: "Star Sitter",
+
+  // ── Provider: Pet Care Card screen ────────────────────────────────────────
+  careCardButtonLabel: "Medical Card",
+  careCardScreenTitle: "Pet Care Card",
+  careCardLoading: "Loading medical info...",
+  careCardEmpty: "No pets found for this booking",
+  careCardReadOnlyNotice: "Read-only view. Information belongs to the pet owner.",
+  careCardAllergiesSection: "Allergies & Conditions",
+  careCardNoAllergies: "No known allergies",
+  careCardMedicalSection: "Medical Notes & Feeding",
+  careCardVetSection: "Emergency Vet",
+  careCardCallVet: "Call Vet",
+  careCardYearsShort: "y",
 };
 
 const heMerged = { ...he, ...communityHe };

@@ -150,6 +150,7 @@ public class BookingsController : ControllerBase
             $"You have a new request from {owner?.Name ?? "a pet owner"}.",
             booking.Id);
 
+        booking.ProviderProfile = provider;
         return CreatedAtAction(nameof(GetById), new { id = booking.Id }, ToDto(booking, provider.User.Name, owner?.Name ?? "", serviceRate.Unit.ToString()));
     }
 
@@ -370,9 +371,53 @@ public class BookingsController : ControllerBase
         return NoContent();
     }
 
+    [HttpGet("{id:guid}/care-cards")]
+    public async Task<IActionResult> GetCareCards(Guid id)
+    {
+        var userId = GetUserId();
+
+        var booking = await _db.Bookings
+            .AsNoTracking()
+            .Include(b => b.BookingPets).ThenInclude(bp => bp.Pet)
+            .FirstOrDefaultAsync(b => b.Id == id);
+
+        if (booking is null)
+            return NotFound(new { message = "Booking not found." });
+
+        if (booking.OwnerId != userId && booking.ProviderProfileId != userId)
+            return Forbid();
+
+        var cards = booking.BookingPets.Select(bp => new PetCareCardDto(
+            bp.Pet.Id,
+            bp.Pet.Name,
+            bp.Pet.Species,
+            bp.Pet.Breed,
+            bp.Pet.Age,
+            bp.Pet.Weight,
+            bp.Pet.ImageUrl,
+            bp.Pet.Allergies,
+            bp.Pet.MedicalConditions,
+            bp.Pet.MedicalNotes,
+            bp.Pet.FeedingSchedule,
+            bp.Pet.IsNeutered,
+            bp.Pet.MicrochipNumber,
+            bp.Pet.VetName,
+            bp.Pet.VetPhone
+        )).ToList();
+
+        return Ok(cards);
+    }
+
     private static BookingDto ToDto(Booking b, string providerName, string ownerName, string unit,
         string? providerPhone = null, string? ownerPhone = null)
     {
+        var p = b.ProviderProfile;
+        var location = p is null
+            ? null
+            : string.Join(", ",
+                new[] { p.Street, p.BuildingNumber, p.ApartmentNumber, p.City }
+                    .Where(s => !string.IsNullOrWhiteSpace(s)));
+
         return new BookingDto(
             b.Id, b.OwnerId, b.ProviderProfileId,
             providerName, ownerName,
@@ -383,7 +428,8 @@ public class BookingsController : ControllerBase
             b.CreatedAt, b.Notes,
             providerPhone, ownerPhone,
             b.Review is not null,
-            b.CancellationReason
+            b.CancellationReason,
+            string.IsNullOrWhiteSpace(location) ? null : location
         );
     }
 
