@@ -13,6 +13,7 @@ import * as DocumentPicker from "expo-document-picker";
 import { useTranslation, type TranslationKey, rowDirectionForAppLayout } from "../../../../i18n";
 import { useTheme } from "../../../../theme/ThemeContext";
 import { medicalApi, filesApi } from "../../../../api/client";
+import { getApiErrorMessage } from "../../../../utils/apiUtils";
 import { DatePickerField } from "../../../../components/DatePickerField";
 import { ListSkeleton } from "../../../../components/shared/ListSkeleton";
 import {
@@ -210,17 +211,7 @@ export function VaccinesSection({ petId, reloadNonce = 0 }: { petId: string; rel
       resetForm();
       await load();
     } catch (e: unknown) {
-      const err = e as { response?: { data?: unknown }; message?: string };
-      const data = err.response?.data as
-        | { message?: string; errors?: Record<string, string[]>; title?: string }
-        | undefined;
-      const msg =
-        (typeof data?.message === "string" && data.message) ||
-        (data?.errors && JSON.stringify(data.errors)) ||
-        (typeof data?.title === "string" && data.title) ||
-        err.message ||
-        t("genericError");
-      showGlobalAlertCompat(t("errorTitle"), msg);
+      showGlobalAlertCompat(t("errorTitle"), getApiErrorMessage(e));
     }
     setSaving(false);
   };

@@ -17,6 +17,7 @@ import {
   StyleSheet,
 } from "react-native";
 import { showGlobalAlertCompat } from "../../components/global-modal";
+import { getApiErrorMessage } from "../../utils/apiUtils";
 import ConfettiCannon from "react-native-confetti-cannon";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -35,6 +36,7 @@ import {
   findSimilarBreed,
   formatBreedForDisplay,
   getBreedsForSpecies,
+  normalizePetSpecies,
   parseAllergiesFromString,
   serializeAllergies,
 } from "./addPetHelpers";
@@ -161,10 +163,11 @@ export function AddPetScreen() {
     const pet = usePetsStore.getState().pets.find((p) => p.id === petId);
     if (pet) {
       setName(pet.name);
-      setSpecies(pet.species);
+      const resolvedSpecies = normalizePetSpecies(pet.species);
+      setSpecies(resolvedSpecies);
       const b = pet.breed ?? "";
-      if (pet.species === PetSpecies.Dog || pet.species === PetSpecies.Cat) {
-        const list = getBreedsForSpecies(pet.species);
+      if (resolvedSpecies === PetSpecies.Dog || resolvedSpecies === PetSpecies.Cat) {
+        const list = getBreedsForSpecies(resolvedSpecies);
         if (b && list.includes(b)) {
           setBreed(b);
           setCustomBreedOther("");
@@ -446,11 +449,7 @@ export function AddPetScreen() {
         setPetAddedCelebration({ name: name.trim() });
       }
     } catch (e: unknown) {
-      const msg =
-        e && typeof e === "object" && "message" in e && typeof (e as Error).message === "string"
-          ? (e as Error).message
-          : t("profileSaveError");
-      showGlobalAlertCompat(t("errorTitle"), msg);
+      showGlobalAlertCompat(t("errorTitle"), getApiErrorMessage(e));
     } finally {
       setSaving(false);
     }

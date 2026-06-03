@@ -134,6 +134,7 @@ apiClient.interceptors.response.use(
 
       const normalized = normalizeApiError(error);
       attachNormalizedApiError(error, normalized);
+      error.message = normalized.message;
       markApiErrorHandledByInterceptor(error);
       logAxiosErrorDev(error);
       logger.apiError(error, {
@@ -324,7 +325,10 @@ export const providerApi = {
       .post<{ url: string; thumbnailUrl: string }>(
         "/providers/upload-image",
         file,
-        { headers: { "Content-Type": "multipart/form-data" } },
+        {
+          headers: { "Content-Type": "multipart/form-data" },
+          timeout: 60_000,
+        },
       )
       .then((r) => r.data),
   getStats: () =>
@@ -727,17 +731,7 @@ export const medicalApi = {
   addVaccination: (petId: string, data: CreateVaccinationRequest) =>
     apiClient
       .post<VaccinationDto>(`/pets/${petId}/vaccinations`, data)
-      .then((r) => r.data)
-      .catch((error: unknown) => {
-        const ax = error as { response?: { data?: unknown }; message?: string };
-        console.error(
-          "[medicalApi.addVaccination] error.response?.data:",
-          ax.response?.data,
-          "| status:",
-          (ax as { response?: { status?: number } }).response?.status,
-        );
-        return Promise.reject(error);
-      }),
+      .then((r) => r.data),
   updateVaccination: (petId: string, vacId: string, data: any) =>
     apiClient
       .put(`/pets/${petId}/vaccinations/${vacId}`, data)
@@ -787,6 +781,9 @@ export const favoritesApi = {
 };
 
 export default apiClient;
+
+export { getApiErrorMessage, getNormalizedApiError } from "../utils/apiUtils";
+export { showApiErrorToast, showApiErrorAlert } from "../services/apiErrorToast";
 
 // ─── Playdate Pals ────────────────────────────────────────────────────────────
 

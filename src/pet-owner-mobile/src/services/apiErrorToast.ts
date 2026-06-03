@@ -1,7 +1,8 @@
 import axios, { type InternalAxiosRequestConfig } from "axios";
 import Toast from "react-native-toast-message";
+import { showGlobalAlertCompat } from "../components/global-modal";
 import { translate } from "../i18n";
-import type { NormalizedApiError } from "../utils/apiUtils";
+import { getNormalizedApiError, type NormalizedApiError } from "../utils/apiUtils";
 
 /**
  * Whether the global interceptor should show a toast for this failure.
@@ -55,6 +56,15 @@ export function showApiErrorToast(
     position: "top",
     visibilityTime: 5500,
   });
+}
+
+/** Modal alert for screens that handle errors locally (e.g. skipGlobalErrorToast). */
+export function showApiErrorAlert(error: unknown, options?: { title?: string }): void {
+  const n = getNormalizedApiError(error);
+  showGlobalAlertCompat(
+    options?.title ?? n.title ?? translate("errorTitle"),
+    n.isServerError ? translate("apiErrorServer") : n.message,
+  );
 }
 
 /** Session expiry UX (non-blocking toast). */

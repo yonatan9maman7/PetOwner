@@ -23,4 +23,5 @@ public class ServiceRequest
     public Service? Service { get; set; }
     public Review? Review { get; set; }
     public Payment? Payment { get; set; }
+    public ICollection<SupportTicket> SupportTickets { get; set; } = [];
 }

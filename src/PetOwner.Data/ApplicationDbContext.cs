@@ -58,6 +58,7 @@ public class ApplicationDbContext : DbContext
     public DbSet<PlaydateRsvp> PlaydateRsvps => Set<PlaydateRsvp>();
     public DbSet<PlaydateEventComment> PlaydateEventComments => Set<PlaydateEventComment>();
     public DbSet<PlaydateBeacon> PlaydateBeacons => Set<PlaydateBeacon>();
+    public DbSet<SupportTicket> SupportTickets => Set<SupportTicket>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -104,6 +105,7 @@ public class ApplicationDbContext : DbContext
         ConfigurePlaydatePrefs(modelBuilder);
         ConfigurePlaydateEvent(modelBuilder);
         ConfigurePlaydateBeacon(modelBuilder);
+        ConfigureSupportTickets(modelBuilder);
     }
 
     private static void ConfigureUser(ModelBuilder modelBuilder, bool isSqlServer)
@@ -1677,6 +1679,69 @@ public class ApplicationDbContext : DbContext
                 .WithMany()
                 .HasForeignKey(b => b.UserId)
                 .OnDelete(DeleteBehavior.Cascade);
+        });
+    }
+
+    private static void ConfigureSupportTickets(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<SupportTicket>(entity =>
+        {
+            entity.HasKey(t => t.Id);
+
+            entity.Property(t => t.Id)
+                .HasDefaultValueSql("NEWSEQUENTIALID()");
+
+            entity.Property(t => t.Category)
+                .IsRequired()
+                .HasConversion<string>()
+                .HasMaxLength(30);
+
+            entity.Property(t => t.Urgency)
+                .IsRequired()
+                .HasConversion<string>()
+                .HasMaxLength(20);
+
+            entity.Property(t => t.Status)
+                .IsRequired()
+                .HasConversion<string>()
+                .HasMaxLength(30)
+                .HasDefaultValue(TicketStatus.Open);
+
+            entity.Property(t => t.Description)
+                .IsRequired()
+                .HasMaxLength(2000);
+
+            entity.Property(t => t.FinancialDecision)
+                .IsRequired()
+                .HasConversion<string>()
+                .HasMaxLength(20)
+                .HasDefaultValue(TicketFinancialDecision.None);
+
+            entity.Property(t => t.AssignedTo)
+                .HasMaxLength(256);
+
+            entity.Property(t => t.CreatedAt)
+                .HasDefaultValueSql("GETUTCDATE()")
+                .HasConversion(
+                    v => v.Kind == DateTimeKind.Utc ? v : v.ToUniversalTime(),
+                    v => DateTime.SpecifyKind(v, DateTimeKind.Utc));
+
+            entity.Property(t => t.UpdatedAt)
+                .HasDefaultValueSql("GETUTCDATE()");
+
+            entity.HasIndex(t => new { t.UserId, t.Status });
+            entity.HasIndex(t => t.BookingId);
+
+            entity.HasOne(t => t.Booking)
+                .WithMany(sr => sr.SupportTickets)
+                .HasForeignKey(t => t.BookingId)
+                .IsRequired(false)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasOne(t => t.User)
+                .WithMany(u => u.SupportTickets)
+                .HasForeignKey(t => t.UserId)
+                .OnDelete(DeleteBehavior.Restrict);
         });
     }
 

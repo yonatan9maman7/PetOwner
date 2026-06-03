@@ -37,4 +37,5 @@ public class User
     public ICollection<CommunitySavedPost> SavedCommunityPosts { get; set; } = [];
     public ICollection<CommunityReport> CommunityReports { get; set; } = [];
     public ICollection<CommunitySosSighting> SosSightings { get; set; } = [];
+    public ICollection<SupportTicket> SupportTickets { get; set; } = [];
 }

@@ -101,6 +101,36 @@ export function getBreedsForSpecies(s: PetSpecies | null): string[] {
   return [];
 }
 
+/** API may return numeric enum or JsonStringEnumConverter names (e.g. `"Dog"`). */
+export function normalizePetSpecies(
+  species: PetSpecies | string | number | null | undefined,
+): PetSpecies | null {
+  if (species === null || species === undefined) return null;
+  if (typeof species === "number" && species >= 1 && species <= 6) {
+    return species as PetSpecies;
+  }
+  if (typeof species === "string") {
+    const parsed = parseInt(species, 10);
+    if (!Number.isNaN(parsed) && parsed >= 1 && parsed <= 6) {
+      return parsed as PetSpecies;
+    }
+    const lower = species.trim().toLowerCase();
+    if (lower === "dog") return PetSpecies.Dog;
+    if (lower === "cat") return PetSpecies.Cat;
+    if (lower.includes("bird")) return PetSpecies.Bird;
+    if (lower.includes("rabbit")) return PetSpecies.Rabbit;
+    if (
+      lower.includes("reptile") ||
+      lower.includes("snake") ||
+      lower.includes("lizard")
+    ) {
+      return PetSpecies.Reptile;
+    }
+    if (lower === "other") return PetSpecies.Other;
+  }
+  return null;
+}
+
 /** Canonical allergy ids; stored as comma-separated English labels for API / chips. */
 export const ALLERGY_OPTIONS = [
   { id: "chicken", storageLabel: "Chicken" },

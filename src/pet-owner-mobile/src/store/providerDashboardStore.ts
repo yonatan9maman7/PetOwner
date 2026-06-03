@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { providerApi } from "../api/client";
+import { getApiErrorMessage } from "../utils/apiUtils";
 import type {
   EarningsSummaryDto,
   EarningsTransactionDto,
@@ -87,14 +88,11 @@ export const useProviderDashboardStore = create<ProviderDashboardState>((set) =>
         error: null,
       });
     } catch (e: unknown) {
-      const msg =
-        (e as { response?: { data?: { message?: string } } })?.response?.data?.message ??
-        (e instanceof Error ? e.message : "Failed to load dashboard");
       set({
         loading: false,
         earningsLoading: false,
         transactionsLoading: false,
-        error: String(msg),
+        error: getApiErrorMessage(e),
       });
     }
   },

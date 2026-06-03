@@ -189,6 +189,20 @@ export function normalizeApiError(error: unknown): NormalizedApiError {
       };
     }
 
+    if (typeof status === "number" && status >= 500) {
+      return {
+        message: translate("apiErrorServer"),
+        title: translate("genericErrorTitle"),
+        status,
+        code: picked.code,
+        traceId: picked.traceId,
+        isConnectivityError: false,
+        isAuthError: status === 401,
+        isServerError: true,
+        raw: __DEV__ ? data : undefined,
+      };
+    }
+
     let message = picked.message;
     if (!message && picked.detail) message = picked.detail;
     if (!message && picked.title && picked.title !== "An unexpected error occurred.") {

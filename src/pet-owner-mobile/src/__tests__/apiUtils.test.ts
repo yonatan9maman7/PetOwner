@@ -65,7 +65,7 @@ describe("apiUtils", () => {
       expect(getApiErrorMessage({})).toBe("t:genericErrorDesc");
     });
 
-    it("uses ProblemDetails.detail when no message", () => {
+    it("uses friendly server copy for 500 instead of ProblemDetails.detail", () => {
       jest.spyOn(axios, "isAxiosError").mockReturnValue(true);
       const err = {
         response: {
@@ -79,7 +79,7 @@ describe("apiUtils", () => {
         },
         config: { headers: {} },
       } as AxiosError;
-      expect(getApiErrorMessage(err)).toBe("The server encountered an unexpected error.");
+      expect(getApiErrorMessage(err)).toBe("t:apiErrorServer");
     });
 
     it("flattens ASP.NET validation errors dictionary", () => {

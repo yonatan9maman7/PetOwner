@@ -192,6 +192,7 @@ builder.Services.AddScoped<IEmailService, SmtpEmailService>();
 
 builder.Services.AddSignalR();
 builder.Services.AddScoped<INotificationService, NotificationService>();
+builder.Services.AddScoped<ISupportTicketService, SupportTicketService>();
 builder.Services.AddScoped<IAchievementService, AchievementService>();
 builder.Services.AddHttpClient<IExpoPushService, ExpoPushService>(client =>
 {
