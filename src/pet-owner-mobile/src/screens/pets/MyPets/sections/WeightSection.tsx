@@ -327,7 +327,15 @@ function weightLogDateToPickerValue(dateRecorded: string): string {
   return `${y}-${m}-${day}`;
 }
 
-export function WeightSection({ petId, reloadNonce = 0 }: { petId: string; reloadNonce?: number }) {
+export function WeightSection({
+  petId,
+  reloadNonce = 0,
+  onWeightChanged,
+}: {
+  petId: string;
+  reloadNonce?: number;
+  onWeightChanged?: () => void;
+}) {
   const { t, isRTL } = useTranslation();
   const { colors } = useTheme();
   const [history, setHistory] = useState<WeightLogDto[]>([]);
@@ -372,6 +380,7 @@ export function WeightSection({ petId, reloadNonce = 0 }: { petId: string; reloa
       setFormDate("");
       try {
         await load();
+        onWeightChanged?.();
       } catch (reloadErr: unknown) {
         console.error("WeightSection: load after addWeight failed", reloadErr);
       }
@@ -416,6 +425,7 @@ export function WeightSection({ petId, reloadNonce = 0 }: { petId: string; reloa
       cancelEditLog();
       try {
         await load();
+        onWeightChanged?.();
       } catch (reloadErr: unknown) {
         console.error("WeightSection: load after updateWeight failed", reloadErr);
       }
@@ -432,6 +442,7 @@ export function WeightSection({ petId, reloadNonce = 0 }: { petId: string; reloa
     try {
       await medicalApi.deleteWeightLog(petId, logId);
       await load();
+      onWeightChanged?.();
     } catch {}
   };
 

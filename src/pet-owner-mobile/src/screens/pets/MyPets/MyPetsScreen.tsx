@@ -141,6 +141,11 @@ export function MyPetsScreen() {
     if (activePet) setShareModalPetId(activePet.id);
   }, [activePet]);
 
+  const handleWeightChanged = useCallback(() => {
+    void usePetsStore.getState().fetchPets();
+    setSectionReloadNonce((n) => n + 1);
+  }, []);
+
   const handleShareOpen = useCallback(() => {
     if (activePet) setShareModalPetId(activePet.id);
   }, [activePet]);
@@ -276,7 +281,13 @@ export function MyPetsScreen() {
         >
           {activeSection === "health" && <PetInfoSection pet={activePet} />}
           {activeSection === "vaccines" && <VaccinesSection petId={activePet.id} reloadNonce={sectionReloadNonce} />}
-          {activeSection === "weight" && <WeightSection petId={activePet.id} reloadNonce={sectionReloadNonce} />}
+          {activeSection === "weight" && (
+            <WeightSection
+              petId={activePet.id}
+              reloadNonce={sectionReloadNonce}
+              onWeightChanged={handleWeightChanged}
+            />
+          )}
           {activeSection === "records" && <VaultSection petId={activePet.id} reloadNonce={sectionReloadNonce} />}
           {activeSection === "triage" && <TriageSection petId={activePet.id} reloadNonce={sectionReloadNonce} />}
         </SectionShell>

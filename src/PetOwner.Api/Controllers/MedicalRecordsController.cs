@@ -388,6 +388,8 @@ public class MedicalRecordsController : ControllerBase
         _db.MedicalRecords.Add(linkedRecord);
         await _db.SaveChangesAsync();
 
+        await SyncPetWeightFromLogsAsync(petId);
+
         var dto = new WeightLogDto(log.Id, log.PetId, log.Weight, log.DateRecorded, log.CreatedAt);
         return CreatedAtAction(nameof(GetWeightLog), new { petId, id = log.Id }, dto);
     }
@@ -420,6 +422,8 @@ public class MedicalRecordsController : ControllerBase
 
         await _db.SaveChangesAsync();
 
+        await SyncPetWeightFromLogsAsync(petId);
+
         return Ok(new WeightLogDto(log.Id, log.PetId, log.Weight, log.DateRecorded, log.CreatedAt));
     }
 
@@ -442,6 +446,8 @@ public class MedicalRecordsController : ControllerBase
 
         _db.WeightLogs.Remove(log);
         await _db.SaveChangesAsync();
+
+        await SyncPetWeightFromLogsAsync(petId);
 
         return NoContent();
     }
@@ -498,6 +504,21 @@ public class MedicalRecordsController : ControllerBase
             .ToListAsync();
 
         return Ok(new { shared = true, records });
+    }
+
+    private async Task SyncPetWeightFromLogsAsync(Guid petId)
+    {
+        var latest = await _db.WeightLogs
+            .Where(w => w.PetId == petId)
+            .OrderByDescending(w => w.DateRecorded)
+            .ThenByDescending(w => w.CreatedAt)
+            .FirstOrDefaultAsync();
+
+        var pet = await _db.Pets.FirstOrDefaultAsync(p => p.Id == petId);
+        if (pet is null) return;
+
+        pet.Weight = latest is null ? null : (double)latest.Weight;
+        await _db.SaveChangesAsync();
     }
 
     private async Task<IActionResult?> VerifyOwnership(Guid petId)
