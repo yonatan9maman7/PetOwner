@@ -66,6 +66,9 @@ public class ActivitiesController : ControllerBase
         _db.Activities.Add(activity);
         await _db.SaveChangesAsync();
 
+        if (string.Equals(activity.Type, "Weight", StringComparison.OrdinalIgnoreCase))
+            await SyncPetWeightAsync(petId);
+
         return CreatedAtAction(nameof(GetAll), new { petId },
             new ActivityDto(activity.Id, activity.PetId, activity.Type, activity.Value,
                 activity.DurationMinutes, activity.Notes, activity.Date, activity.CreatedAt));
@@ -92,6 +95,9 @@ public class ActivitiesController : ControllerBase
         activity.Date = NormalizeActivityDate(dto.Type, dto.Date);
 
         await _db.SaveChangesAsync();
+
+        if (string.Equals(activity.Type, "Weight", StringComparison.OrdinalIgnoreCase))
+            await SyncPetWeightAsync(petId);
 
         return Ok(new ActivityDto(activity.Id, activity.PetId, activity.Type, activity.Value,
             activity.DurationMinutes, activity.Notes, activity.Date, activity.CreatedAt));
@@ -181,6 +187,23 @@ public class ActivitiesController : ControllerBase
         }
 
         return streak;
+    }
+
+    private async Task SyncPetWeightAsync(Guid petId)
+    {
+        var latest = await _db.Activities
+            .Where(a => a.PetId == petId && a.Type == "Weight" && a.Value.HasValue)
+            .OrderByDescending(a => a.Date)
+            .ThenByDescending(a => a.CreatedAt)
+            .FirstOrDefaultAsync();
+
+        if (latest is null) return;
+
+        var pet = await _db.Pets.FirstOrDefaultAsync(p => p.Id == petId);
+        if (pet is null) return;
+
+        pet.Weight = (double)latest.Value!.Value;
+        await _db.SaveChangesAsync();
     }
 
     private async Task<bool> OwnsOrNot(Guid petId, Guid userId) =>

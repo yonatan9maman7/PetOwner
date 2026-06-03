@@ -69,6 +69,19 @@ public class PetsController : ControllerBase
         };
 
         _db.Pets.Add(pet);
+
+        if (request.Weight > 0)
+        {
+            _db.Activities.Add(new Activity
+            {
+                PetId = pet.Id,
+                UserId = userId,
+                Type = "Weight",
+                Value = (decimal)request.Weight,
+                Date = DateTime.UtcNow.Date,
+            });
+        }
+
         await _db.SaveChangesAsync();
 
         return CreatedAtAction(nameof(GetMyPets), MapToDto(pet));

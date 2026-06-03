@@ -5,10 +5,10 @@ import {
   TouchableOpacity,
   RefreshControl,
   InteractionManager,
+  Image,
 } from "react-native";
 import { FlashList } from "@shopify/flash-list";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Ionicons } from "@expo/vector-icons";
 import { useChatStore } from "../../store/chatStore";
 import { startConnection } from "../../services/signalr";
 import { useTranslation } from "../../i18n";
@@ -31,6 +31,51 @@ function formatTimeAgo(dateStr: string, t: (k: string) => string): string {
   if (diffDays === 0) return t("today");
   if (diffDays === 1) return t("yesterday");
   return date.toLocaleDateString();
+}
+
+function ConversationAvatar({
+  uri,
+  initials,
+  colors,
+}: {
+  uri?: string;
+  initials: string;
+  colors: ReturnType<typeof useTheme>["colors"];
+}) {
+  const [failed, setFailed] = useState(false);
+
+  if (uri && !failed) {
+    return (
+      <Image
+        source={{ uri }}
+        style={{
+          width: 48,
+          height: 48,
+          borderRadius: 24,
+          backgroundColor: colors.primaryLight,
+        }}
+        resizeMode="cover"
+        onError={() => setFailed(true)}
+      />
+    );
+  }
+
+  return (
+    <View
+      style={{
+        width: 48,
+        height: 48,
+        borderRadius: 24,
+        alignItems: "center",
+        justifyContent: "center",
+        backgroundColor: colors.primary,
+      }}
+    >
+      <Text style={{ color: colors.textInverse, fontWeight: "bold", fontSize: 16 }}>
+        {initials}
+      </Text>
+    </View>
+  );
 }
 
 export function MessagesScreen() {
@@ -107,24 +152,11 @@ export function MessagesScreen() {
           style={{ paddingHorizontal: BRAND_HEADER_HORIZONTAL_PAD, paddingVertical: 16 }}
         >
           <View style={[rtlRow, { alignItems: "center", gap: 12 }]}>
-            <View
-              style={{
-                width: 48,
-                height: 48,
-                borderRadius: 24,
-                alignItems: "center",
-                justifyContent: "center",
-                backgroundColor: colors.primary,
-              }}
-            >
-              {item.otherUserAvatar ? (
-                <Ionicons name="person-circle" size={48} color={colors.textInverse} />
-              ) : (
-                <Text style={{ color: colors.textInverse, fontWeight: "bold", fontSize: 16 }}>
-                  {initials}
-                </Text>
-              )}
-            </View>
+            <ConversationAvatar
+              uri={item.otherUserAvatar}
+              initials={initials}
+              colors={colors}
+            />
 
             <View style={{ flex: 1 }}>
               <View style={[rtlRow, { alignItems: "center", justifyContent: "space-between", marginBottom: 4 }]}>
