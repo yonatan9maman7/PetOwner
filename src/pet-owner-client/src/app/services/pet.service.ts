@@ -48,6 +48,9 @@ export interface ReportLostPayload {
   lastSeenLat: number;
   lastSeenLng: number;
   contactPhone: string;
+  description?: string;
+  imageUrl?: string;
+  content?: string;
 }
 
 export interface CreatePetPayload {

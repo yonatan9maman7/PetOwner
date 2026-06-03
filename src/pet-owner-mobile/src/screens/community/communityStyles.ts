@@ -207,6 +207,22 @@ export const getStyles = (colors: any) =>
       paddingVertical: 2,
       borderRadius: 8,
     },
+    foundPetClaimBtn: {
+      marginTop: 12,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 8,
+      backgroundColor: "#16a34a",
+      paddingVertical: 14,
+      paddingHorizontal: 16,
+      borderRadius: 14,
+    },
+    foundPetClaimBtnText: {
+      color: "#fff",
+      fontSize: 16,
+      fontWeight: "800",
+    },
     kindBadge: {
       backgroundColor: colors.primaryLight,
       paddingHorizontal: 7,

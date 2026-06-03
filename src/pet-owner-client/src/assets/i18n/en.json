@@ -470,7 +470,11 @@
     "CREATING": "Creating...",
     "ERROR_CREATE_GROUP": "Failed to create group.",
     "LOST_AND_FOUND": "Lost & Found",
-    "SOS_BADGE": "SOS — Lost Pet"
+    "SOS_BADGE": "SOS — Lost Pet",
+    "FOUND_PET_BADGE": "Found!",
+    "FOUND_PET_CLAIM": "This is my pet!",
+    "FOUND_PET_CLAIM_HINT": "Message the person who found them",
+    "CHAT_SELF_ERROR": "You cannot message yourself"
   },
   "WIZARD": {
     "STEP_OF": "Step {{current}} of {{total}}",

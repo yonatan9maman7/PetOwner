@@ -17,6 +17,7 @@ import { BREED_I18N_MAP } from './breed.constants';
 import { PetFormComponent } from './pet-form/pet-form.component';
 import { PetHealthPassportComponent } from './pet-health-passport/pet-health-passport.component';
 import { Subject, debounceTime, distinctUntilChanged, switchMap } from 'rxjs';
+import { buildLostPetPostContent, type AppLanguage } from '../../utils/sos-post-content';
 
 @Component({
   selector: 'app-my-pets',
@@ -817,11 +818,13 @@ export class MyPetsComponent implements OnInit, OnDestroy {
     if (!pet || !addr || !phone) return;
 
     this.sosSubmitting.set(true);
+    const lang = (this.translate.currentLang === 'he' ? 'he' : 'en') as AppLanguage;
     const payload: ReportLostPayload = {
       lastSeenLocation: addr.displayName,
       lastSeenLat: addr.lat,
       lastSeenLng: addr.lon,
       contactPhone: phone,
+      content: buildLostPetPostContent(lang, pet.name, addr.displayName, phone),
     };
 
     this.petService.reportLost(pet.id, payload).subscribe({

@@ -497,6 +497,9 @@ const he = {
   reportFoundSuccess: "הדיווח נשלח בהצלחה והקהילה באזור עודכנה!",
   reportFoundNeedLogin: "התחבר/י כדי לדווח על חיה שנמצאה.",
   reportFoundNoPetsForLost: "הוסף/י חיית מחמד כדי לדווח על אובדן.",
+  foundPetClaimMine: "מדובר בחיה שלי!",
+  foundPetClaimHint: "שלח/י הודעה למוצא/ת החיה",
+  foundPetChatSelf: "לא ניתן לשלוח הודעה לעצמך",
   sosEmergencySymptomPrefill:
     "חירום: חיית המחמד שלי זקוקה לטיפול וטרינרי דחוף. אנא סייעו בהערכה ובהפניה.",
   sosEmergencyModeBanner:
@@ -1938,6 +1941,9 @@ const en: Record<keyof typeof he, string> = {
   reportFoundSuccess: "Report sent! The community nearby has been notified.",
   reportFoundNeedLogin: "Sign in to report a found pet.",
   reportFoundNoPetsForLost: "Add a pet to your profile to report a lost pet.",
+  foundPetClaimMine: "This is my pet!",
+  foundPetClaimHint: "Message the person who found them",
+  foundPetChatSelf: "You cannot message yourself",
   sosEmergencySymptomPrefill:
     "EMERGENCY: My pet needs urgent veterinary care. Please help assess and advise.",
   sosEmergencyModeBanner:

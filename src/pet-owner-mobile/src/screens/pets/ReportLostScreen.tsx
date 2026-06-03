@@ -26,6 +26,7 @@ import { AddressAutocomplete } from "../../components/shared/AddressAutocomplete
 import { ScreenLoadingCenter } from "../../components/shared/ScreenLoadingCenter";
 import { fetchReverseGeocode } from "../../api/googlePlaces";
 import { useAuthStore } from "../../store/authStore";
+import { buildLostPetPostContent } from "../../utils/sosPostContent";
 import { usePetsStore } from "../../store/petsStore";
 import { filesApi } from "../../api/client";
 import { useTranslation, rowDirectionForAppLayout } from "../../i18n";
@@ -80,6 +81,7 @@ export function ReportLostScreen() {
   const { t, isRTL, rtlText, rtlInput } = useTranslation();
   const { colors } = useTheme();
   const isLoggedIn = useAuthStore((s) => s.isLoggedIn);
+  const language = useAuthStore((s) => s.language);
   const pets = usePetsStore((s) => s.pets);
   const loading = usePetsStore((s) => s.loading);
   const fetchPets = usePetsStore((s) => s.fetchPets);
@@ -234,6 +236,7 @@ export function ReportLostScreen() {
           return;
         }
       }
+      const pet = pets.find((p) => p.id === selectedId);
       await reportLost(selectedId, {
         lastSeenLocation: locText,
         lastSeenLat: markerCoord.latitude,
@@ -241,6 +244,15 @@ export function ReportLostScreen() {
         contactPhone: phone,
         description: description.trim() || undefined,
         imageUrl: uploadedImageUrl,
+        content: pet
+          ? buildLostPetPostContent(
+              language,
+              pet.name,
+              locText,
+              phone,
+              description,
+            )
+          : undefined,
       });
       const err = usePetsStore.getState().error;
       if (err) {

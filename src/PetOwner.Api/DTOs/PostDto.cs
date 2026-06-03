@@ -69,5 +69,6 @@ public record ReportFoundPetDto(
     double Latitude,
     double Longitude,
     [Required] string ContactPhone,
-    string? Description = null
+    string? Description = null,
+    string? Content = null
 );

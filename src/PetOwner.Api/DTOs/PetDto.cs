@@ -34,7 +34,8 @@ public record ReportLostRequest(
     double LastSeenLng,
     string ContactPhone,
     string? Description = null,
-    string? ImageUrl = null
+    string? ImageUrl = null,
+    string? Content = null
 );
 
 public record LostPetDto(

@@ -585,6 +585,11 @@ export function activityLabel(activity: DogPark["activity"], isRTL: boolean): st
   }
 }
 
+export function isFoundPetPost(post: PostDto, kind?: PostKind): boolean {
+  const k = kind ?? categoryToKind(post.category);
+  return k === "Found Pet" || (post.category ?? "").toLowerCase() === "found_pet";
+}
+
 /** Active SOS-style lost post: Lost & Found category, not yet resolved on the server. */
 export function isActiveSosLostPost(post: PostDto, kind: PostKind): boolean {
   if (kind === "Found Pet") return false;

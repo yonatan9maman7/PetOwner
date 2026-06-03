@@ -469,7 +469,11 @@
     "CREATING": "יוצר...",
     "ERROR_CREATE_GROUP": "יצירת הקבוצה נכשלה.",
     "LOST_AND_FOUND": "אבדות ומציאות",
-    "SOS_BADGE": "SOS — חיה אבודה"
+    "SOS_BADGE": "SOS — חיה אבודה",
+    "FOUND_PET_BADGE": "נמצאה!",
+    "FOUND_PET_CLAIM": "מדובר בחיה שלי!",
+    "FOUND_PET_CLAIM_HINT": "שלח/י הודעה למוצא/ת החיה",
+    "CHAT_SELF_ERROR": "לא ניתן לשלוח הודעה לעצמך"
   },
   "WIZARD": {
     "STEP_OF": "שלב {{current}} מתוך {{total}}",

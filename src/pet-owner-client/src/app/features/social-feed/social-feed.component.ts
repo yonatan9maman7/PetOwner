@@ -9,6 +9,7 @@ import { FileUploadService } from '../../services/file-upload.service';
 import { ToastService } from '../../services/toast.service';
 import { MapService, UserMiniProfile } from '../../services/map.service';
 import { CommunityService, CommunityGroup } from '../../services/community.service';
+import { isFoundPetCategory } from '../../utils/sos-post-content';
 
 @Component({
   selector: 'app-social-feed',
@@ -181,7 +182,9 @@ import { CommunityService, CommunityGroup } from '../../services/community.servi
               <div class="bg-white rounded-2xl shadow-sm overflow-hidden"
                    [ngClass]="post.category === 'lost_and_found'
                      ? 'border-2 border-red-300 ring-1 ring-red-100'
-                     : 'border border-gray-100'"
+                     : isFoundPetCategory(post.category)
+                       ? 'border-2 border-emerald-300 ring-1 ring-emerald-100'
+                       : 'border border-gray-100'"
                    [id]="'post-' + post.id"
                    [style.background-color]="highlightPostId() === post.id ? 'rgb(254 242 242 / 0.3)' : ''">
                 @if (post.category === 'lost_and_found') {
@@ -189,19 +192,26 @@ import { CommunityService, CommunityGroup } from '../../services/community.servi
                     <span class="text-sm leading-none">🆘</span>
                     <span class="text-xs font-bold uppercase tracking-wide">{{ 'COMMUNITY.SOS_BADGE' | translate }}</span>
                   </div>
+                } @else if (isFoundPetCategory(post.category)) {
+                  <div class="bg-emerald-600 text-white px-4 py-1.5 flex items-center gap-2">
+                    <span class="text-sm leading-none">🐾</span>
+                    <span class="text-xs font-bold uppercase tracking-wide">{{ 'COMMUNITY.FOUND_PET_BADGE' | translate }}</span>
+                  </div>
                 }
                 <!-- Post Header -->
                 <div class="flex items-center gap-3 px-5 pt-4 pb-2">
                   <button
-                    (click)="openMiniProfile(post.userId, $event)"
-                    class="w-9 h-9 rounded-full bg-sky-100 flex items-center justify-center text-sky-600 font-bold text-sm hover:ring-2 hover:ring-sky-300 transition-all cursor-pointer shrink-0"
+                    (click)="onPostAuthorClick(post, $event)"
+                    class="w-9 h-9 rounded-full flex items-center justify-center font-bold text-sm hover:ring-2 transition-all cursor-pointer shrink-0"
+                    [ngClass]="isFoundPetCategory(post.category) ? 'bg-emerald-100 text-emerald-700 hover:ring-emerald-300' : 'bg-sky-100 text-sky-600 hover:ring-sky-300'"
                   >
                     {{ post.userName.charAt(0).toUpperCase() }}
                   </button>
                   <div class="flex-1 min-w-0">
                     <button
-                      (click)="openMiniProfile(post.userId, $event)"
-                      class="text-sm font-semibold text-slate-800 hover:text-sky-600 transition-colors cursor-pointer"
+                      (click)="onPostAuthorClick(post, $event)"
+                      class="text-sm font-semibold transition-colors cursor-pointer"
+                      [ngClass]="isFoundPetCategory(post.category) ? 'text-emerald-800 hover:text-emerald-600' : 'text-slate-800 hover:text-sky-600'"
                     >
                       {{ post.userName }}
                     </button>
@@ -219,6 +229,20 @@ import { CommunityService, CommunityGroup } from '../../services/community.servi
                 <!-- Post Content -->
                 <div class="px-5 pb-3">
                   <p class="text-sm text-slate-700 whitespace-pre-wrap leading-relaxed" dir="auto">{{ post.content }}</p>
+                  @if (isFoundPetCategory(post.category) && post.userId !== currentUserId()) {
+                    <button
+                      type="button"
+                      (click)="openChatWithUser(post.userId, post.userName, $event)"
+                      class="mt-4 w-full flex items-center justify-center gap-2 rounded-xl bg-emerald-600 hover:bg-emerald-700
+                             text-white text-sm font-bold py-3 px-4 shadow-sm transition-colors"
+                      [attr.aria-label]="'COMMUNITY.FOUND_PET_CLAIM' | translate"
+                    >
+                      <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                      </svg>
+                      {{ 'COMMUNITY.FOUND_PET_CLAIM' | translate }}
+                    </button>
+                  }
                 </div>
 
                 @if (post.imageUrl) {
@@ -887,6 +911,28 @@ export class SocialFeedComponent implements OnInit, AfterViewInit {
   }
 
   // --- Mini Profile ---
+
+  readonly isFoundPetCategory = isFoundPetCategory;
+
+  onPostAuthorClick(post: Post, event: Event): void {
+    if (isFoundPetCategory(post.category)) {
+      this.openChatWithUser(post.userId, post.userName, event);
+      return;
+    }
+    this.openMiniProfile(post.userId, event);
+  }
+
+  openChatWithUser(userId: string, userName: string, event: Event): void {
+    event.stopPropagation();
+    const me = this.currentUserId();
+    if (me && userId.toLowerCase() === me.toLowerCase()) {
+      this.toast.error(this.translate.instant('COMMUNITY.CHAT_SELF_ERROR'));
+      return;
+    }
+    this.router.navigate(['/chat', userId], {
+      state: { name: userName },
+    });
+  }
 
   openMiniProfile(userId: string, event: Event): void {
     event.stopPropagation();

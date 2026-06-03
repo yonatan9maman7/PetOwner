@@ -77,7 +77,7 @@ import {
   POST_TYPES, VISIBILITY_OPTIONS,
   initials, formatDateTime, formatDistanceKm, distanceKm,
   categoryToKind, postKindLabel, visibilityLabel, sizeLabel, energyLabel, ageLabel,
-  activityLabel, isActiveSosLostPost, filterMatchesPost,
+  activityLabel, isActiveSosLostPost, isFoundPetPost, filterMatchesPost,
 } from "./communityShared";
 import { PlaydatesTab } from "./tabs/PlaydatesTab";
 import { ParksTab } from "./tabs/ParksTab";
@@ -106,6 +106,7 @@ const PostCard = memo(function PostCard({
   isDeletePending,
   onSosResolved,
   celebrateMarkFoundBurst,
+  onOpenChat,
 }: {
   post: PostDto;
   meta?: PostMeta;
@@ -126,6 +127,7 @@ const PostCard = memo(function PostCard({
   isDeletePending?: boolean;
   onSosResolved?: (postId: string, resolvedAtIso: string) => void;
   celebrateMarkFoundBurst?: () => void;
+  onOpenChat?: (userId: string, userName: string) => void;
 }) {
   const { colors } = useTheme();
   const { language, t } = useTranslation();
@@ -140,9 +142,16 @@ const PostCard = memo(function PostCard({
   const [menuOpen, setMenuOpen] = useState(false);
   const [sosResolving, setSosResolving] = useState(false);
   const kind = meta?.kind ?? categoryToKind(post.category);
+  const isFoundPet = isFoundPetPost(post, kind);
+  const canMessageFinder = isFoundPet && !isMine && !!onOpenChat;
   const showOwnerSosResolve =
     isMine &&
     isActiveSosLostPost(post, kind);
+
+  const handleAuthorPress = () => {
+    if (!canMessageFinder || !onOpenChat) return;
+    onOpenChat(post.userId, post.userName);
+  };
 
   const handleOwnerMarkFoundFromSos = () => {
     if (sosResolving) return;
@@ -175,12 +184,32 @@ const PostCard = memo(function PostCard({
   return (
     <View style={styles.card}>
       <View style={[styles.cardRow, rtlRow]}>
-        <View style={styles.avatar}>
+        <Pressable
+          onPress={canMessageFinder ? handleAuthorPress : undefined}
+          disabled={!canMessageFinder}
+          style={({ pressed }) => [
+            styles.avatar,
+            canMessageFinder && pressed ? { opacity: 0.85 } : null,
+          ]}
+        >
           <Text style={styles.avatarText}>{initials(post.userName)}</Text>
-        </View>
+        </Pressable>
         <View style={{ flex: 1 }}>
           <View style={[styles.authorRow, rtlRow]}>
-            <Text style={[styles.authorName, rtlText]}>{post.userName}</Text>
+            <Pressable
+              onPress={canMessageFinder ? handleAuthorPress : undefined}
+              disabled={!canMessageFinder}
+            >
+              <Text
+                style={[
+                  styles.authorName,
+                  rtlText,
+                  canMessageFinder ? { color: colors.primary } : null,
+                ]}
+              >
+                {post.userName}
+              </Text>
+            </Pressable>
             {post.authorIsApprovedProvider && (
               <View style={styles.providerBadge}>
                 <Ionicons name="shield-checkmark" size={10} color={colors.textInverse} />
@@ -248,6 +277,23 @@ const PostCard = memo(function PostCard({
       {!!post.content && (
         <Text style={[styles.contentText, rtlText]}>{post.content}</Text>
       )}
+
+      {canMessageFinder ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={t("foundPetClaimMine")}
+          onPress={handleAuthorPress}
+          style={[
+            styles.foundPetClaimBtn,
+            { flexDirection: isRTL ? "row-reverse" : "row" },
+          ]}
+        >
+          <Ionicons name="paw" size={22} color="#fff" />
+          <Text style={[styles.foundPetClaimBtnText, rtlText]}>
+            {t("foundPetClaimMine")}
+          </Text>
+        </Pressable>
+      ) : null}
 
       {meta?.dogName && (
         <View style={[styles.dogMiniCard, rtlRow]}>
@@ -447,6 +493,20 @@ export function CommunityScreen() {
   const { t, rtlText, rtlRow, rtlInput, isRTL } = useTranslation();
   const fetchStorePets = usePetsStore((s) => s.fetchPets);
   const styles = useCommunityStyles();
+
+  const openChatWithPostAuthor = useCallback(
+    (otherUserId: string, otherUserName: string) => {
+      if (user?.id === otherUserId) {
+        showGlobalAlertCompat(t("errorTitle"), t("foundPetChatSelf"));
+        return;
+      }
+      navigation.navigate("Messages", {
+        screen: "ChatRoom",
+        params: { otherUserId, otherUserName },
+      });
+    },
+    [navigation, user?.id, t],
+  );
   const copy = useCallback((key: CopyKey) => (isRTL ? HE[key] : EN[key]), [isRTL]);
   const { behavior: keyboardAvoidBehavior } = useKeyboardAvoidingState();
 
@@ -1601,6 +1661,7 @@ export function CommunityScreen() {
         onPlaydateComing={handlePlaydateComing}
         onSosResolved={handleSosResolved}
         celebrateMarkFoundBurst={burstMarkFoundCelebrate}
+        onOpenChat={openChatWithPostAuthor}
         rtlText={rtlText}
         rtlRow={rtlRow}
         isRTL={isRTL}
@@ -1612,6 +1673,7 @@ export function CommunityScreen() {
     [
       postMetaById,
       user,
+      openChatWithPostAuthor,
       handleToggleLike,
       handleToggleHelpful,
       handleToggleSave,
@@ -1817,6 +1879,7 @@ export function CommunityScreen() {
         onPlaydateComing={handlePlaydateComing}
         onSosResolved={handleSosResolved}
         celebrateMarkFoundBurst={burstMarkFoundCelebrate}
+        onOpenChat={openChatWithPostAuthor}
         rtlText={rtlText}
         rtlRow={rtlRow}
         isRTL={isRTL}
@@ -1826,7 +1889,7 @@ export function CommunityScreen() {
       />
     ),
     [
-      postMetaById, user, handleToggleLike, handleToggleHelpful, handleToggleSave,
+      postMetaById, user, openChatWithPostAuthor, handleToggleLike, handleToggleHelpful, handleToggleSave,
       handleDelete, handleHidePost, handleReportPost, handleBlockUser, handlePlaydateComing,
       handleSosResolved, burstMarkFoundCelebrate, rtlText, rtlRow, isRTL, copy, likeBusy, deleteBusy,
     ],

@@ -251,11 +251,18 @@ public class PostsController : ControllerBase
         if (string.IsNullOrWhiteSpace(request.ContactPhone))
             return BadRequest(new { message = "Contact phone is required." });
 
-        var descriptionSection = !string.IsNullOrWhiteSpace(request.Description)
-            ? $"\n📝 {request.Description.Trim()}"
-            : string.Empty;
-        var content =
-            $"🐾 Found Pet!\n\n📞 Contact: {request.ContactPhone.Trim()}{descriptionSection}\n\nIf you recognize this pet, please contact the finder.";
+        var preferredLanguage = await _db.Users
+            .AsNoTracking()
+            .Where(u => u.Id == userId)
+            .Select(u => u.PreferredLanguage)
+            .FirstOrDefaultAsync();
+
+        var content = !string.IsNullOrWhiteSpace(request.Content)
+            ? request.Content.Trim()
+            : SosPostContentFormatter.BuildFoundPetContent(
+                request.ContactPhone,
+                request.Description,
+                preferredLanguage);
 
         var post = new Post
         {

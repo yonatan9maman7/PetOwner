@@ -25,6 +25,7 @@ import {
 import { AddressAutocomplete } from "../../components/shared/AddressAutocomplete";
 import { fetchReverseGeocode } from "../../api/googlePlaces";
 import { useAuthStore } from "../../store/authStore";
+import { buildFoundPetPostContent } from "../../utils/sosPostContent";
 import { filesApi, postsApi } from "../../api/client";
 import { useTranslation, rowDirectionForAppLayout } from "../../i18n";
 import { useTheme } from "../../theme/ThemeContext";
@@ -76,6 +77,7 @@ export function ReportFoundScreen() {
   const { t, isRTL, rtlText, rtlInput } = useTranslation();
   const { colors } = useTheme();
   const isLoggedIn = useAuthStore((s) => s.isLoggedIn);
+  const language = useAuthStore((s) => s.language);
   const mapRef = useRef<any>(null);
   const initialCoordsRef = useRef<{ latitude: number; longitude: number } | null>(
     null,
@@ -229,6 +231,7 @@ export function ReportFoundScreen() {
         longitude: markerCoord.longitude,
         contactPhone: phone,
         description: description.trim() || undefined,
+        content: buildFoundPetPostContent(language, phone, description),
       });
       showGlobalAlertCompat("", t("reportFoundSuccess"), [
         { text: "OK", onPress: goToCommunity },

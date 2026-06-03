@@ -168,14 +168,27 @@ public class PetsController : ControllerBase
         pet.LostAt = DateTime.UtcNow;
         pet.ContactPhone = request.ContactPhone;
 
+        var preferredLanguage = await _db.Users
+            .AsNoTracking()
+            .Where(u => u.Id == userId)
+            .Select(u => u.PreferredLanguage)
+            .FirstOrDefaultAsync();
+
         var postImage = !string.IsNullOrEmpty(request.ImageUrl) ? request.ImageUrl : pet.ImageUrl;
         var imageSection = !string.IsNullOrEmpty(postImage) ? $"\n🖼️ Photo: {postImage}" : "";
-        var descriptionSection = !string.IsNullOrEmpty(request.Description) ? $"\n📝 {request.Description}" : "";
+        var baseContent = !string.IsNullOrWhiteSpace(request.Content)
+            ? request.Content.Trim()
+            : SosPostContentFormatter.BuildLostPetContent(
+                pet.Name,
+                request.LastSeenLocation,
+                request.ContactPhone,
+                request.Description,
+                preferredLanguage);
         var sosPost = new Post
         {
             Id = Guid.NewGuid(),
             UserId = userId,
-            Content = $"🆘 SOS: {pet.Name} is lost!\n\n📍 Last seen: {request.LastSeenLocation}\n📞 Contact: {request.ContactPhone}{descriptionSection}{imageSection}\n\nPlease help us find {pet.Name}! If you see this pet, contact the owner immediately.",
+            Content = baseContent + imageSection,
             ImageUrl = postImage,
             Latitude = request.LastSeenLat,
             Longitude = request.LastSeenLng,
