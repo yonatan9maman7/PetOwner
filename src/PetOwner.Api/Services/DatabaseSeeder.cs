@@ -181,6 +181,14 @@ public class DatabaseSeeder
                     { SRID = 4326 },
                 },
             };
+
+            var pp = providerUsers[i].ProviderProfile!;
+            if (providerUsers[i].Location?.GeoLocation is { } bizPoint)
+            {
+                pp.Latitude = bizPoint.Y;
+                pp.Longitude = bizPoint.X;
+                pp.BusinessGeoLocation = bizPoint;
+            }
         }
 
         _db.Users.AddRange(providerUsers);
@@ -478,6 +486,13 @@ public class DatabaseSeeder
                     { SRID = 4326 },
                 }
             };
+
+            if (user.Location?.GeoLocation is { } bizPoint)
+            {
+                user.ProviderProfile!.Latitude = bizPoint.Y;
+                user.ProviderProfile.Longitude = bizPoint.X;
+                user.ProviderProfile.BusinessGeoLocation = bizPoint;
+            }
 
             users.Add(user);
         }

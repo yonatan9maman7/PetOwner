@@ -18,16 +18,21 @@ export const SERVICE_I18N_MAP: Record<string, TranslationKey> = {
   "doggy day care": "serviceDoggyDayCare",
   grooming: "serviceGrooming",
   "pet grooming": "serviceGrooming",
-  veterinary: "chipVet",
-  vet: "chipVet",
-  "vet clinic": "chipVet",
+  veterinary: "serviceVeterinary",
+  vet: "serviceVeterinary",
+  "vet clinic": "serviceVeterinary",
+  clinic: "serviceVeterinary",
 };
+
+export function serviceLabelKeyFromApiName(name: string): TranslationKey | undefined {
+  const normalized = name.toLowerCase().trim().replace(/\s+/g, " ");
+  return SERVICE_I18N_MAP[normalized];
+}
 
 export function translateServiceLabel(
   name: string,
   t: (key: TranslationKey) => string,
 ): string {
-  const normalized = name.toLowerCase().trim().replace(/\s+/g, " ");
-  const key = SERVICE_I18N_MAP[normalized];
+  const key = serviceLabelKeyFromApiName(name);
   return key ? t(key) : name;
 }

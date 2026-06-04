@@ -118,13 +118,13 @@ export class MapDashboardComponent implements OnInit, OnDestroy, AfterViewInit {
   searchQuery = signal('');
   selectedCategory = signal('');
   isFilterActive = computed(() =>
-    !!this.filterDate() || !!this.filterTime() ||
+    !!this.filterDate() ||
     !!this.filterServiceType() || this.filterMinRating() !== null ||
     this.filterMaxRate() !== null || this.filterRadiusKm() !== null
   );
   activeFilterCount = computed(() => {
     let count = 0;
-    if (this.filterDate() && this.filterTime()) count++;
+    if (this.filterDate()) count++;
     if (this.filterServiceType()) count++;
     if (this.filterMinRating() !== null) count++;
     if (this.filterMaxRate() !== null) count++;
@@ -295,6 +295,11 @@ export class MapDashboardComponent implements OnInit, OnDestroy, AfterViewInit {
         this.loadPins();
       }
     );
+  }
+
+  onFilterDateInput(value: string): void {
+    this.filterDate.set(value);
+    if (!value.trim()) this.filterTime.set('');
   }
 
   applyFilter(): void {
@@ -473,9 +478,12 @@ export class MapDashboardComponent implements OnInit, OnDestroy, AfterViewInit {
    */
   private buildMapSearchFilters(): MapSearchFilters {
     const filters: MapSearchFilters = {};
-    const date = this.filterDate();
-    const time = this.filterTime();
-    if (date && time) filters.requestedTime = `${date}T${time}:00`;
+    const date = this.filterDate().trim();
+    const time = this.filterTime().trim();
+    if (date) {
+      filters.requestedDate = date;
+      if (time) filters.requestedTime = time;
+    }
     if (this.filterServiceType()) filters.serviceType = this.filterServiceType();
     if (this.filterMinRating() !== null) filters.minRating = this.filterMinRating()!;
     if (this.filterMaxRate() !== null) filters.maxRate = this.filterMaxRate()!;

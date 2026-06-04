@@ -4,7 +4,8 @@ using PetOwner.Data.Models;
 namespace PetOwner.Api.Services;
 
 public record MapSearchFilter(
-    DateTime? RequestedTime = null,
+    DateTime? RequestedDate = null,
+    TimeSpan? RequestedTime = null,
     string? ServiceType = null,
     double? MinRating = null,
     decimal? MaxRate = null,

@@ -24,6 +24,7 @@ import { useTranslation } from "../../i18n";
 import { getNormalizedApiError } from "../../utils/apiUtils";
 import { mapAuthApiErrorToTranslationKey } from "../../utils/authErrorI18n";
 import { LanguageToggle } from "../../components/LanguageToggle";
+import { ThemePickerModal, ThemeToggleButton } from "../../components/ThemePickerModal";
 import { authApi } from "../../api/client";
 import { useTheme } from "../../theme/ThemeContext";
 import { useKeyboardAvoidingState } from "../../hooks/useKeyboardAvoidingState";
@@ -174,6 +175,7 @@ function LoginForm() {
   const [bioTypeLabel, setBioTypeLabel] = useState<biometricService.BiometricTypeLabel>("generic");
   /** When false and biometrics are on, show biometric-first layout (no email/password). */
   const [showPasswordForm, setShowPasswordForm] = useState(true);
+  const [showThemePicker, setShowThemePicker] = useState(false);
   const showPasswordFormRef = useRef(showPasswordForm);
 
   const identifierRef = useRef<TextInput>(null);
@@ -531,10 +533,12 @@ function LoginForm() {
                 {
                   width: "100%",
                   justifyContent: "flex-end",
+                  gap: 8,
                   marginBottom: 8,
                 },
               ]}
             >
+              <ThemeToggleButton onPress={() => setShowThemePicker(true)} />
               <LanguageToggle />
             </View>
           ) : (
@@ -556,7 +560,10 @@ function LoginForm() {
                 >
                   {t("welcomeTitle")}
                 </Text>
-                <LanguageToggle />
+                <View style={[rtlRow, { alignItems: "center", gap: 8, flexShrink: 0 }]}>
+                  <ThemeToggleButton onPress={() => setShowThemePicker(true)} />
+                  <LanguageToggle />
+                </View>
               </View>
               <Text
                 style={[rtlText, { color: colors.textSecondary }]}
@@ -890,6 +897,10 @@ function LoginForm() {
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
+      <ThemePickerModal
+        visible={showThemePicker}
+        onClose={() => setShowThemePicker(false)}
+      />
     </View>
   );
 }

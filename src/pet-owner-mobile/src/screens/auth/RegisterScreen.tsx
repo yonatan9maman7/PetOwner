@@ -21,6 +21,7 @@ import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import { useAuthStore } from "../../store/authStore";
 import { useTranslation } from "../../i18n";
 import { LanguageToggle } from "../../components/LanguageToggle";
+import { ThemePickerModal, ThemeToggleButton } from "../../components/ThemePickerModal";
 import { authApi } from "../../api/client";
 import { useTheme } from "../../theme/ThemeContext";
 import { useKeyboardAvoidingState } from "../../hooks/useKeyboardAvoidingState";
@@ -78,6 +79,7 @@ export function RegisterScreen() {
   const [confirmPasswordError, setConfirmPasswordError] = useState<string | null>(null);
   const [termsError, setTermsError] = useState<string | null>(null);
   const [secureEntry, setSecureEntry] = useState(true);
+  const [showThemePicker, setShowThemePicker] = useState(false);
 
   const clearAuthError = useCallback(() => setErrorMessage(null), []);
 
@@ -374,7 +376,10 @@ export function RegisterScreen() {
               >
                 {t("registerTitle")}
               </Text>
-              <LanguageToggle />
+              <View style={[rtlRow, { alignItems: "center", gap: 8, flexShrink: 0 }]}>
+                <ThemeToggleButton onPress={() => setShowThemePicker(true)} />
+                <LanguageToggle />
+              </View>
             </View>
             <Text
               style={[rtlText, { color: colors.textSecondary }]}
@@ -736,6 +741,10 @@ export function RegisterScreen() {
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
+      <ThemePickerModal
+        visible={showThemePicker}
+        onClose={() => setShowThemePicker(false)}
+      />
     </View>
   );
 }

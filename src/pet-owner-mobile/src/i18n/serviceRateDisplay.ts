@@ -39,7 +39,7 @@ const SERVICE_TYPE_TO_TRANSLATION_KEY: Record<ServiceType, TranslationKey> = {
   [ServiceType.PetStore]: "servicePetStore",
   [ServiceType.HouseSitting]: "serviceHouseSitting",
   [ServiceType.DoggyDayCare]: "serviceDoggyDayCare",
-  [ServiceType.Veterinary]: "chipVet",
+  [ServiceType.Veterinary]: "serviceVeterinary",
 };
 
 const PRICING_UNIT_NUM_TO_KEY: Record<number, TranslationKey> = {

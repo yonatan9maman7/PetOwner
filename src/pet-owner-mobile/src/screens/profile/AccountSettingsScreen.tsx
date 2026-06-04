@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Modal } from "react-native";
+import { View, Text, TouchableOpacity, ScrollView, StyleSheet } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
@@ -11,6 +11,7 @@ import {
 } from "../../i18n";
 import { useTheme } from "../../theme/ThemeContext";
 import type { ThemePreference } from "../../store/themeStore";
+import { ThemePickerModal } from "../../components/ThemePickerModal";
 
 /* ───────────────────── Primitives ───────────────────── */
 
@@ -153,126 +154,6 @@ function RowDivider() {
           SETTINGS_ROW_PADDING_H + SETTINGS_ROW_ICON_SIZE + SETTINGS_ROW_GAP,
       }}
     />
-  );
-}
-
-/* ───────────────────── Dark Mode Picker Modal ───────────────────── */
-
-const THEME_OPTIONS: { id: ThemePreference; icon: keyof typeof Ionicons.glyphMap }[] = [
-  { id: "light", icon: "sunny-outline" },
-  { id: "dark", icon: "moon-outline" },
-  { id: "system", icon: "phone-portrait-outline" },
-];
-
-function DarkModePicker({
-  visible,
-  onClose,
-}: {
-  visible: boolean;
-  onClose: () => void;
-}) {
-  const { colors, isDark, preference, setPreference } = useTheme();
-  const { t, isRTL, rtlText } = useTranslation();
-
-  const labels: Record<ThemePreference, string> = {
-    light: t("themeLight"),
-    dark: t("themeDark"),
-    system: t("themeSystem"),
-  };
-
-  return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <TouchableOpacity
-        activeOpacity={1}
-        onPress={onClose}
-        style={{
-          flex: 1,
-          backgroundColor: colors.overlay,
-          justifyContent: "center",
-          alignItems: "center",
-          padding: 32,
-        }}
-      >
-        <TouchableOpacity activeOpacity={1} style={{
-          width: "100%",
-          maxWidth: 340,
-          backgroundColor: colors.surface,
-          borderRadius: 20,
-          padding: 20,
-          shadowColor: colors.shadow,
-          shadowOffset: { width: 0, height: 8 },
-          shadowOpacity: 0.15,
-          shadowRadius: 24,
-          elevation: 10,
-        }}>
-          <Text style={{
-            fontSize: 18,
-            fontWeight: "700",
-            color: colors.text,
-            textAlign: "center",
-            marginBottom: 20,
-          }}>
-            {t("darkMode")}
-          </Text>
-
-          {THEME_OPTIONS.map((opt) => {
-            const active = preference === opt.id;
-            return (
-              <TouchableOpacity
-                key={opt.id}
-                activeOpacity={0.6}
-                onPress={() => {
-                  setPreference(opt.id);
-                  onClose();
-                }}
-                style={{
-                  flexDirection: rowDirectionForAppLayout(isRTL),
-                  alignItems: "center",
-                  paddingVertical: 14,
-                  paddingHorizontal: 16,
-                  borderRadius: 12,
-                  marginBottom: 6,
-                  backgroundColor: active ? colors.primaryLight : "transparent",
-                }}
-              >
-                <View style={{
-                  width: 40,
-                  height: 40,
-                  borderRadius: 12,
-                  backgroundColor: active ? colors.primary : colors.surfaceSecondary,
-                  alignItems: "center",
-                  justifyContent: "center",
-                  marginEnd: 14,
-                }}>
-                  <Ionicons
-                    name={opt.icon}
-                    size={20}
-                    color={active ? colors.primaryText : colors.textMuted}
-                  />
-                </View>
-                <Text style={{
-                  flex: 1,
-                  fontSize: 16,
-                  fontWeight: "600",
-                  color: active ? colors.primary : colors.text,
-                  ...rtlText,
-                }}>
-                  {labels[opt.id]}
-                </Text>
-                {active && (
-                  <Ionicons
-                    name="checkmark-circle"
-                    size={24}
-                    color={colors.primary}
-                    style={{ marginStart: 8 }}
-                  />
-                )}
-              </TouchableOpacity>
-            );
-          })}
-        </TouchableOpacity>
-      </TouchableOpacity>
-    </Modal>
   );
 }
 
@@ -548,7 +429,7 @@ export function AccountSettingsScreen() {
         </Text>
       </ScrollView>
 
-      <DarkModePicker visible={showThemePicker} onClose={() => setShowThemePicker(false)} />
+      <ThemePickerModal visible={showThemePicker} onClose={() => setShowThemePicker(false)} />
     </SafeAreaView>
   );
 }

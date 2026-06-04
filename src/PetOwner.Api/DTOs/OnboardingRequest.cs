@@ -117,7 +117,8 @@ public record ProviderMeResponse(
     List<DogSize> AcceptedDogSizes,
     int? MaxDogsCapacity,
     string? PhoneNumber,
-    string? BusinessName
+    string? BusinessName,
+    bool UseLiveLocationOnMap
 );
 
 public record GenerateBioRequest([param: MaxLength(500)] string UserNotes);
@@ -137,4 +138,5 @@ public record UpdateProfileDto(
     string? ApartmentNumber,
     bool? AcceptsOffHoursRequests,
     List<DogSize>? AcceptedDogSizes = null,
-    int? MaxDogsCapacity = null);
+    int? MaxDogsCapacity = null,
+    bool UseLiveLocationOnMap = false);

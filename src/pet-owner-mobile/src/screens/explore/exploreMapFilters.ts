@@ -149,6 +149,32 @@ export function applyExploreMapPinFilters(
   });
 }
 
+/** Map explore date/time UI state to GET /map/pins availability query params. */
+export function applyMapAvailabilityFilters(
+  filters: MapSearchFilters,
+  filterDate: string,
+  filterTime: string,
+): void {
+  const date = filterDate.trim();
+  if (!date) return;
+
+  filters.requestedDate = date;
+
+  const time = filterTime.trim();
+  if (time) {
+    filters.requestedTimeOfDay = time.includes(":") && time.split(":").length === 2
+      ? `${time}:00`
+      : time;
+  }
+}
+
+/** Parsed max price from filter input; null when empty, zero, or invalid. */
+export function parseExploreMaxRate(filterMaxRate: string): number | null {
+  const maxRateRaw = filterMaxRate.trim();
+  const maxRateParsed = maxRateRaw ? Number(maxRateRaw) : NaN;
+  return Number.isFinite(maxRateParsed) && maxRateParsed > 0 ? maxRateParsed : null;
+}
+
 export function buildExploreMapFilterCriteria(input: {
   activeServices: Set<string>;
   filterMinRating: number | null;
@@ -157,10 +183,7 @@ export function buildExploreMapFilterCriteria(input: {
   userLat: number | null;
   userLng: number | null;
 }): ExploreMapFilterCriteria {
-  const maxRateRaw = input.filterMaxRate.trim();
-  const maxRateParsed = maxRateRaw ? Number(maxRateRaw) : NaN;
-  const maxRate =
-    Number.isFinite(maxRateParsed) && maxRateParsed > 0 ? maxRateParsed : null;
+  const maxRate = parseExploreMaxRate(input.filterMaxRate);
 
   return {
     activeServices: input.activeServices,
@@ -210,9 +233,7 @@ export function buildMapSearchFiltersForApi(
     f.maxRate = criteria.maxRate;
   }
 
-  if (options.filterDate && options.filterTime) {
-    f.requestedTime = `${options.filterDate}T${options.filterTime}:00`;
-  }
+  applyMapAvailabilityFilters(f, options.filterDate, options.filterTime);
 
   const hasUserLocation =
     criteria.userLatitude != null

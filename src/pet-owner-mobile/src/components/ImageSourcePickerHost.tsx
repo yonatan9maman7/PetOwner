@@ -19,7 +19,7 @@ import {
   subscribeImageSourceSheet,
 } from "../utils/imagePicker";
 import { useTheme } from "../theme/ThemeContext";
-import { useTranslation } from "../i18n";
+import { useTranslation, rowDirectionForAppLayout } from "../i18n";
 
 /**
  * Renders the image source bottom sheet on Android and web. iOS uses ActionSheetIOS inside
@@ -29,7 +29,7 @@ export function ImageSourcePickerHost() {
   const { colors } = useTheme();
   const { isRTL, rtlText } = useTranslation();
   const insets = useSafeAreaInsets();
-  const sheetDirection = isRTL ? "rtl" : "ltr";
+  const rowDir = rowDirectionForAppLayout(isRTL);
 
   const snap = useSyncExternalStore(
     subscribeImageSourceSheet,
@@ -83,6 +83,41 @@ export function ImageSourcePickerHost() {
 
   const { title, message, labels, allowRemove } = pending.options;
 
+  const renderOption = (
+    onPress: () => void,
+    icon: keyof typeof Ionicons.glyphMap,
+    label: string,
+    iconBg: string,
+    iconColor: string,
+    labelColor?: string,
+  ) => (
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.optionBtn,
+        { borderColor: colors.borderLight, backgroundColor: pressed ? colors.surfaceSecondary : colors.surface },
+      ]}
+      android_ripple={{ color: colors.surfaceSecondary }}
+    >
+      <View style={[styles.optionRow, { flexDirection: rowDir }]}>
+        <View style={[styles.iconWrap, { backgroundColor: iconBg }]}>
+          <Ionicons name={icon} size={22} color={iconColor} />
+        </View>
+        <Text
+          style={[styles.optionLabel, rtlText, { color: labelColor ?? colors.text }]}
+          numberOfLines={2}
+        >
+          {label}
+        </Text>
+        <Ionicons
+          name={isRTL ? "chevron-back" : "chevron-forward"}
+          size={20}
+          color={colors.textMuted}
+        />
+      </View>
+    </Pressable>
+  );
+
   return (
     <Modal
       visible
@@ -98,79 +133,58 @@ export function ImageSourcePickerHost() {
             {
               backgroundColor: colors.surface,
               paddingBottom: Math.max(insets.bottom, 16),
-              direction: sheetDirection,
             },
           ]}
           onPress={(e) => e.stopPropagation()}
         >
-          <View style={[styles.handle, { backgroundColor: colors.border }]} />
+          <View style={styles.sheetInner}>
+            <View style={[styles.handle, { backgroundColor: colors.border }]} />
 
-          <Text style={[styles.title, rtlText, { color: colors.text }]}>{title}</Text>
-          <Text style={[styles.subtitle, rtlText, { color: colors.textSecondary }]}>{message}</Text>
+            <Text style={[styles.title, rtlText, { color: colors.text }]}>{title}</Text>
+            <Text style={[styles.subtitle, rtlText, { color: colors.textSecondary }]}>{message}</Text>
 
-          <Pressable
-            onPress={onCamera}
-            style={({ pressed }) => [
-              styles.optionRow,
-              { backgroundColor: pressed ? colors.surfaceSecondary : "transparent" },
-            ]}
-            android_ripple={{ color: colors.surfaceSecondary }}
-          >
-            <View style={[styles.iconWrap, { backgroundColor: colors.primaryLight }]}>
-              <Ionicons name="camera-outline" size={22} color={colors.primary} />
+            <View style={styles.optionsBlock}>
+              {renderOption(
+                onCamera,
+                "camera-outline",
+                labels.camera,
+                colors.primaryLight,
+                colors.primary,
+              )}
+              {renderOption(
+                onGallery,
+                "images-outline",
+                labels.gallery,
+                colors.primaryLight,
+                colors.primary,
+              )}
+              {allowRemove
+                ? renderOption(
+                    onRemovePhoto,
+                    "trash-outline",
+                    removeLabelFor(pending.options),
+                    colors.dangerLight,
+                    colors.danger,
+                    colors.danger,
+                  )
+                : null}
             </View>
-            <Text style={[styles.optionLabel, rtlText, { color: colors.text }]}>{labels.camera}</Text>
-          </Pressable>
 
-          <View style={[styles.divider, { backgroundColor: colors.borderLight }]} />
-
-          <Pressable
-            onPress={onGallery}
-            style={({ pressed }) => [
-              styles.optionRow,
-              { backgroundColor: pressed ? colors.surfaceSecondary : "transparent" },
-            ]}
-            android_ripple={{ color: colors.surfaceSecondary }}
-          >
-            <View style={[styles.iconWrap, { backgroundColor: colors.primaryLight }]}>
-              <Ionicons name="images-outline" size={22} color={colors.primary} />
-            </View>
-            <Text style={[styles.optionLabel, rtlText, { color: colors.text }]}>{labels.gallery}</Text>
-          </Pressable>
-
-          {allowRemove ? (
-            <>
-              <View style={[styles.divider, { backgroundColor: colors.borderLight }]} />
-              <Pressable
-                onPress={onRemovePhoto}
-                style={({ pressed }) => [
-                  styles.optionRow,
-                  { backgroundColor: pressed ? colors.surfaceSecondary : "transparent" },
-                ]}
-                android_ripple={{ color: colors.surfaceSecondary }}
-              >
-                <View style={[styles.iconWrap, { backgroundColor: colors.dangerLight }]}>
-                  <Ionicons name="trash-outline" size={22} color={colors.danger} />
-                </View>
-                <Text style={[styles.optionLabel, rtlText, { color: colors.danger }]}>
-                  {removeLabelFor(pending.options)}
-                </Text>
-              </Pressable>
-            </>
-          ) : null}
-
-          <Pressable
-            onPress={onCancel}
-            style={({ pressed }) => [
-              styles.cancelBtn,
-              {
-                borderColor: colors.border,
-                backgroundColor: pressed ? colors.surfaceSecondary : colors.surfaceTertiary,
-              },
-            ]}
-          >
-            <Text style={[styles.cancelLabel, { color: colors.textSecondary }]}>{labels.cancel}</Text>
-          </Pressable>
+            <Pressable
+              onPress={onCancel}
+              style={({ pressed }) => [
+                styles.cancelBtn,
+                {
+                  borderColor: colors.border,
+                  backgroundColor: pressed ? colors.surfaceSecondary : colors.surfaceTertiary,
+                },
+              ]}
+            >
+              <Text style={[styles.cancelLabel, rtlText, { color: colors.textSecondary }]}>
+                {labels.cancel}
+              </Text>
+            </Pressable>
+          </View>
         </Pressable>
       </Pressable>
     </Modal>
@@ -183,10 +197,15 @@ const styles = StyleSheet.create({
     justifyContent: "flex-end",
   },
   sheet: {
+    width: "100%",
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     paddingHorizontal: 20,
     paddingTop: 8,
+  },
+  sheetInner: {
+    width: "100%",
+    alignSelf: "stretch",
   },
   handle: {
     alignSelf: "center",
@@ -203,16 +222,25 @@ const styles = StyleSheet.create({
   subtitle: {
     fontSize: 14,
     lineHeight: 20,
-    marginBottom: 8,
+    marginBottom: 16,
+  },
+  optionsBlock: {
+    width: "100%",
+    gap: 10,
+  },
+  optionBtn: {
+    width: "100%",
+    borderRadius: 14,
+    borderWidth: StyleSheet.hairlineWidth,
+    paddingVertical: 4,
+    paddingHorizontal: 4,
   },
   optionRow: {
-    flexDirection: "row",
     alignItems: "center",
     alignSelf: "stretch",
     gap: 14,
-    paddingVertical: 14,
-    paddingHorizontal: 4,
-    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 12,
   },
   iconWrap: {
     width: 44,
@@ -220,27 +248,24 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     alignItems: "center",
     justifyContent: "center",
+    flexShrink: 0,
   },
   optionLabel: {
     flex: 1,
     fontSize: 16,
     fontWeight: "600",
   },
-  divider: {
-    height: StyleSheet.hairlineWidth,
-    marginVertical: 2,
-  },
   cancelBtn: {
-    marginTop: 12,
+    marginTop: 16,
     paddingVertical: 14,
     borderRadius: 12,
     borderWidth: 1,
     alignItems: "center",
     justifyContent: "center",
+    alignSelf: "stretch",
   },
   cancelLabel: {
     fontSize: 16,
     fontWeight: "600",
-    textAlign: "center",
   },
 });

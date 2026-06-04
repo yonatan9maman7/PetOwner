@@ -14,7 +14,8 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { useNavigation, useRoute, useFocusEffect } from "@react-navigation/native";
-import { useTranslation, rowDirectionForAppLayout } from "../../i18n";
+import { useTranslation, rowDirectionForAppLayout, type Language } from "../../i18n";
+import { serviceRateDisplayName } from "../../i18n/serviceRateDisplay";
 import { useTheme } from "../../theme/ThemeContext";
 import { useAuthStore } from "../../store/authStore";
 import { useBookingsStore } from "../../store/bookingsStore";
@@ -52,21 +53,32 @@ function statusKey(
   }
 }
 
-function formatDate(iso: string) {
+const APP_LOCALE: Record<Language, string> = {
+  he: "he-IL",
+  en: "en-US",
+};
+
+function formatBookingDate(iso: string, locale: string) {
   const d = new Date(iso);
-  return d.toLocaleDateString(undefined, {
+  if (Number.isNaN(d.getTime())) return iso;
+  return d.toLocaleDateString(locale, {
     day: "numeric",
     month: "short",
     year: "numeric",
   });
 }
 
-function formatTime(iso: string) {
+function formatBookingTime(iso: string, locale: string) {
   const d = new Date(iso);
-  return d.toLocaleTimeString(undefined, {
+  if (Number.isNaN(d.getTime())) return "";
+  return d.toLocaleTimeString(locale, {
     hour: "2-digit",
     minute: "2-digit",
   });
+}
+
+function formatBookingRange(startIso: string, endIso: string, locale: string) {
+  return `${formatBookingDate(startIso, locale)} ${formatBookingTime(startIso, locale)} – ${formatBookingDate(endIso, locale)} ${formatBookingTime(endIso, locale)}`;
 }
 
 function isFutureBooking(b: BookingDto): boolean {
@@ -87,7 +99,12 @@ export function MyBookingsScreen() {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
   const { colors } = useTheme();
-  const { t, isRTL, rtlText } = useTranslation();
+  const { t, isRTL, rtlText, language } = useTranslation();
+  const locale = APP_LOCALE[language];
+  const bookingServiceLabel = useCallback(
+    (service: string) => serviceRateDisplayName({ service }, t),
+    [t],
+  );
   const tRef = useRef(t);
   useEffect(() => {
     tRef.current = t;
@@ -333,12 +350,15 @@ export function MyBookingsScreen() {
           }}
         >
           <Text
-            style={{
-              fontSize: 16,
-              fontWeight: "700",
-              color: colors.text,
-              flex: 1,
-            }}
+            style={[
+              rtlText,
+              {
+                fontSize: 16,
+                fontWeight: "700",
+                color: colors.text,
+                flex: 1,
+              },
+            ]}
             numberOfLines={1}
           >
             {item.providerName}
@@ -378,13 +398,17 @@ export function MyBookingsScreen() {
             color={colors.textMuted}
           />
           <Text
-            style={{
-              fontSize: 13,
-              color: colors.textSecondary,
-              fontWeight: "500",
-            }}
+            style={[
+              rtlText,
+              {
+                fontSize: 13,
+                color: colors.textSecondary,
+                fontWeight: "500",
+                flex: 1,
+              },
+            ]}
           >
-            {item.service}
+            {bookingServiceLabel(item.service)}
           </Text>
         </View>
 
@@ -401,9 +425,8 @@ export function MyBookingsScreen() {
             size={14}
             color={colors.textMuted}
           />
-          <Text style={{ fontSize: 13, color: colors.textSecondary }}>
-            {formatDate(item.startDate)} {formatTime(item.startDate)} —{" "}
-            {formatDate(item.endDate)} {formatTime(item.endDate)}
+          <Text style={[rtlText, { fontSize: 13, color: colors.textSecondary, flex: 1 }]}>
+            {formatBookingRange(item.startDate, item.endDate, locale)}
           </Text>
         </View>
 
@@ -553,25 +576,36 @@ export function MyBookingsScreen() {
             marginBottom: 10,
           }}
         >
-          <View style={{ flex: 1 }}>
+          <View
+            style={{
+              flex: 1,
+              alignItems: isRTL ? "flex-end" : "flex-start",
+            }}
+          >
             <Text
-              style={{
-                fontSize: 16,
-                fontWeight: "700",
-                color: colors.text,
-              }}
+              style={[
+                rtlText,
+                {
+                  fontSize: 12,
+                  color: colors.textMuted,
+                },
+              ]}
+            >
+              {t("fromOwner")}
+            </Text>
+            <Text
+              style={[
+                rtlText,
+                {
+                  fontSize: 16,
+                  fontWeight: "700",
+                  color: colors.text,
+                  marginTop: 2,
+                },
+              ]}
               numberOfLines={1}
             >
               {item.ownerName}
-            </Text>
-            <Text
-              style={{
-                fontSize: 12,
-                color: colors.textMuted,
-                marginTop: 2,
-              }}
-            >
-              {t("fromOwner")}
             </Text>
           </View>
           <View
@@ -609,13 +643,17 @@ export function MyBookingsScreen() {
             color={colors.textMuted}
           />
           <Text
-            style={{
-              fontSize: 13,
-              color: colors.textSecondary,
-              fontWeight: "500",
-            }}
+            style={[
+              rtlText,
+              {
+                fontSize: 13,
+                color: colors.textSecondary,
+                fontWeight: "500",
+                flex: 1,
+              },
+            ]}
           >
-            {item.service}
+            {bookingServiceLabel(item.service)}
           </Text>
         </View>
 
@@ -632,9 +670,8 @@ export function MyBookingsScreen() {
             size={14}
             color={colors.textMuted}
           />
-          <Text style={{ fontSize: 13, color: colors.textSecondary }}>
-            {formatDate(item.startDate)} {formatTime(item.startDate)} —{" "}
-            {formatDate(item.endDate)} {formatTime(item.endDate)}
+          <Text style={[rtlText, { fontSize: 13, color: colors.textSecondary, flex: 1 }]}>
+            {formatBookingRange(item.startDate, item.endDate, locale)}
           </Text>
         </View>
 

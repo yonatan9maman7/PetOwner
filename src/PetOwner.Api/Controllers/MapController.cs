@@ -77,7 +77,10 @@ public class MapController : ControllerBase
 
     [HttpGet("pins")]
     public async Task<IActionResult> GetPins(
+        /// <summary>Legacy combined ISO datetime (e.g. 2026-06-04T14:30:00).</summary>
         [FromQuery] DateTime? requestedTime,
+        [FromQuery] DateTime? requestedDate,
+        [FromQuery] TimeSpan? requestedTimeOfDay,
         [FromQuery] string? serviceType,
         [FromQuery] double? minRating,
         [FromQuery] decimal? maxRate,
@@ -87,8 +90,19 @@ public class MapController : ControllerBase
         [FromQuery] string? searchTerm,
         [FromQuery] ProviderType? providerType = null)
     {
+        var (availabilityDate, availabilityTime) =
+            MapAvailabilityQueryParser.Parse(requestedTime, requestedDate, requestedTimeOfDay);
         var filter = new MapSearchFilter(
-            requestedTime, serviceType, minRating, maxRate, radiusKm, latitude, longitude, searchTerm, providerType);
+            availabilityDate,
+            availabilityTime,
+            serviceType,
+            minRating,
+            maxRate,
+            radiusKm,
+            latitude,
+            longitude,
+            searchTerm,
+            providerType);
         var pins = await _mapService.SearchProvidersAsync(filter);
 
         // Search-appearance tracking — increment per returned provider for the stats dashboard.

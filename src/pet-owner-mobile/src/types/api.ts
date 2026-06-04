@@ -176,7 +176,10 @@ export interface MapPinDto {
 }
 
 export interface MapSearchFilters {
-  requestedTime?: string;
+  /** Calendar date (YYYY-MM-DD) for weekly availability filter. */
+  requestedDate?: string;
+  /** Time of day (HH:mm or HH:mm:ss); only sent with {@link requestedDate}. */
+  requestedTimeOfDay?: string;
   serviceType?: string;
   minRating?: number;
   maxRate?: number;
@@ -364,6 +367,7 @@ export interface ProviderMeResponse {
   apartmentNumber: string | null;
   latitude: number | null;
   longitude: number | null;
+  useLiveLocationOnMap: boolean;
   phoneNumber: string | null;
   whatsAppNumber: string | null;
   websiteUrl: string | null;
@@ -778,6 +782,7 @@ export interface UpdateProfileDto {
   acceptsOffHoursRequests?: boolean;
   acceptedDogSizes: DogSize[];
   maxDogsCapacity?: number | null;
+  useLiveLocationOnMap?: boolean;
   /** When supported by API — business providers / pending applications. */
   businessName?: string;
 }

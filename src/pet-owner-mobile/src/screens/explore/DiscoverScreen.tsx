@@ -22,6 +22,7 @@ import Animated, {
   FadeIn,
 } from "react-native-reanimated";
 import { useTranslation, rowDirectionForAppLayout, type TranslationKey } from "../../i18n";
+import { serviceLabelKeyFromApiName, translateServiceLabel } from "../../i18n/serviceLabels";
 import { useTheme, type ThemeColors } from "../../theme/ThemeContext";
 import { mapApi } from "../../api/client";
 import { getNormalizedApiError } from "../../utils/apiUtils";
@@ -54,38 +55,6 @@ const INDIVIDUAL_SERVICE_CHIP_IDS = new Set([
   "doggy day care",
 ]);
 
-/**
- * Map API `getServiceTypes()` strings (English) to i18n keys — aligned with
- * [`ExploreScreen.tsx`](./ExploreScreen.tsx) `SERVICE_I18N_MAP`.
- */
-const SERVICE_I18N_MAP: Record<string, TranslationKey> = {
-  boarding: "serviceBoarding",
-  "dog walker": "serviceDogWalking",
-  "dog walking": "serviceDogWalking",
-  "drop-in visit": "serviceDropInVisit",
-  "drop in visit": "serviceDropInVisit",
-  "pet insurance": "serviceInsurance",
-  "pet sitter": "servicePetSitting",
-  "pet sitting": "servicePetSitting",
-  "pet store": "servicePetStore",
-  "pet trainer": "serviceTraining",
-  training: "serviceTraining",
-  insurance: "serviceInsurance",
-  "house sitting": "serviceHouseSitting",
-  "doggy day care": "serviceDoggyDayCare",
-  grooming: "serviceGrooming",
-  "pet grooming": "serviceGrooming",
-  vet: "chipVet",
-  "vet clinic": "chipVet",
-  veterinary: "chipVet",
-  clinic: "chipVet",
-};
-
-function serviceLabelKeyFromApiName(svc: string): TranslationKey | undefined {
-  const normalized = svc.toLowerCase().trim().replace(/\s+/g, " ");
-  return SERVICE_I18N_MAP[normalized];
-}
-
 function formatCategoryLine(
   servicesCsv: string,
   t: (key: TranslationKey) => string,
@@ -93,8 +62,7 @@ function formatCategoryLine(
 ): string {
   const first = servicesCsv.split(",")[0]?.trim() ?? "";
   if (!first) return "";
-  const key = serviceLabelKeyFromApiName(first);
-  const text = key ? t(key) : first;
+  const text = translateServiceLabel(first, t);
   return isRTL ? text : text.toUpperCase();
 }
 

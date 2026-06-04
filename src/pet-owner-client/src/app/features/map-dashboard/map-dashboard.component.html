@@ -191,10 +191,13 @@
             {{ 'FILTERS.AVAILABLE_ON' | translate }}
           </label>
           <div class="flex gap-2">
-            <input type="date" dir="auto" [value]="filterDate()" (input)="filterDate.set($any($event.target).value)"
+            <input type="date" dir="auto" [value]="filterDate()"
+              (input)="onFilterDateInput($any($event.target).value)"
               (change)="applyFilter()" class="filter-input flex-1 text-start" />
-            <input type="time" dir="auto" [value]="filterTime()" (input)="filterTime.set($any($event.target).value)"
-              (change)="applyFilter()" class="filter-input flex-1 text-start" />
+            <input type="time" dir="auto" [value]="filterTime()"
+              [disabled]="!filterDate()"
+              (input)="filterTime.set($any($event.target).value)"
+              (change)="applyFilter()" class="filter-input flex-1 text-start disabled:opacity-50" />
           </div>
         </div>
 

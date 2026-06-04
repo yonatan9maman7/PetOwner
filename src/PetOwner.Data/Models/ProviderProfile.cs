@@ -1,3 +1,5 @@
+using NetTopologySuite.Geometries;
+
 namespace PetOwner.Data.Models;
 
 public class ProviderProfile
@@ -42,8 +44,17 @@ public class ProviderProfile
     public string Street { get; set; } = null!;
     public string BuildingNumber { get; set; } = null!;
     public string? ApartmentNumber { get; set; }
+    /// <summary>Static business address latitude (geocoded from profile address).</summary>
     public double? Latitude { get; set; }
+
+    /// <summary>Static business address longitude (geocoded from profile address).</summary>
     public double? Longitude { get; set; }
+
+    /// <summary>Spatial index for map search against the static business address.</summary>
+    public Point? BusinessGeoLocation { get; set; }
+
+    /// <summary>When true, the explore map pin uses live device GPS from <see cref="Location"/> instead of business coords.</summary>
+    public bool UseLiveLocationOnMap { get; set; }
 
     public User User { get; set; } = null!;
     public ICollection<ProviderServiceRate> ServiceRates { get; set; } = new List<ProviderServiceRate>();

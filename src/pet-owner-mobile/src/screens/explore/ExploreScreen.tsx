@@ -53,6 +53,7 @@ import { ScreenLoadingCenter } from "../../components/shared/ScreenLoadingCenter
 const EXPLORE_HEADER_LOGO = require("../../../assets/petcare-logo-header-trimmed.png");
 const EXPLORE_HEADER_LOGO_ASPECT = 639 / 246;
 import { useTranslation, rowDirectionForAppLayout, type TranslationKey } from "../../i18n";
+import { translateServiceLabel } from "../../i18n/serviceLabels";
 import { getNormalizedApiError } from "../../utils/apiUtils";
 import { showApiErrorToast } from "../../services/apiErrorToast";
 import { useAuthStore } from "../../store/authStore";
@@ -74,6 +75,7 @@ import {
   type PlaydateMapPinDto,
 } from "../../types/api";
 import { showGlobalAlertCompat } from "../../components/global-modal";
+import { SosOptionsModal } from "../../components/SosOptionsModal";
 import { MapViewWrapper, MarkerWrapper, CircleWrapper } from "../../components/MapViewWrapper";
 import { groupPinsForMapMarkers, sortMarkerItemsStable } from "./mapCollision";
 import {
@@ -93,6 +95,7 @@ import {
   applyExploreMapPinFilters,
   buildExploreMapFilterCriteria,
   buildMapSearchFiltersForApi,
+  parseExploreMaxRate,
 } from "./exploreMapFilters";
 import {
   navigateToLoginClearingStack,
@@ -128,22 +131,6 @@ const SERVICE_ICONS: Record<string, { icon: string; active: string }> = {
   "doggy day care": { icon: "sunny-outline", active: "sunny" },
 };
 
-const SERVICE_I18N_MAP: Record<string, string> = {
-  boarding: "serviceBoarding",
-  "dog walker": "serviceDogWalking",
-  "dog walking": "serviceDogWalking",
-  "drop-in visit": "serviceDropInVisit",
-  "pet insurance": "serviceInsurance",
-  "pet sitter": "servicePetSitting",
-  "pet sitting": "servicePetSitting",
-  "pet store": "servicePetStore",
-  "pet trainer": "serviceTraining",
-  training: "serviceTraining",
-  insurance: "serviceInsurance",
-  "house sitting": "serviceHouseSitting",
-  "doggy day care": "serviceDoggyDayCare",
-};
-
 /** Map API comma-separated English service labels to current locale (same keys as filter chips). */
 function translateServiceNamesCsv(
   services: string | null | undefined,
@@ -155,10 +142,7 @@ function translateServiceNamesCsv(
     .split(",")
     .map((p) => p.trim())
     .filter(Boolean)
-    .map((part) => {
-      const key = SERVICE_I18N_MAP[part.toLowerCase()] as TranslationKey | undefined;
-      return key ? t(key) : part;
-    })
+    .map((part) => translateServiceLabel(part, t))
     .join(", ");
 }
 
@@ -319,6 +303,7 @@ export function ExploreScreen() {
   const [filterDate, setFilterDate] = useState("");
   const [filterTime, setFilterTime] = useState("");
   const [showFilterPanel, setShowFilterPanel] = useState(false);
+  const [sosModalOpen, setSosModalOpen] = useState(false);
 
   /* Playdate-on-map layer */
   const [playdateMode, setPlaydateMode] = useState(false);
@@ -332,6 +317,7 @@ export function ExploreScreen() {
   const dogParksAbortRef = useRef<AbortController | null>(null);
   const [showDogParksOnly, setShowDogParksOnly] = useState(false);
   const showDogParksOnlyRef = useRef(false);
+  const loadPinsRef = useRef<(opts?: { silent?: boolean }) => void>(() => {});
   const [selectedDogPark, setSelectedDogPark] = useState<DogParkDto | null>(null);
   const [dogParkCheckInLoading, setDogParkCheckInLoading] = useState(false);
   const [checkInSecondsLeft, setCheckInSecondsLeft] = useState(0);
@@ -459,17 +445,158 @@ export function ExploreScreen() {
     }
   }, [pins, selectedPin]);
 
+  const activeMaxRate = useMemo(
+    () => parseExploreMaxRate(filterMaxRate),
+    [filterMaxRate],
+  );
+
   const activeFilterCount = useMemo(() => {
     let count = 0;
     if (activeServices.size > 0) count += activeServices.size;
     if (filterMinRating) count++;
-    if (filterMaxRate) count++;
-    if (filterRadiusKm) count++;
-    if (filterDate && filterTime) count++;
+    if (activeMaxRate != null) count++;
+    if (filterRadiusKm != null && filterRadiusKm > 0) count++;
+    if (filterDate) count++;
     if (playdateMode) count++;
     if (showDogParksOnly) count++;
     return count;
-  }, [activeServices, filterMinRating, filterMaxRate, filterRadiusKm, filterDate, filterTime, playdateMode, showDogParksOnly]);
+  }, [
+    activeServices,
+    filterMinRating,
+    activeMaxRate,
+    filterRadiusKm,
+    filterDate,
+    filterTime,
+    playdateMode,
+    showDogParksOnly,
+  ]);
+
+  const activeFilterChips = useMemo(() => {
+    type Chip = {
+      id: string;
+      label: string;
+      bg: string;
+      fg: string;
+      icon?: string;
+      onRemove: () => void;
+    };
+    const chips: Chip[] = [];
+    const reloadPins = () => setTimeout(() => loadPinsRef.current(), 0);
+
+    if (playdateMode) {
+      chips.push({
+        id: "playdate",
+        label: t("filterPlayWithPal"),
+        bg: colors.text,
+        fg: colors.textInverse,
+        icon: "paw",
+        onRemove: () => {
+          setPlaydateMode(false);
+          reloadPins();
+        },
+      });
+    }
+    if (showDogParksOnly) {
+      chips.push({
+        id: "dogParks",
+        label: t("dogParksLayerTitle"),
+        bg: "#16a34a",
+        fg: "#fff",
+        icon: "leaf",
+        onRemove: () => {
+          setShowDogParksOnly(false);
+          reloadPins();
+        },
+      });
+    }
+    for (const svc of activeServices) {
+      chips.push({
+        id: `service-${svc}`,
+        label: translateServiceLabel(svc, t),
+        bg: colors.text,
+        fg: colors.textInverse,
+        onRemove: () => {
+          setActiveServices((prev) => {
+            const next = new Set(prev);
+            next.delete(svc);
+            return next;
+          });
+          reloadPins();
+        },
+      });
+    }
+    if (filterRadiusKm != null && filterRadiusKm > 0) {
+      const distOpt = DISTANCE_OPTIONS.find((o) => o.value === filterRadiusKm);
+      chips.push({
+        id: "distance",
+        label: distOpt ? t(distOpt.labelKey) : `${filterRadiusKm} km`,
+        bg: colors.text,
+        fg: colors.textInverse,
+        icon: "navigate-outline",
+        onRemove: () => {
+          setFilterRadiusKm(null);
+          reloadPins();
+        },
+      });
+    }
+    if (filterMinRating != null && filterMinRating > 0) {
+      chips.push({
+        id: "rating",
+        label: t("filterChipMinRating").replace("{{n}}", String(filterMinRating)),
+        bg: colors.text,
+        fg: colors.textInverse,
+        icon: "star",
+        onRemove: () => {
+          setFilterMinRating(null);
+          reloadPins();
+        },
+      });
+    }
+    if (activeMaxRate != null) {
+      chips.push({
+        id: "maxPrice",
+        label: t("filterChipMaxPrice").replace("{{n}}", String(activeMaxRate)),
+        bg: colors.text,
+        fg: colors.textInverse,
+        onRemove: () => {
+          setFilterMaxRate("");
+          reloadPins();
+        },
+      });
+    }
+    if (filterDate) {
+      const availabilityLabel = filterTime
+        ? t("filterChipDateTime")
+            .replace("{{date}}", filterDate)
+            .replace("{{time}}", filterTime)
+        : t("filterChipDate").replace("{{date}}", filterDate);
+      chips.push({
+        id: "availability",
+        label: availabilityLabel,
+        bg: colors.text,
+        fg: colors.textInverse,
+        icon: "calendar-outline",
+        onRemove: () => {
+          setFilterDate("");
+          setFilterTime("");
+          reloadPins();
+        },
+      });
+    }
+    return chips;
+  }, [
+    activeServices,
+    activeMaxRate,
+    colors.text,
+    colors.textInverse,
+    filterDate,
+    filterMinRating,
+    filterRadiusKm,
+    filterTime,
+    playdateMode,
+    showDogParksOnly,
+    t,
+  ]);
 
   useFocusEffect(
     useCallback(() => {
@@ -842,7 +969,6 @@ export function ExploreScreen() {
   );
 
   /* Always-fresh ref so debounced / native callbacks never go stale */
-  const loadPinsRef = useRef(loadPins);
   loadPinsRef.current = loadPins;
 
   useFocusEffect(
@@ -1667,57 +1793,7 @@ export function ExploreScreen() {
           )}
 
           {/* Active filter chips (compact summary) */}
-          {playdateMode && (
-            <View style={{ paddingTop: 10 }}>
-              <View
-                style={{
-                  flexDirection: "row",
-                  alignItems: "center",
-                  alignSelf: "flex-start",
-                  backgroundColor: colors.text,
-                  borderRadius: 16,
-                  paddingLeft: 10,
-                  paddingRight: 6,
-                  paddingVertical: 5,
-                  gap: 4,
-                }}
-              >
-                <Ionicons name="paw" size={12} color={colors.textInverse} />
-                <Text style={{ fontSize: 11, fontWeight: "700", color: colors.textInverse }}>
-                  {t("filterPlayWithPal")}
-                </Text>
-                <Pressable onPress={() => setPlaydateMode(false)} hitSlop={6}>
-                  <Ionicons name="close-circle" size={14} color={colors.textInverse} />
-                </Pressable>
-              </View>
-            </View>
-          )}
-          {showDogParksOnly && (
-            <View style={{ paddingTop: 10 }}>
-              <View
-                style={{
-                  flexDirection: "row",
-                  alignItems: "center",
-                  alignSelf: "flex-start",
-                  backgroundColor: "#16a34a",
-                  borderRadius: 16,
-                  paddingLeft: 10,
-                  paddingRight: 6,
-                  paddingVertical: 5,
-                  gap: 4,
-                }}
-              >
-                <Ionicons name="leaf" size={12} color="#fff" />
-                <Text style={{ fontSize: 11, fontWeight: "700", color: "#fff" }}>
-                  {t("dogParksLayerTitle")}
-                </Text>
-                <Pressable onPress={() => setShowDogParksOnly(false)} hitSlop={6}>
-                  <Ionicons name="close-circle" size={14} color="#fff" />
-                </Pressable>
-              </View>
-            </View>
-          )}
-          {activeServices.size > 0 && (
+          {activeFilterChips.length > 0 && (
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
@@ -1727,13 +1803,13 @@ export function ExploreScreen() {
                 flexDirection: rowDirectionForAppLayout(isRTL),
               }}
             >
-              {[...activeServices].map((svc) => (
+              {activeFilterChips.map((chip) => (
                 <View
-                  key={svc}
+                  key={chip.id}
                   style={{
                     flexDirection: "row",
                     alignItems: "center",
-                    backgroundColor: colors.text,
+                    backgroundColor: chip.bg,
                     borderRadius: 16,
                     paddingLeft: 10,
                     paddingRight: 6,
@@ -1741,17 +1817,14 @@ export function ExploreScreen() {
                     gap: 4,
                   }}
                 >
-                  <Text style={{ fontSize: 11, fontWeight: "700", color: colors.textInverse }}>
-                    {SERVICE_I18N_MAP[svc.toLowerCase()] ? t(SERVICE_I18N_MAP[svc.toLowerCase()] as any) : svc}
+                  {chip.icon ? (
+                    <Ionicons name={chip.icon as any} size={12} color={chip.fg} />
+                  ) : null}
+                  <Text style={{ fontSize: 11, fontWeight: "700", color: chip.fg }}>
+                    {chip.label}
                   </Text>
-                  <Pressable
-                    onPress={() => {
-                      toggleServiceFilter(svc);
-                      setTimeout(() => loadPinsRef.current(), 0);
-                    }}
-                    hitSlop={6}
-                  >
-                    <Ionicons name="close-circle" size={14} color={colors.textInverse} />
+                  <Pressable onPress={chip.onRemove} hitSlop={6}>
+                    <Ionicons name="close-circle" size={14} color={chip.fg} />
                   </Pressable>
                 </View>
               ))}
@@ -1869,7 +1942,7 @@ export function ExploreScreen() {
         }
       </Pressable>
 
-      {/* Report Lost Pet — SOS (nested tab target matches GlobalSosFab / BookingScreen) */}
+      {/* SOS — Lost / Found / Vet (shared with GlobalSosFab) */}
       <View
         style={{
           position: "absolute",
@@ -1891,13 +1964,7 @@ export function ExploreScreen() {
         }}
       >
         <Pressable
-          onPress={() => {
-            if (!isLoggedIn) {
-              navigateToLoginClearingStack(navigation);
-              return;
-            }
-            navigation.navigate("MyPets", { screen: "ReportLost" });
-          }}
+          onPress={() => setSosModalOpen(true)}
           accessibilityRole="button"
           accessibilityLabel={t("reportLostMapBtn")}
           style={({ pressed }) => ({
@@ -2780,7 +2847,7 @@ export function ExploreScreen() {
                           color={active ? colors.textInverse : colors.textSecondary}
                         />
                         <Text style={{ fontSize: 13, fontWeight: "600", color: active ? colors.textInverse : colors.textSecondary }}>
-                          {SERVICE_I18N_MAP[svc.toLowerCase()] ? t(SERVICE_I18N_MAP[svc.toLowerCase()] as any) : svc}
+                          {translateServiceLabel(svc, t)}
                         </Text>
                         {active && (
                           <Ionicons name="checkmark-circle" size={14} color={colors.textInverse} />
@@ -2894,6 +2961,20 @@ export function ExploreScreen() {
                     );
                   })}
                 </View>
+                {filterRadiusKm != null
+                  && filterRadiusKm > 0
+                  && (userLat == null || userLng == null) && (
+                  <Text
+                    style={{
+                      fontSize: 12,
+                      color: colors.textSecondary,
+                      marginTop: 8,
+                      textAlign: isRTL ? "right" : "left",
+                    }}
+                  >
+                    {t("distanceFilterNeedsLocation")}
+                  </Text>
+                )}
               </View>
 
               {/* ── Date + Time ── */}
@@ -2910,18 +2991,22 @@ export function ExploreScreen() {
                   <View style={{ flex: 1 }}>
                     <DatePickerField
                       value={filterDate}
-                      onChange={setFilterDate}
+                      onChange={(next) => {
+                        setFilterDate(next);
+                        if (!next.trim()) setFilterTime("");
+                      }}
                       placeholder={t("date")}
                       isRTL={isRTL}
                       minimumDate={new Date()}
                     />
                   </View>
-                  <View style={{ flex: 1 }}>
+                  <View style={{ flex: 1, opacity: filterDate ? 1 : 0.45 }}>
                     <TimePickerField
                       value={filterTime}
                       onChange={setFilterTime}
                       placeholder={t("time")}
                       isRTL={isRTL}
+                      disabled={!filterDate}
                     />
                   </View>
                 </View>
@@ -2931,6 +3016,11 @@ export function ExploreScreen() {
           </View>
         </GestureHandlerRootView>
       </Modal>
+
+      <SosOptionsModal
+        visible={sosModalOpen}
+        onClose={() => setSosModalOpen(false)}
+      />
     </View>
   );
 }

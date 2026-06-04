@@ -48,6 +48,9 @@ export interface UserMiniProfile {
 }
 
 export interface MapSearchFilters {
+  /** Calendar date (YYYY-MM-DD). */
+  requestedDate?: string;
+  /** Time of day (HH:mm); only meaningful with requestedDate. */
   requestedTime?: string;
   serviceType?: string;
   minRating?: number;
@@ -68,7 +71,8 @@ export class MapService {
 
   fetchPins(filters: MapSearchFilters = {}): Observable<MapPin[]> {
     let params = new HttpParams();
-    if (filters.requestedTime) params = params.set('requestedTime', filters.requestedTime);
+    if (filters.requestedDate) params = params.set('requestedDate', filters.requestedDate);
+    if (filters.requestedTime) params = params.set('requestedTimeOfDay', filters.requestedTime);
     if (filters.serviceType) params = params.set('serviceType', filters.serviceType);
     if (filters.minRating != null) params = params.set('minRating', filters.minRating.toString());
     if (filters.maxRate != null) params = params.set('maxRate', filters.maxRate.toString());

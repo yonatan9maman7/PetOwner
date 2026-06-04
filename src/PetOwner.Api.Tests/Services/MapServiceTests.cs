@@ -169,7 +169,9 @@ public class MapServiceTests
         var mondayEvening = new DateTime(2026, 1, 5, 20, 0, 0);
 
         // Act
-        var result = await sut.SearchProvidersAsync(new MapSearchFilter(RequestedTime: mondayEvening));
+        var result = await sut.SearchProvidersAsync(new MapSearchFilter(
+            RequestedDate: mondayEvening.Date,
+            RequestedTime: mondayEvening.TimeOfDay));
 
         // Assert
         Assert.Empty(result);
@@ -198,7 +200,9 @@ public class MapServiceTests
         var mondayEvening = new DateTime(2026, 1, 5, 20, 0, 0);
 
         // Act
-        var result = await sut.SearchProvidersAsync(new MapSearchFilter(RequestedTime: mondayEvening));
+        var result = await sut.SearchProvidersAsync(new MapSearchFilter(
+            RequestedDate: mondayEvening.Date,
+            RequestedTime: mondayEvening.TimeOfDay));
 
         // Assert
         Assert.Single(result);
@@ -226,10 +230,64 @@ public class MapServiceTests
         var sut = new MapService(db);
 
         // Act
-        var result = await sut.SearchProvidersAsync(new MapSearchFilter(RequestedTime: MondayNoon));
+        var result = await sut.SearchProvidersAsync(new MapSearchFilter(
+            RequestedDate: MondayNoon.Date,
+            RequestedTime: MondayNoon.TimeOfDay));
 
         // Assert
         Assert.Single(result);
+    }
+
+    [Fact]
+    public async Task SearchProvidersAsync_WhenDateOnly_AndProviderHasSlotOnThatDayOfWeek_IncludesProvider()
+    {
+        await using var db = TestDbFactory.Create();
+        await SeedProviderAsync(db, new ProviderSeedOptions
+        {
+            AcceptsOffHoursRequests = false,
+            AvailabilitySlots =
+            [
+                new AvailabilitySlot
+                {
+                    Id = Guid.NewGuid(),
+                    DayOfWeek = (int)DayOfWeek.Monday,
+                    StartTime = TimeSpan.FromHours(9),
+                    EndTime = TimeSpan.FromHours(17),
+                },
+            ],
+        });
+        var sut = new MapService(db);
+        var monday = new DateTime(2026, 1, 5);
+
+        var result = await sut.SearchProvidersAsync(new MapSearchFilter(RequestedDate: monday));
+
+        Assert.Single(result);
+    }
+
+    [Fact]
+    public async Task SearchProvidersAsync_WhenDateOnly_AndNoSlotOnThatDayOfWeek_ExcludesProvider()
+    {
+        await using var db = TestDbFactory.Create();
+        await SeedProviderAsync(db, new ProviderSeedOptions
+        {
+            AcceptsOffHoursRequests = false,
+            AvailabilitySlots =
+            [
+                new AvailabilitySlot
+                {
+                    Id = Guid.NewGuid(),
+                    DayOfWeek = (int)DayOfWeek.Monday,
+                    StartTime = TimeSpan.FromHours(9),
+                    EndTime = TimeSpan.FromHours(17),
+                },
+            ],
+        });
+        var sut = new MapService(db);
+        var tuesday = new DateTime(2026, 1, 6);
+
+        var result = await sut.SearchProvidersAsync(new MapSearchFilter(RequestedDate: tuesday));
+
+        Assert.Empty(result);
     }
 
     // --- ServiceType filter ---
@@ -585,6 +643,9 @@ public class MapServiceTests
                 City = "Tel Aviv",
                 Street = "Main",
                 BuildingNumber = "1",
+                Latitude = options.Latitude,
+                Longitude = options.Longitude,
+                BusinessGeoLocation = geo,
                 ServiceRates = rates,
                 AvailabilitySlots = slots,
             },

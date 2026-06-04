@@ -35,7 +35,7 @@ public class MapControllerTests
         var sut = CreateSut(mapService, db);
 
         // Act
-        var result = await sut.GetPins(null, null, null, null, null, null, null, null, null);
+        var result = await sut.GetPins(null, null, null, null, null, null, null, null, null, null, null);
 
         // Assert
         var ok = Assert.IsType<OkObjectResult>(result);
@@ -56,7 +56,7 @@ public class MapControllerTests
         var sut = CreateSut(mapService, db);
 
         // Act
-        await sut.GetPins(null, null, null, null, null, null, null, null, null);
+        await sut.GetPins(null, null, null, null, null, null, null, null, null, null, null);
 
         // Assert
         var profile = await db.ProviderProfiles.AsNoTracking().SingleAsync(p => p.UserId == providerId);
@@ -279,8 +279,22 @@ public class MapControllerTests
                 City = "Tel Aviv",
                 Street = "Main",
                 BuildingNumber = "1",
+                Latitude = 32.08,
+                Longitude = 34.78,
+                BusinessGeoLocation = new Point(34.78, 32.08) { SRID = 4326 },
                 SearchAppearanceCount = searchAppearanceCount,
                 ProfileViewCount = profileViewCount,
+                ServiceRates =
+                [
+                    new ProviderServiceRate
+                    {
+                        Id = Guid.NewGuid(),
+                        ProviderProfileId = providerId,
+                        Service = ServiceType.DogWalking,
+                        Rate = 50m,
+                        Unit = PricingUnit.PerHour,
+                    },
+                ],
                 ProviderServices =
                 [
                     new ProviderService { ProviderId = providerId, ServiceId = serviceId },

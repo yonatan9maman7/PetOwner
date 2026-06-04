@@ -9,6 +9,7 @@ export interface TimePickerFieldProps {
   onChange: (hhmm: string) => void;
   placeholder: string;
   isRTL?: boolean;
+  disabled?: boolean;
 }
 
 /** Parse "HH:MM" string into a Date (using today's date). Falls back to current time. */
@@ -44,6 +45,7 @@ export function TimePickerField({
   onChange,
   placeholder,
   isRTL,
+  disabled = false,
 }: TimePickerFieldProps) {
   const [showPicker, setShowPicker] = useState(false);
   const [draftDate, setDraftDate] = useState<Date>(() => parseHHMM(value));
@@ -64,12 +66,15 @@ export function TimePickerField({
           flexDirection: rowDirectionForAppLayout(isRTL),
           alignItems: "center",
           gap: 8,
+          opacity: disabled ? 0.5 : 1,
         }}
+        pointerEvents={disabled ? "none" : "auto"}
       >
         <Ionicons name="time-outline" size={16} color={colors.textMuted} />
         <input
           type="time"
           value={value}
+          disabled={disabled}
           onChange={(e) => onChange(e.target.value)}
           placeholder={placeholder}
           style={{
@@ -93,7 +98,9 @@ export function TimePickerField({
   return (
     <>
       <Pressable
+        disabled={disabled}
         onPress={() => {
+          if (disabled) return;
           setDraftDate(parseHHMM(value));
           setShowPicker(true);
         }}
@@ -107,6 +114,7 @@ export function TimePickerField({
           flexDirection: rowDirectionForAppLayout(isRTL),
           alignItems: "center",
           gap: 8,
+          opacity: disabled ? 0.5 : 1,
         }}
       >
         <Ionicons name="time-outline" size={16} color={colors.textMuted} />

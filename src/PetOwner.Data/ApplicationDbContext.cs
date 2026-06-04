@@ -262,6 +262,12 @@ public class ApplicationDbContext : DbContext
 
             entity.Property(p => p.MaxDogsCapacity);
 
+            entity.Property(p => p.BusinessGeoLocation)
+                .HasColumnType("geography");
+
+            entity.Property(p => p.UseLiveLocationOnMap)
+                .HasDefaultValue(false);
+
             entity.Property(p => p.ProfileViewCount).HasDefaultValue(0);
             entity.Property(p => p.SearchAppearanceCount).HasDefaultValue(0);
 

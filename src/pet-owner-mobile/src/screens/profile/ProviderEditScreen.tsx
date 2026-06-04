@@ -40,6 +40,7 @@ import { pickImageWithSource } from "../../utils/imagePicker";
 import { getNormalizedApiError } from "../../utils/apiUtils";
 import { showApiErrorToast } from "../../services/apiErrorToast";
 import { useKeyboardAvoidingState } from "../../hooks/useKeyboardAvoidingState";
+import { useBottomSafeInset } from "../../hooks/useBottomSafeInset";
 import { providerBreakdownFromBasePrice, providerNetFromBasePrice, roundMoney } from "../../utils/pricingDisplay";
 
 const NAVY = "#001a5a";
@@ -356,6 +357,7 @@ function AddPackageModal({
 }) {
   const { colors } = useTheme();
   const modalInsets = useSafeAreaInsets();
+  const bottomSafeInset = useBottomSafeInset();
   const [title, setTitle] = useState("");
   const [price, setPrice] = useState("");
   const [description, setDescription] = useState("");
@@ -364,7 +366,25 @@ function AddPackageModal({
     if (visible) { setTitle(""); setPrice(""); setDescription(""); }
   }, [visible]);
 
-  const canSave = title.trim().length > 0 && price.trim().length > 0 && Number(price) > 0;
+  const priceNum = Number(price);
+  const canSave =
+    title.trim().length > 0 && price.trim().length > 0 && !Number.isNaN(priceNum) && priceNum > 0;
+
+  const scrollBottomPadding = Math.max(40, bottomSafeInset + modalInsets.bottom + 16);
+
+  const handleSavePress = () => {
+    if (!canSave) return;
+    const pkg = {
+      title: title.trim(),
+      price: price.trim(),
+      description: description.trim(),
+    };
+    onSave(pkg);
+    showGlobalAlertCompat(
+      "חבילה נוספה",
+      "אל תשכחו לשמור את הפרופיל כדי שהחבילה תתעדכן.",
+    );
+  };
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
@@ -376,16 +396,19 @@ function AddPackageModal({
           justifyContent: "flex-end",
         }}
       >
-        <KeyboardAvoidingView behavior={keyboardAvoidBehavior}>
+        <KeyboardAvoidingView
+          behavior={keyboardAvoidBehavior}
+          style={{ flex: 1, justifyContent: "flex-end" }}
+        >
           <Pressable
             onPress={(e) => e.stopPropagation()}
             style={{
               backgroundColor: colors.surface,
               borderTopLeftRadius: 24,
               borderTopRightRadius: 24,
-              paddingHorizontal: 24,
               paddingTop: 20,
               paddingBottom: Math.max(modalInsets.bottom, 28),
+              maxHeight: "88%",
             }}
           >
             {/* Handle bar */}
@@ -407,144 +430,163 @@ function AddPackageModal({
                 color: colors.text,
                 marginBottom: 20,
                 textAlign: isRTL ? "right" : "left",
+                paddingHorizontal: 24,
               }}
             >
               {t("packages")}
             </Text>
 
-            {/* Title */}
-            <Text
-              style={{
-                fontSize: 13,
-                fontWeight: "600",
-                color: colors.text,
-                marginBottom: 6,
-                textAlign: isRTL ? "right" : "left",
+            <ScrollView
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={{
+                paddingHorizontal: 24,
+                paddingBottom: scrollBottomPadding,
               }}
             >
-              {t("packageTitle")}
-            </Text>
-            <TextInput
-              value={title}
-              onChangeText={setTitle}
-              placeholder={t("packageTitlePlaceholder")}
-              placeholderTextColor={colors.textMuted}
-              style={{
-                backgroundColor: colors.surfaceTertiary,
-                borderRadius: 12,
-                paddingHorizontal: 14,
-                paddingVertical: 12,
-                fontSize: 15,
-                color: colors.text,
-                borderWidth: 1.5,
-                borderColor: colors.border,
-                marginBottom: 14,
-                textAlign: isRTL ? "right" : "left",
-              }}
-            />
-
-            {/* Price */}
-            <Text
-              style={{
-                fontSize: 13,
-                fontWeight: "600",
-                color: colors.text,
-                marginBottom: 6,
-                textAlign: isRTL ? "right" : "left",
-              }}
-            >
-              {t("packagePrice")}
-            </Text>
-            <View
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                backgroundColor: colors.surfaceTertiary,
-                borderRadius: 12,
-                borderWidth: 1.5,
-                borderColor: colors.border,
-                marginBottom: 14,
-                overflow: "hidden",
-              }}
-            >
-              <View
+              {/* Package title */}
+              <Text
                 style={{
-                  backgroundColor: colors.surfaceSecondary,
-                  paddingHorizontal: 14,
-                  height: 46,
-                  justifyContent: "center",
+                  fontSize: 13,
+                  fontWeight: "600",
+                  color: colors.text,
+                  marginBottom: 6,
+                  textAlign: isRTL ? "right" : "left",
                 }}
               >
-                <Text style={{ fontWeight: "800", fontSize: 16, color: colors.text }}>₪</Text>
-              </View>
+                {t("packageTitle")}
+              </Text>
               <TextInput
-                value={price}
-                onChangeText={(v) => setPrice(v.replace(/[^0-9]/g, ""))}
-                keyboardType="numeric"
-                maxLength={6}
-                placeholder="0"
+                value={title}
+                onChangeText={setTitle}
+                placeholder={t("packageTitlePlaceholder")}
                 placeholderTextColor={colors.textMuted}
                 style={{
-                  flex: 1,
+                  backgroundColor: colors.surfaceTertiary,
+                  borderRadius: 12,
                   paddingHorizontal: 14,
                   paddingVertical: 12,
-                  fontSize: 16,
-                  fontWeight: "700",
+                  fontSize: 15,
                   color: colors.text,
+                  borderWidth: 1.5,
+                  borderColor: colors.border,
+                  marginBottom: 14,
+                  textAlign: isRTL ? "right" : "left",
                 }}
               />
-            </View>
 
-            {/* Description */}
-            <Text
-              style={{
-                fontSize: 13,
-                fontWeight: "600",
-                color: colors.text,
-                marginBottom: 6,
-                textAlign: isRTL ? "right" : "left",
-              }}
-            >
-              {t("packageDescription")}
-            </Text>
-            <TextInput
-              value={description}
-              onChangeText={setDescription}
-              placeholder={t("packageDescPlaceholder")}
-              placeholderTextColor={colors.textMuted}
-              multiline
-              style={{
-                backgroundColor: colors.surfaceTertiary,
-                borderRadius: 12,
-                paddingHorizontal: 14,
-                paddingVertical: 12,
-                fontSize: 14,
-                color: colors.text,
-                borderWidth: 1.5,
-                borderColor: colors.border,
-                marginBottom: 22,
-                minHeight: 60,
-                textAlignVertical: "top",
-                textAlign: isRTL ? "right" : "left",
-              }}
-            />
-
-            {/* Save button */}
-            <Pressable
-              onPress={() => onSave({ title: title.trim(), price: price.trim(), description: description.trim() })}
-              disabled={!canSave}
-              style={({ pressed }) => ({
-                backgroundColor: canSave ? colors.primary : colors.borderLight,
-                borderRadius: 14,
-                paddingVertical: 16,
-                alignItems: "center",
-                opacity: pressed && canSave ? 0.85 : 1,
-              })}
-            >
-              <Text style={{ fontSize: 16, fontWeight: "700", color: "#fff" }}>
-                {t("savePackage")}
+              {/* Price */}
+              <Text
+                style={{
+                  fontSize: 13,
+                  fontWeight: "600",
+                  color: colors.text,
+                  marginBottom: 6,
+                  textAlign: isRTL ? "right" : "left",
+                }}
+              >
+                {t("packagePrice")}
               </Text>
-            </Pressable>
+              <View
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  backgroundColor: colors.surfaceTertiary,
+                  borderRadius: 12,
+                  borderWidth: 1.5,
+                  borderColor: colors.border,
+                  marginBottom: 14,
+                  overflow: "hidden",
+                }}
+              >
+                <View
+                  style={{
+                    backgroundColor: colors.surfaceSecondary,
+                    paddingHorizontal: 14,
+                    height: 46,
+                    justifyContent: "center",
+                  }}
+                >
+                  <Text style={{ fontWeight: "800", fontSize: 16, color: colors.text }}>₪</Text>
+                </View>
+                <TextInput
+                  value={price}
+                  onChangeText={(v) => setPrice(v.replace(/[^0-9]/g, ""))}
+                  keyboardType="numeric"
+                  maxLength={6}
+                  placeholder="0"
+                  placeholderTextColor={colors.textMuted}
+                  style={{
+                    flex: 1,
+                    paddingHorizontal: 14,
+                    paddingVertical: 12,
+                    fontSize: 16,
+                    fontWeight: "700",
+                    color: colors.text,
+                  }}
+                />
+              </View>
+
+              {/* Description */}
+              <Text
+                style={{
+                  fontSize: 13,
+                  fontWeight: "600",
+                  color: colors.text,
+                  marginBottom: 6,
+                  textAlign: isRTL ? "right" : "left",
+                }}
+              >
+                {t("packageDescription")}
+              </Text>
+              <TextInput
+                value={description}
+                onChangeText={setDescription}
+                placeholder={t("packageDescPlaceholder")}
+                placeholderTextColor={colors.textMuted}
+                multiline
+                style={{
+                  backgroundColor: colors.surfaceTertiary,
+                  borderRadius: 12,
+                  paddingHorizontal: 14,
+                  paddingVertical: 12,
+                  fontSize: 14,
+                  color: colors.text,
+                  borderWidth: 1.5,
+                  borderColor: colors.border,
+                  marginBottom: 22,
+                  minHeight: 60,
+                  textAlignVertical: "top",
+                  textAlign: isRTL ? "right" : "left",
+                }}
+              />
+
+              {/* Save button */}
+              <Pressable
+                onPress={handleSavePress}
+                accessibilityRole="button"
+                accessibilityState={{ disabled: !canSave }}
+                style={({ pressed }) => ({
+                  backgroundColor: canSave ? colors.primary : colors.surfaceSecondary,
+                  borderRadius: 14,
+                  paddingVertical: 16,
+                  alignItems: "center",
+                  borderWidth: canSave ? 0 : 1.5,
+                  borderColor: colors.border,
+                  opacity: pressed && canSave ? 0.85 : 1,
+                })}
+              >
+                <Text
+                  style={{
+                    fontSize: 16,
+                    fontWeight: "700",
+                    color: canSave ? "#fff" : colors.textSecondary,
+                  }}
+                >
+                  {t("savePackage")}
+                </Text>
+              </Pressable>
+            </ScrollView>
           </Pressable>
         </KeyboardAvoidingView>
       </Pressable>
@@ -627,6 +669,7 @@ export function ProviderEditScreen() {
   const [apartmentNumber, setApartmentNumber] = useState("");
   const [latitude, setLatitude] = useState(DEFAULT_LAT);
   const [longitude, setLongitude] = useState(DEFAULT_LNG);
+  const [useLiveLocationOnMap, setUseLiveLocationOnMap] = useState(false);
   const [slots, setSlots] = useState<AvailabilitySlotDto[]>([]);
   const [deletedSlotIds, setDeletedSlotIds] = useState<string[]>([]);
   const [availabilityError, setAvailabilityError] = useState<string | null>(null);
@@ -685,6 +728,7 @@ export function ProviderEditScreen() {
         setApartmentNumber(profile.apartmentNumber || "");
         setLatitude(profile.latitude || DEFAULT_LAT);
         setLongitude(profile.longitude || DEFAULT_LNG);
+        setUseLiveLocationOnMap(!!profile.useLiveLocationOnMap);
         setAcceptedDogSizes(profile.acceptedDogSizes ?? []);
         setMaxDogsCapacity(
           profile.maxDogsCapacity != null ? String(profile.maxDogsCapacity) : "",
@@ -996,6 +1040,7 @@ export function ProviderEditScreen() {
           acceptsOffHoursRequests: urgentAvailable,
           acceptedDogSizes: needsDogPrefs ? acceptedDogSizes : [],
           maxDogsCapacity: needsDogPrefs ? Number(maxDogsCapacity) : null,
+          useLiveLocationOnMap,
           ...(isBusiness ? { businessName: businessName.trim() } : {}),
         });
 
@@ -1396,6 +1441,34 @@ export function ProviderEditScreen() {
                   </Pressable>
                 </View>
               </View>
+
+              {!isNewProvider && (
+                <View
+                  style={{
+                    flexDirection: rowDirectionForAppLayout(isRTL),
+                    alignItems: "center",
+                    gap: 12,
+                    marginBottom: 20,
+                    paddingHorizontal: 4,
+                  }}
+                >
+                  <Text
+                    style={[
+                      rtlText,
+                      { flex: 1, fontSize: 14, fontWeight: "600", color: colors.text, lineHeight: 20 },
+                    ]}
+                  >
+                    {t("useLiveLocationOnMapLabel")}
+                  </Text>
+                  <Switch
+                    value={useLiveLocationOnMap}
+                    onValueChange={setUseLiveLocationOnMap}
+                    trackColor={{ false: colors.borderLight, true: "#34d399" }}
+                    thumbColor="#fff"
+                    style={{ transform: [{ scaleX: isRTL ? -1 : 1 }] }}
+                  />
+                </View>
+              )}
 
               {/* ── Services & Pricing ── */}
               <View style={{ marginBottom: 28 }}>

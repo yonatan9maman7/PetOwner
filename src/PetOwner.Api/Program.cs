@@ -446,6 +446,9 @@ static async Task EnsureSeededAdminsHaveProviderProfilesAsync(
             ReferenceName = "Dev Admin Reference",
             ReferenceContact = "0500000000",
             AcceptsOffHoursRequests = true,
+            Latitude = 32.0809,
+            Longitude = 34.7749,
+            BusinessGeoLocation = new Point(34.7749, 32.0809) { SRID = 4326 },
         };
 
         foreach (var def in definitions)

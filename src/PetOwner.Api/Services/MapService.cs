@@ -18,35 +18,52 @@ public class MapService : IMapService
 
     public async Task<List<MapPinDto>> GetApprovedAvailableProvidersAsync(DateTime? requestedTime = null)
     {
-        return await SearchProvidersAsync(new MapSearchFilter(RequestedTime: requestedTime));
+        MapSearchFilter filter = requestedTime.HasValue
+            ? new MapSearchFilter(
+                RequestedDate: requestedTime.Value.Date,
+                RequestedTime: requestedTime.Value.TimeOfDay)
+            : new MapSearchFilter();
+        return await SearchProvidersAsync(filter);
     }
 
     public async Task<List<MapPinDto>> SearchProvidersAsync(MapSearchFilter filter)
     {
         ArgumentNullException.ThrowIfNull(filter);
 
-        // Approved + location + not admin-suspended. Do not require IsAvailableNow — that toggle is for
-        // "I'm online right now" and would hide most providers on the explore map (default is false).
-        var query = _db.Locations
+        // Approved providers with a resolvable map pin (business or live GPS). IsAvailableNow is not required.
+        var query = _db.ProviderProfiles
             .AsNoTracking()
-            .Where(l =>
-                l.GeoLocation != null &&
-                l.User != null &&
-                l.User.ProviderProfile != null &&
-                l.User.ProviderProfile.Status == ProviderStatus.Approved &&
-                !l.User.ProviderProfile.IsSuspended);
+            .Where(p =>
+                p.Status == ProviderStatus.Approved &&
+                !p.IsSuspended &&
+                (
+                    p.BusinessGeoLocation != null
+                    || (p.Latitude != null && p.Longitude != null)
+                    || (p.UseLiveLocationOnMap
+                        && p.User != null
+                        && p.User.Location != null
+                        && p.User.Location.GeoLocation != null)));
 
-        if (filter.RequestedTime.HasValue)
+        if (filter.RequestedDate.HasValue)
         {
-            var dayOfWeek = (int)filter.RequestedTime.Value.DayOfWeek;
-            var timeOfDay = filter.RequestedTime.Value.TimeOfDay;
+            var dayOfWeek = (int)filter.RequestedDate.Value.DayOfWeek;
 
-            query = query.Where(l =>
-                l.User!.ProviderProfile!.AcceptsOffHoursRequests
-                || l.User.ProviderProfile.AvailabilitySlots.Any(slot =>
-                    slot.DayOfWeek == dayOfWeek
-                    && slot.StartTime <= timeOfDay
-                    && slot.EndTime > timeOfDay));
+            if (filter.RequestedTime.HasValue)
+            {
+                var timeOfDay = filter.RequestedTime.Value;
+                query = query.Where(p =>
+                    p.AcceptsOffHoursRequests
+                    || p.AvailabilitySlots.Any(slot =>
+                        slot.DayOfWeek == dayOfWeek
+                        && slot.StartTime <= timeOfDay
+                        && slot.EndTime > timeOfDay));
+            }
+            else
+            {
+                query = query.Where(p =>
+                    p.AcceptsOffHoursRequests
+                    || p.AvailabilitySlots.Any(slot => slot.DayOfWeek == dayOfWeek));
+            }
         }
 
         var parsedServiceTypes = new List<ServiceType>();
@@ -61,28 +78,28 @@ public class MapService : IMapService
 
         if (parsedServiceTypes.Count > 0)
         {
-            query = query.Where(l =>
-                l.User!.ProviderProfile!.ServiceRates.Any(r => parsedServiceTypes.Contains(r.Service)));
+            query = query.Where(p =>
+                p.ServiceRates.Any(r => parsedServiceTypes.Contains(r.Service)));
         }
 
         if (filter.MinRating.HasValue)
         {
             var minRating = (decimal)filter.MinRating.Value;
-            query = query.Where(l =>
-                l.User!.ProviderProfile!.AverageRating != null &&
-                l.User.ProviderProfile.AverageRating >= minRating);
+            query = query.Where(p =>
+                p.AverageRating != null &&
+                p.AverageRating >= minRating);
         }
 
         if (filter.MaxRate.HasValue)
         {
             if (parsedServiceTypes.Count > 0)
             {
-                query = query.Where(l => l.User!.ProviderProfile!.ServiceRates
+                query = query.Where(p => p.ServiceRates
                     .Any(r => parsedServiceTypes.Contains(r.Service) && r.Rate <= filter.MaxRate.Value));
             }
             else
             {
-                query = query.Where(l => l.User!.ProviderProfile!.ServiceRates
+                query = query.Where(p => p.ServiceRates
                     .Any(r => r.Rate <= filter.MaxRate.Value));
             }
         }
@@ -105,7 +122,14 @@ public class MapService : IMapService
             {
                 var center = new Point(filter.Longitude.Value, filter.Latitude.Value) { SRID = 4326 };
                 var radiusMeters = filter.RadiusKm.Value * 1000;
-                query = query.Where(l => l.GeoLocation!.Distance(center) <= radiusMeters);
+                query = query.Where(p =>
+                    (p.UseLiveLocationOnMap
+                        && p.User!.Location != null
+                        && p.User.Location.GeoLocation != null
+                        && p.User.Location.GeoLocation.Distance(center) <= radiusMeters)
+                    || (!p.UseLiveLocationOnMap
+                        && p.BusinessGeoLocation != null
+                        && p.BusinessGeoLocation.Distance(center) <= radiusMeters));
             }
         }
 
@@ -115,39 +139,45 @@ public class MapService : IMapService
             var matchingTypes = ServiceTypeCatalog.ServiceTypesWithDisplayNameContaining(term);
             if (matchingTypes.Count > 0)
             {
-                query = query.Where(l =>
-                    l.User!.Name.Contains(term) ||
-                    l.User.ProviderProfile!.ServiceRates.Any(r => matchingTypes.Contains(r.Service)));
+                query = query.Where(p =>
+                    p.User!.Name.Contains(term) ||
+                    p.ServiceRates.Any(r => matchingTypes.Contains(r.Service)));
             }
             else
             {
-                query = query.Where(l => l.User!.Name.Contains(term));
+                query = query.Where(p => p.User!.Name.Contains(term));
             }
         }
 
         if (filter.ProviderTypeFilter.HasValue)
         {
             var wanted = filter.ProviderTypeFilter.Value;
-            query = query.Where(l => l.User!.ProviderProfile!.Type == wanted);
+            query = query.Where(p => p.Type == wanted);
         }
 
-        // Materialize after spatial/basic filters only. Min(Rate) + service lists in the projection
-        // become per-row CASE/EXISTS subqueries and multiply joins; compute those in memory instead.
         var baseRows = await query
-            .Select(l => new
+            .Select(p => new
             {
-                l.UserId,
-                Name = l.User!.Name,
-                Latitude = l.GeoLocation!.Y,
-                Longitude = l.GeoLocation.X,
-                l.User.ProviderProfile!.ProfileImageUrl,
-                l.User.ProviderProfile.AverageRating,
-                l.User.ProviderProfile.ReviewCount,
-                l.User.ProviderProfile.AcceptsOffHoursRequests,
-                l.User.ProviderProfile.Type,
-                l.User.ProviderProfile.WhatsAppNumber,
-                l.User.ProviderProfile.WebsiteUrl,
-                l.User.ProviderProfile.IsEmergencyService,
+                p.UserId,
+                Name = p.User!.Name,
+                Latitude = p.UseLiveLocationOnMap
+                    && p.User.Location != null
+                    && p.User.Location.GeoLocation != null
+                    ? p.User.Location.GeoLocation.Y
+                    : (p.BusinessGeoLocation != null ? p.BusinessGeoLocation.Y : p.Latitude!.Value),
+                Longitude = p.UseLiveLocationOnMap
+                    && p.User.Location != null
+                    && p.User.Location.GeoLocation != null
+                    ? p.User.Location.GeoLocation.X
+                    : (p.BusinessGeoLocation != null ? p.BusinessGeoLocation.X : p.Longitude!.Value),
+                p.ProfileImageUrl,
+                p.AverageRating,
+                p.ReviewCount,
+                p.AcceptsOffHoursRequests,
+                p.Type,
+                p.WhatsAppNumber,
+                p.WebsiteUrl,
+                p.IsEmergencyService,
             })
             .ToListAsync();
 

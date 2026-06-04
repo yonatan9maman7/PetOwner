@@ -137,6 +137,7 @@ public class ProvidersController : ControllerBase
                 : request.ApartmentNumber.Trim(),
             Latitude = request.Latitude,
             Longitude = request.Longitude,
+            BusinessGeoLocation = new Point(request.Longitude, request.Latitude) { SRID = 4326 },
         };
 
         if (NeedsDogSizesAndCapacity(selectedServiceTypes))
@@ -146,14 +147,6 @@ public class ProvidersController : ControllerBase
         }
 
         _db.ProviderProfiles.Add(profile);
-
-        var location = new PetOwner.Data.Models.Location
-        {
-            UserId = userId,
-            GeoLocation = new Point(request.Longitude, request.Latitude) { SRID = 4326 },
-        };
-
-        _db.Locations.Add(location);
 
         foreach (var svcRate in request.SelectedServices)
         {
@@ -359,12 +352,6 @@ public class ProvidersController : ControllerBase
         if (profile is null)
             return NotFound(new { message = "Provider profile not found." });
 
-        var location = await _db.Locations
-            .FirstOrDefaultAsync(l => l.UserId == userId);
-
-        if (location is null)
-            return NotFound(new { message = "Location not found." });
-
         var updateServiceTypes = request.SelectedServices.Select(s => s.ServiceType).ToList();
         var providerTypeError = ValidateProviderTypeServices(profile.Type, updateServiceTypes);
         if (providerTypeError is not null)
@@ -381,6 +368,10 @@ public class ProvidersController : ControllerBase
         profile.ApartmentNumber = string.IsNullOrWhiteSpace(request.ApartmentNumber)
             ? null
             : request.ApartmentNumber.Trim();
+        profile.Latitude = request.Latitude;
+        profile.Longitude = request.Longitude;
+        profile.BusinessGeoLocation = new Point(request.Longitude, request.Latitude) { SRID = 4326 };
+        profile.UseLiveLocationOnMap = request.UseLiveLocationOnMap;
 
         if (request.AcceptsOffHoursRequests.HasValue)
             profile.AcceptsOffHoursRequests = request.AcceptsOffHoursRequests.Value;
@@ -438,8 +429,6 @@ public class ProvidersController : ControllerBase
                 ServiceId = service.Id,
             });
         }
-
-        location.GeoLocation = new Point(request.Longitude, request.Latitude) { SRID = 4326 };
 
         await _db.SaveChangesAsync();
 
@@ -600,10 +589,6 @@ public class ProvidersController : ControllerBase
         if (profile is null)
             return NotFound(new { message = "Provider profile not found." });
 
-        var location = await _db.Locations
-            .AsNoTracking()
-            .FirstOrDefaultAsync(l => l.UserId == userId);
-
         return Ok(new ProviderMeResponse(
             profile.Status.ToString(),
             profile.IsAvailableNow,
@@ -617,8 +602,8 @@ public class ProvidersController : ControllerBase
             profile.Street,
             profile.BuildingNumber,
             profile.ApartmentNumber,
-            location?.GeoLocation?.Y,
-            location?.GeoLocation?.X,
+            profile.BusinessGeoLocation?.Y ?? profile.Latitude,
+            profile.BusinessGeoLocation?.X ?? profile.Longitude,
             profile.ProviderServices.Select(ps => ps.ServiceId).ToList(),
             profile.ProviderServices.Select(ps => ps.Service.Name).ToList(),
             profile.ProfileImageUrl,
@@ -635,7 +620,8 @@ public class ProvidersController : ControllerBase
             profile.AcceptedDogSizes,
             profile.MaxDogsCapacity,
             profile.PhoneNumber ?? profile.User.Phone,
-            profile.BusinessName
+            profile.BusinessName,
+            profile.UseLiveLocationOnMap
         ));
     }
 

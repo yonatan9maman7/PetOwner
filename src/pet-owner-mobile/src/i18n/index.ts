@@ -525,7 +525,7 @@ const he = {
   petAlreadyLost: "כבר מסומן כאבד/ה",
   useCurrentLocation: "השתמש במיקום הנוכחי",
   tapMapToMark: "הקש/י על המפה לסמן את המיקום האחרון",
-  reportLostMapBtn: "דיווח על חיית מחמד אבודה",
+  reportLostMapBtn: "SOS / אבידות ומציאות",
   markFoundBtn: "סמן כנמצא",
   sosMarkFoundCloseReport: "החיה נמצאה\u200F! סגור דיווח",
   petLostActiveBanner:
@@ -572,6 +572,11 @@ const he = {
   distanceOption5km: '5 ק"מ',
   distanceOption10km: '10 ק"מ',
   distanceOption25km: '25 ק"מ',
+  distanceFilterNeedsLocation: "הפעל מיקום כדי לסנן לפי מרחק ממך",
+  filterChipMinRating: "דירוג {{n}}+",
+  filterChipMaxPrice: "עד ₪{{n}}",
+  filterChipDate: "תאריך: {{date}}",
+  filterChipDateTime: "{{date}} {{time}}",
   availableOn: "זמין בתאריך",
   date: "תאריך",
   time: "שעה",
@@ -587,6 +592,7 @@ const he = {
   serviceDogWalking: "טיולים",
   serviceHouseSitting: "שמירה בבית הבעלים",
   serviceDoggyDayCare: "מעון יום לכלבים",
+  serviceVeterinary: "וטרינריה",
   serviceInfoDogWalking:
     "לקיחת הכלב לטיול בשכונה שלו למשך זמן מוגדר.",
   serviceInfoBoarding: "טיפול בחיית מחמד ללילה בביתך.",
@@ -1093,6 +1099,8 @@ const he = {
   mapVisibilityOnLabel: "גלוי במפה – לקוחות יכולים למצוא אותך",
   mapVisibilityOffLabel: "מוסתרים מהמפה",
   mapVisibilityUpdateError: "לא ניתן לעדכן את נראות המפה. נסה שוב.",
+  useLiveLocationOnMapLabel:
+    "הצג את המיקום החי שלי במפה במקום הכתובת הקבועה",
   aboutProvider: "אודות",
   /** Provider profile — placeholder until translation API is wired. */
   seeTranslation: "הצג תרגום",
@@ -1992,7 +2000,7 @@ const en: Record<keyof typeof he, string> = {
   petAlreadyLost: "Already marked lost",
   useCurrentLocation: "Use current location",
   tapMapToMark: "Tap the map to mark last seen location",
-  reportLostMapBtn: "Report a lost pet",
+  reportLostMapBtn: "SOS & Lost Pets",
   markFoundBtn: "Mark as found",
   sosMarkFoundCloseReport: "Pet found — close report",
   petLostActiveBanner:
@@ -2039,6 +2047,11 @@ const en: Record<keyof typeof he, string> = {
   distanceOption5km: "5 km",
   distanceOption10km: "10 km",
   distanceOption25km: "25 km",
+  distanceFilterNeedsLocation: "Enable location to filter by distance from you",
+  filterChipMinRating: "Rating {{n}}+",
+  filterChipMaxPrice: "Up to ₪{{n}}",
+  filterChipDate: "Date: {{date}}",
+  filterChipDateTime: "{{date}} {{time}}",
   availableOn: "Available On",
   date: "Date",
   time: "Time",
@@ -2054,6 +2067,7 @@ const en: Record<keyof typeof he, string> = {
   serviceDogWalking: "Dog Walking",
   serviceHouseSitting: "House Sitting",
   serviceDoggyDayCare: "Doggy Day Care",
+  serviceVeterinary: "Veterinary",
   serviceInfoDogWalking:
     "Taking a dog for a walk around their neighborhood for a specific duration.",
   serviceInfoBoarding: "Caring for a pet overnight at your own home.",
