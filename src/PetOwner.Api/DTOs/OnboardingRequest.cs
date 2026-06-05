@@ -14,7 +14,8 @@ public record ServiceRateDto(
     ServiceType ServiceType,
     decimal Rate,
     PricingUnit PricingUnit,
-    List<ServicePackageDto>? Packages = null
+    List<ServicePackageDto>? Packages = null,
+    int? FixedDurationMinutes = null
 );
 
 public record ProviderApplicationRequest
@@ -82,6 +83,8 @@ public record ProviderApplicationRequest
     public List<DogSize> AcceptedDogSizes { get; init; } = [];
 
     public int? MaxDogsCapacity { get; init; }
+
+    public List<CreateAvailabilitySlotDto>? AvailabilitySlots { get; init; }
 }
 
 public record ProviderApplicationResponse(

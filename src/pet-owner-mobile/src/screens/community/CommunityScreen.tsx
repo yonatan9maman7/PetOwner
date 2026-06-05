@@ -145,9 +145,11 @@ const PostCard = memo(function PostCard({
   const kind = meta?.kind ?? categoryToKind(post.category);
   const isFoundPet = isFoundPetPost(post, kind);
   const canMessageFinder = isFoundPet && !isMine && !!onOpenChat;
-  const showOwnerSosResolve =
-    isMine &&
-    isActiveSosLostPost(post, kind);
+  const isActiveLost = isActiveSosLostPost(post, kind);
+  const isResolved = !!post.sosResolvedAt;
+  const finderCtaText = post.relatedPetName?.trim()
+    ? t("sosFinderCtaPersonalized").replace("{{name}}", post.relatedPetName.trim())
+    : t("sosFinderCtaGeneric");
 
   const handleAuthorPress = () => {
     if (!canMessageFinder || !onOpenChat) return;
@@ -180,6 +182,11 @@ const PostCard = memo(function PostCard({
         setSosResolving(false);
       }
     });
+  };
+
+  const handleFinderSosPress = () => {
+    if (!onOpenChat) return;
+    onOpenChat(post.userId, post.userName);
   };
 
   return (
@@ -332,29 +339,55 @@ const PostCard = memo(function PostCard({
         </>
       )}
 
-      {showOwnerSosResolve ? (
+      {isResolved ? (
+        <View style={styles.sosResolvedBadge}>
+          <Text style={[styles.sosResolvedBadgeText, rtlText]}>
+            {t("sosResolvedBadge")}
+          </Text>
+        </View>
+      ) : isActiveLost && isMine ? (
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={t("sosMarkFoundCloseReport")}
+          accessibilityLabel={`${t("sosCloseReport")}. ${t("sosCloseReportHint")}`}
           onPress={handleOwnerMarkFoundFromSos}
           disabled={sosResolving}
           style={[
             styles.sosMarkFoundWrap,
-            styles.sosMarkFoundFullBtn,
-            { flexDirection: isRTL ? "row-reverse" : "row" },
-            sosResolving ? styles.sosMarkFoundFullBtnDisabled : null,
+            styles.sosOwnerCloseBtn,
+            sosResolving ? styles.sosOwnerCloseBtnDisabled : null,
           ]}
         >
           {sosResolving ? (
-            <ActivityIndicator color="#fff" />
+            <ActivityIndicator color="#ef4444" />
           ) : (
-            <>
-              <Ionicons name="checkmark-circle" size={22} color="#fff" />
-              <Text style={[styles.sosMarkFoundFullBtnText, rtlText]}>
-                {t("sosMarkFoundCloseReport")}
+            <View style={styles.sosOwnerCloseBtnInner}>
+              <View style={[styles.sosOwnerCloseBtnRow, rtlRow]}>
+                <Ionicons name="checkmark-circle-outline" size={20} color="#ef4444" />
+                <Text style={[styles.sosOwnerCloseBtnText, rtlText]}>
+                  {t("sosCloseReport")}
+                </Text>
+              </View>
+              <Text style={[styles.sosOwnerCloseBtnHint, rtlText]}>
+                {t("sosCloseReportHint")}
               </Text>
-            </>
+            </View>
           )}
+        </Pressable>
+      ) : isActiveLost && !isMine ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={finderCtaText}
+          onPress={handleFinderSosPress}
+          disabled={!onOpenChat}
+          style={[
+            styles.sosMarkFoundWrap,
+            styles.sosFinderBtn,
+            { flexDirection: isRTL ? "row-reverse" : "row" },
+            !onOpenChat ? styles.sosFinderBtnDisabled : null,
+          ]}
+        >
+          <Ionicons name="chatbubble-ellipses" size={22} color="#fff" />
+          <Text style={[styles.sosFinderBtnText, rtlText]}>{finderCtaText}</Text>
         </Pressable>
       ) : null}
 
@@ -675,7 +708,7 @@ export function CommunityScreen() {
       else setIsFetchingNextPage(true);
       setFeedError(false);
       try {
-        const data = await postsApi.getFeed(p, PAGE_SIZE, { ranked: true });
+        const data = await postsApi.getFeed(p, PAGE_SIZE);
         if (!focusedRef.current) return;
         setPosts((prev) => (replace ? data : [...prev, ...data]));
         setHasMore(data.length >= PAGE_SIZE);
@@ -2113,7 +2146,6 @@ export function CommunityScreen() {
             parksLoading={parksLoading}
             beacons={beacons}
             beaconsLoading={beaconsLoading}
-            myBeaconId={myBeaconId}
             parkCheckins={parkCheckins}
             checkingInPark={checkingInPark}
             bottomContentPadding={bottomContentPadding}

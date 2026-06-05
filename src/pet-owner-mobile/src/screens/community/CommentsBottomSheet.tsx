@@ -92,7 +92,8 @@ export function CommentsBottomSheet({
   const me = useAuthStore((s) => s.user);
   const styles = getStyles(colors);
   const bottomInset = useBottomSafeInset();
-  const { behavior: keyboardAvoidBehavior } = useKeyboardAvoidingState();
+  const { behavior: keyboardAvoidBehavior, keyboardVisible } = useKeyboardAvoidingState();
+  const composerPaddingBottom = keyboardVisible ? 10 : 10 + bottomInset;
 
   const [comments, setComments] = useState<CommentDto[]>([]);
   const [loading, setLoading] = useState(false);
@@ -414,7 +415,6 @@ export function CommentsBottomSheet({
         <KeyboardAvoidingView
           style={styles.sheet}
           behavior={keyboardAvoidBehavior}
-          keyboardVerticalOffset={Platform.OS === "ios" ? bottomInset : 0}
         >
           {/* Drag handle + header */}
           <View style={styles.handle} />
@@ -457,7 +457,7 @@ export function CommentsBottomSheet({
           )}
 
           {/* Composer */}
-          <View style={[styles.composer, rtlRow, { paddingBottom: 10 + bottomInset }]}>
+          <View style={[styles.composer, rtlRow, { paddingBottom: composerPaddingBottom }]}>
             <TextInput
               ref={inputRef}
               style={[styles.composerInput, rtlInput]}

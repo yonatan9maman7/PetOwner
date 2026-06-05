@@ -74,6 +74,14 @@ export function servicesForOnboarding(providerType: number): ServiceDef[] {
 /** Service ids that require dog-size + capacity preferences. Mirrors API NeedsDogSizesAndCapacity. */
 export const DOG_CARE_SERVICE_TYPES = new Set([0, 2, 7, 8]);
 
+/** Short services with a fixed session length (slot-based booking). Mirrors API defaults. */
+export const FIXED_DURATION_SERVICE_TYPES = new Set<ServiceType>([
+  ServiceType.DogWalking,
+  ServiceType.DropInVisit,
+]);
+
+export const FIXED_DURATION_OPTIONS = [30, 45, 60] as const;
+
 export const DAY_KEYS: TranslationKey[] = [
   "daySun", "dayMon", "dayTue", "dayWed", "dayThu", "dayFri", "daySat",
 ];

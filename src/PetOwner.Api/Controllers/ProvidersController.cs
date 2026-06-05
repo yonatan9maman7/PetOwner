@@ -156,6 +156,7 @@ public class ProvidersController : ControllerBase
                 Service = svcRate.ServiceType,
                 Rate = svcRate.Rate,
                 Unit = svcRate.PricingUnit,
+                FixedDurationMinutes = ResolveFixedDurationMinutes(svcRate.ServiceType, svcRate.FixedDurationMinutes),
             };
             _db.ProviderServiceRates.Add(rate);
 
@@ -193,6 +194,29 @@ public class ProvidersController : ControllerBase
         }
 
         await _db.SaveChangesAsync();
+
+        if (request.AvailabilitySlots is { Count: > 0 })
+        {
+            foreach (var slotRequest in request.AvailabilitySlots)
+            {
+                var slotError = ValidateSlotTimes(
+                    slotRequest.DayOfWeek,
+                    slotRequest.StartTime,
+                    slotRequest.EndTime);
+                if (slotError is not null)
+                    return BadRequest(new { message = slotError });
+
+                _db.AvailabilitySlots.Add(new AvailabilitySlot
+                {
+                    ProviderId = userId,
+                    DayOfWeek = slotRequest.DayOfWeek,
+                    StartTime = slotRequest.StartTime,
+                    EndTime = slotRequest.EndTime,
+                });
+            }
+
+            await _db.SaveChangesAsync();
+        }
 
         var admins = await _db.Users
             .Where(u => u.Role == "Admin")
@@ -398,6 +422,7 @@ public class ProvidersController : ControllerBase
                 Service = svcRate.ServiceType,
                 Rate = svcRate.Rate,
                 Unit = svcRate.PricingUnit,
+                FixedDurationMinutes = ResolveFixedDurationMinutes(svcRate.ServiceType, svcRate.FixedDurationMinutes),
             };
             _db.ProviderServiceRates.Add(rate);
 
@@ -596,7 +621,8 @@ public class ProvidersController : ControllerBase
             profile.Bio,
             profile.ServiceRates.Select(r => new ServiceRateDto(
                 r.Service, r.Rate, r.Unit,
-                r.Packages.Select(p => new ServicePackageDto(p.Id, p.Title, p.Price, p.Description)).ToList()
+                r.Packages.Select(p => new ServicePackageDto(p.Id, p.Title, p.Price, p.Description)).ToList(),
+                r.FixedDurationMinutes
             )).ToList(),
             profile.City,
             profile.Street,
@@ -1099,4 +1125,14 @@ public class ProvidersController : ControllerBase
 
         return null;
     }
+
+    /// <summary>
+    /// Short services (dog walking, drop-in) default to 30 minutes when the client omits a duration.
+    /// </summary>
+    private static int? ResolveFixedDurationMinutes(ServiceType serviceType, int? requested) =>
+        requested is > 0
+            ? requested
+            : serviceType is ServiceType.DogWalking or ServiceType.DropInVisit
+                ? 30
+                : null;
 }

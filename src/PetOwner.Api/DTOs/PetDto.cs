@@ -8,6 +8,7 @@ public record PetDto(
     PetSpecies Species,
     string? Breed,
     int Age,
+    DateTime? BirthDate,
     double? Weight,
     string? Allergies,
     string? MedicalConditions,
@@ -67,7 +68,8 @@ public record CreatePetRequest(
     string? MicrochipNumber = null,
     string? VetName = null,
     string? VetPhone = null,
-    string? ImageUrl = null
+    string? ImageUrl = null,
+    DateTime? BirthDate = null
 );
 
 public record UpdatePetRequest(
@@ -85,5 +87,6 @@ public record UpdatePetRequest(
     string? MicrochipNumber = null,
     string? VetName = null,
     string? VetPhone = null,
-    string? ImageUrl = null
+    string? ImageUrl = null,
+    DateTime? BirthDate = null
 );

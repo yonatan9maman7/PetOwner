@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using NetTopologySuite.Geometries;
 using PetOwner.Api.DTOs;
+using PetOwner.Api.Helpers;
 using PetOwner.Api.Services;
 using PetOwner.Data;
 using PetOwner.Data.Models;
@@ -123,7 +124,7 @@ public class PlaydatesController : ControllerBase
                 Attendees = ev.Rsvps.Select(r => new
                 {
                     r.UserId, r.User.Name, Status = r.Status.ToString(),
-                    Pet = r.Pet == null ? null : new { r.Pet.Id, r.Pet.Name, Species = r.Pet.Species.ToString(), r.Pet.Breed, r.Pet.Age, r.Pet.ImageUrl, r.Pet.DogSize, r.Pet.Sterilization, r.Pet.TagsCsv }
+                    Pet = r.Pet == null ? null : new { r.Pet.Id, r.Pet.Name, Species = r.Pet.Species.ToString(), r.Pet.Breed, r.Pet.BirthDate, r.Pet.Age, r.Pet.ImageUrl, r.Pet.DogSize, r.Pet.Sterilization, r.Pet.TagsCsv }
                 }).ToList()
             })
             .FirstOrDefaultAsync();
@@ -137,7 +138,7 @@ public class PlaydatesController : ControllerBase
 
         var attendees = e.Attendees.Select(a => new PlaydateAttendeeDto(
             a.UserId, a.Name, a.Status,
-            a.Pet == null ? null : new PalPetDto(a.Pet.Id, a.Pet.Name, a.Pet.Species, a.Pet.Breed, a.Pet.Age, a.Pet.ImageUrl,
+            a.Pet == null ? null : new PalPetDto(a.Pet.Id, a.Pet.Name, a.Pet.Species, a.Pet.Breed, PetAgeHelper.CalculateAge(a.Pet.BirthDate, a.Pet.Age), a.Pet.ImageUrl,
                 a.Pet.DogSize?.ToString(), a.Pet.Sterilization == SterilizationStatus.Unknown ? null : a.Pet.Sterilization.ToString(),
                 string.IsNullOrEmpty(a.Pet.TagsCsv) ? [] : [.. a.Pet.TagsCsv.Split(',', StringSplitOptions.RemoveEmptyEntries)])))
             .ToList();

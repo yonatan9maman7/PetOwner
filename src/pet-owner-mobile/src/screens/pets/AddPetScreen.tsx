@@ -41,6 +41,7 @@ import {
   serializeAllergies,
 } from "./addPetHelpers";
 import { BrandedAppHeader } from "../../components/BrandedAppHeader";
+import { DatePickerField } from "../../components/DatePickerField";
 import { filesApi } from "../../api/client";
 import { usePetsStore } from "../../store/petsStore";
 import { PetSpecies } from "../../types/api";
@@ -125,7 +126,7 @@ export function AddPetScreen() {
   const [customSpecies, setCustomSpecies] = useState("");
 
   // Step 2
-  const [age, setAge] = useState("");
+  const [birthDate, setBirthDate] = useState("");
   const [weight, setWeight] = useState("");
   const [weightUnit, setWeightUnit] = useState<"kg" | "lbs">("kg");
   const [isNeutered, setIsNeutered] = useState(false);
@@ -182,7 +183,9 @@ export function AddPetScreen() {
         setBreed(b);
         setCustomBreedOther("");
       }
-      setAge(String(pet.age));
+      if (pet.birthDate) {
+        setBirthDate(pet.birthDate.slice(0, 10));
+      }
       setWeight(pet.weight != null ? String(pet.weight) : "");
       const parsedAll = parseAllergiesFromString(pet.allergies ?? "");
       setSelectedAllergyIds(parsedAll.ids);
@@ -259,8 +262,7 @@ export function AddPetScreen() {
     (selectedAllergyIds.size > 0 &&
       (!selectedAllergyIds.has("other") || allergyOtherText.trim().length > 0));
 
-  const step2Ready =
-    age.trim().length > 0 && !isNaN(Number(age)) && allergiesStepOk;
+  const step2Ready = birthDate.trim().length > 0 && allergiesStepOk;
 
   const isStep1Valid = (): boolean => step1Ready;
 
@@ -345,7 +347,7 @@ export function AddPetScreen() {
   };
 
   const handleSave = async () => {
-    if (!name.trim() || !age.trim() || species === null) {
+    if (!name.trim() || !birthDate.trim() || species === null) {
       showGlobalAlertCompat(t("errorTitle"), t("fillAllFields"));
       return;
     }
@@ -413,7 +415,8 @@ export function AddPetScreen() {
         name: name.trim(),
         species: species!,
         breed: breedValue,
-        age: Number(age),
+        age: 0,
+        birthDate: `${birthDate}T00:00:00.000Z`,
         weight: weight.trim()
           ? weightUnit === "lbs"
             ? Math.round(Number(weight) * 0.453592 * 100) / 100
@@ -844,7 +847,7 @@ export function AddPetScreen() {
                   </Text>
                 </View>
 
-                {/* Age & Weight row */}
+                {/* Birth date & Weight row */}
                 <View
                   style={{
                     flexDirection: rowDirectionForAppLayout(isRTL),
@@ -861,17 +864,16 @@ export function AddPetScreen() {
                         ...paraTextStyle,
                       }}
                     >
-                      {t("ageYears")}{" "}
+                      {t("petBirthDate")}{" "}
                       <Text style={{ color: colors.danger }}>*</Text>
                     </Text>
-                    <TextInput
-                      style={inputStyle(isRTL, colors)}
-                      value={age}
-                      onChangeText={setAge}
-                      placeholder={t("petAgePlaceholder")}
-                      placeholderTextColor={colors.textMuted}
-                      keyboardType="numeric"
-                      textAlign={textAlign}
+                    <DatePickerField
+                      value={birthDate}
+                      onChange={setBirthDate}
+                      placeholder={t("petBirthDatePlaceholder")}
+                      isRTL={isRTL}
+                      maximumDate={new Date()}
+                      minimumDate={new Date(new Date().getFullYear() - 30, 0, 1)}
                     />
                   </View>
                   <View style={{ flex: 1, gap: 8 }}>

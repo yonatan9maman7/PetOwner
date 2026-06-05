@@ -8,7 +8,7 @@ export type Language = "he" | "en";
 const he = {
   welcomeTitle: "ברוכים השבים",
   welcomeSubtitle:
-    "גישה למקלט שלך וללוח הבקרה המותאם אישית לחיות המחמד שלך.",
+    "התחברו כדי לנהל את חיות המחמד, ההזמנות והקהילה שלכם.",
   emailLabel: "כתובת אימייל",
   emailPlaceholder: "name@premium.com",
   passwordLabel: "סיסמה",
@@ -149,6 +149,9 @@ const he = {
   bookingSelectServiceForTimes: "בחר שירות תחילה כדי לראות שעות פנויות.",
   bookingDateOnlyHint: "לשירות זה נדרש תאריך בלבד — אין צורך לבחור שעה.",
   bookingWalkDuration: "משך הטיול: {{minutes}} דקות",
+  bookingFixedDurationWindow: "משך הפעילות: {{minutes}} דקות ({{start}} - {{end}})",
+  providerSessionDuration: "משך מפגש",
+  rateUnitMinute: "דק'",
   bookingCheckInDate: "תאריך כניסה",
   bookingCheckOutDate: "תאריך יציאה",
   bookingCheckInTime: "שעת כניסה",
@@ -397,6 +400,9 @@ const he = {
   petBreedPlaceholder: "גזע (אופציונלי)",
   petAge: "גיל",
   petAgePlaceholder: "גיל (שנים)",
+  petBirthDate: "תאריך לידה (משוער זה בסדר)",
+  petBirthDatePlaceholder: "בחרו תאריך לידה",
+  petBornLabel: "נולד/ה",
   petWeight: "משקל",
   petWeightPlaceholder: "משקל",
   weightUnitKg: "ק\"ג",
@@ -527,7 +533,12 @@ const he = {
   tapMapToMark: "הקש/י על המפה לסמן את המיקום האחרון",
   reportLostMapBtn: "SOS / אבידות ומציאות",
   markFoundBtn: "סמן כנמצא",
-  sosMarkFoundCloseReport: "החיה נמצאה\u200F! סגור דיווח",
+  sosMarkFoundCloseReport: "החיה נמצאה\u200F? סגור דיווח",
+  sosCloseReport: "מצאתם את החיה? סמנו שהיא נמצאה",
+  sosCloseReportHint: "כפתור זה מוצג רק לך כבעל/ת",
+  sosFinderCtaPersonalized: "במידה וזיהית את {{name}} לחץ כאן!",
+  sosFinderCtaGeneric: "במידה ומצאת את החיה לחץ כאן!",
+  sosResolvedBadge: "✅ החיה נמצאה!",
   petLostActiveBanner:
     "חיית המחמד מסומנת כאבודה. סמנו כנמצא כדי לסגור את הדיווח ולעדכן את הקהילה.",
 
@@ -958,6 +969,7 @@ const he = {
   notifAccountReactivated:
     "חשבון הספק שלך הופעל מחדש. כעת תוכל לקבל הזמנות שוב.",
   notifNew: "התראה חדשה",
+  notifPetBirthdayTitle: "מזל טוב! 🥳",
 
   medicalCard: "כרטיס רפואי",
   healthPassport: "דרכון בריאות",
@@ -1482,7 +1494,7 @@ const he = {
 const en: Record<keyof typeof he, string> = {
   welcomeTitle: "Welcome Back",
   welcomeSubtitle:
-    "Access your sanctuary and personalized pet care dashboard.",
+    "Sign in to manage your pets, bookings, and community.",
   emailPlaceholder: "name@premium.com",
   passwordLabel: "Password",
   passwordPlaceholder: "••••••••",
@@ -1621,6 +1633,9 @@ const en: Record<keyof typeof he, string> = {
   bookingSelectServiceForTimes: "Select a service first to see available times.",
   bookingDateOnlyHint: "This service only requires a date — no time slot needed.",
   bookingWalkDuration: "Walk duration: {{minutes}} min",
+  bookingFixedDurationWindow: "Session: {{minutes}} min ({{start}} – {{end}})",
+  providerSessionDuration: "Session length",
+  rateUnitMinute: "min",
   bookingCheckInDate: "Check-in date",
   bookingCheckOutDate: "Check-out date",
   bookingCheckInTime: "Check-in time",
@@ -1872,6 +1887,9 @@ const en: Record<keyof typeof he, string> = {
   petBreedPlaceholder: "Breed (optional)",
   petAge: "Age",
   petAgePlaceholder: "Age (years)",
+  petBirthDate: "Birth date (approximate is fine)",
+  petBirthDatePlaceholder: "Select birth date",
+  petBornLabel: "Born",
   petWeight: "Weight",
   petWeightPlaceholder: "Weight",
   weightUnitKg: "kg",
@@ -2003,6 +2021,11 @@ const en: Record<keyof typeof he, string> = {
   reportLostMapBtn: "SOS & Lost Pets",
   markFoundBtn: "Mark as found",
   sosMarkFoundCloseReport: "Pet found — close report",
+  sosCloseReport: "Found your pet? Mark as found",
+  sosCloseReportHint: "Only you as the owner see this button",
+  sosFinderCtaPersonalized: "If you saw {{name}}, click here!",
+  sosFinderCtaGeneric: "If you found the pet, click here!",
+  sosResolvedBadge: "✅ Pet Found!",
   petLostActiveBanner:
     "This pet is marked as lost. Mark as found to close the report and update the community.",
 
@@ -2433,6 +2456,7 @@ const en: Record<keyof typeof he, string> = {
   notifAccountReactivated:
     "Your provider account has been reactivated. You can now accept bookings again.",
   notifNew: "New notification",
+  notifPetBirthdayTitle: "Happy Birthday! 🥳",
 
   medicalCard: "Medical Card",
   healthPassport: "Health Passport",
@@ -2574,6 +2598,8 @@ const en: Record<keyof typeof he, string> = {
   mapVisibilityOnLabel: "Visible on map — owners can find you",
   mapVisibilityOffLabel: "Hidden from map",
   mapVisibilityUpdateError: "Could not update map visibility. Please try again.",
+  useLiveLocationOnMapLabel:
+    "Show my live location on the map instead of my fixed address",
   aboutProvider: "About",
   seeTranslation: "See translation",
   providerProfileMoreServices: "+{count} more",
@@ -2984,6 +3010,7 @@ const NOTIFICATION_API_I18N_MAP: Record<string, TranslationKey> = {
   "NOTIFICATIONS.ACCOUNT_REACTIVATED_TITLE": "notifAccountReactivatedTitle",
   "NOTIFICATIONS.ACCOUNT_REACTIVATED": "notifAccountReactivated",
   "NOTIFICATIONS.NEW": "notifNew",
+  "NOTIFICATIONS.PET_BIRTHDAY_TITLE": "notifPetBirthdayTitle",
 };
 
 export function resolveNotificationApiText(

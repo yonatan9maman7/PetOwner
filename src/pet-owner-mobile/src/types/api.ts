@@ -51,6 +51,7 @@ export interface PetDto {
   species: PetSpecies;
   breed?: string;
   age: number;
+  birthDate?: string;
   weight?: number;
   allergies?: string;
   medicalConditions?: string;
@@ -76,6 +77,7 @@ export interface CreatePetRequest {
   species: PetSpecies;
   breed?: string;
   age: number;
+  birthDate?: string;
   weight?: number;
   allergies?: string;
   medicalConditions?: string;
@@ -94,6 +96,7 @@ export interface UpdatePetRequest {
   species: PetSpecies;
   breed?: string;
   age: number;
+  birthDate?: string;
   weight?: number;
   allergies?: string;
   medicalConditions?: string;
@@ -767,6 +770,7 @@ export interface ServiceRatePayload {
   serviceType: ServiceType;
   rate: number;
   pricingUnit: number;
+  fixedDurationMinutes?: number | null;
   packages?: ServicePackagePayload[];
 }
 
@@ -812,6 +816,11 @@ export interface ProviderApplicationPayload {
   referenceContact?: string;
   acceptedDogSizes: DogSize[];
   maxDogsCapacity?: number | null;
+  availabilitySlots?: {
+    dayOfWeek: number;
+    startTime: string;
+    endTime: string;
+  }[];
 }
 
 export interface ProviderApplicationResponse {

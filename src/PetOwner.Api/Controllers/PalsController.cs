@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using PetOwner.Api.DTOs;
+using PetOwner.Api.Helpers;
 using PetOwner.Api.Services;
 using PetOwner.Data;
 using PetOwner.Data.Models;
@@ -159,7 +160,7 @@ public class PalsController : ControllerBase
             u.PlaydatePrefs!.Bio, u.PlaydatePrefs.LastActiveAt,
             Lat = u.Location!.GeoLocation!.Y,
             Lng = u.Location.GeoLocation.X,
-            Pets = u.Pets.Select(p => new { p.Id, p.Name, Species = p.Species, p.Breed, p.Age, p.ImageUrl, p.DogSize, p.Sterilization, p.TagsCsv }).ToList()
+            Pets = u.Pets.Select(p => new { p.Id, p.Name, Species = p.Species, p.Breed, p.BirthDate, p.Age, p.ImageUrl, p.DogSize, p.Sterilization, p.TagsCsv }).ToList()
         }).Take(150).ToListAsync();
 
         // bump heartbeat
@@ -177,7 +178,7 @@ public class PalsController : ControllerBase
                 Math.Round(x.dist * 2, MidpointRounding.AwayFromZero) / 2,
                 null,
                 x.u.Bio,
-                x.u.Pets.Select(p => MapPet(p.Id, p.Name, p.Species.ToString(), p.Breed, p.Age, p.ImageUrl, p.DogSize, p.Sterilization, p.TagsCsv)).ToList(),
+                x.u.Pets.Select(p => MapPet(p.Id, p.Name, p.Species.ToString(), p.Breed, p.BirthDate, p.Age, p.ImageUrl, p.DogSize, p.Sterilization, p.TagsCsv)).ToList(),
                 x.u.LastActiveAt))
             .ToList();
 
@@ -237,7 +238,7 @@ public class PalsController : ControllerBase
 
         var myPets = await _db.Pets.AsNoTracking()
             .Where(p => p.UserId == meId)
-            .Select(p => new { p.Id, p.Species, p.Name, p.Breed, p.Age, p.ImageUrl, p.DogSize, p.Sterilization, p.TagsCsv })
+            .Select(p => new { p.Id, p.Species, p.Name, p.Breed, p.BirthDate, p.Age, p.ImageUrl, p.DogSize, p.Sterilization, p.TagsCsv })
             .ToListAsync();
         if (myPets.Count == 0)
             return Conflict(new { code = "NoPetOnProfile", message = "Add a pet before starting a beacon." });
@@ -274,7 +275,7 @@ public class PalsController : ControllerBase
 
         var meName = await _db.Users.Where(u => u.Id == meId).Select(u => u.Name).FirstAsync();
         var beaconPets = myPets.Where(p => requestedIds.Contains(p.Id))
-            .Select(p => MapPet(p.Id, p.Name, p.Species.ToString(), p.Breed, p.Age, p.ImageUrl, p.DogSize, p.Sterilization, p.TagsCsv))
+            .Select(p => MapPet(p.Id, p.Name, p.Species.ToString(), p.Breed, p.BirthDate, p.Age, p.ImageUrl, p.DogSize, p.Sterilization, p.TagsCsv))
             .ToList();
 
         // Fire-and-forget fan-out to nearby pals
@@ -325,7 +326,7 @@ public class PalsController : ControllerBase
             {
                 b.Id, b.UserId, HostName = b.User.Name, b.PlaceName,
                 b.Latitude, b.Longitude, b.City, b.CreatedAt, b.ExpiresAt, b.Species, b.PetIdsCsv,
-                Pets = b.User.Pets.Select(p => new { p.Id, p.Name, Species = p.Species, p.Breed, p.Age, p.ImageUrl, p.DogSize, p.Sterilization, p.TagsCsv }).ToList()
+                Pets = b.User.Pets.Select(p => new { p.Id, p.Name, Species = p.Species, p.Breed, p.BirthDate, p.Age, p.ImageUrl, p.DogSize, p.Sterilization, p.TagsCsv }).ToList()
             })
             .ToListAsync();
 
@@ -340,7 +341,7 @@ public class PalsController : ControllerBase
                     .Where(g => g.HasValue).Select(g => g!.Value).ToHashSet();
                 var pets = x.b.Pets
                     .Where(p => petIds.Count == 0 || petIds.Contains(p.Id))
-                    .Select(p => MapPet(p.Id, p.Name, p.Species.ToString(), p.Breed, p.Age, p.ImageUrl, p.DogSize, p.Sterilization, p.TagsCsv))
+                    .Select(p => MapPet(p.Id, p.Name, p.Species.ToString(), p.Breed, p.BirthDate, p.Age, p.ImageUrl, p.DogSize, p.Sterilization, p.TagsCsv))
                     .ToList();
                 var roundedDist = Math.Round(x.dist * 2, MidpointRounding.AwayFromZero) / 2;
                 return new LiveBeaconDto(x.b.Id, x.b.UserId, x.b.HostName, x.b.PlaceName,
@@ -406,9 +407,9 @@ public class PalsController : ControllerBase
         string.IsNullOrEmpty(p.PreferredDogSizesCsv) ? [] : [.. p.PreferredDogSizesCsv.Split(',', StringSplitOptions.RemoveEmptyEntries)],
         p.IncludeAsProvider, isProvider, hasPet, p.LastActiveAt == default ? null : p.LastActiveAt);
 
-    private static PalPetDto MapPet(Guid id, string name, string species, string? breed, int age, string? imageUrl,
+    private static PalPetDto MapPet(Guid id, string name, string species, string? breed, DateTime? birthDate, int storedAge, string? imageUrl,
         DogSize? dogSize, SterilizationStatus sterilization, string tagsCsv) => new(
-        id, name, species, breed, age, imageUrl,
+        id, name, species, breed, PetAgeHelper.CalculateAge(birthDate, storedAge), imageUrl,
         dogSize?.ToString(),
         sterilization == SterilizationStatus.Unknown ? null : sterilization.ToString(),
         string.IsNullOrEmpty(tagsCsv) ? [] : [.. tagsCsv.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)]);

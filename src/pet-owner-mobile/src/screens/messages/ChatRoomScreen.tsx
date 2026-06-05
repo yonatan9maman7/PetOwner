@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import {
   View,
   Text,
@@ -17,11 +17,13 @@ import { Ionicons } from "@expo/vector-icons";
 import { useChatStore } from "../../store/chatStore";
 import { useAuthStore } from "../../store/authStore";
 import { sendMessage } from "../../services/signalr";
-import { useTranslation } from "../../i18n";
+import { useTranslation, rowDirectionForAppLayout } from "../../i18n";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import { useTheme } from "../../theme/ThemeContext";
 import { useKeyboardAvoidingState } from "../../hooks/useKeyboardAvoidingState";
+import { ConversationAvatar } from "../../components/shared";
 import type { ChatMessageDto } from "../../types/api";
+import type { ChatRoomParams } from "../../navigation/types";
 
 const READ_RECEIPT_BLUE = "#34B7F1";
 
@@ -64,10 +66,23 @@ export function ChatRoomScreen() {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
   const { colors } = useTheme();
-  const { otherUserId, otherUserName } = route.params as {
-    otherUserId: string;
-    otherUserName: string;
-  };
+  const { otherUserId, otherUserName, otherUserAvatar } = route.params as ChatRoomParams;
+
+  const storeAvatar = useChatStore((s) =>
+    s.conversations.find((c) => c.otherUserId === otherUserId)?.otherUserAvatar,
+  );
+  const avatarUrl = otherUserAvatar || storeAvatar;
+
+  const initials = useMemo(
+    () =>
+      otherUserName
+        .split(" ")
+        .map((w) => w[0])
+        .join("")
+        .slice(0, 2)
+        .toUpperCase(),
+    [otherUserName],
+  );
 
   const currentUserId = useAuthStore((s) => s.userId);
   const activeMessages = useChatStore((s) => s.activeMessages);
@@ -249,9 +264,10 @@ export function ChatRoomScreen() {
         <View
           style={{
             height: 56,
-            flexDirection: "row",
+            flexDirection: rowDirectionForAppLayout(isRTL),
             alignItems: "center",
             paddingHorizontal: 16,
+            gap: 8,
             backgroundColor: colors.surface,
           }}
         >
@@ -272,7 +288,16 @@ export function ChatRoomScreen() {
               color={colors.primary}
             />
           </TouchableOpacity>
-          <Text style={{ fontSize: 18, fontWeight: "bold", color: colors.text, marginLeft: 8 }}>
+          <ConversationAvatar
+            uri={avatarUrl}
+            initials={initials}
+            colors={colors}
+            size={36}
+          />
+          <Text
+            style={[rtlText, { flex: 1, fontSize: 18, fontWeight: "bold", color: colors.text }]}
+            numberOfLines={1}
+          >
             {otherUserName}
           </Text>
         </View>

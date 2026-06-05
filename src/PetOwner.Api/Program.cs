@@ -159,6 +159,7 @@ builder.Services.AddScoped<IProviderShareCardService, ProviderShareCardService>(
 builder.Services.AddScoped<DatabaseSeeder>();
 builder.Services.AddHostedService<BookingExpirationService>();
 builder.Services.AddHostedService<VaccinationReminderService>();
+builder.Services.AddHostedService<PetBirthdayWorker>();
 
 builder.Services.AddScoped<IPricingService, PricingService>();
 

@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using PetOwner.Api.DTOs;
+using PetOwner.Api.Helpers;
 using PetOwner.Api.Services;
 using PetOwner.Data;
 using PetOwner.Data.Models;
@@ -31,16 +32,9 @@ public class PetsController : ControllerBase
         var pets = await _db.Pets
             .AsNoTracking()
             .Where(p => p.UserId == userId)
-            .Select(p => new PetDto(
-                p.Id, p.Name, p.Species, p.Breed, p.Age, p.Weight,
-                p.Allergies, p.MedicalConditions, p.Notes, p.IsNeutered,
-                p.MedicalNotes, p.FeedingSchedule, p.MicrochipNumber,
-                p.VetName, p.VetPhone, p.ImageUrl,
-                p.IsLost, p.LastSeenLocation, p.LastSeenLat, p.LastSeenLng,
-                p.LostAt, p.ContactPhone, p.CommunityPostId))
             .ToListAsync();
 
-        return Ok(pets);
+        return Ok(pets.Select(MapToDto).ToList());
     }
 
     [HttpPost]
@@ -54,7 +48,6 @@ public class PetsController : ControllerBase
             Name = request.Name,
             Species = request.Species,
             Breed = request.Breed,
-            Age = request.Age,
             Weight = request.Weight,
             Allergies = request.Allergies,
             MedicalConditions = request.MedicalConditions,
@@ -67,6 +60,7 @@ public class PetsController : ControllerBase
             VetPhone = request.VetPhone,
             ImageUrl = request.ImageUrl,
         };
+        PetAgeHelper.ApplyBirthDate(pet, request.BirthDate, request.Age);
 
         if (request.Weight > 0)
         {
@@ -122,7 +116,7 @@ public class PetsController : ControllerBase
         pet.Name = request.Name;
         pet.Species = request.Species;
         pet.Breed = request.Breed;
-        pet.Age = request.Age;
+        PetAgeHelper.ApplyBirthDate(pet, request.BirthDate, request.Age);
         pet.Weight = request.Weight;
         pet.Allergies = request.Allergies;
         pet.MedicalConditions = request.MedicalConditions;
@@ -337,7 +331,7 @@ public class PetsController : ControllerBase
     }
 
     private static PetDto MapToDto(Pet p) => new(
-        p.Id, p.Name, p.Species, p.Breed, p.Age, p.Weight,
+        p.Id, p.Name, p.Species, p.Breed, PetAgeHelper.CalculateAge(p), p.BirthDate, p.Weight,
         p.Allergies, p.MedicalConditions, p.Notes, p.IsNeutered,
         p.MedicalNotes, p.FeedingSchedule, p.MicrochipNumber,
         p.VetName, p.VetPhone, p.ImageUrl,

@@ -65,6 +65,10 @@ function PetPassportCardInner({
     ? `···· ${pet.microchipNumber.slice(-4)}`
     : null;
 
+  const bornLabel = pet.birthDate
+    ? `${t("petBornLabel")} ${new Date(`${pet.birthDate.slice(0, 10)}T12:00:00`).toLocaleDateString()}`
+    : null;
+
   const metaLine = [
     pet.breed ? formatBreedForDisplay(pet.breed, t) : null,
     pet.age != null ? `${pet.age}y` : null,
@@ -212,6 +216,19 @@ function PetPassportCardInner({
             >
               {metaLine}
             </Text>
+            {bornLabel ? (
+              <Text
+                style={{
+                  fontSize: 11,
+                  color: "rgba(255,255,255,0.5)",
+                  textAlign: isRTL ? "right" : "left",
+                  marginTop: 2,
+                }}
+                numberOfLines={1}
+              >
+                {bornLabel}
+              </Text>
+            ) : null}
           </View>
         </View>
 

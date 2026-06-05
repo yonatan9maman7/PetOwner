@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using PetOwner.Api.DTOs;
+using PetOwner.Api.Helpers;
 using PetOwner.Api.Infrastructure;
 using PetOwner.Api.Services;
 using PetOwner.Data;
@@ -392,7 +393,7 @@ public class BookingsController : ControllerBase
             bp.Pet.Name,
             bp.Pet.Species,
             bp.Pet.Breed,
-            bp.Pet.Age,
+            PetAgeHelper.CalculateAge(bp.Pet),
             bp.Pet.Weight,
             bp.Pet.ImageUrl,
             bp.Pet.Allergies,

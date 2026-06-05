@@ -517,6 +517,7 @@ export function ProviderProfileScreen() {
     navigation.navigate("ChatRoom", {
       otherUserId: profile!.providerId,
       otherUserName: profile!.name,
+      otherUserAvatar: profile!.profileImageUrl,
     });
   };
 

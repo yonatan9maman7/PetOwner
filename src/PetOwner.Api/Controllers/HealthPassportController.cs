@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using PetOwner.Api.DTOs;
+using PetOwner.Api.Helpers;
 using PetOwner.Data;
 using PetOwner.Data.Models;
 
@@ -116,7 +117,8 @@ public class HealthPassportController : ControllerBase
                 pet.Name,
                 pet.Species,
                 pet.Breed,
-                pet.Age,
+                Age = PetAgeHelper.CalculateAge(pet),
+                pet.BirthDate,
                 pet.Weight,
                 pet.Allergies,
                 pet.MedicalConditions,

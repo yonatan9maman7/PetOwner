@@ -1,8 +1,18 @@
 import type { Language } from "../../../i18n";
 
+/** Parse API timestamps as UTC when the server omits a timezone suffix. */
+export function parseApiUtcDate(iso: string): Date {
+  const trimmed = iso.trim();
+  if (!trimmed) return new Date(Number.NaN);
+  if (/[zZ]$/.test(trimmed) || /[+-]\d{2}:\d{2}$/.test(trimmed)) {
+    return new Date(trimmed);
+  }
+  return new Date(`${trimmed}Z`);
+}
+
 /** Relative time for community cards (Hebrew / English). */
 export function formatCommunityRelativeTime(iso: string, language: Language): string {
-  const diff = Date.now() - new Date(iso).getTime();
+  const diff = Date.now() - parseApiUtcDate(iso).getTime();
   const mins = Math.floor(diff / 60_000);
   if (mins < 1) return language === "he" ? "עכשיו" : "Just now";
   if (mins < 60) return language === "he" ? `לפני ${mins} דק׳` : `${mins} min ago`;

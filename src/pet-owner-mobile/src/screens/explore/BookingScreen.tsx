@@ -48,6 +48,14 @@ function combineDateAndTime(dateStr: string, timeStr: string): string {
   return `${dateStr}T${timeStr}:00`;
 }
 
+function addMinutesToTimeHm(timeStr: string, minutes: number): string {
+  const parts = timeStr.split(":");
+  const total = Number(parts[0]) * 60 + Number(parts[1]) + minutes;
+  const h = Math.floor(total / 60) % 24;
+  const m = total % 60;
+  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+}
+
 /** Matches backend `PricingUnit` / JSON string names from the API */
 type BillingMode = "perHour" | "perNight" | "flat";
 
@@ -125,7 +133,9 @@ function calculateBookingTotal(
     case "perNight":
       return rate * calendarNightsBetween(start, end);
     case "perHour": {
-      const hours = (end.getTime() - start.getTime()) / 3600000;
+      const hours = fixedDurationMinutes && fixedDurationMinutes > 0
+        ? fixedDurationMinutes / 60
+        : (end.getTime() - start.getTime()) / 3600000;
       const total = rate * Math.max(0, hours);
       return Math.round(total * 100) / 100;
     }
@@ -146,10 +156,12 @@ function applyPetMultiplier(total: number, petCount: number): number {
   return total * Math.max(1, petCount);
 }
 
-function getFixedDurationMinutes(rate: any): number | null {
+function getFixedDurationMinutes(rate: any, serviceType?: ServiceType | null): number | null {
   const raw = rate?.fixedDurationMinutes ?? rate?.FixedDurationMinutes;
   const value = typeof raw === "number" ? raw : Number(raw);
-  return Number.isFinite(value) && value > 0 ? value : null;
+  if (Number.isFinite(value) && value > 0) return value;
+  if (serviceType === ServiceType.DogWalking || serviceType === ServiceType.DropInVisit) return 30;
+  return null;
 }
 
 function isDogPet(pet: PetDto): boolean {
@@ -221,7 +233,7 @@ function serviceNeedsTimeSelection(
   rate: any,
   serviceType: ServiceType | null,
 ): boolean {
-  if (getFixedDurationMinutes(rate)) return true;
+  if (getFixedDurationMinutes(rate, serviceType)) return true;
   const mode = getBillingMode(rate);
   if (mode === "perHour" || mode === "perNight") return true;
   if (isMultiDayStayService(serviceType)) return true;
@@ -341,8 +353,8 @@ export function BookingScreen() {
     [sr],
   );
   const fixedDurationMinutes = useMemo(
-    () => (sr ? getFixedDurationMinutes(sr) : null),
-    [sr],
+    () => (sr ? getFixedDurationMinutes(sr, selectedServiceType) : null),
+    [sr, selectedServiceType],
   );
   const isFixedDuration = fixedDurationMinutes !== null;
   const isDogOnlyService = selectedServiceType === ServiceType.DogWalking
@@ -517,6 +529,18 @@ export function BookingScreen() {
     startAvailabilityLoading,
     startAvailableTimes,
   ]);
+
+  const fixedDurationWindowLabel = useMemo(() => {
+    if (!fixedDurationMinutes) return null;
+    if (startTime) {
+      const endHm = addMinutesToTimeHm(startTime, fixedDurationMinutes);
+      return t("bookingFixedDurationWindow")
+        .replace("{{minutes}}", String(fixedDurationMinutes))
+        .replace("{{start}}", startTime)
+        .replace("{{end}}", endHm);
+    }
+    return t("bookingWalkDuration").replace("{{minutes}}", String(fixedDurationMinutes));
+  }, [fixedDurationMinutes, startTime, t]);
 
   const togglePetSelection = (petId: string) => {
     setSelectedPetIds((ids) =>
@@ -994,7 +1018,7 @@ export function BookingScreen() {
             </Text>
           ) : null}
 
-          {needsTimeSelection && fixedDurationMinutes ? (
+          {needsTimeSelection && fixedDurationMinutes && fixedDurationWindowLabel ? (
             <View
               style={{
                 flexDirection: rowDirectionForAppLayout(isRTL),
@@ -1009,7 +1033,7 @@ export function BookingScreen() {
             >
               <Ionicons name="time-outline" size={18} color={colors.primary} />
               <Text style={[rtlText, { color: colors.primary, fontSize: 14, fontWeight: "700", flex: 1 }]}>
-                {t("bookingWalkDuration").replace("{{minutes}}", String(fixedDurationMinutes))}
+                {fixedDurationWindowLabel}
               </Text>
             </View>
           ) : needsTimeSelection && sr && isMultiDayService ? (

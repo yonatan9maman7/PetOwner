@@ -14,6 +14,7 @@ import QRCode from "qrcode";
 import { SvgXml } from "react-native-svg";
 import { medicalApi, triageApi } from "../api/client";
 import { useAuthStore } from "../store/authStore";
+import { getBrandLogoDataUriForPdf } from "../branding/logos";
 import { generateHealthPassportHtml } from "../utils/HealthPassportPdf";
 import { useTranslation, rowDirectionForAppLayout } from "../i18n";
 import { useTheme } from "../theme/ThemeContext";
@@ -79,6 +80,7 @@ export function ShareHealthPassportModal({ pet, petId, visible, onClose }: Props
         medicalApi.getMedicalRecords(pet.id),
         triageApi.getHistory(pet.id, { backgroundRequest: true }).catch(() => []),
       ]);
+      const logoDataUri = (await getBrandLogoDataUriForPdf()) ?? undefined;
       const html = generateHealthPassportHtml({
         pet,
         ownerName: user?.name ?? "",
@@ -88,6 +90,7 @@ export function ShareHealthPassportModal({ pet, petId, visible, onClose }: Props
         medicalRecords,
         triageHistory,
         language: lang,
+        logoDataUri,
       });
       const { uri } = await Print.printToFileAsync({ html });
       await Sharing.shareAsync(uri, { UTI: ".pdf", mimeType: "application/pdf" });

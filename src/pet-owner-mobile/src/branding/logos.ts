@@ -1,4 +1,6 @@
 import { Image, type ImageStyle, type StyleProp } from "react-native";
+import { Asset } from "expo-asset";
+import * as FileSystem from "expo-file-system/legacy";
 
 export const APP_DISPLAY_NAME = "PetCare";
 
@@ -50,5 +52,31 @@ export function prefetchBrandLogos(): void {
     if (src?.uri) {
       Image.prefetch(src.uri).catch(() => {});
     }
+  }
+}
+
+let pdfLogoDataUriCache: string | null | undefined;
+
+/** Base64 data URI for embedding the brand logo in print/PDF HTML. */
+export async function getBrandLogoDataUriForPdf(): Promise<string | null> {
+  if (pdfLogoDataUriCache !== undefined) {
+    return pdfLogoDataUriCache;
+  }
+  try {
+    const asset = Asset.fromModule(LOGO_HERO);
+    await asset.downloadAsync();
+    const uri = asset.localUri ?? asset.uri;
+    if (!uri) {
+      pdfLogoDataUriCache = null;
+      return null;
+    }
+    const base64 = await FileSystem.readAsStringAsync(uri, {
+      encoding: FileSystem.EncodingType.Base64,
+    });
+    pdfLogoDataUriCache = `data:image/png;base64,${base64}`;
+    return pdfLogoDataUriCache;
+  } catch {
+    pdfLogoDataUriCache = null;
+    return null;
   }
 }

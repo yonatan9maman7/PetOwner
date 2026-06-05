@@ -27,12 +27,15 @@ import { ScreenLoadingCenter } from "../../components/shared/ScreenLoadingCenter
 import { StackBackHeader } from "../../components/StackBackHeader";
 import { CompactTimeChip, toApiTimeSpan } from "../../components/shared/CompactTimeChip";
 import { DAY_FULL_KEYS } from "../../features/provider-onboarding/constants";
+import { availabilitySlotsForApply } from "../../features/provider-onboarding/helpers";
 import { DogSizeCapacityEditor, toggleDogSize } from "../../features/provider-onboarding/DogSizeCapacityFields";
 import { AddressMapModal } from "../../features/provider-onboarding/AddressMapModal";
 import {
   SERVICES,
   servicesForProviderType,
   DOG_CARE_SERVICE_TYPES,
+  FIXED_DURATION_OPTIONS,
+  FIXED_DURATION_SERVICE_TYPES,
   type ServiceDef,
 } from "../../features/provider-onboarding/constants";
 import { ProviderType, ServiceType, type AvailabilitySlotDto, type DogSize } from "../../types/api";
@@ -111,11 +114,19 @@ interface ServiceState {
   enabled: boolean;
   rate: string;
   packages: ServicePackage[];
+  fixedDurationMinutes: number;
 }
 
 function buildInitialServiceStates(): Record<number, ServiceState> {
   const init: Record<number, ServiceState> = {};
-  for (const svc of SERVICES) init[svc.serviceType] = { enabled: false, rate: "", packages: [] };
+  for (const svc of SERVICES) {
+    init[svc.serviceType] = {
+      enabled: false,
+      rate: "",
+      packages: [],
+      fixedDurationMinutes: 30,
+    };
+  }
   return init;
 }
 
@@ -129,6 +140,7 @@ function ServiceRow({
   state,
   onToggle,
   onRateChange,
+  onDurationChange,
   onDeletePackage,
   onAddPackagePress,
   t,
@@ -138,12 +150,14 @@ function ServiceRow({
   state: ServiceState;
   onToggle: () => void;
   onRateChange: (val: string) => void;
+  onDurationChange: (minutes: number) => void;
   onDeletePackage: (pkgId: string) => void;
   onAddPackagePress: () => void;
   t: (key: TranslationKey) => string;
   isRTL: boolean;
 }) {
   const { colors } = useTheme();
+  const showDurationPicker = FIXED_DURATION_SERVICE_TYPES.has(service.serviceTypeName);
 
   return (
     <View
@@ -263,6 +277,51 @@ function ServiceRow({
           </Text>
         );
       })()}
+
+      {state.enabled && showDurationPicker ? (
+        <View style={{ marginTop: 10, marginLeft: isRTL ? 0 : 52, marginRight: isRTL ? 52 : 0 }}>
+          <Text
+            style={{
+              fontSize: 12,
+              fontWeight: "700",
+              color: colors.textSecondary,
+              marginBottom: 8,
+              textAlign: isRTL ? "right" : "left",
+            }}
+          >
+            {t("providerSessionDuration")}
+          </Text>
+          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+            {FIXED_DURATION_OPTIONS.map((minutes) => {
+              const selected = state.fixedDurationMinutes === minutes;
+              return (
+                <Pressable
+                  key={minutes}
+                  onPress={() => onDurationChange(minutes)}
+                  style={{
+                    paddingHorizontal: 14,
+                    paddingVertical: 8,
+                    borderRadius: 10,
+                    borderWidth: 2,
+                    borderColor: selected ? colors.primary : colors.border,
+                    backgroundColor: selected ? colors.primaryLight : colors.surfaceTertiary,
+                  }}
+                >
+                  <Text
+                    style={{
+                      fontSize: 13,
+                      fontWeight: selected ? "700" : "500",
+                      color: selected ? colors.primary : colors.textSecondary,
+                    }}
+                  >
+                    {minutes} {t("rateUnitMinute")}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        </View>
+      ) : null}
 
       {/* Packages section (visible only when service is enabled) */}
       {state.enabled && (
@@ -744,10 +803,13 @@ export function ProviderEditScreen() {
                 description: p.description,
               }),
             );
+            const rawDuration = rate.fixedDurationMinutes ?? (rate as { FixedDurationMinutes?: number }).FixedDurationMinutes;
+            const duration = typeof rawDuration === "number" && rawDuration > 0 ? rawDuration : 30;
             loaded[typeNum] = {
               enabled: true,
               rate: String(roundMoney(Number(rate.rate) / 0.9)),
               packages: existingPkgs,
+              fixedDurationMinutes: duration,
             };
           }
         }
@@ -773,6 +835,13 @@ export function ProviderEditScreen() {
     setServiceStates((prev) => ({
       ...prev,
       [serviceType]: { ...prev[serviceType], rate: value },
+    }));
+  };
+
+  const updateFixedDuration = (serviceType: number, minutes: number) => {
+    setServiceStates((prev) => ({
+      ...prev,
+      [serviceType]: { ...prev[serviceType], fixedDurationMinutes: minutes },
     }));
   };
 
@@ -952,7 +1021,13 @@ export function ProviderEditScreen() {
         return st.enabled && st.rate && Number(st.rate) > 0;
       }).map((svc) => {
         const st = serviceStates[svc.serviceType];
-        return {
+        const payload: {
+          serviceType: ServiceType;
+          rate: number;
+          pricingUnit: number;
+          fixedDurationMinutes?: number;
+          packages: { title: string; price: number; description?: string }[];
+        } = {
           serviceType: svc.serviceTypeName,
           rate: providerNetFromBasePrice(Number(st.rate)),
           pricingUnit: svc.pricingUnit,
@@ -962,6 +1037,10 @@ export function ProviderEditScreen() {
             description: p.description || undefined,
           })),
         };
+        if (FIXED_DURATION_SERVICE_TYPES.has(svc.serviceTypeName)) {
+          payload.fixedDurationMinutes = st.fixedDurationMinutes;
+        }
+        return payload;
       });
 
       const needsDogPrefs = editable.some(
@@ -1021,6 +1100,7 @@ export function ProviderEditScreen() {
           selectedServices: applyPayloadServices,
           acceptedDogSizes: needsDogPrefs ? acceptedDogSizes : [],
           maxDogsCapacity: needsDogPrefs ? Number(maxDogsCapacity) : null,
+          availabilitySlots: availabilitySlotsForApply(slots),
         });
         setProviderStatus("Pending");
         const msg = t("applicationSubmitted");
@@ -1484,10 +1564,12 @@ export function ProviderEditScreen() {
                         enabled: false,
                         rate: "",
                         packages: [],
+                        fixedDurationMinutes: 30,
                       }
                     }
                     onToggle={() => toggleService(svc.serviceType)}
                     onRateChange={(val) => updateRate(svc.serviceType, val)}
+                    onDurationChange={(minutes) => updateFixedDuration(svc.serviceType, minutes)}
                     onDeletePackage={(pkgId) => deletePackage(svc.serviceType, pkgId)}
                     onAddPackagePress={() => setPkgModalServiceType(svc.serviceType)}
                     t={t}

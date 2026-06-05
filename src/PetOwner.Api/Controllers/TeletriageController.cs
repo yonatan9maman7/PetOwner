@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using NetTopologySuite.Geometries;
 using PetOwner.Api.DTOs;
+using PetOwner.Api.Helpers;
 using PetOwner.Api.Services;
 using PetOwner.Data;
 using PetOwner.Data.Models;
@@ -46,7 +47,8 @@ public class TeletriageController : ControllerBase
 
         var medicalHistory = recentRecords.Count > 0 ? string.Join("; ", recentRecords) : null;
 
-        var petDetails = $"Pet: {pet.Name}, a {pet.Age}-year-old {pet.Species}."
+        var petAge = PetAgeHelper.CalculateAge(pet);
+        var petDetails = $"Pet: {pet.Name}, a {petAge}-year-old {pet.Species}."
             + (medicalHistory != null ? $"\nMedical history: {medicalHistory}" : "");
 
         var result = await _aiService.AssessTeletriageAsync(
@@ -57,7 +59,7 @@ public class TeletriageController : ControllerBase
             PetId = pet.Id,
             UserId = userId,
             Symptoms = request.Symptoms.Trim(),
-            PetContext = $"{pet.Species}, {pet.Age}y" + (medicalHistory != null ? $" | History: {medicalHistory}" : ""),
+            PetContext = $"{pet.Species}, {petAge}y" + (medicalHistory != null ? $" | History: {medicalHistory}" : ""),
             Severity = result.Severity,
             Assessment = result.Assessment,
             Recommendations = result.Recommendations,

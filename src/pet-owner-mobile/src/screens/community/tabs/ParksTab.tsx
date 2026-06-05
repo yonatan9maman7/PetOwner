@@ -16,7 +16,6 @@ interface ParksTabProps {
   parksLoading: boolean;
   beacons: LiveBeaconDto[];
   beaconsLoading: boolean;
-  myBeaconId: string | null;
   parkCheckins: Record<string, boolean>;
   checkingInPark: DogPark | null;
   bottomContentPadding: number;
@@ -33,7 +32,6 @@ export const ParksTab = memo(function ParksTab({
   parksLoading,
   beacons,
   beaconsLoading,
-  myBeaconId,
   parkCheckins,
   checkingInPark,
   bottomContentPadding,
@@ -63,12 +61,7 @@ export const ParksTab = memo(function ParksTab({
       }
       contentContainerStyle={{ paddingBottom: bottomContentPadding }}
     >
-      <SectionHeader
-        title={copy("parksTitle")}
-        subtitle={copy("parksSub")}
-        actionLabel={myBeaconId ? copy("removeCheckIn") : copy("checkIn")}
-        onAction={myBeaconId ? onRemoveBeacon : parks[0] ? () => onCheckIn(parks[0]) : undefined}
-      />
+      <SectionHeader title={copy("parksTitle")} subtitle={copy("parksSub")} />
       <View style={styles.card}>
         <Text style={[styles.sectionCardTitle, rtlText]}>{copy("activeNow")}</Text>
         {beacons.length > 0 ? (

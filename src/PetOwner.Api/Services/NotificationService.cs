@@ -25,6 +25,7 @@ public class NotificationService : INotificationService
         ["NOTIFICATIONS.ACCOUNT_REACTIVATED_TITLE"] = ("✅ החשבון הופעל מחדש", "✅ Account Reactivated"),
         ["NOTIFICATIONS.ACCOUNT_REACTIVATED"] = ("החשבון שלך הופעל מחדש ופעיל שוב.", "Your account has been reactivated and is active again."),
         ["NOTIFICATIONS.NEW"] = ("🔔 התראה חדשה", "🔔 New Notification"),
+        ["NOTIFICATIONS.PET_BIRTHDAY_TITLE"] = ("מזל טוב! 🥳", "Happy Birthday! 🥳"),
     };
 
     private readonly ApplicationDbContext _db;

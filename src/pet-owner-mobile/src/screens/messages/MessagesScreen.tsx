@@ -5,7 +5,6 @@ import {
   TouchableOpacity,
   RefreshControl,
   InteractionManager,
-  Image,
 } from "react-native";
 import { FlashList } from "@shopify/flash-list";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -18,7 +17,7 @@ import {
   BrandedAppHeader,
   BRAND_HEADER_HORIZONTAL_PAD,
 } from "../../components/BrandedAppHeader";
-import { ListEmptyState } from "../../components/shared";
+import { ConversationAvatar, ListEmptyState } from "../../components/shared";
 import { ScreenLoadingCenter } from "../../components/shared/ScreenLoadingCenter";
 import type { ChatConversationDto } from "../../types/api";
 
@@ -31,51 +30,6 @@ function formatTimeAgo(dateStr: string, t: (k: string) => string): string {
   if (diffDays === 0) return t("today");
   if (diffDays === 1) return t("yesterday");
   return date.toLocaleDateString();
-}
-
-function ConversationAvatar({
-  uri,
-  initials,
-  colors,
-}: {
-  uri?: string;
-  initials: string;
-  colors: ReturnType<typeof useTheme>["colors"];
-}) {
-  const [failed, setFailed] = useState(false);
-
-  if (uri && !failed) {
-    return (
-      <Image
-        source={{ uri }}
-        style={{
-          width: 48,
-          height: 48,
-          borderRadius: 24,
-          backgroundColor: colors.primaryLight,
-        }}
-        resizeMode="cover"
-        onError={() => setFailed(true)}
-      />
-    );
-  }
-
-  return (
-    <View
-      style={{
-        width: 48,
-        height: 48,
-        borderRadius: 24,
-        alignItems: "center",
-        justifyContent: "center",
-        backgroundColor: colors.primary,
-      }}
-    >
-      <Text style={{ color: colors.textInverse, fontWeight: "bold", fontSize: 16 }}>
-        {initials}
-      </Text>
-    </View>
-  );
 }
 
 export function MessagesScreen() {
@@ -124,8 +78,8 @@ export function MessagesScreen() {
   );
 
   const handlePress = useCallback(
-    (otherUserId: string, otherUserName: string) => {
-      navigation.navigate("ChatRoom", { otherUserId, otherUserName });
+    (otherUserId: string, otherUserName: string, otherUserAvatar?: string) => {
+      navigation.navigate("ChatRoom", { otherUserId, otherUserName, otherUserAvatar });
     },
     [navigation],
   );
@@ -147,7 +101,9 @@ export function MessagesScreen() {
 
       return (
         <TouchableOpacity
-          onPress={() => handlePress(item.otherUserId, item.otherUserName)}
+          onPress={() =>
+            handlePress(item.otherUserId, item.otherUserName, item.otherUserAvatar)
+          }
           activeOpacity={0.7}
           style={{ paddingHorizontal: BRAND_HEADER_HORIZONTAL_PAD, paddingVertical: 16 }}
         >

@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Hosting;
 using PetOwner.Api.DTOs;
+using PetOwner.Api.Helpers;
 using PetOwner.Api.Services;
 using PetOwner.Data;
 using PetOwner.Data.Models;
@@ -434,21 +435,20 @@ public class AdminController : ControllerBase
         var pets = await _db.Pets
             .Include(p => p.User)
             .OrderByDescending(p => p.Id)
-            .Select(p => new AdminPetDto
-            {
-                Id = p.Id,
-                Name = p.Name,
-                Breed = p.Breed,
-                Species = p.Species.ToString(),
-                Age = p.Age,
-                ImageUrl = p.ImageUrl,
-                OwnerName = p.User.Name,
-                OwnerEmail = p.User.Email,
-                OwnerId = p.UserId
-            })
             .ToListAsync();
 
-        return Ok(pets);
+        return Ok(pets.Select(p => new AdminPetDto
+        {
+            Id = p.Id,
+            Name = p.Name,
+            Breed = p.Breed,
+            Species = p.Species.ToString(),
+            Age = PetAgeHelper.CalculateAge(p),
+            ImageUrl = p.ImageUrl,
+            OwnerName = p.User.Name,
+            OwnerEmail = p.User.Email,
+            OwnerId = p.UserId
+        }).ToList());
     }
 
     [HttpDelete("pets/{id:guid}")]

@@ -8,6 +8,7 @@ import {
 } from "../types/api";
 import { getSpeciesEmoji } from "../screens/pets/MyPets/constants";
 import { formatBreedForLanguage } from "../screens/pets/addPetHelpers";
+import { APP_DISPLAY_NAME } from "../branding/logos";
 
 interface HealthPassportParams {
   pet: PetDto;
@@ -18,6 +19,7 @@ interface HealthPassportParams {
   medicalRecords: MedicalRecordDto[];
   triageHistory: TeletriageHistoryDto[];
   language: "he" | "en";
+  logoDataUri?: string;
 }
 
 const VACCINE_LABEL: Record<string | number, string> = {
@@ -228,7 +230,17 @@ function labelsForLanguage(isRTL: boolean): PassportLabels {
 }
 
 export function generateHealthPassportHtml(params: HealthPassportParams): string {
-  const { pet, ownerName, ownerEmail, vaccineStatuses, weightHistory, medicalRecords, triageHistory, language } = params;
+  const {
+    pet,
+    ownerName,
+    ownerEmail,
+    vaccineStatuses,
+    weightHistory,
+    medicalRecords,
+    triageHistory,
+    language,
+    logoDataUri,
+  } = params;
   const isRTL = language === "he";
   const dir = isRTL ? "rtl" : "ltr";
   const L = labelsForLanguage(isRTL);
@@ -243,6 +255,10 @@ export function generateHealthPassportHtml(params: HealthPassportParams): string
   const petPhotoHtml = pet.imageUrl
     ? `<img src="${esc(pet.imageUrl)}" alt="" width="96" height="96" style="width:96px;height:96px;border-radius:50%;object-fit:cover;border:3px solid #ffffff;box-shadow:0 2px 10px rgba(0,0,0,0.12);" />`
     : `<div style="width:96px;height:96px;border-radius:50%;background:#e4e4e7;border:3px solid #ffffff;box-shadow:0 2px 10px rgba(0,0,0,0.12);display:flex;align-items:center;justify-content:center;font-size:40px;line-height:1;">${speciesEmoji}</div>`;
+
+  const logoHtml = logoDataUri
+    ? `<div class="logo-slot logo-slot--brand" aria-label="${esc(APP_DISPLAY_NAME)}"><img src="${logoDataUri}" alt="${esc(APP_DISPLAY_NAME)}" /></div>`
+    : `<div class="logo-slot" aria-label="${esc(L.logoPlaceholder)}">${esc(L.logoPlaceholder)}</div>`;
 
   const medications = medicalRecords.filter(r => r.type === "Medication");
   const conditions = medicalRecords.filter(r => r.type === "Condition");
@@ -433,19 +449,23 @@ export function generateHealthPassportHtml(params: HealthPassportParams): string
     .logo-slot {
       width: 88px;
       height: 88px;
-      border: 2px dashed #d4d4d8;
       border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+    .logo-slot:not(.logo-slot--brand) {
+      border: 2px dashed #d4d4d8;
       background: #fafafa;
       font-size: 9px;
       line-height: 1.25;
       color: #71717a;
       text-align: center;
-      display: flex;
-      align-items: center;
-      justify-content: center;
       padding: 6px;
     }
-    .logo-slot img { display: none; width: 100%; height: 100%; object-fit: contain; }
+    .logo-slot--brand { border: none; background: transparent; padding: 0; }
+    .logo-slot img { width: 100%; height: 100%; object-fit: contain; display: block; }
     .doc-title-wrap { text-align: center; }
     .doc-title {
       margin: 0;
@@ -579,7 +599,7 @@ export function generateHealthPassportHtml(params: HealthPassportParams): string
     <table class="doc-header" role="presentation" dir="${dir}">
       <tr>
         <td style="width:100px;">
-          <div class="logo-slot" aria-label="${esc(L.logoPlaceholder)}">${esc(L.logoPlaceholder)}</div>
+          ${logoHtml}
         </td>
         <td class="doc-title-wrap">
           <h1 class="doc-title">${esc(L.docTitle)}</h1>

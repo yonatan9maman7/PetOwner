@@ -1,5 +1,6 @@
 import type { ProviderApplicationPayload } from "../../types/api";
 import { ServiceType } from "../../types/api";
+import { toApiTimeSpan } from "../../components/shared/CompactTimeChip";
 import { providerNetFromBasePrice } from "../../utils/pricingDisplay";
 import type { OnboardingFormValues } from "./schemas";
 import {
@@ -20,7 +21,7 @@ export function serializeAvailability(
   return [
     "",
     "---",
-    "Requested hours (applicant preference — not in system yet):",
+    "Requested weekly hours:",
     ...lines,
   ].join("\n");
 }
@@ -29,6 +30,16 @@ function serializeSpecialOffers(text: string): string {
   const trimmed = text.trim();
   if (!trimmed) return "";
   return "\n---\nSpecial offers / promotions:\n" + trimmed;
+}
+
+export function availabilitySlotsForApply(
+  slots: { dayOfWeek: number; startTime: string; endTime: string }[],
+): NonNullable<ProviderApplicationPayload["availabilitySlots"]> {
+  return slots.map((s) => ({
+    dayOfWeek: s.dayOfWeek,
+    startTime: toApiTimeSpan(s.startTime),
+    endTime: toApiTimeSpan(s.endTime),
+  }));
 }
 
 function buildDescription(values: OnboardingFormValues): string {
@@ -100,5 +111,6 @@ export function formToPayload(values: OnboardingFormValues): ProviderApplication
     referenceContact: values.referenceContact.trim() || undefined,
     acceptedDogSizes: needsDogPrefs ? values.acceptedDogSizes : [],
     maxDogsCapacity: needsDogPrefs ? Number(values.maxDogsCapacity) : null,
+    availabilitySlots: availabilitySlotsForApply(values.availabilitySlots),
   };
 }
