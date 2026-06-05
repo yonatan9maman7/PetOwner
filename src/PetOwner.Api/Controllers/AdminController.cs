@@ -443,6 +443,7 @@ public class AdminController : ControllerBase
             Name = p.Name,
             Breed = p.Breed,
             Species = p.Species.ToString(),
+            Gender = p.Gender.ToString(),
             Age = PetAgeHelper.CalculateAge(p),
             ImageUrl = p.ImageUrl,
             OwnerName = p.User.Name,

@@ -7,6 +7,7 @@ public class Pet
     public string Name { get; set; } = null!;
     public PetSpecies Species { get; set; }
     public string? Breed { get; set; }
+    public PetGender Gender { get; set; } = PetGender.Unknown;
     public int Age { get; set; }
     public DateTime? BirthDate { get; set; }
     public double? Weight { get; set; }

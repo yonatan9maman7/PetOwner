@@ -6,6 +6,7 @@ import {
   Pressable,
   ScrollView,
   KeyboardAvoidingView,
+  Platform,
   ActivityIndicator,
   Animated,
   Easing,
@@ -183,8 +184,14 @@ export function ForgotPasswordScreen() {
             paddingTop: 28,
             paddingBottom: 120,
           }}
+          scrollEnabled={false}
+          bounces={false}
+          alwaysBounceVertical={false}
+          overScrollMode="never"
           keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="interactive"
           showsVerticalScrollIndicator={false}
+          automaticallyAdjustKeyboardInsets={Platform.OS === "ios"}
         >
           <View className="mb-5">
             <View

@@ -325,6 +325,10 @@
     "SPECIES_RABBIT": "ארנב",
     "SPECIES_REPTILE": "זוחל",
     "SPECIES_OTHER": "אחר",
+    "GENDER": "מין",
+    "GENDER_MALE": "זכר",
+    "GENDER_FEMALE": "נקבה",
+    "GENDER_UNKNOWN": "לא ידוע",
     "SELECT_BREED": "בחרו גזע...",
     "SPECIFY_ANIMAL": "ציינו סוג בעל חיים",
     "SPECIFY_BREED": "ציינו גזע",
@@ -974,6 +978,16 @@
     "LOAD_FAILED": "טעינת הנתונים נכשלה.",
     "SAVE_FAILED": "השמירה נכשלה. נסו שוב.",
     "DELETE_FAILED": "המחיקה נכשלה. נסו שוב."
+  },
+  "PUBLIC_PASSPORT": {
+    "SHARED_PASSPORT": "דרכון בריאות משותף",
+    "OWNER_CONTACT": "פרטי בעלים",
+    "OWNER_NAME": "שם",
+    "OWNER_PHONE": "טלפון",
+    "OWNER_EMAIL": "אימייל",
+    "LINK_EXPIRED": "הקישור פג תוקף או לא נמצא",
+    "LINK_EXPIRED_HINT": "ייתכן שקישור דרכון הבריאות פג תוקף או שאינו תקין. בקשו מבעל חיית המחמד ליצור קישור חדש.",
+    "EXPIRES": "הקישור תקף עד"
   },
   "CHAT": {
     "INBOX_TITLE": "הודעות",

@@ -7,7 +7,7 @@ import {
   type TeletriageHistoryDto,
 } from "../types/api";
 import { getSpeciesEmoji } from "../screens/pets/MyPets/constants";
-import { formatBreedForLanguage } from "../screens/pets/addPetHelpers";
+import { formatBreedForLanguage, formatPetGenderForLanguage } from "../screens/pets/addPetHelpers";
 import { APP_DISPLAY_NAME } from "../branding/logos";
 
 interface HealthPassportParams {
@@ -145,6 +145,7 @@ type PassportLabels = {
   age: string;
   neuteredYes: string;
   neuteredNo: string;
+  gender: string;
   species: string;
   breed: string;
   footerGenerated: (date: string) => string;
@@ -185,7 +186,8 @@ function labelsForLanguage(isRTL: boolean): PassportLabels {
       age: "גיל",
       neuteredYes: "מסורס/ת",
       neuteredNo: "לא מסורס/ת",
-      species: "מין",
+      gender: "מין",
+      species: "סוג",
       breed: "גזע",
       footerGenerated: (date: string) => `נוצר בתאריך ${esc(date)} באמצעות אפליקציית PetCare`,
     };
@@ -223,6 +225,7 @@ function labelsForLanguage(isRTL: boolean): PassportLabels {
     age: "Age",
     neuteredYes: "Neutered / spayed",
     neuteredNo: "Not neutered / spayed",
+    gender: "Gender",
     species: "Species",
     breed: "Breed",
     footerGenerated: (date: string) => `Generated on ${esc(date)} via PetCare App`,
@@ -250,6 +253,7 @@ export function generateHealthPassportHtml(params: HealthPassportParams): string
   const speciesLabel = speciesLabelForPassport(pet.species);
   const speciesEmoji = getSpeciesEmoji(pet.species);
   const breedDisplay = pet.breed ? esc(formatBreedForLanguage(pet.breed, language)) : "";
+  const genderDisplay = formatPetGenderForLanguage(pet.gender, language);
   const neuteredLabel = pet.isNeutered ? L.neuteredYes : L.neuteredNo;
 
   const petPhotoHtml = pet.imageUrl
@@ -615,6 +619,7 @@ export function generateHealthPassportHtml(params: HealthPassportParams): string
           <h2 class="pet-name">${esc(pet.name)}</h2>
           <p class="meta-line"><span class="label">${esc(L.species)}</span><span class="meta-strong">${esc(speciesLabel)}</span></p>
           ${breedDisplay ? `<p class="meta-line"><span class="label">${esc(L.breed)}</span><span class="meta-strong">${breedDisplay}</span></p>` : ""}
+          ${genderDisplay ? `<p class="meta-line"><span class="label">${esc(L.gender)}</span><span class="meta-strong">${esc(genderDisplay)}</span></p>` : ""}
           <p class="meta-line"><span class="label">${esc(L.age)}</span><span class="meta-strong">${esc(String(pet.age))}</span>${pet.weight ? `<span style="color:#71717a;font-weight:600;"> · ${esc(String(pet.weight))} kg</span>` : ""}</p>
           <p class="meta-line"><span class="label">${esc(L.statusLabel)}</span><span class="meta-strong">${esc(neuteredLabel)}</span></p>
         </td>

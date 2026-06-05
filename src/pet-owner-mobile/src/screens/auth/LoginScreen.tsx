@@ -188,7 +188,7 @@ function LoginForm() {
   const { t, isHebrew, rtlText, rtlStyle, rtlRow, rtlInput, alignCls, trailingFormLinkAlign } =
     useTranslation();
   const { colors, isDark } = useTheme();
-  const { behavior: keyboardAvoidBehavior } = useKeyboardAvoidingState();
+  const { behavior: keyboardAvoidBehavior, keyboardVisible } = useKeyboardAvoidingState();
 
   /** Text on filled `colors.brand` controls; `textInverse` matches `brand` in dark theme and disappears. */
   const onBrandLabelColor = colors.primaryText;
@@ -515,6 +515,10 @@ function LoginForm() {
             paddingTop: 28,
             paddingBottom: 120 + insets.bottom,
           }}
+          scrollEnabled={keyboardVisible}
+          bounces={false}
+          alwaysBounceVertical={false}
+          overScrollMode="never"
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="interactive"
           showsVerticalScrollIndicator={false}

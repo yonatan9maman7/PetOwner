@@ -93,7 +93,7 @@ export function RegisterScreen() {
   const { t, language, isHebrew, rtlText, rtlStyle, rtlRow, rtlInput, alignCls } =
     useTranslation();
   const { colors, isDark } = useTheme();
-  const { behavior: keyboardAvoidBehavior } = useKeyboardAvoidingState();
+  const { behavior: keyboardAvoidBehavior, keyboardVisible } = useKeyboardAvoidingState();
 
   /** Dark theme `brand` matches page chrome; use accent fill for terms checkbox + CTA. */
   const termsCheckboxAccent = isDark ? colors.primary : colors.brand;
@@ -347,6 +347,10 @@ export function RegisterScreen() {
             paddingTop: 28,
             paddingBottom: 120 + insets.bottom,
           }}
+          scrollEnabled={keyboardVisible}
+          bounces={false}
+          alwaysBounceVertical={false}
+          overScrollMode="never"
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="interactive"
           showsVerticalScrollIndicator={false}

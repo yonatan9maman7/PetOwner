@@ -26,6 +26,7 @@ public record PalPetDto(
     string Name,
     string Species,
     string? Breed,
+    string? Gender,
     int Age,
     string? ImageUrl,
     string? DogSize,

@@ -8,7 +8,7 @@ import { useTranslation, rowDirectionForAppLayout, type TranslationKey } from ".
 import { useTheme } from "../../../../theme/ThemeContext";
 import type { PetDto } from "../../../../types/api";
 import { getSpeciesEmoji } from "../constants";
-import { ALLERGY_LABEL_I18N, formatBreedForDisplay } from "../../addPetHelpers";
+import { ALLERGY_LABEL_I18N, formatBreedForDisplay, formatPetGenderForDisplay } from "../../addPetHelpers";
 import { showGlobalAlertCompat } from "../../../../components/global-modal";
 
 interface PetPassportCardProps {
@@ -71,6 +71,7 @@ function PetPassportCardInner({
 
   const metaLine = [
     pet.breed ? formatBreedForDisplay(pet.breed, t) : null,
+    formatPetGenderForDisplay(pet.gender, t),
     pet.age != null ? `${pet.age}y` : null,
     pet.weight ? `${pet.weight}kg` : null,
     pet.isNeutered ? "✂" : null,

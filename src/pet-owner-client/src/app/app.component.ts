@@ -75,7 +75,7 @@ export class AppComponent {
 
   showNav = computed(() => {
     const u = this.url();
-    return !u.startsWith('/login');
+    return !u.startsWith('/login') && !u.startsWith('/passport/');
   });
 
   /** Map home uses a non-scrolling flex layout so the Leaflet pane matches the visible area (nav padding included). */

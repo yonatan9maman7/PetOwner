@@ -45,11 +45,18 @@ export enum PetSpecies {
   Other = 6,
 }
 
+export enum PetGender {
+  Unknown = 0,
+  Male = 1,
+  Female = 2,
+}
+
 export interface PetDto {
   id: string;
   name: string;
   species: PetSpecies;
   breed?: string;
+  gender?: PetGender;
   age: number;
   birthDate?: string;
   weight?: number;
@@ -76,6 +83,7 @@ export interface CreatePetRequest {
   name: string;
   species: PetSpecies;
   breed?: string;
+  gender?: PetGender;
   age: number;
   birthDate?: string;
   weight?: number;
@@ -95,6 +103,7 @@ export interface UpdatePetRequest {
   name: string;
   species: PetSpecies;
   breed?: string;
+  gender?: PetGender;
   age: number;
   birthDate?: string;
   weight?: number;
@@ -1070,6 +1079,7 @@ export interface PetCareCardDto {
   name: string;
   species: PetSpecies;
   breed?: string;
+  gender?: PetGender;
   age: number;
   weight?: number;
   imageUrl?: string;
@@ -1198,6 +1208,7 @@ export interface PalPetDto {
   name: string;
   species: string;
   breed: string | null;
+  gender?: string | null;
   age: number;
   imageUrl: string | null;
   dogSize: DogSizeValue | null;

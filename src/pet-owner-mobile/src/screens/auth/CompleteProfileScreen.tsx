@@ -5,6 +5,7 @@ import {
   TextInput,
   Pressable,
   KeyboardAvoidingView,
+  Platform,
   ActivityIndicator,
   BackHandler,
   ScrollView,
@@ -109,8 +110,14 @@ export function CompleteProfileScreen() {
             paddingTop: 4,
             paddingBottom: 120,
           }}
+          scrollEnabled={false}
+          bounces={false}
+          alwaysBounceVertical={false}
+          overScrollMode="never"
           keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="interactive"
           showsVerticalScrollIndicator={false}
+          automaticallyAdjustKeyboardInsets={Platform.OS === "ios"}
         >
           {/* ── Header ── */}
           <View className="mb-8">

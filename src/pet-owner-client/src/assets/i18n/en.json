@@ -326,6 +326,10 @@
     "SPECIES_RABBIT": "Rabbit",
     "SPECIES_REPTILE": "Reptile",
     "SPECIES_OTHER": "Other",
+    "GENDER": "Gender",
+    "GENDER_MALE": "Male",
+    "GENDER_FEMALE": "Female",
+    "GENDER_UNKNOWN": "Unknown",
     "SELECT_BREED": "Select breed...",
     "SPECIFY_ANIMAL": "Specify Animal Type",
     "SPECIFY_BREED": "Specify Breed",
@@ -974,6 +978,16 @@
     "LOAD_FAILED": "Failed to load data.",
     "SAVE_FAILED": "Failed to save. Please try again.",
     "DELETE_FAILED": "Failed to delete. Please try again."
+  },
+  "PUBLIC_PASSPORT": {
+    "SHARED_PASSPORT": "Shared Health Passport",
+    "OWNER_CONTACT": "Owner Contact",
+    "OWNER_NAME": "Name",
+    "OWNER_PHONE": "Phone",
+    "OWNER_EMAIL": "Email",
+    "LINK_EXPIRED": "Link expired or not found",
+    "LINK_EXPIRED_HINT": "This health passport link may have expired or is invalid. Please ask the pet owner to generate a new one.",
+    "EXPIRES": "Link valid until"
   },
   "CHAT": {
     "INBOX_TITLE": "Messages",

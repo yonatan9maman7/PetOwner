@@ -46,9 +46,8 @@ public class HealthPassportController : ControllerBase
         _db.PetHealthShares.Add(share);
         await _db.SaveChangesAsync();
 
-        var baseUrl = _config["App:BaseUrl"]?.TrimEnd('/')
-                      ?? $"{Request.Scheme}://{Request.Host}";
-        var url = $"{baseUrl}/api/public/health-passport/{token}";
+        var baseUrl = (_config["FrontendBaseUrl"] ?? $"{Request.Scheme}://{Request.Host}").TrimEnd('/');
+        var url = $"{baseUrl}/passport/{token}";
 
         return Ok(new { share.Token, Url = url, share.ExpiresAt });
     }
@@ -117,6 +116,7 @@ public class HealthPassportController : ControllerBase
                 pet.Name,
                 pet.Species,
                 pet.Breed,
+                pet.Gender,
                 Age = PetAgeHelper.CalculateAge(pet),
                 pet.BirthDate,
                 pet.Weight,

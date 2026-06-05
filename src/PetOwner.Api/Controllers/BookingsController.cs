@@ -393,6 +393,7 @@ public class BookingsController : ControllerBase
             bp.Pet.Name,
             bp.Pet.Species,
             bp.Pet.Breed,
+            bp.Pet.Gender,
             PetAgeHelper.CalculateAge(bp.Pet),
             bp.Pet.Weight,
             bp.Pet.ImageUrl,

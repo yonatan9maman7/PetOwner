@@ -1,6 +1,6 @@
 import type { Language, TranslationKey } from "../../i18n";
 import { translateKey } from "../../i18n";
-import { PetSpecies } from "../../types/api";
+import { PetGender, PetSpecies } from "../../types/api";
 
 /** Maps canonical API/storage breed string → i18n key (display only). */
 export const BREED_LABEL_I18N: Record<string, TranslationKey> = {
@@ -284,4 +284,24 @@ export function findSimilarBreed(userInput: string, breedList: string[]): string
     }
   }
   return best;
+}
+
+export function formatPetGenderForDisplay(
+  gender: PetGender | string | number | null | undefined,
+  t: (key: TranslationKey) => string,
+): string | null {
+  const raw = typeof gender === "string" ? gender.toLowerCase() : gender;
+  if (raw === PetGender.Male || raw === "male" || raw === "1") return `♂ ${t("genderMale")}`;
+  if (raw === PetGender.Female || raw === "female" || raw === "2") return `♀ ${t("genderFemale")}`;
+  return null;
+}
+
+export function formatPetGenderForLanguage(
+  gender: PetGender | string | number | null | undefined,
+  language: Language,
+): string | null {
+  const raw = typeof gender === "string" ? gender.toLowerCase() : gender;
+  if (raw === PetGender.Male || raw === "male" || raw === "1") return `♂ ${translateKey(language, "genderMale")}`;
+  if (raw === PetGender.Female || raw === "female" || raw === "2") return `♀ ${translateKey(language, "genderFemale")}`;
+  return null;
 }

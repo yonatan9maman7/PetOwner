@@ -12,6 +12,7 @@ public record PetCareCardDto(
     string Name,
     PetSpecies Species,
     string? Breed,
+    PetGender Gender,
     int Age,
     double? Weight,
     string? ImageUrl,

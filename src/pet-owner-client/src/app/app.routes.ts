@@ -32,6 +32,13 @@ export const routes: Routes = [
       ),
   },
   {
+    path: 'passport/:token',
+    loadComponent: () =>
+      import('./features/public-health-passport/public-health-passport.component').then(
+        (m) => m.PublicHealthPassportComponent
+      ),
+  },
+  {
     path: '',
     loadComponent: () =>
       import('./features/map-dashboard/map-dashboard.component').then(

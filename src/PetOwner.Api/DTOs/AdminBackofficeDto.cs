@@ -45,6 +45,7 @@ public class AdminPetDto
     public string Name { get; set; } = null!;
     public string? Breed { get; set; }
     public string Species { get; set; } = null!;
+    public string Gender { get; set; } = null!;
     public int Age { get; set; }
     public string? ImageUrl { get; set; }
     public string OwnerName { get; set; } = null!;

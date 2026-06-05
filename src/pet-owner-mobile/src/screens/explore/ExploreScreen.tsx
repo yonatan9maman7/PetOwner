@@ -82,6 +82,7 @@ import {
   OFFSCREEN_COORDINATE,
   type MarkerPoolSlot,
 } from "./ExploreMapMarkers";
+import { DogParkMarker } from "./DogParkMarker";
 import { mapDiag } from "./exploreMapDiag";
 import {
   EXPLORE_MAP_INITIAL_REGION,
@@ -303,8 +304,7 @@ export function ExploreScreen() {
   const [dogParks, setDogParks] = useState<DogParkDto[]>([]);
   const dogParksFetchGenRef = useRef(0);
   const dogParksAbortRef = useRef<AbortController | null>(null);
-  const [showDogParksOnly, setShowDogParksOnly] = useState(false);
-  const showDogParksOnlyRef = useRef(false);
+  const [includeDogParks, setIncludeDogParks] = useState(false);
   const loadPinsRef = useRef<(opts?: { silent?: boolean }) => void>(() => {});
   const [selectedDogPark, setSelectedDogPark] = useState<DogParkDto | null>(null);
   const [dogParkCheckInLoading, setDogParkCheckInLoading] = useState(false);
@@ -345,7 +345,7 @@ export function ExploreScreen() {
 
   /* ─── Marker object pool (RecyclerView / view-recycling pattern) ─── */
   const markerPool: MarkerPoolSlot[] = useMemo(() => {
-    const pinSource = showDogParksOnly ? [] : pins;
+    const pinSource = pins;
     const items = sortMarkerItemsStable(groupPinsForMapMarkers(pinSource, mapLatDelta));
 
     let singles = 0;
@@ -407,7 +407,7 @@ export function ExploreScreen() {
       }
     }
     return pool;
-  }, [pins, showDogParksOnly, mapLatDelta]);
+  }, [pins, mapLatDelta]);
 
 
 
@@ -446,7 +446,7 @@ export function ExploreScreen() {
     if (filterRadiusKm != null && filterRadiusKm > 0) count++;
     if (filterDate) count++;
     if (playdateMode) count++;
-    if (showDogParksOnly) count++;
+    if (includeDogParks) count++;
     return count;
   }, [
     activeServices,
@@ -456,7 +456,7 @@ export function ExploreScreen() {
     filterDate,
     filterTime,
     playdateMode,
-    showDogParksOnly,
+    includeDogParks,
   ]);
 
   const activeFilterChips = useMemo(() => {
@@ -484,7 +484,7 @@ export function ExploreScreen() {
         },
       });
     }
-    if (showDogParksOnly) {
+    if (includeDogParks) {
       chips.push({
         id: "dogParks",
         label: t("dogParksLayerTitle"),
@@ -492,7 +492,7 @@ export function ExploreScreen() {
         fg: "#fff",
         icon: "leaf",
         onRemove: () => {
-          setShowDogParksOnly(false);
+          setIncludeDogParks(false);
           reloadPins();
         },
       });
@@ -582,7 +582,7 @@ export function ExploreScreen() {
     filterRadiusKm,
     filterTime,
     playdateMode,
-    showDogParksOnly,
+    includeDogParks,
     t,
   ]);
 
@@ -609,10 +609,6 @@ export function ExploreScreen() {
         .catch(() => {});
     }, []),
   );
-
-  useEffect(() => {
-    showDogParksOnlyRef.current = showDogParksOnly;
-  }, [showDogParksOnly]);
 
   /* ─── Dog parks catalog (one fetch per screen mount) ─── */
   useEffect(() => {
@@ -704,6 +700,28 @@ export function ExploreScreen() {
       });
   }, [playdateMode, userLat, userLng, filterRadiusKm]);
 
+  const applyUserMapRegion = useCallback(
+    (latitude: number, longitude: number, opts?: { animate?: boolean }) => {
+      const region = {
+        latitude,
+        longitude,
+        latitudeDelta: 0.02,
+        longitudeDelta: 0.02,
+      };
+      mapRegionRef.current = region;
+      mapLatDeltaRef.current = region.latitudeDelta;
+      setMapLatDelta(region.latitudeDelta);
+      if (opts?.animate !== false) {
+        suppressViewportFetchRef.current = true;
+        setTimeout(() => {
+          suppressViewportFetchRef.current = false;
+        }, PROGRAMMATIC_MAP_MOVE_SUPPRESS_MS);
+        mapRef.current?.animateToRegion?.(region, 700);
+      }
+    },
+    [],
+  );
+
   /* ─── Request location ─── */
   useEffect(() => {
     let active = true;
@@ -717,9 +735,32 @@ export function ExploreScreen() {
         if (!active) return;
         if (status !== "granted") {
           setLocationHint("denied");
+          loadPinsRef.current();
           return;
         }
         setLocationHint("none");
+
+        // Fast one-shot fix before watchPositionAsync — avoids Tel Aviv flash + pin fetch.
+        try {
+          const initialLoc = await Location.getCurrentPositionAsync({
+            accuracy: Location.Accuracy.Balanced,
+          });
+          if (!active) return;
+          const { latitude, longitude } = initialLoc.coords;
+          prevUserLatRef.current = latitude;
+          prevUserLngRef.current = longitude;
+          setUserLat(latitude);
+          setUserLng(longitude);
+          hasAutocenteredRef.current = true;
+          applyUserMapRegion(latitude, longitude);
+          if (useAuthStore.getState().isLoggedIn) {
+            usersApi.updateLocation(latitude, longitude).catch(() => {});
+          }
+          loadPinsRef.current();
+        } catch {
+          if (!active) return;
+          loadPinsRef.current();
+        }
 
         // Subscribe to position updates so the blue dot + circle stay live.
         subPromise = Location.watchPositionAsync(
@@ -757,21 +798,21 @@ export function ExploreScreen() {
               usersApi.updateLocation(latitude, longitude).catch(() => {});
             }
 
-            // Auto-center once on the first real fix.
+            // Auto-center once on the first real fix (skipped when getCurrentPositionAsync already ran).
             if (!hasAutocenteredRef.current) {
               hasAutocenteredRef.current = true;
-              beginProgrammaticMapMove();
-              mapRef.current?.animateToRegion?.(
-                { latitude, longitude, latitudeDelta: 0.02, longitudeDelta: 0.02 },
-                700,
-              );
+              applyUserMapRegion(latitude, longitude);
             }
           },
         );
         const sub = await subPromise;
         // If we unmounted while the promise was in-flight, remove immediately.
         if (!active) sub.remove();
-      } catch {}
+      } catch {
+        if (active) {
+          loadPinsRef.current();
+        }
+      }
     })();
 
     return () => {
@@ -781,7 +822,7 @@ export function ExploreScreen() {
       subPromise?.then((sub) => sub.remove()).catch(() => {});
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [applyUserMapRegion]);
 
   /* ─── Map filter criteria (strict AND on client; API params for server pre-filter) ─── */
   const exploreFilterCriteria = useMemo(
@@ -967,11 +1008,6 @@ export function ExploreScreen() {
       return undefined;
     }, []),
   );
-
-  /* ─── Initial load ─── */
-  useEffect(() => {
-    loadPins();
-  }, []);
 
   useEffect(() => {
     return () => {
@@ -1173,10 +1209,6 @@ export function ExploreScreen() {
             mapDiag("region.refetch.suppressed", { seq });
             return;
           }
-          if (showDogParksOnlyRef.current) {
-            mapDiag("region.refetch.skipped-dog-parks-only", { seq });
-            return;
-          }
           setCollocatedChooserPins(null);
           loadPinsRef.current({ silent: true });
         });
@@ -1287,7 +1319,7 @@ export function ExploreScreen() {
     setFilterTime("");
     setSearchText("");
     setPlaydateMode(false);
-    setShowDogParksOnly(false);
+    setIncludeDogParks(false);
     setSelectedPin(null);
     setSelectedPlaydate(null);
     setSelectedDogPark(null);
@@ -1310,6 +1342,8 @@ export function ExploreScreen() {
       markerJustTappedRef.current = false;
     }, 300);
     setCollocatedChooserPins(null);
+    setSelectedDogPark(null);
+    setSelectedPlaydate(null);
     setSelectedPin(pin);
   }, []);
 
@@ -1347,6 +1381,7 @@ export function ExploreScreen() {
       markerJustTappedRef.current = false;
     }, 300);
     setSelectedPin(pin);
+    setSelectedDogPark(null);
     setCollocatedChooserPins(null);
   }, []);
 
@@ -1594,33 +1629,27 @@ export function ExploreScreen() {
             </MarkerWrapper>
           </>
         )}
-        {!showDogParksOnly && (
-          <ExploreMapMarkers
-            pool={markerPool}
-            onPressProviderId={onPressProviderMarkerId}
-            onPressClusterPins={openCollocatedChooser}
-          />
-        )}
+        <ExploreMapMarkers
+          pool={markerPool}
+          onPressProviderId={onPressProviderMarkerId}
+          onPressClusterPins={openCollocatedChooser}
+        />
         {/*
          * Overlay marker for the selected pin — rendered AFTER the base marker set so
          * the dark-paw annotation sits on top. Using a separate <Marker> (instead of
          * flipping a prop on the base paw) means MapKit only sees a clean
          * add / remove when selection changes, not a property update mid-gesture.
          */}
-        {!showDogParksOnly && (
-          <ExploreSelectedMarkerOverlay
-            providerId={selectedPin?.providerId ?? null}
-            latitude={selectedPin?.latitude ?? null}
-            longitude={selectedPin?.longitude ?? null}
-          />
-        )}
-        {showDogParksOnly &&
+        <ExploreSelectedMarkerOverlay
+          providerId={selectedPin?.providerId ?? null}
+          latitude={selectedPin?.latitude ?? null}
+          longitude={selectedPin?.longitude ?? null}
+        />
+        {includeDogParks &&
           dogParks.map((park) => (
-            <MarkerWrapper
+            <DogParkMarker
               key={park.id}
               coordinate={{ latitude: park.latitude, longitude: park.longitude }}
-              tracksViewChanges={false}
-              zIndex={400}
               onPress={() => {
                 suppressViewportFetchAfterMarkerMsRef.current =
                   Date.now() + MARKER_TAP_VIEWPORT_SUPPRESS_MS;
@@ -1633,13 +1662,9 @@ export function ExploreScreen() {
                 setSelectedPlaydate(null);
                 setCollocatedChooserPins(null);
               }}
-            >
-              <View style={styles.dogParkMarkerOuter}>
-                <Ionicons name="leaf" size={16} color="#fff" />
-              </View>
-            </MarkerWrapper>
+            />
           ))}
-        {playdateMode && !showDogParksOnly && playdatePins.map((pd) => (
+        {playdateMode && playdatePins.map((pd) => (
           <MarkerWrapper
             key={pd.eventId}
             coordinate={{ latitude: pd.latitude, longitude: pd.longitude }}
@@ -1648,6 +1673,7 @@ export function ExploreScreen() {
               suppressViewportFetchAfterMarkerMsRef.current = Date.now() + MARKER_TAP_VIEWPORT_SUPPRESS_MS;
               setSelectedPlaydate(pd);
               setSelectedPin(null);
+              setSelectedDogPark(null);
               setCollocatedChooserPins(null);
             }}
           >
@@ -1792,7 +1818,7 @@ export function ExploreScreen() {
       )}
 
       {/* Empty state */}
-      {!loading && !showDogParksOnly && pins.length === 0 && (
+      {!loading && pins.length === 0 && !includeDogParks && (
         <View style={styles.emptyOverlay}>
           <View
             className="rounded-2xl px-8 py-6 items-center"
@@ -1806,7 +1832,7 @@ export function ExploreScreen() {
         </View>
       )}
 
-      {showDogParksOnly && dogParks.length === 0 && (
+      {includeDogParks && dogParks.length === 0 && (
         <View style={styles.emptyOverlay} pointerEvents="none">
           <View
             className="rounded-2xl px-8 py-6 items-center"
@@ -2006,7 +2032,7 @@ export function ExploreScreen() {
       </Pressable>
 
       {/* Selected pin card */}
-      {selectedPin && !showDogParksOnly && (
+      {selectedPin && (
         <View
           key={`pin-sheet-${selectedPin.providerId}`}
           className="absolute left-0 right-0"
@@ -2135,7 +2161,7 @@ export function ExploreScreen() {
       )}
 
       {/* Selected playdate card */}
-      {selectedPlaydate && !showDogParksOnly && (
+      {selectedPlaydate && (
         <View
           className="absolute left-0 right-0"
           onLayout={onBottomCardLayout}
@@ -2207,7 +2233,7 @@ export function ExploreScreen() {
       )}
 
       {/* Selected dog park — bottom card (no navigation to profile) */}
-      {selectedDogPark && showDogParksOnly && (
+      {selectedDogPark && (
         <View
           className="absolute left-0 right-0"
           onLayout={onBottomCardLayout}
@@ -2688,10 +2714,7 @@ export function ExploreScreen() {
               {/* ── Play with a Pal toggle ── */}
               <View>
                 <Pressable
-                  onPress={() => {
-                    setShowDogParksOnly(false);
-                    setPlaydateMode((prev) => !prev);
-                  }}
+                  onPress={() => setPlaydateMode((prev) => !prev)}
                   style={{
                     flexDirection: rowDirectionForAppLayout(isRTL),
                     alignItems: "center",
@@ -2718,35 +2741,32 @@ export function ExploreScreen() {
               {/* ── Dog parks map layer ── */}
               <View>
                 <Pressable
-                  onPress={() => {
-                    setPlaydateMode(false);
-                    setShowDogParksOnly((prev) => !prev);
-                  }}
+                  onPress={() => setIncludeDogParks((prev) => !prev)}
                   style={{
                     flexDirection: rowDirectionForAppLayout(isRTL),
                     alignItems: "center",
                     gap: 10,
-                    backgroundColor: showDogParksOnly ? "#16a34a" : colors.surfaceSecondary,
+                    backgroundColor: includeDogParks ? "#16a34a" : colors.surfaceSecondary,
                     paddingHorizontal: 14,
                     paddingVertical: 12,
                     borderRadius: 12,
                     borderWidth: 1.5,
-                    borderColor: showDogParksOnly ? "#16a34a" : colors.border,
+                    borderColor: includeDogParks ? "#16a34a" : colors.border,
                   }}
                 >
-                  <Ionicons name="leaf" size={18} color={showDogParksOnly ? "#fff" : "#16a34a"} />
+                  <Ionicons name="leaf" size={18} color={includeDogParks ? "#fff" : "#16a34a"} />
                   <Text
                     style={{
                       fontSize: 13,
                       fontWeight: "600",
-                      color: showDogParksOnly ? "#fff" : colors.textSecondary,
+                      color: includeDogParks ? "#fff" : colors.textSecondary,
                       flex: 1,
                       textAlign: isRTL ? "right" : "left",
                     }}
                   >
                     {t("dogParksLayerTitle")}
                   </Text>
-                  {showDogParksOnly && <Ionicons name="checkmark-circle" size={16} color="#fff" />}
+                  {includeDogParks && <Ionicons name="checkmark-circle" size={16} color="#fff" />}
                 </Pressable>
               </View>
 
@@ -3070,17 +3090,6 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     paddingHorizontal: 8,
     paddingVertical: 5,
-    borderWidth: 2,
-    borderColor: "#fff",
-  },
-  /** Dog park pin — no shadow* (same MapKit snapshot caveat as `playdateMarker` / user dot). */
-  dogParkMarkerOuter: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: "#16a34a",
-    alignItems: "center",
-    justifyContent: "center",
     borderWidth: 2,
     borderColor: "#fff",
   },

@@ -16,7 +16,7 @@ import { useTheme } from "../../theme/ThemeContext";
 import { bookingsApi } from "../../api/client";
 import type { PetCareCardDto } from "../../types/api";
 import { getSpeciesEmoji } from "../pets/MyPets/constants";
-import { ALLERGY_LABEL_I18N } from "../pets/addPetHelpers";
+import { ALLERGY_LABEL_I18N, formatPetGenderForDisplay } from "../pets/addPetHelpers";
 import type { TranslationKey } from "../../i18n";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -103,6 +103,7 @@ function PetCard({ pet, isRTL, t }: { pet: PetCareCardDto; isRTL: boolean; t: (k
 
   const metaParts = [
     pet.breed ?? null,
+    formatPetGenderForDisplay(pet.gender, t),
     pet.age != null ? `${pet.age}${t("careCardYearsShort")}` : null,
     pet.weight != null ? `${pet.weight} kg` : null,
     pet.isNeutered ? t("neutered") : null,

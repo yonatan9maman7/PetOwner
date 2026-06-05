@@ -44,7 +44,7 @@ import { BrandedAppHeader } from "../../components/BrandedAppHeader";
 import { DatePickerField } from "../../components/DatePickerField";
 import { filesApi } from "../../api/client";
 import { usePetsStore } from "../../store/petsStore";
-import { PetSpecies } from "../../types/api";
+import { PetGender, PetSpecies } from "../../types/api";
 import type { CreatePetRequest, UpdatePetRequest } from "../../types/api";
 import { pickImageWithSource } from "../../utils/imagePicker";
 import { useKeyboardAvoidingState } from "../../hooks/useKeyboardAvoidingState";
@@ -124,6 +124,7 @@ export function AddPetScreen() {
   const [breed, setBreed] = useState("");
   const [customBreedOther, setCustomBreedOther] = useState("");
   const [customSpecies, setCustomSpecies] = useState("");
+  const [gender, setGender] = useState<PetGender | null>(null);
 
   // Step 2
   const [birthDate, setBirthDate] = useState("");
@@ -166,6 +167,9 @@ export function AddPetScreen() {
       setName(pet.name);
       const resolvedSpecies = normalizePetSpecies(pet.species);
       setSpecies(resolvedSpecies);
+      if (pet.gender === PetGender.Male || pet.gender === PetGender.Female) {
+        setGender(pet.gender);
+      }
       const b = pet.breed ?? "";
       if (resolvedSpecies === PetSpecies.Dog || resolvedSpecies === PetSpecies.Cat) {
         const list = getBreedsForSpecies(resolvedSpecies);
@@ -252,6 +256,7 @@ export function AddPetScreen() {
   const step1Ready =
     name.trim().length > 0 &&
     species !== null &&
+    (gender === PetGender.Male || gender === PetGender.Female) &&
     (!breedRequired ||
       (breed.trim().length > 0 &&
         (breed !== "Other" || customBreedOther.trim().length > 0))) &&
@@ -415,6 +420,7 @@ export function AddPetScreen() {
         name: name.trim(),
         species: species!,
         breed: breedValue,
+        gender: gender!,
         age: 0,
         birthDate: `${birthDate}T00:00:00.000Z`,
         weight: weight.trim()
@@ -817,6 +823,59 @@ export function AddPetScreen() {
                     )}
                   </View>
                 )}
+
+                {/* Gender */}
+                <View style={{ gap: 8 }}>
+                  <Text
+                    style={{
+                      fontSize: 13,
+                      fontWeight: "700",
+                      color: colors.text,
+                      paddingHorizontal: 4,
+                      ...paraTextStyle,
+                    }}
+                  >
+                    {t("petGender")}{" "}
+                    <Text style={{ color: colors.danger }}>*</Text>
+                  </Text>
+                  <View
+                    style={{
+                      flexDirection: rowDirectionForAppLayout(isRTL),
+                      backgroundColor: colors.inputBg,
+                      borderRadius: 10,
+                      padding: 2,
+                    }}
+                  >
+                    {([PetGender.Male, PetGender.Female] as const).map((value) => {
+                      const selected = gender === value;
+                      const labelKey = value === PetGender.Male ? "genderMale" : "genderFemale";
+                      return (
+                        <Pressable
+                          key={value}
+                          onPress={() => setGender(value)}
+                          style={{
+                            flex: 1,
+                            paddingVertical: 12,
+                            borderRadius: 8,
+                            alignItems: "center",
+                            backgroundColor: selected ? colors.primary : "transparent",
+                          }}
+                        >
+                          <Text
+                            style={{
+                              fontSize: 13,
+                              fontWeight: "700",
+                              color: selected ? "#fff" : colors.textSecondary,
+                            }}
+                          >
+                            {value === PetGender.Male ? "♂ " : "♀ "}
+                            {t(labelKey)}
+                          </Text>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                </View>
               </View>
             )}
 

@@ -48,6 +48,7 @@ public class PetsController : ControllerBase
             Name = request.Name,
             Species = request.Species,
             Breed = request.Breed,
+            Gender = request.Gender,
             Weight = request.Weight,
             Allergies = request.Allergies,
             MedicalConditions = request.MedicalConditions,
@@ -116,6 +117,7 @@ public class PetsController : ControllerBase
         pet.Name = request.Name;
         pet.Species = request.Species;
         pet.Breed = request.Breed;
+        pet.Gender = request.Gender;
         PetAgeHelper.ApplyBirthDate(pet, request.BirthDate, request.Age);
         pet.Weight = request.Weight;
         pet.Allergies = request.Allergies;
@@ -297,6 +299,7 @@ public class PetsController : ControllerBase
                 p.Name,
                 p.Species,
                 p.Breed,
+                p.Gender,
                 p.ImageUrl,
                 p.LastSeenLocation!,
                 p.LastSeenLat!.Value,
@@ -331,7 +334,7 @@ public class PetsController : ControllerBase
     }
 
     private static PetDto MapToDto(Pet p) => new(
-        p.Id, p.Name, p.Species, p.Breed, PetAgeHelper.CalculateAge(p), p.BirthDate, p.Weight,
+        p.Id, p.Name, p.Species, p.Breed, p.Gender, PetAgeHelper.CalculateAge(p), p.BirthDate, p.Weight,
         p.Allergies, p.MedicalConditions, p.Notes, p.IsNeutered,
         p.MedicalNotes, p.FeedingSchedule, p.MicrochipNumber,
         p.VetName, p.VetPhone, p.ImageUrl,
