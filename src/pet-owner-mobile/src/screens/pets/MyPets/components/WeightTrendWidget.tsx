@@ -1,18 +1,19 @@
 import { View, Text } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import type { WeightLogDto } from "../../../../types/api";
+import type { PetDto, WeightLogDto } from "../../../../types/api";
 import { useTranslation } from "../../../../i18n";
 import { SparklineChart } from "../../../../components/SparklineChart";
 import { WidgetCard } from "./WidgetCard";
 import { useTheme } from "../../../../theme/ThemeContext";
 
 interface WeightTrendWidgetProps {
+  pet?: Pick<PetDto, "id" | "imageUrl" | "species"> | null;
   weightHistory: WeightLogDto[];
   onPress: () => void;
   disabled?: boolean;
 }
 
-export function WeightTrendWidget({ weightHistory, onPress, disabled }: WeightTrendWidgetProps) {
+export function WeightTrendWidget({ pet, weightHistory, onPress, disabled }: WeightTrendWidgetProps) {
   const { t } = useTranslation();
   const { colors } = useTheme();
 
@@ -54,6 +55,7 @@ export function WeightTrendWidget({ weightHistory, onPress, disabled }: WeightTr
 
   return (
     <WidgetCard
+      pet={pet}
       icon="analytics"
       iconColor="#001a5a"
       iconBg="#e8ecf4"

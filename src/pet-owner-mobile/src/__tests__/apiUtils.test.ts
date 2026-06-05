@@ -46,6 +46,36 @@ describe("apiUtils", () => {
       expect(getApiErrorMessage(err)).toBe("Server says no");
     });
 
+    it("translates SOS_COOLDOWN instead of English API message", () => {
+      jest.spyOn(axios, "isAxiosError").mockReturnValue(true);
+      const err = {
+        response: {
+          status: 400,
+          data: {
+            message: "You can only send one SOS report every 24 hours.",
+            code: "SOS_COOLDOWN",
+          },
+        },
+        config: { headers: {} },
+      } as AxiosError;
+      expect(getApiErrorMessage(err)).toBe("t:sosCooldownError");
+    });
+
+    it("translates PET_ALREADY_LOST instead of English API message", () => {
+      jest.spyOn(axios, "isAxiosError").mockReturnValue(true);
+      const err = {
+        response: {
+          status: 400,
+          data: {
+            message: "Pet is already reported as lost.",
+            code: "PET_ALREADY_LOST",
+          },
+        },
+        config: { headers: {} },
+      } as AxiosError;
+      expect(getApiErrorMessage(err)).toBe("t:petAlreadyLost");
+    });
+
     it("returns connectivity copy for ERR_NETWORK", () => {
       jest.spyOn(axios, "isAxiosError").mockReturnValue(true);
       const err = {

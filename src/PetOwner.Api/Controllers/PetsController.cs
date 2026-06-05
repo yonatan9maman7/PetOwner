@@ -173,7 +173,7 @@ public class PetsController : ControllerBase
             return NotFound(new { message = "Pet not found." });
 
         if (pet.IsLost)
-            return BadRequest(new { message = "Pet is already reported as lost." });
+            return BadRequest(new { message = "Pet is already reported as lost.", code = "PET_ALREADY_LOST" });
 
         var cooldownThreshold = DateTime.UtcNow - SosCooldown;
         var lastReport = await _db.Pets
@@ -234,16 +234,15 @@ public class PetsController : ControllerBase
 
         await _db.SaveChangesAsync();
 
-        await _notifications.NotifyUsersNearLocationAsync(
-            request.LastSeenLat,
-            request.LastSeenLng,
-            radiusKm: 7,
-            type: "sos",
-            title: "NOTIFICATIONS.SOS_ALERT_TITLE",
-            message: "NOTIFICATIONS.SOS_ALERT",
-            relatedEntityId: sosPost.Id);
+        var dto = MapToDto(pet);
+        var lat = request.LastSeenLat;
+        var lng = request.LastSeenLng;
+        var postId = sosPost.Id;
 
-        return Ok(MapToDto(pet));
+        // Nearby SOS alerts can take longer than mobile client timeouts — respond after persist.
+        _ = NotifySosNearbyAsync(lat, lng, postId);
+
+        return Ok(dto);
     }
 
     [HttpPost("{id:guid}/mark-found")]
@@ -317,6 +316,25 @@ public class PetsController : ControllerBase
     }
 
     // ── Helpers ───────────────────────────────────────────────────────
+
+    private async Task NotifySosNearbyAsync(double lat, double lng, Guid postId)
+    {
+        try
+        {
+            await _notifications.NotifyUsersNearLocationAsync(
+                lat,
+                lng,
+                radiusKm: 7,
+                type: "sos",
+                title: "NOTIFICATIONS.SOS_ALERT_TITLE",
+                message: "NOTIFICATIONS.SOS_ALERT",
+                relatedEntityId: postId);
+        }
+        catch
+        {
+            /* background fire-and-forget — report already saved */
+        }
+    }
 
     private static PetDto MapToDto(Pet p) => new(
         p.Id, p.Name, p.Species, p.Breed, p.Age, p.Weight,

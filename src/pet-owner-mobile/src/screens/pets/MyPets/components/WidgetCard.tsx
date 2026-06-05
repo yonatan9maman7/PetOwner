@@ -3,6 +3,8 @@ import { View, Text, Pressable } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../../../../theme/ThemeContext";
 import { rowDirectionForAppLayout, useTranslation } from "../../../../i18n";
+import type { PetDto } from "../../../../types/api";
+import { PetThumb } from "./PetThumb";
 
 export interface WidgetCardProps {
   icon: keyof typeof Ionicons.glyphMap;
@@ -14,6 +16,7 @@ export interface WidgetCardProps {
   disabled?: boolean;
   rightSlot?: ReactNode;
   showChevron?: boolean;
+  pet?: Pick<PetDto, "id" | "imageUrl" | "species"> | null;
 }
 
 export function WidgetCard({
@@ -26,9 +29,11 @@ export function WidgetCard({
   disabled,
   rightSlot,
   showChevron = true,
+  pet,
 }: WidgetCardProps) {
   const { colors } = useTheme();
   const { isRTL } = useTranslation();
+  const showPetPhoto = !!pet?.imageUrl;
 
   return (
     <View
@@ -61,12 +66,23 @@ export function WidgetCard({
             width: 44,
             height: 44,
             borderRadius: 13,
-            backgroundColor: iconBg,
+            backgroundColor: showPetPhoto ? colors.surfaceSecondary : iconBg,
             alignItems: "center",
             justifyContent: "center",
+            overflow: "hidden",
           }}
         >
-          <Ionicons name={icon} size={22} color={iconColor} />
+          {showPetPhoto ? (
+            <PetThumb
+              imageUrl={pet!.imageUrl}
+              species={pet!.species}
+              size={44}
+              borderRadius={13}
+              recyclingKey={pet!.id}
+            />
+          ) : (
+            <Ionicons name={icon} size={22} color={iconColor} />
+          )}
         </View>
 
         <View style={{ flex: 1, minWidth: 0 }}>

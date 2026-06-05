@@ -2846,8 +2846,7 @@ function CreatePlaydateModal({
   creating: boolean;
   onCreate: () => void;
 }) {
-  const insets = useSafeAreaInsets();
-  const bottomInset = Math.max(insets.bottom, useBottomSafeInset());
+  const bottomInset = useBottomSafeInset();
   const labelWrapStyle = {
     alignSelf: "stretch" as const,
     alignItems: (isRTL ? "flex-end" : "flex-start") as "flex-end" | "flex-start",

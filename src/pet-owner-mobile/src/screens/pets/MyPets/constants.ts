@@ -1,4 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
+import { TAB_BAR_CONTENT_HEIGHT } from "../../../navigation/tabBarLayout";
 import { PetSpecies } from "../../../types/api";
 import type { TranslationKey } from "../../../i18n";
 import type { Section } from "./types";
@@ -65,5 +66,5 @@ export const TILE_CONFIG: TileConfigItem[] = [
   { key: "records", icon: "folder-open", labelKey: "medicalRecords", color: "#d97706", bg: "#fffbeb" },
 ];
 
-/** Tab bar in AppNavigator: position absolute, bottom 30, height 70 — content must scroll above it. */
-export const SECTION_SCROLL_TAB_BAR_CLEARANCE = 30 + 70 + 24;
+/** Scroll content must clear the overlay tab bar (icons row + breathing room). */
+export const SECTION_SCROLL_TAB_BAR_CLEARANCE = TAB_BAR_CONTENT_HEIGHT + 24;

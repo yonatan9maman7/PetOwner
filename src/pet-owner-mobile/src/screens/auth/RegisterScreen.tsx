@@ -10,7 +10,6 @@ import {
   ActivityIndicator,
   Animated,
   Easing,
-  Image,
   Alert,
   Linking,
 } from "react-native";
@@ -29,8 +28,7 @@ import { getNormalizedApiError } from "../../utils/apiUtils";
 import { mapAuthApiErrorToTranslationKey } from "../../utils/authErrorI18n";
 import { isValidEmailFormat } from "../../utils/emailValidation";
 import { isIsraeliMobileValid } from "../../features/provider-onboarding/phoneUtils";
-
-const AUTH_PETCARE_HERO_LOGO = require("../../../assets/petcare-logo-transparent.png");
+import { LOGO_HERO, heroLogoStyle, prefetchBrandLogos } from "../../branding/logos";
 
 const MIN_PASSWORD_LENGTH = 6;
 
@@ -144,10 +142,7 @@ export function RegisterScreen() {
   );
 
   useEffect(() => {
-    const src = Image.resolveAssetSource(AUTH_PETCARE_HERO_LOGO);
-    if (src?.uri) {
-      Image.prefetch(src.uri).catch(() => {});
-    }
+    prefetchBrandLogos();
   }, []);
 
   useEffect(() => {
@@ -326,14 +321,14 @@ export function RegisterScreen() {
           />
         </View>
         <Animated.Image
-          source={AUTH_PETCARE_HERO_LOGO}
-          style={{
-            width: "100%",
-            maxWidth: 326,
-            height: 152,
-            opacity: logoOpacity,
-            transform: [{ scale: logoScale }],
-          }}
+          source={LOGO_HERO}
+          style={[
+            heroLogoStyle(),
+            {
+              opacity: logoOpacity,
+              transform: [{ scale: logoScale }],
+            },
+          ]}
           resizeMode="contain"
           onLoad={startLogoReveal}
         />

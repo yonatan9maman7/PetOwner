@@ -100,6 +100,16 @@ function pickBackendStrings(data: Record<string, unknown>): {
   return { message, detail, title, code, traceId, details };
 }
 
+function translateKnownBackendError(code?: string, message?: string): string | undefined {
+  if (code === "SOS_COOLDOWN") return translate("sosCooldownError");
+  if (code === "PET_ALREADY_LOST") return translate("petAlreadyLost");
+  const normalized = message?.trim().toLowerCase();
+  if (normalized === "pet is already reported as lost.") {
+    return translate("petAlreadyLost");
+  }
+  return undefined;
+}
+
 function statusFallbackKey(
   status: number,
   hadBearerOn401: boolean,
@@ -203,7 +213,8 @@ export function normalizeApiError(error: unknown): NormalizedApiError {
       };
     }
 
-    let message = picked.message;
+    let message = translateKnownBackendError(picked.code, picked.message);
+    if (!message) message = picked.message;
     if (!message && picked.detail) message = picked.detail;
     if (!message && picked.title && picked.title !== "An unexpected error occurred.") {
       message = picked.title;

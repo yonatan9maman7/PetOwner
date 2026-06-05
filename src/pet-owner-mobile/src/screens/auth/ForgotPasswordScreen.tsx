@@ -9,7 +9,6 @@ import {
   ActivityIndicator,
   Animated,
   Easing,
-  Image,
 } from "react-native";
 import { showGlobalAlertCompat } from "../../components/global-modal";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -23,8 +22,7 @@ import { getNormalizedApiError } from "../../utils/apiUtils";
 import { mapAuthApiErrorToTranslationKey } from "../../utils/authErrorI18n";
 import { useTheme } from "../../theme/ThemeContext";
 import { useKeyboardAvoidingState } from "../../hooks/useKeyboardAvoidingState";
-
-const AUTH_PETCARE_HERO_LOGO = require("../../../assets/petcare-logo-transparent.png");
+import { LOGO_HERO, heroLogoStyle, prefetchBrandLogos } from "../../branding/logos";
 
 export function ForgotPasswordScreen() {
   const [identifier, setIdentifier] = useState("");
@@ -82,10 +80,7 @@ export function ForgotPasswordScreen() {
   );
 
   useEffect(() => {
-    const src = Image.resolveAssetSource(AUTH_PETCARE_HERO_LOGO);
-    if (src?.uri) {
-      Image.prefetch(src.uri).catch(() => {});
-    }
+    prefetchBrandLogos();
   }, []);
 
   useEffect(() => {
@@ -163,14 +158,14 @@ export function ForgotPasswordScreen() {
           />
         </View>
         <Animated.Image
-          source={AUTH_PETCARE_HERO_LOGO}
-          style={{
-            width: "100%",
-            maxWidth: 326,
-            height: 152,
-            opacity: logoOpacity,
-            transform: [{ scale: logoScale }],
-          }}
+          source={LOGO_HERO}
+          style={[
+            heroLogoStyle(),
+            {
+              opacity: logoOpacity,
+              transform: [{ scale: logoScale }],
+            },
+          ]}
           resizeMode="contain"
           onLoad={startLogoReveal}
         />

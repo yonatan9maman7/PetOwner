@@ -40,6 +40,7 @@ export function PetInfoWidget({ pet, onPress, disabled }: PetInfoWidgetProps) {
 
   return (
     <WidgetCard
+      pet={pet}
       icon="heart"
       iconColor="#7c3aed"
       iconBg="#f5f3ff"

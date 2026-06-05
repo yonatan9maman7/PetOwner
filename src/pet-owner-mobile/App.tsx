@@ -32,8 +32,8 @@ import { useThemeStore } from "./src/store/themeStore";
 import { useDogParkStore } from "./src/store/dogParkStore";
 import { ThemeProvider, useTheme } from "./src/theme/ThemeContext";
 
-/** Brand tab-bar blue — paints behind transparent Android system bars before theme hydrates. */
-const ANDROID_EDGE_BG = "#001a5a";
+/** Tab-bar navy — paints behind Android system navigation bar before theme hydrates. */
+const ANDROID_EDGE_BG = "#0D1B42";
 const APP_LAYOUT_ROOT = {
   direction: "ltr" as const,
 };

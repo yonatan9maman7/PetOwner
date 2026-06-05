@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { View, Text, Pressable, StyleSheet } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useBottomSafeInset } from "../hooks/useBottomSafeInset";
+import { TAB_BAR_FLOATING_GAP, useTabBarOccupiedHeight } from "../navigation/tabBarLayout";
 import { getFocusedRouteNameFromRoute } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuthStore } from "../store/authStore";
@@ -10,9 +10,6 @@ import { useTranslation } from "../i18n";
 import { useTheme } from "../theme/ThemeContext";
 import { navigationRef } from "../navigation/navigationRef";
 import { SosOptionsModal } from "./SosOptionsModal";
-
-/** Sits just above the tab bar. */
-const TAB_BAR_OFFSET = 72;
 
 /** Pets stack screens where the global SOS FAB would duplicate the flow or cover inputs. */
 const MY_PETS_STACK_HIDE_SOS = new Set<string>([
@@ -57,7 +54,7 @@ function useSosFabVisible(): boolean {
 
 export function GlobalSosFab() {
   const insets = useSafeAreaInsets();
-  const bottomInset = useBottomSafeInset();
+  const tabBarHeight = useTabBarOccupiedHeight();
   const { t, isRTL } = useTranslation();
   const { colors } = useTheme();
   const isLoggedIn = useAuthStore((s) => s.isLoggedIn);
@@ -66,7 +63,7 @@ export function GlobalSosFab() {
   const visible = navAllowsFab && !sectionDetailOpen;
   const [menuOpen, setMenuOpen] = useState(false);
 
-  const bottom = bottomInset + TAB_BAR_OFFSET;
+  const bottom = tabBarHeight + TAB_BAR_FLOATING_GAP;
   const edge = 20;
   const horizontalStyle = isRTL
     ? { left: Math.max(edge, insets.left) }

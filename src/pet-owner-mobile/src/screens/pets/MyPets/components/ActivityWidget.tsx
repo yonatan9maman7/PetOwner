@@ -1,18 +1,19 @@
 import { View, Text } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import type { ActivitySummaryDto } from "../../../../types/api";
+import type { ActivitySummaryDto, PetDto } from "../../../../types/api";
 import { useTranslation } from "../../../../i18n";
 import { WidgetCard } from "./WidgetCard";
 import { useTheme } from "../../../../theme/ThemeContext";
 
 interface ActivityWidgetProps {
+  pet?: Pick<PetDto, "id" | "imageUrl" | "species"> | null;
   summary: ActivitySummaryDto | null;
   petId?: string | null;
   onPress: () => void;
   disabled?: boolean;
 }
 
-export function ActivityWidget({ summary, petId, onPress, disabled }: ActivityWidgetProps) {
+export function ActivityWidget({ pet, summary, petId, onPress, disabled }: ActivityWidgetProps) {
   const { t } = useTranslation();
   const { colors } = useTheme();
 
@@ -34,6 +35,7 @@ export function ActivityWidget({ summary, petId, onPress, disabled }: ActivityWi
 
   return (
     <WidgetCard
+      pet={pet}
       icon="footsteps"
       iconColor={colors.primary}
       iconBg={colors.primaryLight}

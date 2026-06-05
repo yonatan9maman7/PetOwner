@@ -152,7 +152,7 @@ function labelsForLanguage(isRTL: boolean): PassportLabels {
   if (isRTL) {
     return {
       docTitle: "פרופיל רפואי",
-      docTagline: "תיעוד בריאות דיגיטלי · PetOwner",
+      docTagline: "תיעוד בריאות דיגיטלי · PetCare",
       logoPlaceholder: "מקום לוגו האפליקציה",
       statusLabel: "סטטוס",
       ownerContact: "פרטי בעלים",
@@ -185,12 +185,12 @@ function labelsForLanguage(isRTL: boolean): PassportLabels {
       neuteredNo: "לא מסורס/ת",
       species: "מין",
       breed: "גזע",
-      footerGenerated: (date: string) => `נוצר בתאריך ${esc(date)} באמצעות אפליקציית PetOwner`,
+      footerGenerated: (date: string) => `נוצר בתאריך ${esc(date)} באמצעות אפליקציית PetCare`,
     };
   }
   return {
     docTitle: "Pet Health Passport",
-    docTagline: "Digital health record · PetOwner",
+    docTagline: "Digital health record · PetCare",
     logoPlaceholder: "App Logo Placeholder",
     statusLabel: "Status",
     ownerContact: "Owner contact",
@@ -223,7 +223,7 @@ function labelsForLanguage(isRTL: boolean): PassportLabels {
     neuteredNo: "Not neutered / spayed",
     species: "Species",
     breed: "Breed",
-    footerGenerated: (date: string) => `Generated on ${esc(date)} via PetOwner App`,
+    footerGenerated: (date: string) => `Generated on ${esc(date)} via PetCare App`,
   };
 }
 

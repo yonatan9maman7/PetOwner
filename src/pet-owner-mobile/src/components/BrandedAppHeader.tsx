@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
-import { View, Text, type StyleProp, type ViewStyle } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import { View, type StyleProp, type ViewStyle } from "react-native";
+import { BrandLogoImage } from "./BrandLogoImage";
 import { useTheme } from "../theme/ThemeContext";
 
 export const BRAND_HEADER_HORIZONTAL_PAD = 28;
@@ -20,7 +20,7 @@ export const BRAND_HEADER_LTR_CONTAINER = {
 };
 
 type Props = {
-  /** Renders before the paw + wordmark (e.g. back button). */
+  /** Renders before the wordmark (e.g. back button). */
   leading?: ReactNode;
   /** Optional trailing slot (e.g. `LanguageToggle` on auth screens only). */
   trailing?: ReactNode;
@@ -30,6 +30,8 @@ type Props = {
   chromed?: boolean;
   /** Use 0 when the parent already applies horizontal padding (e.g. auth ScrollView). */
   horizontalPadding?: number;
+  /** Header logo height in pt (default 36). */
+  logoHeight?: number;
   style?: StyleProp<ViewStyle>;
 };
 
@@ -39,13 +41,13 @@ export function BrandedAppHeader({
   elevated = true,
   chromed = false,
   horizontalPadding = BRAND_HEADER_HORIZONTAL_PAD,
+  logoHeight,
   style,
 }: Props) {
   const { colors } = useTheme();
-  const brandRow = brandHeaderRowFlexDirection();
 
   const surfaceStyle = chromed
-    ? { backgroundColor: colors.text }
+    ? { backgroundColor: colors.tabBar }
     : elevated
       ? { backgroundColor: colors.surface }
       : undefined;
@@ -87,7 +89,7 @@ export function BrandedAppHeader({
     >
       <View
         style={{
-          flexDirection: brandRow,
+          flexDirection: brandHeaderRowFlexDirection(),
           alignItems: "center",
           flex: 1,
           minWidth: 0,
@@ -95,31 +97,7 @@ export function BrandedAppHeader({
         }}
       >
         {leading}
-        <View
-          style={{
-            flexDirection: brandRow,
-            alignItems: "center",
-            gap: 12,
-            minWidth: 0,
-            flexShrink: 1,
-          }}
-        >
-          <View
-            className="w-10 h-10 rounded-xl items-center justify-center"
-            style={{
-              backgroundColor: chromed ? "rgba(255,255,255,0.18)" : colors.text,
-            }}
-          >
-            <Ionicons name="paw" size={22} color={colors.textInverse} />
-          </View>
-          <Text
-            className="text-2xl font-extrabold"
-            style={{ color: chromed ? colors.textInverse : colors.text }}
-            numberOfLines={1}
-          >
-            PetOwner
-          </Text>
-        </View>
+        <BrandLogoImage variant="header" headerHeight={logoHeight} />
       </View>
       {trailing}
     </View>

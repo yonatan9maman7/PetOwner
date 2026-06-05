@@ -40,7 +40,6 @@ import { pickImageWithSource } from "../../utils/imagePicker";
 import { getNormalizedApiError } from "../../utils/apiUtils";
 import { showApiErrorToast } from "../../services/apiErrorToast";
 import { useKeyboardAvoidingState } from "../../hooks/useKeyboardAvoidingState";
-import { useBottomSafeInset } from "../../hooks/useBottomSafeInset";
 import { providerBreakdownFromBasePrice, providerNetFromBasePrice, roundMoney } from "../../utils/pricingDisplay";
 
 const NAVY = "#001a5a";
@@ -357,7 +356,6 @@ function AddPackageModal({
 }) {
   const { colors } = useTheme();
   const modalInsets = useSafeAreaInsets();
-  const bottomSafeInset = useBottomSafeInset();
   const [title, setTitle] = useState("");
   const [price, setPrice] = useState("");
   const [description, setDescription] = useState("");
@@ -370,7 +368,7 @@ function AddPackageModal({
   const canSave =
     title.trim().length > 0 && price.trim().length > 0 && !Number.isNaN(priceNum) && priceNum > 0;
 
-  const scrollBottomPadding = Math.max(40, bottomSafeInset + modalInsets.bottom + 16);
+  const scrollBottomPadding = Math.max(40, modalInsets.bottom + 16);
 
   const handleSavePress = () => {
     if (!canSave) return;

@@ -10,7 +10,6 @@ import {
   ActivityIndicator,
   Animated,
   Easing,
-  Image,
 } from "react-native";
 import { showGlobalAlertCompat } from "../../components/global-modal";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
@@ -29,10 +28,9 @@ import { authApi } from "../../api/client";
 import { useTheme } from "../../theme/ThemeContext";
 import { useKeyboardAvoidingState } from "../../hooks/useKeyboardAvoidingState";
 import * as biometricService from "../../services/biometricService";
+import { LOGO_HERO, heroLogoStyle, prefetchBrandLogos } from "../../branding/logos";
 
 WebBrowser.maybeCompleteAuthSession();
-
-const LOGIN_HERO_LOGO = require("../../../assets/petcare-logo-transparent.png");
 
 /** True when `expo-auth-session` Google provider has the client IDs it requires for this OS. */
 function hasGoogleOAuthEnvForCurrentPlatform(): boolean {
@@ -203,12 +201,8 @@ function LoginForm() {
   const showGoogleButton = hasGoogleOAuthEnvForCurrentPlatform();
   const showSocialSection = Platform.OS === "ios" || showGoogleButton;
 
-  /* Warm hero logo decode/cache as soon as the screen mounts */
   useEffect(() => {
-    const src = Image.resolveAssetSource(LOGIN_HERO_LOGO);
-    if (src?.uri) {
-      Image.prefetch(src.uri).catch(() => {});
-    }
+    prefetchBrandLogos();
   }, []);
 
   const biometricMessages = useMemo(
@@ -495,14 +489,14 @@ function LoginForm() {
           />
         </View>
         <Animated.Image
-          source={LOGIN_HERO_LOGO}
-          style={{
-            width: "100%",
-            maxWidth: 326,
-            height: 152,
-            opacity: logoOpacity,
-            transform: [{ scale: logoScale }],
-          }}
+          source={LOGO_HERO}
+          style={[
+            heroLogoStyle(),
+            {
+              opacity: logoOpacity,
+              transform: [{ scale: logoScale }],
+            },
+          ]}
           resizeMode="contain"
           onLoad={startLogoReveal}
         />

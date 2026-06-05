@@ -518,6 +518,33 @@ export function MyBookingsScreen() {
           </Text>
         ) : null}
 
+        {item.status === "Cancelled" && item.cancellationReason ? (
+          <View
+            style={{
+              marginTop: 10,
+              backgroundColor: "#fff1f2",
+              borderLeftWidth: 3,
+              borderLeftColor: "#ef4444",
+              borderRadius: 8,
+              paddingHorizontal: 12,
+              paddingVertical: 8,
+              flexDirection: rowDirectionForAppLayout(isRTL),
+              alignItems: "flex-start",
+              gap: 8,
+            }}
+          >
+            <Ionicons name="information-circle-outline" size={16} color="#ef4444" style={{ marginTop: 1 }} />
+            <View style={{ flex: 1 }}>
+              <Text style={[rtlText, { fontSize: 11, fontWeight: "700", color: "#ef4444", marginBottom: 2 }]}>
+                {t("cancellationReasonLabel")}
+              </Text>
+              <Text style={[rtlText, { fontSize: 13, color: "#991b1b", lineHeight: 18 }]}>
+                {item.cancellationReason}
+              </Text>
+            </View>
+          </View>
+        ) : null}
+
         {canLeaveReview ? (
           <Pressable
             onPress={() =>
@@ -824,6 +851,33 @@ export function MyBookingsScreen() {
           >
             {item.notes}
           </Text>
+        ) : null}
+
+        {item.status === "Cancelled" && item.cancellationReason ? (
+          <View
+            style={{
+              marginTop: 10,
+              backgroundColor: "#fff1f2",
+              borderLeftWidth: 3,
+              borderLeftColor: "#ef4444",
+              borderRadius: 8,
+              paddingHorizontal: 12,
+              paddingVertical: 8,
+              flexDirection: rowDirectionForAppLayout(isRTL),
+              alignItems: "flex-start",
+              gap: 8,
+            }}
+          >
+            <Ionicons name="information-circle-outline" size={16} color="#ef4444" style={{ marginTop: 1 }} />
+            <View style={{ flex: 1 }}>
+              <Text style={[rtlText, { fontSize: 11, fontWeight: "700", color: "#ef4444", marginBottom: 2 }]}>
+                {t("cancellationReasonLabel")}
+              </Text>
+              <Text style={[rtlText, { fontSize: 13, color: "#991b1b", lineHeight: 18 }]}>
+                {item.cancellationReason}
+              </Text>
+            </View>
+          </View>
         ) : null}
       </View>
     );

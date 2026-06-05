@@ -256,6 +256,12 @@ export function ReportLostScreen() {
       });
       const err = usePetsStore.getState().error;
       if (err) {
+        if (err === t("petAlreadyLost")) {
+          showGlobalAlertCompat("", t("reportSubmitted"), [
+            { text: "OK", onPress: goBackToMyPets },
+          ]);
+          return;
+        }
         showGlobalAlertCompat(t("errorTitle"), String(err));
         return;
       }

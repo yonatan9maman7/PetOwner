@@ -20,6 +20,7 @@ import { useTheme } from "../../theme/ThemeContext";
 import { useAuthStore } from "../../store/authStore";
 import { supportApi } from "../../api/client";
 import { SUPPORT_EMAIL, SUPPORT_PHONE } from "../../config/support";
+import { APP_DISPLAY_NAME } from "../../branding/logos";
 
 const MIN_MESSAGE_LENGTH = 10;
 const MAILTO_SAFE_LENGTH = 1800;
@@ -192,7 +193,7 @@ export function ContactUsScreen() {
       msg.trim(),
       "",
       "---",
-      `PetOwner ${APP_VERSION}`,
+      `${APP_DISPLAY_NAME} ${APP_VERSION}`,
       `${Platform.OS} ${String(Platform.Version ?? "")}`.trim(),
     ];
     if (user?.name || user?.email) {
@@ -208,9 +209,9 @@ export function ContactUsScreen() {
   const resolveMailSubject = (topicId: TopicId) => {
     const sub = subject.trim();
     if (sub.length > 0) {
-      return `[PetOwner] ${topicLabels[topicId]} — ${sub}`;
+      return `[${APP_DISPLAY_NAME}] ${topicLabels[topicId]} — ${sub}`;
     }
-    return `[PetOwner] ${topicLabels[topicId]}`;
+    return `[${APP_DISPLAY_NAME}] ${topicLabels[topicId]}`;
   };
 
   const copyEmail = async () => {

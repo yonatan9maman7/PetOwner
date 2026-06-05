@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "pet-owner-mobile",
+    "name": "PetCare",
     "slug": "pet-owner-mobile",
     "scheme": "petowner",
     "version": "1.0.10",
@@ -11,7 +11,7 @@
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "backgroundColor": "#020d22"
     },
     "androidStatusBar": {
       "barStyle": "light-content",
@@ -33,7 +33,7 @@
         ]
       },
       "infoPlist": {
-        "NSFaceIDUsageDescription": "Allow PetOwner to use Face ID for fast and secure sign-in."
+        "NSFaceIDUsageDescription": "Allow PetCare to use Face ID for fast and secure sign-in."
       }
     },
     "android": {
@@ -42,7 +42,7 @@
       "softwareKeyboardLayoutMode": "resize",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
+        "backgroundColor": "#020d22"
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
@@ -67,7 +67,7 @@
       [
         "expo-local-authentication",
         {
-          "faceIDPermission": "Allow PetOwner to use Face ID for fast and secure sign-in."
+          "faceIDPermission": "Allow PetCare to use Face ID for fast and secure sign-in."
         }
       ],
       [
@@ -84,8 +84,8 @@
       [
         "expo-calendar",
         {
-          "calendarPermission": "Allow PetOwner to add bookings to your calendar.",
-          "remindersPermission": "Allow PetOwner to add reminders for your bookings."
+          "calendarPermission": "Allow PetCare to add bookings to your calendar.",
+          "remindersPermission": "Allow PetCare to add reminders for your bookings."
         }
       ]
     ],

@@ -1,11 +1,12 @@
 import { View, Text } from "react-native";
 import Svg, { Circle } from "react-native-svg";
-import type { VaccineStatusDto } from "../../../../types/api";
+import type { PetDto, VaccineStatusDto } from "../../../../types/api";
 import { useTranslation } from "../../../../i18n";
 import { WidgetCard } from "./WidgetCard";
 import type { Section } from "../types";
 
 interface VaccineRingWidgetProps {
+  pet?: Pick<PetDto, "id" | "imageUrl" | "species"> | null;
   vaccineStatuses: VaccineStatusDto[];
   onPress: () => void;
   disabled?: boolean;
@@ -46,7 +47,7 @@ function VaccineRing({ pct, color }: { pct: number; color: string }) {
   );
 }
 
-export function VaccineRingWidget({ vaccineStatuses, onPress, disabled }: VaccineRingWidgetProps) {
+export function VaccineRingWidget({ pet, vaccineStatuses, onPress, disabled }: VaccineRingWidgetProps) {
   const { t } = useTranslation();
 
   const total = vaccineStatuses.length;
@@ -84,6 +85,7 @@ export function VaccineRingWidget({ vaccineStatuses, onPress, disabled }: Vaccin
 
   return (
     <WidgetCard
+      pet={pet}
       icon="shield-checkmark"
       iconColor="#059669"
       iconBg="#dcfce7"

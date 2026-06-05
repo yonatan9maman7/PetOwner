@@ -6,7 +6,8 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTranslation, type TranslationKey, rowDirectionForAppLayout } from "../../../../i18n";
 import { useTheme } from "../../../../theme/ThemeContext";
 import type { PetDto } from "../../../../types/api";
-import { getSpeciesEmoji, TILE_CONFIG, SECTION_SCROLL_TAB_BAR_CLEARANCE } from "../constants";
+import { TILE_CONFIG, SECTION_SCROLL_TAB_BAR_CLEARANCE } from "../constants";
+import { PetThumb } from "../components/PetThumb";
 import type { Section } from "../types";
 import { useKeyboardAvoidingState } from "../../../../hooks/useKeyboardAvoidingState";
 
@@ -119,7 +120,12 @@ export function SectionShell({
                 borderRadius: 10,
               }}
             >
-              <Text style={{ fontSize: 14 }}>{getSpeciesEmoji(pet.species)}</Text>
+              <PetThumb
+                imageUrl={pet.imageUrl}
+                species={pet.species}
+                size={18}
+                recyclingKey={pet.id}
+              />
               <Text
                 style={{
                   fontSize: 13,
@@ -161,7 +167,7 @@ export function SectionShell({
         <ScrollView
           style={{ flex: 1 }}
           contentContainerStyle={{
-            paddingBottom: insets.bottom + SECTION_SCROLL_TAB_BAR_CLEARANCE,
+            paddingBottom: SECTION_SCROLL_TAB_BAR_CLEARANCE + insets.bottom,
           }}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}

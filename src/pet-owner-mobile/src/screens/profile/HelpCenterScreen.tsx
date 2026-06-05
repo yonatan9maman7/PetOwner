@@ -11,6 +11,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import { useTranslation, type TranslationKey, rowDirectionForAppLayout } from "../../i18n";
 import { useTheme } from "../../theme/ThemeContext";
+import { APP_DISPLAY_NAME } from "../../branding/logos";
 
 /** Kept in sync with app.json / Account settings footer */
 const APP_VERSION = "1.0.0";
@@ -395,7 +396,7 @@ export function HelpCenterScreen() {
             marginTop: 8,
           }}
         >
-          PetOwner {t("helpCenterAppVersion")} {APP_VERSION}
+          {APP_DISPLAY_NAME} {t("helpCenterAppVersion")} {APP_VERSION}
         </Text>
       </ScrollView>
     </SafeAreaView>

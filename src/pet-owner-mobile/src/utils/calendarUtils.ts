@@ -1,12 +1,30 @@
-import * as Calendar from "expo-calendar";
 import { Alert, Platform } from "react-native";
 import type { BookingDto } from "../types/api";
 import { translate } from "../i18n";
+
+type CalendarModule = typeof import("expo-calendar");
+
+async function loadCalendarModule(): Promise<CalendarModule | null> {
+  try {
+    return await import("expo-calendar");
+  } catch {
+    return null;
+  }
+}
 
 export async function addBookingToDeviceCalendar(
   booking: BookingDto,
   role: "owner" | "provider",
 ): Promise<void> {
+  const Calendar = await loadCalendarModule();
+  if (!Calendar) {
+    Alert.alert(
+      translate("calendarAddFailedTitle"),
+      translate("calendarAddFailedDesc"),
+    );
+    return;
+  }
+
   try {
     const { status } = await Calendar.requestCalendarPermissionsAsync();
     if (status !== "granted") {

@@ -44,6 +44,7 @@ function HealthHubListInner({ activePet, summary, onSelectSection, onOpenTriage 
       key: "vaccines",
       node: (
         <VaccineRingWidget
+          pet={activePet}
           vaccineStatuses={summary.vaccineStatuses}
           onPress={() => { if (!disabled) onSelectSection("vaccines"); }}
           disabled={disabled}
@@ -54,6 +55,7 @@ function HealthHubListInner({ activePet, summary, onSelectSection, onOpenTriage 
       key: "weight",
       node: (
         <WeightTrendWidget
+          pet={activePet}
           weightHistory={summary.weightHistory}
           onPress={() => { if (!disabled) onSelectSection("weight"); }}
           disabled={disabled}
@@ -64,6 +66,7 @@ function HealthHubListInner({ activePet, summary, onSelectSection, onOpenTriage 
       key: "records",
       node: (
         <RecordsWidget
+          pet={activePet}
           medicalRecords={summary.medicalRecords}
           onPress={() => { if (!disabled) onSelectSection("records"); }}
           disabled={disabled}
@@ -74,6 +77,7 @@ function HealthHubListInner({ activePet, summary, onSelectSection, onOpenTriage 
       key: "activity",
       node: (
         <ActivityWidget
+          pet={activePet}
           summary={summary.activitySummary}
           petId={petId}
           onPress={() => {

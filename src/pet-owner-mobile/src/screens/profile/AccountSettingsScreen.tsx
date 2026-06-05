@@ -12,6 +12,7 @@ import {
 import { useTheme } from "../../theme/ThemeContext";
 import type { ThemePreference } from "../../store/themeStore";
 import { ThemePickerModal } from "../../components/ThemePickerModal";
+import { APP_DISPLAY_NAME } from "../../branding/logos";
 
 /* ───────────────────── Primitives ───────────────────── */
 
@@ -425,7 +426,7 @@ export function AccountSettingsScreen() {
         </View>
 
         <Text style={{ textAlign: "center", fontSize: 12, color: colors.textMuted, marginTop: 20 }}>
-          PetOwner v1.0.0
+          {APP_DISPLAY_NAME} v1.0.0
         </Text>
       </ScrollView>
 

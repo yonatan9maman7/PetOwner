@@ -1,11 +1,12 @@
 import { View, Text } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import type { MedicalRecordDto } from "../../../../types/api";
+import type { MedicalRecordDto, PetDto } from "../../../../types/api";
 import { useTranslation } from "../../../../i18n";
 import { WidgetCard } from "./WidgetCard";
 import { useTheme } from "../../../../theme/ThemeContext";
 
 interface RecordsWidgetProps {
+  pet?: Pick<PetDto, "id" | "imageUrl" | "species"> | null;
   medicalRecords: MedicalRecordDto[];
   onPress: () => void;
   disabled?: boolean;
@@ -23,7 +24,7 @@ function formatRelativeDate(dateStr: string): string {
   return `${Math.floor(diffMonths / 12)}y ago`;
 }
 
-export function RecordsWidget({ medicalRecords, onPress, disabled }: RecordsWidgetProps) {
+export function RecordsWidget({ pet, medicalRecords, onPress, disabled }: RecordsWidgetProps) {
   const { t } = useTranslation();
   const { colors } = useTheme();
 
@@ -66,6 +67,7 @@ export function RecordsWidget({ medicalRecords, onPress, disabled }: RecordsWidg
 
   return (
     <WidgetCard
+      pet={pet}
       icon="folder-open"
       iconColor="#d97706"
       iconBg="#fef3c7"

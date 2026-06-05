@@ -38,20 +38,18 @@ import Reanimated, {
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect, useIsFocused, useNavigation, useRoute } from "@react-navigation/native";
-import { useBottomSafeInset } from "../../hooks/useBottomSafeInset";
-import { resolveTabBarOccupiedHeight, tabBarRowHeight } from "../../navigation/tabBarLayout";
+import {
+  TAB_BAR_FLOATING_GAP,
+  useTabBarOccupiedHeight,
+} from "../../navigation/tabBarLayout";
 import * as Location from "expo-location";
 import { LinearGradient } from "expo-linear-gradient";
 import {
   BRAND_HEADER_HORIZONTAL_PAD,
-  BRAND_HEADER_LTR_CONTAINER,
-  brandHeaderRowFlexDirection,
+  BrandedAppHeader,
 } from "../../components/BrandedAppHeader";
+import { LOGO_HEADER_HEIGHT_MAP } from "../../branding/logos";
 import { ScreenLoadingCenter } from "../../components/shared/ScreenLoadingCenter";
-
-/** Tight crop of `petcare-logo-transparent.png` (Explore header only). */
-const EXPLORE_HEADER_LOGO = require("../../../assets/petcare-logo-header-trimmed.png");
-const EXPLORE_HEADER_LOGO_ASPECT = 639 / 246;
 import { useTranslation, rowDirectionForAppLayout, type TranslationKey } from "../../i18n";
 import { translateServiceLabel } from "../../i18n/serviceLabels";
 import { getNormalizedApiError } from "../../utils/apiUtils";
@@ -227,20 +225,10 @@ export function ExploreScreen() {
   const tRef = useRef(t);
   tRef.current = t;
   const insets = useSafeAreaInsets();
+  const tabBarOccupiedHeight = useTabBarOccupiedHeight();
+  const [mapContainerHeight, setMapContainerHeight] = useState(0);
   const { height: windowHeight } = useWindowDimensions();
   const isFocused = useIsFocused();
-  const bottomSafeInset = useBottomSafeInset();
-  // tabBarRowHeight() returns the glass bar's content height (68 px).
-  // resolveTabBarOccupiedHeight adds the bottom safe-area inset on top of that.
-  const resolvedTabBarH = useMemo(
-    () =>
-      resolveTabBarOccupiedHeight({
-        tabBarHeightFromHook: tabBarRowHeight(),
-        bottomSafeInset,
-      }),
-    [bottomSafeInset],
-  );
-
   const isLoggedIn = useAuthStore((s) => s.isLoggedIn);
   const hasPets = usePetsStore((s) => s.pets.length > 0);
   const pets = usePetsStore((s) => s.pets);
@@ -1391,34 +1379,27 @@ export function ExploreScreen() {
   }, []);
 
   /**
-   * The screen's layout coordinate system ends at the top of the tab bar (React Navigation
-   * clips screen content above the tab bar). So bottom: 0 = tab bar top — no need to add
-   * resolvedTabBarH. We just need a small breathing gap.
-   */
-  const CARD_ABOVE_TAB_GAP = 8;
-  const ANDROID_TAB_BAR_MAP_PADDING = 80;
-
-  /**
-   * mapPadding.bottom leaves a blank strip on iOS (parent background shows through).
-   * On Android, keep the bottom tab-bar area reserved so Google Maps does not
-   * capture touches that visually belong to the tab bar.
+   * Screen coordinate system ends at the tab bar top. Floating controls only need a small gap.
+   * On Android the map view is physically bounded above the tab bar so it cannot steal touches.
    */
   const exploreMapPadding = useMemo(() => {
-    const tabBarPadding = Platform.OS === "android" ? ANDROID_TAB_BAR_MAP_PADDING : 0;
     if (!hasBottomOverlay || measuredCardHeight <= 0) {
-      return { top: 0, right: 0, bottom: tabBarPadding, left: 0 };
+      return { top: 0, right: 0, bottom: 0, left: 0 };
     }
     return {
       top: 0,
       right: 0,
       left: 0,
-      bottom: tabBarPadding + measuredCardHeight + CARD_ABOVE_TAB_GAP,
+      bottom: measuredCardHeight + TAB_BAR_FLOATING_GAP,
     };
   }, [hasBottomOverlay, measuredCardHeight]);
+
   const fabRowBottom = useMemo(
     () =>
-      CARD_ABOVE_TAB_GAP +
-      (hasBottomOverlay && measuredCardHeight > 0 ? measuredCardHeight + CARD_ABOVE_TAB_GAP : 0),
+      TAB_BAR_FLOATING_GAP +
+      (hasBottomOverlay && measuredCardHeight > 0
+        ? measuredCardHeight + TAB_BAR_FLOATING_GAP
+        : 0),
     [hasBottomOverlay, measuredCardHeight],
   );
   const locationButtonBottom = fabRowBottom + 56;
@@ -1560,12 +1541,19 @@ export function ExploreScreen() {
   /* ═════════════════════ RENDER ═════════════════════ */
 
   return (
-    <View style={[styles.root, { backgroundColor: colors.background }]}>
+    <View
+      style={[styles.root, { backgroundColor: colors.background }]}
+      onLayout={(e) => setMapContainerHeight(e.nativeEvent.layout.height)}
+    >
       {/* MapView: iOS stays a direct child of the root; Android uses AndroidMapRtlIsolation (positioned View + LTR) so Google Maps keeps gestures after RTL language reload. */}
       <AndroidMapRtlIsolation>
         <MapViewWrapper
           ref={mapRef}
-          style={StyleSheet.absoluteFillObject}
+          style={
+            Platform.OS === "android" && mapContainerHeight > 0
+              ? { position: "absolute", top: 0, left: 0, right: 0, height: mapContainerHeight }
+              : StyleSheet.absoluteFillObject
+          }
           initialRegion={EXPLORE_MAP_INITIAL_REGION}
           fallbackLabel="Explore Map"
           showsMyLocationButton={false}
@@ -1679,51 +1667,14 @@ export function ExploreScreen() {
           Platform.OS === "android" && { elevation: 22 },
         ]}
       >
-        <View
-          style={{
-            ...BRAND_HEADER_LTR_CONTAINER,
-            alignItems: "center",
-            justifyContent: "space-between",
-            paddingHorizontal: BRAND_HEADER_HORIZONTAL_PAD,
-            paddingVertical: 10,
-            gap: 12,
-            backgroundColor: colors.surface,
-            shadowColor: colors.shadow,
-            shadowOffset: { width: 0, height: 2 },
-            shadowOpacity: 0.08,
-            shadowRadius: 8,
-            elevation: 4,
-          }}
-        >
-          <View
-            style={{
-              flexDirection: brandHeaderRowFlexDirection(),
-              alignItems: "center",
-              flexShrink: 1,
-              minWidth: 0,
-              gap: 12,
-            }}
-          >
-            <View
-              style={{
-                backgroundColor: colors.brand,
-                borderRadius: 10,
-                paddingHorizontal: 4,
-                paddingVertical: 3,
-                justifyContent: "center",
-                alignItems: "center",
-              }}
-            >
-              <Image
-                source={EXPLORE_HEADER_LOGO}
-                style={{ height: 40, aspectRatio: EXPLORE_HEADER_LOGO_ASPECT }}
-                resizeMode="contain"
-              />
-            </View>
-          </View>
-        </View>
+        <BrandedAppHeader
+          chromed
+          elevated={false}
+          logoHeight={LOGO_HEADER_HEIGHT_MAP}
+          style={{ paddingTop: 8, paddingBottom: 4 }}
+        />
 
-        <View className="mt-2" style={{ paddingHorizontal: BRAND_HEADER_HORIZONTAL_PAD }}>
+        <View style={{ paddingHorizontal: BRAND_HEADER_HORIZONTAL_PAD }}>
           {/* Search bar */}
           <View
             className="rounded-full px-5 py-3 flex-row items-center gap-3"
@@ -2061,7 +2012,7 @@ export function ExploreScreen() {
           className="absolute left-0 right-0"
           onLayout={onBottomCardLayout}
           style={{
-            bottom: CARD_ABOVE_TAB_GAP,
+            bottom: TAB_BAR_FLOATING_GAP,
             zIndex: 20,
             paddingHorizontal: BRAND_HEADER_HORIZONTAL_PAD,
           }}
@@ -2189,7 +2140,7 @@ export function ExploreScreen() {
           className="absolute left-0 right-0"
           onLayout={onBottomCardLayout}
           style={{
-            bottom: CARD_ABOVE_TAB_GAP,
+            bottom: TAB_BAR_FLOATING_GAP,
             zIndex: 20,
             paddingHorizontal: BRAND_HEADER_HORIZONTAL_PAD,
           }}
@@ -2261,7 +2212,7 @@ export function ExploreScreen() {
           className="absolute left-0 right-0"
           onLayout={onBottomCardLayout}
           style={{
-            bottom: CARD_ABOVE_TAB_GAP,
+            bottom: TAB_BAR_FLOATING_GAP,
             zIndex: 20,
             paddingHorizontal: BRAND_HEADER_HORIZONTAL_PAD,
           }}

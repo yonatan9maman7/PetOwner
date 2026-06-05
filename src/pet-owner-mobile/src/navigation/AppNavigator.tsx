@@ -5,6 +5,7 @@ import {
   type BottomTabBarProps,
 } from "@react-navigation/bottom-tabs";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { TAB_BAR_CONTENT_HEIGHT } from "./tabBarLayout";
     import { createNativeStackNavigator } from "@react-navigation/native-stack";
     import { getFocusedRouteNameFromRoute } from "@react-navigation/native";
     import { Ionicons } from "@expo/vector-icons";
@@ -132,7 +133,7 @@ function SolidTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
         solidStyles.barContainer,
         {
           backgroundColor: barBg,
-          paddingBottom: Math.max(insets.bottom, 0),
+          paddingBottom: insets.bottom,
           shadowColor: colors.shadow,
         },
       ]}
@@ -206,17 +207,17 @@ function SolidTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
 
 const solidStyles = StyleSheet.create({
   barContainer: {
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-    elevation: 24,
+    borderTopLeftRadius: 12,
+    borderTopRightRadius: 12,
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
+    elevation: 16,
     zIndex: 9999,
   },
   contentRow: {
     flexDirection: "row",
-    height: 70,
+    height: TAB_BAR_CONTENT_HEIGHT,
     paddingHorizontal: 8,
     alignItems: "center",
   },

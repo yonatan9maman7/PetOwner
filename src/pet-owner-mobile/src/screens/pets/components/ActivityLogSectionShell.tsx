@@ -6,7 +6,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useTranslation, rowDirectionForAppLayout } from "../../../i18n";
 import { useTheme } from "../../../theme/ThemeContext";
 import type { PetDto } from "../../../types/api";
-import { getSpeciesEmoji } from "../MyPets/constants";
+import { PetThumb } from "../MyPets/components/PetThumb";
 import { useKeyboardAvoidingState } from "../../../hooks/useKeyboardAvoidingState";
 
 interface ActivityLogSectionShellProps {
@@ -74,7 +74,12 @@ export function ActivityLogSectionShell({ pet, onBack, children }: ActivityLogSe
                   backgroundColor: "rgba(255,255,255,0.2)",
                 }}
               >
-                <Text className="text-sm">{getSpeciesEmoji(pet.species)}</Text>
+                <PetThumb
+                  imageUrl={pet.imageUrl}
+                  species={pet.species}
+                  size={18}
+                  recyclingKey={pet.id}
+                />
                 <Text className="text-[13px] font-semibold" style={{ color: "rgba(255,255,255,0.9)" }}>
                   {pet.name}
                 </Text>

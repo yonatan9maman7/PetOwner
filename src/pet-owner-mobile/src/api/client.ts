@@ -272,7 +272,7 @@ export const petsApi = {
   deletePet: (id: string) => apiClient.delete(`/pets/${id}`),
   reportLost: (id: string, data: ReportLostRequest) =>
     apiClient
-      .post<PetDto>(`/pets/${id}/report-lost`, data)
+      .post<PetDto>(`/pets/${id}/report-lost`, data, { timeout: 60_000 })
       .then((r) => r.data),
   markFound: (id: string) =>
     apiClient.post<PetDto>(`/pets/${id}/mark-found`).then((r) => r.data),
