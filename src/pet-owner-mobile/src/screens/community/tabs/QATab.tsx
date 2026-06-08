@@ -1,5 +1,6 @@
-import { memo } from "react";
-import { View, Text, ScrollView, Pressable, RefreshControl } from "react-native";
+import { memo, useCallback } from "react";
+import { View, Text, Pressable, RefreshControl } from "react-native";
+import { FlashList } from "@shopify/flash-list";
 import { useTranslation } from "../../../i18n";
 import { useTheme } from "../../../theme/ThemeContext";
 import { useCommunityStyles } from "../communityStyles";
@@ -29,48 +30,59 @@ export const QATab = memo(function QATab({
   onAnswer,
   onToggleLike,
   copy,
-  t,
 }: QATabProps) {
   const { colors } = useTheme();
   const styles = useCommunityStyles();
   const { rtlText, rtlRow, isRTL } = useTranslation();
   const appRowDirection = isRTL ? "row-reverse" as const : "row" as const;
 
-  return (
-    <ScrollView
-      style={{ flex: 1 }}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.text} colors={[colors.text]} />}
-      contentContainerStyle={{ paddingBottom: bottomContentPadding }}
-    >
-      <SectionHeader
-        title={copy("qaTitle")}
-        subtitle={copy("qaSub")}
-        actionLabel={copy("askQuestion")}
-        onAction={onAskQuestion}
-      />
-      {questionPosts.length > 0 ? questionPosts.map((post) => (
-        <View key={post.id} style={styles.card}>
-          <Text style={[styles.sectionCardTitle, rtlText]}>{post.content}</Text>
-          <Text style={[styles.sectionCardSub, rtlText]}>
-            {copy("askedBy")} {post.userName} · {post.commentCount} {copy("answers")}
-          </Text>
-          <View style={[styles.metaWrap, { flexDirection: appRowDirection }]}>
-            <Text style={styles.metaPill}>{copy("training")}</Text>
-            <Text style={styles.metaPill}>{copy("bestAnswerPending")}</Text>
-            <Text style={styles.metaPill}>{copy("helpful")} {post.likeCount}</Text>
-          </View>
-          <View style={[styles.actionBar, rtlRow]}>
-            <Pressable onPress={() => onAnswer(post)} style={styles.primarySmallBtn}>
-              <Text style={styles.primarySmallText}>{copy("answer")}</Text>
-            </Pressable>
-            <Pressable onPress={() => onToggleLike(post.id)} style={styles.smallOutlineBtn}>
-              <Text style={styles.smallOutlineText}>{copy("helpful")}</Text>
-            </Pressable>
-          </View>
+  const renderItem = useCallback(
+    ({ item: post }: { item: PostDto; index: number }) => (
+      <View style={styles.card}>
+        <Text style={[styles.sectionCardTitle, rtlText]}>{post.content}</Text>
+        <Text style={[styles.sectionCardSub, rtlText]}>
+          {copy("askedBy")} {post.userName} · {post.commentCount} {copy("answers")}
+        </Text>
+        <View style={[styles.metaWrap, { flexDirection: appRowDirection }]}>
+          <Text style={styles.metaPill}>{copy("training")}</Text>
+          <Text style={styles.metaPill}>{copy("bestAnswerPending")}</Text>
+          <Text style={styles.metaPill}>{copy("helpful")} {post.likeCount}</Text>
         </View>
-      )) : (
-        <ListEmptyState icon="help-circle-outline" title={copy("qaTitle")} message={copy("qaSub")} />
-      )}
-    </ScrollView>
+        <View style={[styles.actionBar, rtlRow]}>
+          <Pressable onPress={() => onAnswer(post)} style={styles.primarySmallBtn}>
+            <Text style={styles.primarySmallText}>{copy("answer")}</Text>
+          </Pressable>
+          <Pressable onPress={() => onToggleLike(post.id)} style={styles.smallOutlineBtn}>
+            <Text style={styles.smallOutlineText}>{copy("helpful")}</Text>
+          </Pressable>
+        </View>
+      </View>
+    ),
+    [styles, rtlText, rtlRow, appRowDirection, copy, onAnswer, onToggleLike],
+  );
+
+  return (
+    <View style={{ flex: 1 }}>
+      <FlashList
+        data={questionPosts}
+        keyExtractor={(item) => item.id}
+        renderItem={renderItem}
+        ListHeaderComponent={
+          <SectionHeader
+            title={copy("qaTitle")}
+            subtitle={copy("qaSub")}
+            actionLabel={copy("askQuestion")}
+            onAction={onAskQuestion}
+          />
+        }
+        ListEmptyComponent={
+          <ListEmptyState icon="help-circle-outline" title={copy("qaTitle")} message={copy("qaSub")} />
+        }
+        contentContainerStyle={{ paddingBottom: bottomContentPadding, flexGrow: 1 }}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.text} colors={[colors.text]} />
+        }
+      />
+    </View>
   );
 });

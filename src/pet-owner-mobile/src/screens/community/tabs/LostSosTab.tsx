@@ -1,6 +1,6 @@
-import { memo } from "react";
-import { ScrollView, RefreshControl } from "react-native";
-import { useTranslation } from "../../../i18n";
+import { memo, useCallback } from "react";
+import { View, RefreshControl } from "react-native";
+import { FlashList } from "@shopify/flash-list";
 import { useTheme } from "../../../theme/ThemeContext";
 import { ListEmptyState, ScreenLoadingCenter } from "../../../components/shared";
 import { SectionHeader } from "./SectionHeader";
@@ -40,28 +40,36 @@ export const LostSosTab = memo(function LostSosTab({
   bottomContentPadding,
   onRefresh,
   renderPostCard,
-  copy,
   t,
 }: LostSosTabProps) {
   const { colors } = useTheme();
-  const { } = useTranslation();
+
+  const renderItem = useCallback(
+    ({ item }: { item: PostDto; index: number }) => renderPostCard(item),
+    [renderPostCard],
+  );
 
   return (
-    <ScrollView
-      style={{ flex: 1 }}
-      refreshControl={
-        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.text} colors={[colors.text]} />
-      }
-      contentContainerStyle={{ paddingBottom: bottomContentPadding }}
-    >
-      <SectionHeader title={t("cm_lost_sos_title")} subtitle={t("cm_lost_sos_subtitle")} />
-      {loading && sosFeedPosts.length === 0 ? (
-        <ScreenLoadingCenter spinnerSize={60} fill={false} style={{ paddingTop: 40 }} title={t("cm_lost_sos_title")} />
-      ) : sosFeedPosts.length > 0 ? (
-        sosFeedPosts.map((item) => renderPostCard(item))
-      ) : (
-        <ListEmptyState icon="warning-outline" title={t("cm_lost_sos_title")} message={t("cm_lost_sos_empty")} />
-      )}
-    </ScrollView>
+    <View style={{ flex: 1 }}>
+      <FlashList
+        data={sosFeedPosts}
+        keyExtractor={(item) => item.id}
+        renderItem={renderItem}
+        ListHeaderComponent={
+          <SectionHeader title={t("cm_lost_sos_title")} subtitle={t("cm_lost_sos_subtitle")} />
+        }
+        ListEmptyComponent={
+          loading ? (
+            <ScreenLoadingCenter spinnerSize={60} fill={false} style={{ paddingTop: 40 }} title={t("cm_lost_sos_title")} />
+          ) : (
+            <ListEmptyState icon="warning-outline" title={t("cm_lost_sos_title")} message={t("cm_lost_sos_empty")} />
+          )
+        }
+        contentContainerStyle={{ paddingBottom: bottomContentPadding }}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.text} colors={[colors.text]} />
+        }
+      />
+    </View>
   );
 });

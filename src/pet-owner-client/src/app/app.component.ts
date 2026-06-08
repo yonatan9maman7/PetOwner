@@ -31,6 +31,14 @@ import { TimeAgoPipe } from './shared/time-ago.pipe';
   styleUrl: './app.component.scss',
 })
 export class AppComponent {
+  private static readonly COMMUNITY_NOTIFICATION_TYPES = new Set([
+    'sos',
+    'sos_found',
+    'sos_resolved',
+    'POST_COMMENT',
+    'SOS_ALERT',
+  ]);
+
   private router = inject(Router);
   readonly auth = inject(AuthService);
   readonly providerService = inject(ProviderService);
@@ -184,7 +192,7 @@ export class AppComponent {
     if (!n.isRead) {
       this.notificationService.markAsRead(n.id).subscribe();
     }
-    if (n.type === 'sos' && n.relatedEntityId) {
+    if (n.relatedEntityId && AppComponent.COMMUNITY_NOTIFICATION_TYPES.has(n.type)) {
       this.router.navigate(['/community'], { queryParams: { highlightPost: n.relatedEntityId } });
       this.showNotificationPanel.set(false);
     } else if (n.relatedEntityId) {

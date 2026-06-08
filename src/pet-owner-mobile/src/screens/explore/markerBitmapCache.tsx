@@ -79,7 +79,8 @@ async function captureView(ref: React.RefObject<View | null>): Promise<string | 
       result: "tmpfile",
     });
     return uri;
-  } catch {
+  } catch (e) {
+    if (__DEV__) console.warn("[MarkerBitmap] captureRef failed:", e);
     return null;
   }
 }
@@ -133,13 +134,18 @@ export const MarkerBitmapPrerender = memo(function MarkerBitmapPrerender({
       return Boolean(p && s);
     };
 
+    const RETRY_DELAYS_MS = [0, 500, 1500, 3000, 5000] as const;
+
     const run = async () => {
-      const ok = await tryCapture(0);
-      if (cancelled || ok) return;
-      // Cold-start retry — give the font / native layout an extra moment.
-      const ok2 = await tryCapture(250);
-      if (cancelled || ok2) return;
-      await tryCapture(750);
+      for (const delayMs of RETRY_DELAYS_MS) {
+        const ok = await tryCapture(delayMs);
+        if (cancelled || ok) return;
+      }
+      if (!cancelled) {
+        console.warn(
+          "[MarkerBitmap] All capture attempts failed — markers will not render",
+        );
+      }
     };
     run();
 

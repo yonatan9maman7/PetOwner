@@ -7,6 +7,7 @@ import {
   SafeAreaProvider,
 } from "react-native-safe-area-context";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
+import { SystemBars } from "react-native-edge-to-edge";
 import { ErrorBoundary } from "react-error-boundary";
 import * as Sentry from "@sentry/react-native";
 import { initSentry, isSentryEnabled, navigationIntegration } from "./src/services/sentry";
@@ -52,7 +53,7 @@ import { GlobalModalProvider } from "./src/components/global-modal";
 import { MarkerBitmapPrerender } from "./src/screens/explore/markerBitmapCache";
 import { attachNotificationListeners, type TapPayload } from "./src/services/pushService";
 import { routeForNotification } from "./src/services/notificationRouter";
-import Toast from "react-native-toast-message";
+import { AppToast } from "./src/components/AppToast";
 
 // Set the foreground notification handler once at module scope (before first render).
 // Without this, Expo silently drops notifications when the app is in the foreground.
@@ -113,9 +114,7 @@ function AppInner() {
         <AppNavigator />
         <StatusBar style={isDark ? "light" : "dark"} />
       </NavigationContainer>
-      <View style={{ zIndex: 9999 }} pointerEvents="box-none">
-        <Toast />
-      </View>
+      <AppToast />
       <ImageSourcePickerHost />
     </>
   );
@@ -192,18 +191,6 @@ function App() {
     };
   }, [authHydrated]);
 
-  if (!authHydrated || !themeHydrated) {
-    return (
-      <View
-        style={{
-          flex: 1,
-          ...APP_LAYOUT_ROOT,
-          backgroundColor: Platform.OS === "android" ? ANDROID_EDGE_BG : "#fff",
-        }}
-      />
-    );
-  }
-
   return (
     <ErrorBoundary
       FallbackComponent={ErrorFallback}
@@ -222,16 +209,26 @@ function App() {
           backgroundColor: Platform.OS === "android" ? ANDROID_EDGE_BG : undefined,
         }}
       >
+        <SystemBars style={{ navigationBar: "auto" }} />
         <SafeAreaProvider initialMetrics={initialWindowMetrics}>
-          <ThemeProvider>
-            <RootShell>
-              <GlobalModalProvider>
-                <MarkerBitmapPrerender>
-                  <AppInner />
-                </MarkerBitmapPrerender>
-              </GlobalModalProvider>
-            </RootShell>
-          </ThemeProvider>
+          {!authHydrated || !themeHydrated ? (
+            <View
+              style={{
+                flex: 1,
+                backgroundColor: Platform.OS === "android" ? ANDROID_EDGE_BG : "#fff",
+              }}
+            />
+          ) : (
+            <ThemeProvider>
+              <RootShell>
+                <GlobalModalProvider>
+                  <MarkerBitmapPrerender>
+                    <AppInner />
+                  </MarkerBitmapPrerender>
+                </GlobalModalProvider>
+              </RootShell>
+            </ThemeProvider>
+          )}
         </SafeAreaProvider>
       </GestureHandlerRootView>
     </ErrorBoundary>

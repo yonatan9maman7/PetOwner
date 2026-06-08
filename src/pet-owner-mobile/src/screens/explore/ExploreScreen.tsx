@@ -363,7 +363,7 @@ export function ExploreScreen() {
       clusterPinsTotal,
     });
 
-    const MAX_MARKER_POOL_SIZE = 200;
+    const MAX_MARKER_POOL_SIZE = 500;
     if (items.length > poolHighWaterRef.current) {
       poolHighWaterRef.current = Math.min(items.length, MAX_MARKER_POOL_SIZE);
     }

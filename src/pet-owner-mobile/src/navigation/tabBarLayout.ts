@@ -1,6 +1,6 @@
 import { useContext } from "react";
 import { BottomTabBarHeightContext } from "@react-navigation/bottom-tabs";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useBottomSafeInset } from "../hooks/useBottomSafeInset";
 
 /** Icon + label row — must match `solidStyles.contentRow.height` in AppNavigator. */
 export const TAB_BAR_CONTENT_HEIGHT = 70;
@@ -26,8 +26,8 @@ export function tabBarOccupiedHeightFromInset(bottomInset: number): number {
  */
 export function useTabBarOccupiedHeight(): number {
   const measured = useContext(BottomTabBarHeightContext);
-  const insets = useSafeAreaInsets();
-  const fallback = tabBarOccupiedHeightFromInset(insets.bottom);
+  const bottomInset = useBottomSafeInset();
+  const fallback = tabBarOccupiedHeightFromInset(bottomInset);
   if (measured !== undefined && measured > TAB_BAR_CONTENT_HEIGHT * 0.5) {
     return Math.max(measured, fallback);
   }

@@ -3,7 +3,7 @@
     "name": "PetCare",
     "slug": "pet-owner-mobile",
     "scheme": "petowner",
-    "version": "1.0.11",
+    "version": "1.0.13",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -38,7 +38,7 @@
     },
     "android": {
       "package": "com.petowner.app",
-      "versionCode": 12,
+      "versionCode": 14,
       "softwareKeyboardLayoutMode": "resize",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",

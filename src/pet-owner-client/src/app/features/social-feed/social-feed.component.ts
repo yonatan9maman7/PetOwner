@@ -1,4 +1,5 @@
-import { Component, inject, OnInit, signal, computed, HostListener, AfterViewInit } from '@angular/core';
+import { Component, inject, OnInit, signal, computed, HostListener } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import { DatePipe, DecimalPipe, NgClass } from '@angular/common';
 import { Router, ActivatedRoute } from '@angular/router';
@@ -558,7 +559,7 @@ import { isFoundPetCategory } from '../../utils/sos-post-content';
     .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
   `,
 })
-export class SocialFeedComponent implements OnInit, AfterViewInit {
+export class SocialFeedComponent implements OnInit {
   private readonly postService = inject(PostService);
   private readonly communityService = inject(CommunityService);
   private readonly petService = inject(PetService);
@@ -624,29 +625,38 @@ export class SocialFeedComponent implements OnInit, AfterViewInit {
   miniProfile = signal<UserMiniProfile | null>(null);
   miniProfileLoading = signal(false);
 
+  constructor() {
+    this.route.queryParamMap.pipe(takeUntilDestroyed()).subscribe((params) => {
+      const hp = params.get('highlightPost');
+      this.highlightPostId.set(hp);
+      if (hp && !this.feedLoading()) {
+        this.attemptScrollToPost(hp);
+      }
+    });
+  }
+
   ngOnInit(): void {
     this.currentUserId.set(this.auth.userId());
     this.loadGroups();
-
-    const hp = this.route.snapshot.queryParamMap.get('highlightPost');
-    if (hp) {
-      this.highlightPostId.set(hp);
-    }
-
     this.loadFeed();
   }
 
-  ngAfterViewInit(): void {
+  private maybeScrollToHighlightPost(): void {
     const hp = this.highlightPostId();
     if (hp) {
-      setTimeout(() => this.scrollToPost(hp), 600);
+      this.attemptScrollToPost(hp);
     }
   }
 
-  private scrollToPost(postId: string): void {
+  private attemptScrollToPost(postId: string, retries = 0): void {
+    const maxRetries = 10;
     const el = document.getElementById('post-' + postId);
     if (el) {
       el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return;
+    }
+    if (retries < maxRetries) {
+      setTimeout(() => this.attemptScrollToPost(postId, retries + 1), 50);
     }
   }
 
@@ -774,6 +784,7 @@ export class SocialFeedComponent implements OnInit, AfterViewInit {
           this.hasMore.set(false);
           this.feedLoading.set(false);
           this.page = 1;
+          this.maybeScrollToHighlightPost();
         },
         error: () => {
           this.toast.error('Failed to load feed.');
@@ -787,6 +798,7 @@ export class SocialFeedComponent implements OnInit, AfterViewInit {
           this.hasMore.set(posts.length >= 20);
           this.feedLoading.set(false);
           this.page = 1;
+          this.maybeScrollToHighlightPost();
         },
         error: () => {
           this.toast.error('Failed to load feed.');

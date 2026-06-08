@@ -23,6 +23,7 @@ module.exports = ({ config }) => {
   const sentryProject = process.env.SENTRY_PROJECT?.trim() || "YOUR_SENTRY_PROJECT";
   const plugins = [
     ...(config.plugins ?? []),
+    "react-native-edge-to-edge",
     [
       "@sentry/react-native/expo",
       {

@@ -17,6 +17,8 @@ import {
   Share,
   InteractionManager,
 } from "react-native";
+import { FlashList } from "@shopify/flash-list";
+import { Image as ExpoImage } from "expo-image";
 import { showGlobalAlertCompat, showMarkFoundConfirmAlert } from "../../components/global-modal";
 import { SafeAreaProvider, SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { FormFieldLabel } from "../../components/FormFieldLabel";
@@ -86,6 +88,9 @@ import { GroupsTab } from "./tabs/GroupsTab";
 import { QATab } from "./tabs/QATab";
 import { EventsTab } from "./tabs/EventsTab";
 import { LostSosTab } from "./tabs/LostSosTab";
+import { PostCardSkeleton } from "./PostCardSkeleton";
+
+const SKELETON_COUNT = [0, 1, 2, 3];
 
 const PostCard = memo(function PostCard({
   post,
@@ -108,6 +113,7 @@ const PostCard = memo(function PostCard({
   onSosResolved,
   celebrateMarkFoundBurst,
   onOpenChat,
+  onCommentsPress,
 }: {
   post: PostDto;
   meta?: PostMeta;
@@ -129,6 +135,7 @@ const PostCard = memo(function PostCard({
   onSosResolved?: (postId: string, resolvedAtIso: string) => void;
   celebrateMarkFoundBurst?: () => void;
   onOpenChat?: (userId: string, userName: string) => void;
+  onCommentsPress: (postId: string) => void;
 }) {
   const { colors } = useTheme();
   const { language, t } = useTranslation();
@@ -138,7 +145,6 @@ const PostCard = memo(function PostCard({
 
   const isMine = currentUserId === post.userId;
   const [lightboxOpen, setLightboxOpen] = useState(false);
-  const [sheetOpen, setSheetOpen] = useState(false);
   const [localCommentCount, setLocalCommentCount] = useState(post.commentCount);
   const [menuOpen, setMenuOpen] = useState(false);
   const [sosResolving, setSosResolving] = useState(false);
@@ -325,10 +331,12 @@ const PostCard = memo(function PostCard({
       {post.imageUrl && (
         <>
           <Pressable onPress={() => setLightboxOpen(true)}>
-            <Image
+            <ExpoImage
               source={{ uri: post.imageUrl }}
               style={styles.postImage}
-              resizeMode="cover"
+              contentFit="cover"
+              cachePolicy="memory-disk"
+              transition={200}
             />
           </Pressable>
           <ImageLightbox
@@ -428,7 +436,7 @@ const PostCard = memo(function PostCard({
         </Pressable>
         <Pressable
           style={[styles.actionBtn, rtlRow]}
-          onPress={() => setSheetOpen(true)}
+          onPress={() => onCommentsPress(post.id)}
         >
           <Ionicons
             name="chatbubble-outline"
@@ -468,15 +476,6 @@ const PostCard = memo(function PostCard({
         </Pressable>
       </View>
 
-      <CommentsBottomSheet
-        visible={sheetOpen}
-        onClose={() => setSheetOpen(false)}
-        postId={post.id}
-        postAuthorId={post.userId}
-        onCommentCountChange={(delta) => {
-          setLocalCommentCount((n) => Math.max(0, n + delta));
-        }}
-      />
     </View>
   );
 });
@@ -556,6 +555,7 @@ export function CommunityScreen() {
   const [hasMore, setHasMore] = useState(false);
   const [isFetchingNextPage, setIsFetchingNextPage] = useState(false);
   const [composerOpen, setComposerOpen] = useState(false);
+  const [openCommentsPostId, setOpenCommentsPostId] = useState<string | null>(null);
   const [newPostContent, setNewPostContent] = useState("");
   const [newPostType, setNewPostType] = useState<PostKind>("Cute moment");
   const [newPostLocation, setNewPostLocation] = useState("");
@@ -585,6 +585,10 @@ export function CommunityScreen() {
   const likeLockRef = useRef<Set<string>>(new Set());
   const deleteLockRef = useRef<Set<string>>(new Set());
   const locationPermissionAsked = useRef(false);
+  const FEED_TTL_MS = 90_000;
+  const lastFeedFetchRef = useRef<number>(0);
+  const lastDashboardFetchRef = useRef<number>(0);
+  const lastPetsFetchRef = useRef<number>(0);
   const [likeBusy, setLikeBusy] = useState<Record<string, boolean>>({});
   const [deleteBusy, setDeleteBusy] = useState<Record<string, boolean>>({});
 
@@ -691,16 +695,6 @@ export function CommunityScreen() {
     }
   }, [focusedRef]);
 
-  useEffect(() => {
-    if (!hydrated || !isLoggedIn) return;
-    const task = InteractionManager.runAfterInteractions(() => {
-      if (focusedRef.current) void loadDashboard();
-    });
-    return () => {
-      task.cancel?.();
-    };
-  }, [hydrated, isLoggedIn, loadDashboard, focusedRef]);
-
   const loadFeed = useCallback(
     async (p: number, replace: boolean) => {
       if (!focusedRef.current) return;
@@ -751,12 +745,6 @@ export function CommunityScreen() {
     }, [navigation, route.params?.focusPostId]),
   );
 
-  const onRefreshFeed = useCallback(async () => {
-    setRefreshing(true);
-    await Promise.all([loadFeed(1, true), loadPets(), loadPlaydates(), loadDashboard()]);
-    setRefreshing(false);
-  }, [loadFeed, loadDashboard]);
-
   const loadGroups = useCallback(async () => {
     if (!focusedRef.current) return;
     setGroupsLoading(true);
@@ -803,6 +791,15 @@ export function CommunityScreen() {
       if (focusedRef.current) setPlaydatesLoading(false);
     }
   }, [focusedRef]);
+
+  const onRefreshFeed = useCallback(async () => {
+    lastFeedFetchRef.current = 0;
+    lastDashboardFetchRef.current = 0;
+    lastPetsFetchRef.current = 0;
+    setRefreshing(true);
+    await Promise.all([loadFeed(1, true), loadPets(), loadPlaydates(), loadDashboard()]);
+    setRefreshing(false);
+  }, [loadFeed, loadPets, loadPlaydates, loadDashboard]);
 
   const loadBeacons = useCallback(async () => {
     if (!focusedRef.current) return;
@@ -907,10 +904,22 @@ export function CommunityScreen() {
       if (!hydrated || !isLoggedIn) return undefined;
       const task = InteractionManager.runAfterInteractions(() => {
         if (!focusedRef.current) return;
-        loadPets();
-        void loadDashboard();
+        const now = Date.now();
+        if (now - lastPetsFetchRef.current > FEED_TTL_MS) {
+          lastPetsFetchRef.current = now;
+          loadPets();
+        }
+        if (now - lastDashboardFetchRef.current > FEED_TTL_MS) {
+          lastDashboardFetchRef.current = now;
+          void loadDashboard();
+        }
         const tab = mainTabRef.current;
-        if (tab === "feed" || tab === "qa" || tab === "lostSos") void loadFeed(1, true);
+        if (tab === "feed" || tab === "qa" || tab === "lostSos") {
+          if (now - lastFeedFetchRef.current > FEED_TTL_MS) {
+            lastFeedFetchRef.current = now;
+            void loadFeed(1, true);
+          }
+        }
         if (tab === "groups") void loadGroups();
         if (tab === "playdates" || tab === "events") void loadPlaydates();
         if (tab === "parks") {
@@ -1701,7 +1710,7 @@ export function CommunityScreen() {
   };
 
   const renderFeedItem = useCallback(
-    ({ item }: ListRenderItemInfo<PostDto>) => (
+    ({ item }: { item: PostDto; index: number }) => (
       <PostCard
         post={item}
         meta={postMetaById[item.id]}
@@ -1717,6 +1726,7 @@ export function CommunityScreen() {
         onSosResolved={handleSosResolved}
         celebrateMarkFoundBurst={burstMarkFoundCelebrate}
         onOpenChat={openChatWithPostAuthor}
+        onCommentsPress={setOpenCommentsPostId}
         rtlText={rtlText}
         rtlRow={rtlRow}
         isRTL={isRTL}
@@ -1935,6 +1945,7 @@ export function CommunityScreen() {
         onSosResolved={handleSosResolved}
         celebrateMarkFoundBurst={burstMarkFoundCelebrate}
         onOpenChat={openChatWithPostAuthor}
+        onCommentsPress={setOpenCommentsPostId}
         rtlText={rtlText}
         rtlRow={rtlRow}
         isRTL={isRTL}
@@ -2066,17 +2077,20 @@ export function CommunityScreen() {
           <ScreenLoadingCenter spinnerSize={60} />
         ) : mainTab === "feed" ? (
           loading && posts.length === 0 ? (
-            <ScrollView
-              style={{ flex: 1 }}
-              contentContainerStyle={{ paddingBottom: bottomContentPadding }}
-              scrollEnabled={false}
-            >
-              {feedHeaderElement}
-              <ScreenLoadingCenter spinnerSize={60} fill={false} style={{ paddingTop: 40 }} />
-            </ScrollView>
+            <View style={{ flex: 1 }}>
+              <FlashList
+                style={{ flex: 1 }}
+                data={SKELETON_COUNT}
+                keyExtractor={(item) => String(item)}
+                renderItem={() => <PostCardSkeleton />}
+                ListHeaderComponent={feedHeaderElement}
+                contentContainerStyle={{ paddingBottom: bottomContentPadding }}
+                scrollEnabled={false}
+              />
+            </View>
           ) : (
             <View style={{ flex: 1 }}>
-              <FlatList
+              <FlashList
                 style={{ flex: 1 }}
                 data={filteredPosts}
                 keyExtractor={(item) => item.id}
@@ -2085,10 +2099,6 @@ export function CommunityScreen() {
                 ListFooterComponent={renderFeedFooter}
                 contentContainerStyle={{ paddingBottom: bottomContentPadding, flexGrow: 1 }}
                 keyboardShouldPersistTaps="handled"
-                initialNumToRender={5}
-                maxToRenderPerBatch={5}
-                windowSize={7}
-                removeClippedSubviews
                 onEndReached={loadMore}
                 onEndReachedThreshold={0.5}
                 refreshControl={
@@ -2412,6 +2422,22 @@ export function CommunityScreen() {
         </Modal>
       )}
 
+      <CommentsBottomSheet
+        visible={openCommentsPostId !== null}
+        onClose={() => setOpenCommentsPostId(null)}
+        postId={openCommentsPostId ?? ""}
+        postAuthorId={posts.find((p) => p.id === openCommentsPostId)?.userId ?? ""}
+        onCommentCountChange={(delta) => {
+          if (!openCommentsPostId) return;
+          setPosts((prev) =>
+            prev.map((p) =>
+              p.id === openCommentsPostId
+                ? { ...p, commentCount: Math.max(0, p.commentCount + delta) }
+                : p,
+            ),
+          );
+        }}
+      />
       <CommentsBottomSheet
         visible={!!answerPost}
         onClose={() => setAnswerPost(null)}

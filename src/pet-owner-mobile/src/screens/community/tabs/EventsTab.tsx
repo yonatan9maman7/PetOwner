@@ -1,6 +1,7 @@
-import { memo } from "react";
-import { View, Text, ScrollView, Pressable, RefreshControl } from "react-native";
+import { memo, useCallback } from "react";
+import { View, Text, Pressable, RefreshControl } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { FlashList } from "@shopify/flash-list";
 import { useTranslation } from "../../../i18n";
 import { useTheme } from "../../../theme/ThemeContext";
 import { useCommunityStyles } from "../communityStyles";
@@ -34,61 +35,69 @@ export const EventsTab = memo(function EventsTab({
   const { rtlText, rtlRow, isRTL } = useTranslation();
   const appRowDirection = isRTL ? "row-reverse" as const : "row" as const;
 
-  return (
-    <ScrollView
-      style={{ flex: 1 }}
-      refreshControl={<RefreshControl refreshing={playdatesLoading} onRefresh={onRefresh} tintColor={colors.text} colors={[colors.text]} />}
-      contentContainerStyle={{ paddingBottom: bottomContentPadding }}
-    >
-      <SectionHeader
-        title={copy("eventsTitle")}
-        subtitle={copy("eventsSub")}
-        actionLabel={copy("createPlaydate")}
-        onAction={onCreatePlaydate}
-      />
-      {playdatesLoading && playdates.length === 0 ? (
-        <ScreenLoadingCenter spinnerSize={60} fill={false} style={{ paddingTop: 40 }} title={copy("eventsTitle")} />
-      ) : playdates.length > 0 ? (
-        playdates.map((event) => {
-          const joined = event.myRsvpStatus === "Going";
-          const spotsLeft = Math.max(0, (event.maxPets ?? event.goingCount) - event.goingCount);
-          return (
-            <View key={event.id} style={styles.card}>
-              <View style={[styles.cardRow, rtlRow]}>
-                <View style={styles.iconBubble}>
-                  <Ionicons name="sparkles-outline" size={19} color={colors.text} />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={[styles.sectionCardTitle, rtlText]}>{event.title}</Text>
-                  <Text style={[styles.sectionCardSub, rtlText]}>
-                    {event.hostUserName} · {formatDateTime(event.scheduledFor)}
-                  </Text>
-                </View>
-              </View>
-              <Text style={[styles.contentText, rtlText]}>{event.description || copy("openPlaydate")}</Text>
-              <View style={[styles.metaWrap, { flexDirection: appRowDirection }]}>
-                <Text style={styles.metaPill}>{event.locationName}</Text>
-                <Text style={styles.metaPill}>
-                  {event.maxPets ? `${event.maxPets} ${copy("maxParticipants")}` : copy("allSizes")}
-                </Text>
-                <Text style={styles.metaPill}>{spotsLeft} {copy("spotsLeft")}</Text>
-                <Text style={styles.metaPill}>{event.goingCount} {copy("dogsAttending")}</Text>
-              </View>
-              <Pressable onPress={() => onJoinEvent(event)} style={joined ? styles.smallOutlineBtn : styles.primarySmallBtn}>
-                <Text style={joined ? styles.smallOutlineText : styles.primarySmallText}>
-                  {joined ? copy("joined") : copy("joinEvent")}
-                </Text>
-              </Pressable>
+  const renderItem = useCallback(
+    ({ item: event }: { item: PlaydateEventDto; index: number }) => {
+      const joined = event.myRsvpStatus === "Going";
+      const spotsLeft = Math.max(0, (event.maxPets ?? event.goingCount) - event.goingCount);
+      return (
+        <View style={styles.card}>
+          <View style={[styles.cardRow, rtlRow]}>
+            <View style={styles.iconBubble}>
+              <Ionicons name="sparkles-outline" size={19} color={colors.text} />
             </View>
-          );
-        })
-      ) : (
-        <ListEmptyState
-          icon="sparkles-outline"
-          title={copy("noPlaydates")}
-          message={copy("eventsSub")}
-        />
-      )}
-    </ScrollView>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.sectionCardTitle, rtlText]}>{event.title}</Text>
+              <Text style={[styles.sectionCardSub, rtlText]}>
+                {event.hostUserName} · {formatDateTime(event.scheduledFor)}
+              </Text>
+            </View>
+          </View>
+          <Text style={[styles.contentText, rtlText]}>{event.description || copy("openPlaydate")}</Text>
+          <View style={[styles.metaWrap, { flexDirection: appRowDirection }]}>
+            <Text style={styles.metaPill}>{event.locationName}</Text>
+            <Text style={styles.metaPill}>
+              {event.maxPets ? `${event.maxPets} ${copy("maxParticipants")}` : copy("allSizes")}
+            </Text>
+            <Text style={styles.metaPill}>{spotsLeft} {copy("spotsLeft")}</Text>
+            <Text style={styles.metaPill}>{event.goingCount} {copy("dogsAttending")}</Text>
+          </View>
+          <Pressable onPress={() => onJoinEvent(event)} style={joined ? styles.smallOutlineBtn : styles.primarySmallBtn}>
+            <Text style={joined ? styles.smallOutlineText : styles.primarySmallText}>
+              {joined ? copy("joined") : copy("joinEvent")}
+            </Text>
+          </Pressable>
+        </View>
+      );
+    },
+    [styles, rtlText, rtlRow, appRowDirection, colors, copy, onJoinEvent],
+  );
+
+  return (
+    <View style={{ flex: 1 }}>
+      <FlashList
+        data={playdates}
+        keyExtractor={(item) => item.id}
+        renderItem={renderItem}
+        ListHeaderComponent={
+          <SectionHeader
+            title={copy("eventsTitle")}
+            subtitle={copy("eventsSub")}
+            actionLabel={copy("createPlaydate")}
+            onAction={onCreatePlaydate}
+          />
+        }
+        ListEmptyComponent={
+          playdatesLoading ? (
+            <ScreenLoadingCenter spinnerSize={60} fill={false} style={{ paddingTop: 40 }} title={copy("eventsTitle")} />
+          ) : (
+            <ListEmptyState icon="sparkles-outline" title={copy("noPlaydates")} message={copy("eventsSub")} />
+          )
+        }
+        contentContainerStyle={{ paddingBottom: bottomContentPadding }}
+        refreshControl={
+          <RefreshControl refreshing={playdatesLoading} onRefresh={onRefresh} tintColor={colors.text} colors={[colors.text]} />
+        }
+      />
+    </View>
   );
 });

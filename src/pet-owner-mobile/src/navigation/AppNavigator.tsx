@@ -1,6 +1,15 @@
-import { useEffect, useRef, useState } from "react";
-import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, InteractionManager } from "react-native";
+import { useContext, useEffect, useRef, useState } from "react";
 import {
+  View,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+  ActivityIndicator,
+  InteractionManager,
+  Platform,
+} from "react-native";
+import {
+  BottomTabBarHeightCallbackContext,
   createBottomTabNavigator,
   type BottomTabBarProps,
 } from "@react-navigation/bottom-tabs";
@@ -119,26 +128,42 @@ import { TAB_BAR_CONTENT_HEIGHT } from "./tabBarLayout";
 
 function SolidTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
   const insets = useSafeAreaInsets();
-  const { colors, isDark } = useTheme();
+  const bottomInset = insets.bottom;
+  const onTabBarHeightChange = useContext(BottomTabBarHeightCallbackContext);
+  const { colors } = useTheme();
 
   const focusedRoute = state.routes[state.index];
   const focusedTabBarStyle = (descriptors[focusedRoute.key].options as any).tabBarStyle;
   if (focusedTabBarStyle?.display === "none") return null;
 
-  const barBg = isDark ? "#0A1229" : "#0D1B42";
-
   return (
     <View
-      style={[
-        solidStyles.barContainer,
-        {
-          backgroundColor: barBg,
-          paddingBottom: insets.bottom,
-          shadowColor: colors.shadow,
-        },
-      ]}
+      onLayout={(e) => onTabBarHeightChange?.(e.nativeEvent.layout.height)}
+      style={{
+        backgroundColor: colors.tabBar,
+        marginBottom: bottomInset,
+        borderTopLeftRadius: 12,
+        borderTopRightRadius: 12,
+        ...(Platform.OS === "ios"
+          ? {
+              shadowColor: colors.shadow,
+              shadowOffset: { width: 0, height: -2 },
+              shadowOpacity: 0.1,
+              shadowRadius: 6,
+            }
+          : { elevation: 16 }),
+        overflow: "visible",
+        zIndex: 9999,
+      }}
     >
-      <View style={solidStyles.contentRow}>
+      <View
+        style={{
+          flexDirection: "row",
+          height: TAB_BAR_CONTENT_HEIGHT,
+          paddingHorizontal: 8,
+          alignItems: "center",
+        }}
+      >
         {state.routes.map((route, index) => {
           const { options } = descriptors[route.key];
           const isFocused = state.index === index;
@@ -206,21 +231,6 @@ function SolidTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
 }
 
 const solidStyles = StyleSheet.create({
-  barContainer: {
-    borderTopLeftRadius: 12,
-    borderTopRightRadius: 12,
-    shadowOffset: { width: 0, height: -2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 6,
-    elevation: 16,
-    zIndex: 9999,
-  },
-  contentRow: {
-    flexDirection: "row",
-    height: TAB_BAR_CONTENT_HEIGHT,
-    paddingHorizontal: 8,
-    alignItems: "center",
-  },
   tabItem: {
     flex: 1,
     height: 56,
@@ -516,6 +526,7 @@ const solidStyles = StyleSheet.create({
       const requiresPhone = useAuthStore((s) => s.requiresPhone);
       const unreadCount = useNotificationStore((s) => s.unreadCount);
       const { t } = useTranslation();
+      const { colors } = useTheme();
 
       useNavigateToExploreAfterLogin(isLoggedIn, requiresPhone);
       useNavigateToLoginAfterLogout(isLoggedIn, requiresPhone);
@@ -540,9 +551,13 @@ const solidStyles = StyleSheet.create({
       return (
         <>
         <NotificationToast />
+        <View
+          style={{ flex: 1, overflow: "visible", backgroundColor: colors.tabBar }}
+          collapsable={false}
+        >
         <Tab.Navigator
           key={isLoggedIn ? "authenticated" : "guest"}
-          tabBar={(tabProps) => <SolidTabBar {...tabProps} />}
+          tabBar={(props) => <SolidTabBar {...props} />}
           screenOptions={{
             headerShown: false,
             freezeOnBlur: true,
@@ -656,6 +671,7 @@ const solidStyles = StyleSheet.create({
             />
           )}
         </Tab.Navigator>
+        </View>
         <GlobalSosFab />
         </>
       );

@@ -49,58 +49,60 @@ export function ThemePickerModal({ visible, onClose }: ThemePickerModalProps) {
         <View style={[styles.card, { width: cardWidth }]}>
           <Text style={[styles.title, { color: colors.text }]}>{t("darkMode")}</Text>
 
-          {THEME_OPTIONS.map((opt) => {
-            const active = preference === opt.id;
-            return (
-              <Pressable
-                key={opt.id}
-                onPress={() => selectTheme(opt.id)}
-                accessibilityRole="radio"
-                accessibilityState={{ selected: active }}
-                style={({ pressed }) => [
-                  styles.option,
-                  active && { backgroundColor: colors.primaryLight },
-                  pressed && !active && { backgroundColor: colors.surfaceSecondary },
-                ]}
-              >
-                <View style={[styles.optionRow, isRTL && styles.optionRowRTL]}>
-                  <View
-                    style={[
-                      styles.iconBox,
-                      {
-                        backgroundColor: active ? colors.primary : colors.surfaceSecondary,
-                      },
-                    ]}
-                  >
-                    <Ionicons
-                      name={opt.icon}
-                      size={20}
-                      color={active ? colors.primaryText : colors.textMuted}
-                    />
-                  </View>
-                  <Text
-                    style={[
-                      styles.optionLabel,
-                      rtlText,
-                      { color: active ? colors.primary : colors.text },
-                    ]}
-                    numberOfLines={1}
-                  >
-                    {labels[opt.id]}
-                  </Text>
-                  <View style={styles.checkSlot}>
-                    {active ? (
+          <View style={styles.optionsList}>
+            {THEME_OPTIONS.map((opt) => {
+              const active = preference === opt.id;
+              return (
+                <Pressable
+                  key={opt.id}
+                  onPress={() => selectTheme(opt.id)}
+                  accessibilityRole="radio"
+                  accessibilityState={{ selected: active }}
+                  style={({ pressed }) => [
+                    styles.option,
+                    active && { backgroundColor: colors.primaryLight },
+                    pressed && !active && { backgroundColor: colors.surfaceSecondary },
+                  ]}
+                >
+                  <View style={[styles.optionRow, isRTL && styles.optionRowRTL]}>
+                    <View
+                      style={[
+                        styles.iconBox,
+                        {
+                          backgroundColor: active ? colors.primary : colors.surfaceSecondary,
+                        },
+                      ]}
+                    >
                       <Ionicons
-                        name="checkmark-circle"
-                        size={24}
-                        color={colors.primary}
+                        name={opt.icon}
+                        size={20}
+                        color={active ? colors.primaryText : colors.textMuted}
                       />
-                    ) : null}
+                    </View>
+                    <Text
+                      style={[
+                        styles.optionLabel,
+                        rtlText,
+                        { color: active ? colors.primary : colors.text },
+                      ]}
+                      numberOfLines={1}
+                    >
+                      {labels[opt.id]}
+                    </Text>
+                    <View style={styles.checkSlot}>
+                      {active ? (
+                        <Ionicons
+                          name="checkmark-circle"
+                          size={24}
+                          color={colors.primary}
+                        />
+                      ) : null}
+                    </View>
                   </View>
-                </View>
-              </Pressable>
-            );
-          })}
+                </Pressable>
+              );
+            })}
+          </View>
         </View>
       </View>
     </Modal>
@@ -133,9 +135,12 @@ function createStyles(colors: ReturnType<typeof useTheme>["colors"]) {
       textAlign: "center",
       marginBottom: 20,
     },
+    optionsList: {
+      gap: 16,
+    },
     option: {
       borderRadius: 12,
-      marginBottom: 6,
+      minHeight: 48,
       paddingVertical: 14,
       paddingHorizontal: 16,
     },
