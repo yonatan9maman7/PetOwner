@@ -9,10 +9,10 @@ test.describe("Expo web smoke", () => {
     await expect(page.getByTestId("tab-login")).toBeVisible();
   });
 
-  test("login tab shows email and password fields", async ({ page }) => {
+  test("login tab shows identifier and password fields", async ({ page }) => {
     await page.goto("/");
     await page.getByTestId("tab-login").click();
-    await expect(page.getByTestId("login-email-input")).toBeVisible();
+    await expect(page.getByTestId("login-identifier-input")).toBeVisible();
     await expect(page.getByTestId("login-password-input")).toBeVisible();
     await expect(page.getByTestId("login-submit-button")).toBeVisible();
   });

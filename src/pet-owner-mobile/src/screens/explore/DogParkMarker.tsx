@@ -34,6 +34,7 @@ export const DogParkMarker = memo(function DogParkMarker({
 
   return (
     <MarkerWrapper
+      testID="map-marker-park"
       coordinate={coordinate}
       tracksViewChanges={tracksViewChanges}
       zIndex={zIndex}

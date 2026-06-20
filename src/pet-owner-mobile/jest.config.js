@@ -7,6 +7,10 @@ module.exports = {
     "<rootDir>/jest.setup-fetch-guard.js",
     ...(jestExpo.setupFiles || []),
   ],
+  setupFilesAfterEnv: [
+    ...(jestExpo.setupFilesAfterEnv || []),
+    "<rootDir>/jest.setup-teardown.js",
+  ],
   moduleNameMapper: {
     ...(jestExpo.moduleNameMapper || {}),
     "^axios$": "<rootDir>/node_modules/axios/dist/node/axios.cjs",

@@ -12,7 +12,10 @@ import {
 import { useTheme } from "../../theme/ThemeContext";
 import type { ThemePreference } from "../../store/themeStore";
 import { ThemePickerModal } from "../../components/ThemePickerModal";
+import Constants from "expo-constants";
 import { APP_DISPLAY_NAME } from "../../branding/logos";
+
+const APP_VERSION = Constants.expoConfig?.version ?? "1.0.0";
 
 /* ───────────────────── Primitives ───────────────────── */
 
@@ -426,7 +429,7 @@ export function AccountSettingsScreen() {
         </View>
 
         <Text style={{ textAlign: "center", fontSize: 12, color: colors.textMuted, marginTop: 20 }}>
-          {APP_DISPLAY_NAME} v1.0.0
+          {APP_DISPLAY_NAME} v{APP_VERSION}
         </Text>
       </ScrollView>
 

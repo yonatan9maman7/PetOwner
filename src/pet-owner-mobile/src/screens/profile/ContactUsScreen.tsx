@@ -20,12 +20,12 @@ import { useTheme } from "../../theme/ThemeContext";
 import { useAuthStore } from "../../store/authStore";
 import { supportApi } from "../../api/client";
 import { SUPPORT_EMAIL, SUPPORT_PHONE } from "../../config/support";
+import Constants from "expo-constants";
 import { APP_DISPLAY_NAME } from "../../branding/logos";
 
 const MIN_MESSAGE_LENGTH = 10;
 const MAILTO_SAFE_LENGTH = 1800;
-/** Keep in sync with app.json and AccountSettingsScreen footer */
-const APP_VERSION = "1.0.0";
+const APP_VERSION = Constants.expoConfig?.version ?? "1.0.0";
 
 type TopicId = "general" | "account" | "bug" | "billing";
 

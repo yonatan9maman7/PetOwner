@@ -122,6 +122,7 @@ const PooledMarker = memo(function PooledMarker({
 
   return (
     <MarkerWrapper
+      testID={isVisible ? "map-marker-provider" : undefined}
       identifier={`pool-${index}`}
       coordinate={coordinate}
       anchor={ANCHOR_CENTER}

@@ -44,6 +44,7 @@ export function AuthPlaceholder({
       </Text>
 
       <Pressable
+        testID="guest-login-button"
         className="w-full h-14 rounded-2xl items-center justify-center active:opacity-90"
         style={{ backgroundColor: colors.brand }}
         onPress={() => navigateToLoginClearingStack(navigation)}

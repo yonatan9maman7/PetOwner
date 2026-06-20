@@ -347,42 +347,6 @@ function LoginForm() {
 
   const handleAppleSignIn = async () => {
     showGlobalAlertCompat(t("appleSignInComingSoonTitle"), t("appleSignInComingSoonMessage"));
-
-    // ── Sign in with Apple (restore when enrolled in Apple Developer Program) ──
-    // try {
-    //   const rawNonce = Array.from(
-    //     await Crypto.getRandomBytesAsync(32),
-    //     (b) => b.toString(16).padStart(2, "0")
-    //   ).join("");
-    //   const hashedNonce = await Crypto.digestStringAsync(
-    //     Crypto.CryptoDigestAlgorithm.SHA256,
-    //     rawNonce
-    //   );
-    //
-    //   const credential = await AppleAuthentication.signInAsync({
-    //     requestedScopes: [
-    //       AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
-    //       AppleAuthentication.AppleAuthenticationScope.EMAIL,
-    //     ],
-    //     nonce: hashedNonce,
-    //   });
-    //
-    //   if (!credential.identityToken) {
-    //     showGlobalAlertCompat(t("errorTitle"), t("socialLoginFailed"));
-    //     return;
-    //   }
-    //
-    //   await handleSocialLoginToken("Apple", credential.identityToken, {
-    //     givenName: credential.fullName?.givenName ?? undefined,
-    //     familyName: credential.fullName?.familyName ?? undefined,
-    //     rawNonce,
-    //   });
-    // } catch (err: any) {
-    //   if (err.code === "ERR_REQUEST_CANCELED") {
-    //     return; // silent cancel
-    //   }
-    //   showGlobalAlertCompat(t("errorTitle"), t("socialLoginFailed"));
-    // }
   };
 
   const bioButtonLabel =

@@ -76,6 +76,7 @@ export function GlobalSosFab() {
   return (
     <>
       <Pressable
+        testID="global-sos-fab"
         accessibilityRole="button"
         accessibilityLabel={t("sosFabHint")}
         onPress={() => setMenuOpen(true)}
